@@ -9,4 +9,5 @@ tasks:
   install:
     desc: Install all dependencies (Node + Python)
     cmds:
+      - mise install
       - pnpm install

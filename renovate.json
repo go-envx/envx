@@ -2,23 +2,14 @@
 	"$schema": "https://docs.renovatebot.com/renovate-schema.json",
 	"extends": ["config:best-practices"],
 	"minimumReleaseAge": "3 days",
+	"lockFileMaintenance": {
+		"schedule": ["at any time"]
+	},
 	"packageRules": [
 		{
 			"description": "Group all non-major updates together",
 			"matchUpdateTypes": ["minor", "patch"],
 			"groupName": "all non-major dependencies"
-		},
-		{
-			"description": "Python 3.x minor versions are effectively major releases",
-			"matchManagers": ["mise"],
-			"matchDepNames": ["python"],
-			"versioning": "regex:^(?<compatibility>\\d+)\\.(?<major>\\d+)\\.(?<minor>\\d+)$"
-		},
-		{
-			"description": "Pin Python Docker images to 3.12.x",
-			"matchDatasources": ["docker"],
-			"matchPackageNames": ["python"],
-			"allowedVersions": "/^3\\.12\\./"
 		}
 	]
 }
