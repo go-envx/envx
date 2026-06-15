@@ -18,7 +18,7 @@ jobs:
   # Commitlint: Validate PR title follows conventional commits
   # ─────────────────────────────────────────────────────────────
   commitlint:
-    name: 📝 Commitlint
+    name: Commit Lint
     runs-on: ubuntu-latest
     steps:
       - name: Validate PR title
