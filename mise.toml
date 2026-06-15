@@ -28,9 +28,9 @@ goreleaser = "2.16.0"             # https://goreleaser.com/
 
 # Node
 node = "24.16.0"                  # https://nodejs.org/docs/latest/api/
-pnpm = "11.6.0"                   # https://pnpm.io/motivation
+pnpm = "11.7.0"                   # https://pnpm.io/motivation
 
 # Tools
-claude = "2.1.175"                # https://code.claude.com/docs/en/overview
+claude = "2.1.177"                # https://code.claude.com/docs/en/overview
 gh = "2.94.0"                     # https://cli.github.com/manual/
 task = "3.51.1"                   # https://taskfile.dev/docs/guide
