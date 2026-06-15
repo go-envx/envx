@@ -1,0 +1,66 @@
+name: Renovate
+
+on:
+  push:
+    branches: [main]
+  issues:
+    types: [edited]
+  schedule:
+    - cron: "0 6 * * *"
+  workflow_dispatch:
+    inputs:
+      dry-run:
+        description: "Run in dry-run mode (no PRs created)"
+        required: false
+        default: "false"
+        type: choice
+        options:
+          - "true"
+          - "false"
+
+concurrency:
+  group: renovate
+  cancel-in-progress: false
+
+jobs:
+  # ─────────────────────────────────────────────────────────────
+  # Renovate: Update dependencies via Renovate bot
+  # ─────────────────────────────────────────────────────────────
+  renovate:
+    name: Renovate
+    runs-on: ubuntu-latest
+    if: >-
+      github.event_name != 'issues' ||
+      contains(github.event.issue.title, 'Dependency Dashboard')
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+
+      - name: Get GitHub App Token
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        id: app-token
+        with:
+          client-id: ${{ vars.GO_ENVX_RENOVATE_BOT_APP_ID }}
+          private-key: ${{ secrets.GO_ENVX_RENOVATE_BOT_APP_PRIVATE_KEY }}
+
+      - name: Restore Renovate Cache
+        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
+        with:
+          path: /tmp/renovate/cache
+          key: renovate-cache-${{ github.run_id }}
+          restore-keys: |
+            renovate-cache-
+
+      - name: Fix cache permissions
+        run: |
+          mkdir -p /tmp/renovate/cache
+          chmod -R 777 /tmp/renovate
+
+      - name: Self-hosted Renovate
+        uses: renovatebot/github-action@8217b3fc286df088d7c27f3255fe8414463bc0fd # v46.1.15
+        env:
+          LOG_LEVEL: info
+          RENOVATE_DRY_RUN: ${{ github.event.inputs.dry-run == 'true' && 'full' || '' }}
+        with:
+          configurationFile: .github/renovate-config.json
+          token: ${{ steps.app-token.outputs.token }}

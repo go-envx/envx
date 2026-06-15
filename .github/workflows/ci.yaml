@@ -1,0 +1,124 @@
+name: 🚧 CI
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+  pull-requests: read
+
+# Cancel in-progress runs for the same PR
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  # ─────────────────────────────────────────────────────────────
+  # Commitlint: Validate PR title follows conventional commits
+  # ─────────────────────────────────────────────────────────────
+  commitlint:
+    name: 📝 Commitlint
+    runs-on: ubuntu-latest
+    steps:
+      - name: Validate PR title
+        uses: amannn/action-semantic-pull-request@48f256284bd46cdaab1048c3721360e808335d50 # v6.1.1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          types: |
+            feat
+            fix
+            docs
+            style
+            refactor
+            perf
+            test
+            build
+            ci
+            chore
+            revert
+          requireScope: false
+
+  # ─────────────────────────────────────────────────────────────
+  # Check: Run formatting and static analysis
+  # ─────────────────────────────────────────────────────────────
+  check:
+    name: 🔍 Check
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/envx
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+      - name: Setup tools
+        uses: jdx/mise-action@dba19683ed58901619b14f395a24841710cb4925 # v4.1.0
+        with:
+          install_args: go golangci-lint task
+      - name: Run checks
+        run: task check
+
+  # ─────────────────────────────────────────────────────────────
+  # Test: Run the test suite
+  # ─────────────────────────────────────────────────────────────
+  test:
+    name: 🧪 Test
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/envx
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+      - name: Setup tools
+        uses: jdx/mise-action@dba19683ed58901619b14f395a24841710cb4925 # v4.1.0
+        with:
+          install_args: go task
+      - name: Run tests
+        run: task test
+      - name: Upload coverage
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: coverage
+          path: apps/envx/coverage.out
+
+  # ─────────────────────────────────────────────────────────────
+  # Build: Verify the binary compiles successfully
+  # ─────────────────────────────────────────────────────────────
+  build:
+    name: 🔨 Build
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/envx
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+      - name: Setup tools
+        uses: jdx/mise-action@dba19683ed58901619b14f395a24841710cb4925 # v4.1.0
+        with:
+          install_args: go task
+      - name: Build binary
+        run: task build
+
+  # ─────────────────────────────────────────────────────────────
+  # Gate: All checks passed
+  # ─────────────────────────────────────────────────────────────
+  ci-passed:
+    name: 🚧 CI Passed
+    if: always()
+    needs: [commitlint, check, test, build]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verify all jobs succeeded
+        run: |
+          if [[ "${{ contains(needs.*.result, 'failure') }}" == "true" ]]; then
+            echo "::error::One or more CI jobs failed"
+            exit 1
+          fi
+          if [[ "${{ contains(needs.*.result, 'cancelled') }}" == "true" ]]; then
+            echo "::error::One or more CI jobs were cancelled"
+            exit 1
+          fi
+          echo "All CI checks passed ✓"

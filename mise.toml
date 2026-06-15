@@ -1,0 +1,36 @@
+# Mise https://mise.jdx.dev/
+
+# ---------------------------------------------------------
+# Settings
+# https://mise.jdx.dev/configuration/settings.html
+# ---------------------------------------------------------
+[settings]
+lockfile = true
+minimum_release_age = "24h"
+
+# ---------------------------------------------------------
+# Shell Aliases
+# https://mise.jdx.dev/shell-aliases.html
+# ---------------------------------------------------------
+[shell_alias]
+cc = "claude --dangerously-skip-permissions"
+
+# ---------------------------------------------------------
+# Tools
+# https://mise-versions.jdx.dev/
+# ---------------------------------------------------------
+[tools]
+
+# Go
+go = "1.26.4"                     # https://go.dev/ref/spec
+golangci-lint = "2.12.2"          # https://golangci-lint.run/
+goreleaser = "2.16.0"             # https://goreleaser.com/
+
+# Node
+node = "24.16.0"                  # https://nodejs.org/docs/latest/api/
+pnpm = "11.5.2"                   # https://pnpm.io/motivation
+
+# Tools
+claude = "2.1.170"                # https://code.claude.com/docs/en/overview
+gh = "2.93.0"                     # https://cli.github.com/manual/
+task = "3.51.1"                   # https://taskfile.dev/docs/guide

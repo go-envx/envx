@@ -1,0 +1,12 @@
+version: '3'
+
+includes:
+  envx:
+    taskfile: ./apps/envx/Taskfile.yaml
+    dir: ./apps/envx
+
+tasks:
+  install:
+    desc: Install all dependencies (Node + Python)
+    cmds:
+      - pnpm install

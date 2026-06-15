@@ -1,0 +1,10 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-global-schema.json",
+  "platform": "github",
+  "repositories": ["go-envx/envx"],
+  "onboarding": false,
+  "requireConfig": "required",
+  "repositoryCache": "enabled",
+  "allowedCommands": ["^mise lock$"],
+  "allowedUnsafeExecutions": ["mise"]
+}

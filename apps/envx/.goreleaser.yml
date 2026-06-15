@@ -1,0 +1,54 @@
+# GoReleaser configuration for envx CLI
+# https://goreleaser.com/customization/
+version: 2
+
+project_name: envx
+
+builds:
+  - main: ./cmd/envx
+    binary: envx
+    env:
+      - CGO_ENABLED=0
+    flags:
+      - -trimpath
+    ldflags:
+      - -s -w -X envx/internal/cmd.version={{.Version}}
+    goos:
+      - linux
+      - darwin
+      - windows
+    goarch:
+      - amd64
+      - arm64
+
+archives:
+  - formats:
+      - tar.gz
+    format_overrides:
+      - goos: windows
+        formats: zip
+    name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+
+checksum:
+  name_template: "checksums.txt"
+  algorithm: sha256
+
+changelog:
+  sort: asc
+  groups:
+    - title: "✨ Features"
+      regexp: '^feat(\(.+\))?:'
+      order: 0
+    - title: "🐛 Bug Fixes"
+      regexp: '^fix(\(.+\))?:'
+      order: 1
+    - title: "📚 Documentation"
+      regexp: '^docs(\(.+\))?:'
+      order: 2
+    - title: "🔧 Maintenance"
+      order: 999
+
+release:
+  draft: false
+  prerelease: auto
+  name_template: "v{{ .Version }}"
