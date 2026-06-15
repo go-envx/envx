@@ -1,0 +1,47 @@
+# Ensure consistent line endings
+* text=auto
+
+# Explicitly define line endings for common file types
+*.css text eol=lf
+*.Dockerfile text eol=lf
+*.env text eol=lf
+*.html text eol=lf
+*.js text eol=lf
+*.json text eol=lf
+*.jsx text eol=lf
+*.md text eol=lf
+*.py text eol=lf
+*.sh text eol=lf
+*.svg text eol=lf
+*.ts text eol=lf
+*.tsx text eol=lf
+*.vue text eol=lf
+*.yaml text eol=lf
+*.yml text eol=lf
+
+# Treat binary files properly
+*.eot binary
+*.gif binary
+*.gz binary
+*.ico binary
+*.jpeg binary
+*.jpg binary
+*.otf binary
+*.pdf binary
+*.png binary
+*.tar binary
+*.ttf binary
+*.woff binary
+*.woff2 binary
+*.zip binary
+
+# Handle diff for specific file types
+*.lock -diff
+*.min.js -diff
+*.min.css -diff
+
+# Linguist overrides
+*.py linguist-language=Python
+*.ts linguist-language=TypeScript
+*.tsx linguist-language=TypeScript
+*.vue linguist-language=Vue

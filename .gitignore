@@ -1,0 +1,47 @@
+# Environment
+*.env
+*.env.*
+!.env.example
+
+# Logs
+*.log
+*.log.*
+
+# Local
+**.local.json
+**/.temp/
+**/temp/
+
+# Build
+**/bin/
+**/build/
+**/coverage/
+**/dist/
+**/obj/
+
+# macOS system files
+_MACOSX/
+.DS_Store
+.DS_Store?
+
+# Windows system files
+ehthumbs.db
+Thumbs.db
+
+# macOS indexing & trash files
+.Spotlight-V100
+.Trashes
+
+# Go
+coverage.out
+
+# Node
+node_modules/
+.pnpm-store/
+
+# Python
+__pycache__/
+.venv/
+
+# TypeScript
+.tsbuildinfo
