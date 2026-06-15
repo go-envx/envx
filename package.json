@@ -1,0 +1,7 @@
+{
+	"name": "root",
+	"packageManager": "pnpm@11.5.2",
+	"devDependencies": {
+		"@biomejs/biome": "2.4.16"
+	}
+}
