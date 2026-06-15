@@ -1,4 +1,4 @@
-name: 🚧 CI
+name: CI 🚧
 
 on:
   pull_request:
@@ -44,7 +44,7 @@ jobs:
   # Check: Run formatting and static analysis
   # ─────────────────────────────────────────────────────────────
   check:
-    name: 🔍 Check
+    name: Check
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -63,7 +63,7 @@ jobs:
   # Test: Run the test suite
   # ─────────────────────────────────────────────────────────────
   test:
-    name: 🧪 Test
+    name: Test
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -87,7 +87,7 @@ jobs:
   # Build: Verify the binary compiles successfully
   # ─────────────────────────────────────────────────────────────
   build:
-    name: 🔨 Build
+    name: Build
     runs-on: ubuntu-latest
     defaults:
       run:
