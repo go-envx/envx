@@ -11,3 +11,4 @@ tasks:
     cmds:
       - mise install
       - pnpm install
+      - task envx:install

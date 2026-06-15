@@ -1,4 +1,4 @@
-module envx
+module github.com/go-envx/envx/apps/envx
 
 go 1.26.3
 

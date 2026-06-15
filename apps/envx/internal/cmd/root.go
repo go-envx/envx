@@ -1,28 +1,24 @@
 package cmd
 
 import (
-	"context"
-
 	"github.com/spf13/cobra"
 )
 
-// version can be injected at build time using ldflags
-var version = "0.1.0-dev"
+// NewRootCmd constructs the root command tree. Version is injected from main.
+func NewRootCmd(version string) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:           "envx",
+		Short:         "envx is a CLI tool for managing environment variables.",
+		Long:          "envx is a CLI tool for managing environment variables in both monorepos and single repositories.",
+		Version:       version,
+		SilenceErrors: true,
+		SilenceUsage:  true,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return cmd.Help()
+		},
+	}
 
-var rootCmd = &cobra.Command{
-	Use:           "envx",
-	Short:         "envx is a CLI tool for managing environments",
-	Long:          `envx is a highly maintainable Cobra CLI built following Go best practices.`,
-	Version:       version,
-	SilenceErrors: true, // Errors are handled centrally in main.go
-	SilenceUsage:  true, // Do not print usage automatically on command errors
-	RunE: func(cmd *cobra.Command, args []string) error {
-		// When called without subcommands, just print help
-		return cmd.Help()
-	},
-}
+	// Register subcommands here as they are added.
 
-// ExecuteContext brings the Cobra CLI to life
-func ExecuteContext(ctx context.Context) error {
-	return rootCmd.ExecuteContext(ctx)
+	return cmd
 }
