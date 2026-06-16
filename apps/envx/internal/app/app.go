@@ -14,7 +14,6 @@ import (
 	"io"
 	"path/filepath"
 
-	"github.com/go-envx/envx/apps/envx/internal/config"
 	"github.com/go-envx/envx/apps/envx/internal/manifest"
 	"github.com/go-envx/envx/apps/envx/internal/merge"
 	"github.com/go-envx/envx/apps/envx/internal/runner"
@@ -29,7 +28,7 @@ type RunFunc func(ctx context.Context, args []string, opts runner.Options) error
 // App holds shared dependencies and provides pipeline methods. Construct via
 // New() and inject into command constructors.
 type App struct {
-	ConfigResolver *config.Resolver
+	ConfigResolver *manifest.Resolver
 	Runner         RunFunc
 }
 
@@ -37,7 +36,7 @@ type App struct {
 // New creates an App with production dependencies.
 func New() *App {
 	return &App{
-		ConfigResolver: config.NewResolver(),
+		ConfigResolver: manifest.NewResolver(),
 		Runner:         runner.Run,
 	}
 }
@@ -48,7 +47,6 @@ func New() *App {
 type Pipeline struct {
 	Manifest *manifest.Manifest
 	Project  manifest.ProjectMatch
-	Config   config.Config
 }
 
 // -------------------------------------------------------------------------------------
@@ -122,7 +120,7 @@ func (a *App) BuildNamespaces(
 func (a *App) MergeEnv(
 	namespaces []merge.Namespace,
 	environment string,
-	cfg config.Config,
+	cfg manifest.ResolvedConfig,
 ) (*merge.Result, error) {
 	return merge.Resolve(namespaces, environment, merge.Options{
 		Strict:          cfg.Strict,
@@ -138,21 +136,21 @@ func (a *App) MergeEnv(
 // call this as their primary entry point.
 func (a *App) ResolvePipeline(
 	configPath, projectRef, environment string,
-	flags config.RawFlags,
-	changed config.FlagSet,
-) (*Pipeline, *merge.Result, error) {
+	flags manifest.RawFlags,
+	changed manifest.FlagSet,
+) (*Pipeline, manifest.ResolvedConfig, *merge.Result, error) {
 	m, err := a.LoadManifest(configPath)
 	if err != nil {
-		return nil, nil, err
+		return nil, manifest.ResolvedConfig{}, nil, err
 	}
 
 	if err := a.ValidateEnvironment(m, environment); err != nil {
-		return nil, nil, err
+		return nil, manifest.ResolvedConfig{}, nil, err
 	}
 
 	match, err := a.ResolveProject(m, projectRef)
 	if err != nil {
-		return nil, nil, err
+		return nil, manifest.ResolvedConfig{}, nil, err
 	}
 
 	cfg := a.ConfigResolver.Resolve(flags, changed, m, &match.Project)
@@ -160,16 +158,15 @@ func (a *App) ResolvePipeline(
 
 	result, err := a.MergeEnv(namespaces, environment, cfg)
 	if err != nil {
-		return nil, nil, err
+		return nil, manifest.ResolvedConfig{}, nil, err
 	}
 
 	pipeline := &Pipeline{
 		Manifest: m,
 		Project:  match,
-		Config:   cfg,
 	}
 
-	return pipeline, result, nil
+	return pipeline, cfg, result, nil
 }
 
 // -------------------------------------------------------------------------------------
@@ -187,11 +184,11 @@ func (a *App) Run(
 	configPath,
 	projectRef,
 	environment string,
-	flags config.RawFlags,
-	changed config.FlagSet,
+	flags manifest.RawFlags,
+	changed manifest.FlagSet,
 	opts RunOptions,
 ) error {
-	pipeline, result, err := a.ResolvePipeline(
+	_, cfg, result, err := a.ResolvePipeline(
 		configPath,
 		projectRef,
 		environment,
@@ -204,7 +201,7 @@ func (a *App) Run(
 
 	return a.Runner(ctx, opts.Args, runner.Options{
 		Env:      result.Env,
-		Overload: pipeline.Config.Overload,
+		Overload: cfg.Overload,
 		Stdout:   opts.Stdout,
 		Stderr:   opts.Stderr,
 	})

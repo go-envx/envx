@@ -6,13 +6,13 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/go-envx/envx/apps/envx/internal/config"
 	"github.com/go-envx/envx/apps/envx/internal/file"
+	"github.com/go-envx/envx/apps/envx/internal/manifest"
 	"github.com/go-envx/envx/apps/envx/internal/runner"
 )
 
 // -------------------------------------------------------------------------------------
-// mockFlagSet implements config.FlagSet for testing.
+// mockFlagSet implements manifest.FlagSet for testing.
 type mockFlagSet struct {
 	changed map[string]bool
 }
@@ -67,10 +67,10 @@ func TestResolvePipelineSuccess(t *testing.T) {
 	configPath := filepath.Join(dir, "envx.yaml")
 
 	app := New()
-	flags := config.RawFlags{}
+	flags := manifest.RawFlags{}
 	changed := &mockFlagSet{changed: map[string]bool{}}
 
-	pipeline, result, err := app.ResolvePipeline(
+	pipeline, _, result, err := app.ResolvePipeline(
 		configPath,
 		"api-core",
 		"development",
@@ -108,10 +108,10 @@ func TestResolvePipelineInvalidProject(t *testing.T) {
 	configPath := filepath.Join(dir, "envx.yaml")
 
 	app := New()
-	flags := config.RawFlags{}
+	flags := manifest.RawFlags{}
 	changed := &mockFlagSet{changed: map[string]bool{}}
 
-	_, _, err := app.ResolvePipeline(
+	_, _, _, err := app.ResolvePipeline(
 		configPath,
 		"nonexistent",
 		"development",
@@ -133,10 +133,10 @@ func TestResolvePipelineInvalidEnvironment(t *testing.T) {
 	configPath := filepath.Join(dir, "envx.yaml")
 
 	app := New()
-	flags := config.RawFlags{}
+	flags := manifest.RawFlags{}
 	changed := &mockFlagSet{changed: map[string]bool{}}
 
-	_, _, err := app.ResolvePipeline(
+	_, _, _, err := app.ResolvePipeline(
 		configPath,
 		"api-core",
 		"nonexistent",
@@ -155,10 +155,10 @@ func TestResolvePipelineBadConfigPath(t *testing.T) {
 	t.Parallel()
 
 	app := New()
-	flags := config.RawFlags{}
+	flags := manifest.RawFlags{}
 	changed := &mockFlagSet{changed: map[string]bool{}}
 
-	_, _, err := app.ResolvePipeline(
+	_, _, _, err := app.ResolvePipeline(
 		"/nonexistent/path/envx.yaml",
 		"api-core",
 		"development",
@@ -181,14 +181,14 @@ func TestRunWithMockRunner(t *testing.T) {
 
 	var capturedEnv map[string]string
 	app := &App{
-		ConfigResolver: config.NewResolver(),
+		ConfigResolver: manifest.NewResolver(),
 		Runner: func(_ context.Context, args []string, opts runner.Options) error {
 			capturedEnv = opts.Env
 			return nil
 		},
 	}
 
-	flags := config.RawFlags{}
+	flags := manifest.RawFlags{}
 	changed := &mockFlagSet{changed: map[string]bool{}}
 
 	err := app.Run(

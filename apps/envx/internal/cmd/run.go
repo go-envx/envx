@@ -4,7 +4,7 @@ import (
 	"fmt"
 
 	"github.com/go-envx/envx/apps/envx/internal/app"
-	"github.com/go-envx/envx/apps/envx/internal/config"
+	"github.com/go-envx/envx/apps/envx/internal/manifest"
 	"github.com/go-envx/envx/apps/envx/internal/str"
 	"github.com/spf13/cobra"
 )
@@ -32,7 +32,7 @@ const (
 // and a pointer to the root-level --config flag value so it can be resolved at
 // execution time (after all persistent flags have been parsed).
 func newRunCmd(application *app.App, configPath *string) *cobra.Command {
-	var flags config.RawFlags
+	var flags manifest.RawFlags
 
 	cmd := &cobra.Command{
 		Use:           runUsage,

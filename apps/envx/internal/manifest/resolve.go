@@ -1,18 +1,8 @@
-// Package config handles resolving CLI configuration from all sources into
-// typed structs. It implements the standard precedence chain:
-//
-//	CLI flags > Environment variables > Project settings > Manifest settings > Defaults
-//
-// This package isolates all configuration resolution logic so that command
-// handlers remain thin and future commands can reuse resolution without
-// duplicating precedence logic.
-package config
+package manifest
 
 import (
 	"os"
 	"strconv"
-
-	"github.com/go-envx/envx/apps/envx/internal/manifest"
 )
 
 // -------------------------------------------------------------------------------------
@@ -40,10 +30,10 @@ type RawFlags struct {
 }
 
 // -------------------------------------------------------------------------------------
-// Config holds the fully resolved configuration after applying the precedence
-// chain. This is the single source of truth passed to application logic — no
-// further env var lookups or flag checks happen downstream.
-type Config struct {
+// ResolvedConfig holds the fully resolved configuration after applying the
+// precedence chain. This is the single source of truth passed to application
+// logic — no further env var lookups or flag checks happen downstream.
+type ResolvedConfig struct {
 	Overload        bool
 	Strict          bool
 	Prefix          string
@@ -66,16 +56,16 @@ func NewResolver() *Resolver {
 }
 
 // -------------------------------------------------------------------------------------
-// Resolve applies the full precedence chain to produce a Config.
+// Resolve applies the full precedence chain to produce a ResolvedConfig.
 // The flags parameter indicates which flags were explicitly set by the user
 // (vs. retaining their default values).
 func (r *Resolver) Resolve(
 	flags RawFlags,
 	changed FlagSet,
-	m *manifest.Manifest,
-	proj *manifest.Project,
-) Config {
-	return Config{
+	m *Manifest,
+	proj *Project,
+) ResolvedConfig {
+	return ResolvedConfig{
 		Overload: r.resolveBool(
 			"overload", flags.Overload, changed,
 			"ENVX_OVERLOAD",

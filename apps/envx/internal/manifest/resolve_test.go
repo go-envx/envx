@@ -1,9 +1,7 @@
-package config
+package manifest
 
 import (
 	"testing"
-
-	"github.com/go-envx/envx/apps/envx/internal/manifest"
 )
 
 // -------------------------------------------------------------------------------------
@@ -39,7 +37,7 @@ func TestResolveOverloadPrecedence(t *testing.T) {
 		flagVal  bool
 		changed  map[string]bool
 		env      map[string]string
-		manifest manifest.Settings
+		manifest Settings
 		want     bool
 	}{
 		{
@@ -47,7 +45,7 @@ func TestResolveOverloadPrecedence(t *testing.T) {
 			flagVal:  true,
 			changed:  map[string]bool{"overload": true},
 			env:      map[string]string{"ENVX_OVERLOAD": "false"},
-			manifest: manifest.Settings{Overload: new(false)},
+			manifest: Settings{Overload: new(false)},
 			want:     true,
 		},
 		{
@@ -55,7 +53,7 @@ func TestResolveOverloadPrecedence(t *testing.T) {
 			flagVal:  false,
 			changed:  map[string]bool{},
 			env:      map[string]string{"ENVX_OVERLOAD": "true"},
-			manifest: manifest.Settings{Overload: new(false)},
+			manifest: Settings{Overload: new(false)},
 			want:     true,
 		},
 		{
@@ -63,7 +61,7 @@ func TestResolveOverloadPrecedence(t *testing.T) {
 			flagVal:  false,
 			changed:  map[string]bool{},
 			env:      map[string]string{},
-			manifest: manifest.Settings{Overload: new(true)},
+			manifest: Settings{Overload: new(true)},
 			want:     true,
 		},
 		{
@@ -71,7 +69,7 @@ func TestResolveOverloadPrecedence(t *testing.T) {
 			flagVal:  false,
 			changed:  map[string]bool{},
 			env:      map[string]string{"ENVX_OVERLOAD": "not-a-bool"},
-			manifest: manifest.Settings{Overload: new(true)},
+			manifest: Settings{Overload: new(true)},
 			want:     true,
 		},
 		{
@@ -79,7 +77,7 @@ func TestResolveOverloadPrecedence(t *testing.T) {
 			flagVal:  false,
 			changed:  map[string]bool{},
 			env:      map[string]string{},
-			manifest: manifest.Settings{},
+			manifest: Settings{},
 			want:     false,
 		},
 	}
@@ -88,17 +86,17 @@ func TestResolveOverloadPrecedence(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			r := &Resolver{LookupEnv: mockEnv(tt.env)}
-			m := &manifest.Manifest{
+			m := &Manifest{
 				Settings:     tt.manifest,
 				Environments: []string{"dev"},
-				Projects:     map[string]manifest.Project{"a": {Path: "x"}},
+				Projects:     map[string]Project{"a": {Path: "x"}},
 			}
 			flags := RawFlags{Overload: tt.flagVal}
 			cfg := r.Resolve(
 				flags,
 				&mockFlagSet{changed: tt.changed},
 				m,
-				&manifest.Project{Path: "x"},
+				&Project{Path: "x"},
 			)
 			if cfg.Overload != tt.want {
 				t.Errorf("Overload = %v, want %v", cfg.Overload, tt.want)
@@ -118,7 +116,7 @@ func TestResolveStrictPrecedence(t *testing.T) {
 		flagVal  bool
 		changed  map[string]bool
 		env      map[string]string
-		manifest manifest.Settings
+		manifest Settings
 		want     bool
 	}{
 		{
@@ -126,7 +124,7 @@ func TestResolveStrictPrecedence(t *testing.T) {
 			flagVal:  true,
 			changed:  map[string]bool{"strict": true},
 			env:      map[string]string{"ENVX_STRICT": "false"},
-			manifest: manifest.Settings{Strict: new(false)},
+			manifest: Settings{Strict: new(false)},
 			want:     true,
 		},
 		{
@@ -134,7 +132,7 @@ func TestResolveStrictPrecedence(t *testing.T) {
 			flagVal:  false,
 			changed:  map[string]bool{},
 			env:      map[string]string{"ENVX_STRICT": "true"},
-			manifest: manifest.Settings{Strict: new(false)},
+			manifest: Settings{Strict: new(false)},
 			want:     true,
 		},
 		{
@@ -142,7 +140,7 @@ func TestResolveStrictPrecedence(t *testing.T) {
 			flagVal:  false,
 			changed:  map[string]bool{},
 			env:      map[string]string{},
-			manifest: manifest.Settings{Strict: new(true)},
+			manifest: Settings{Strict: new(true)},
 			want:     true,
 		},
 		{
@@ -150,7 +148,7 @@ func TestResolveStrictPrecedence(t *testing.T) {
 			flagVal:  false,
 			changed:  map[string]bool{},
 			env:      map[string]string{"ENVX_STRICT": "invalid"},
-			manifest: manifest.Settings{Strict: new(true)},
+			manifest: Settings{Strict: new(true)},
 			want:     true,
 		},
 		{
@@ -158,7 +156,7 @@ func TestResolveStrictPrecedence(t *testing.T) {
 			flagVal:  false,
 			changed:  map[string]bool{},
 			env:      map[string]string{},
-			manifest: manifest.Settings{},
+			manifest: Settings{},
 			want:     false,
 		},
 	}
@@ -167,17 +165,17 @@ func TestResolveStrictPrecedence(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			r := &Resolver{LookupEnv: mockEnv(tt.env)}
-			m := &manifest.Manifest{
+			m := &Manifest{
 				Settings:     tt.manifest,
 				Environments: []string{"dev"},
-				Projects:     map[string]manifest.Project{"a": {Path: "x"}},
+				Projects:     map[string]Project{"a": {Path: "x"}},
 			}
 			flags := RawFlags{Strict: tt.flagVal}
 			cfg := r.Resolve(
 				flags,
 				&mockFlagSet{changed: tt.changed},
 				m,
-				&manifest.Project{Path: "x"},
+				&Project{Path: "x"},
 			)
 			if cfg.Strict != tt.want {
 				t.Errorf("Strict = %v, want %v", cfg.Strict, tt.want)
@@ -197,8 +195,8 @@ func TestResolvePrefixPrecedence(t *testing.T) {
 		flagVal  string
 		changed  map[string]bool
 		env      map[string]string
-		manifest manifest.Settings
-		project  manifest.Project
+		manifest Settings
+		project  Project
 		want     string
 	}{
 		{
@@ -206,12 +204,12 @@ func TestResolvePrefixPrecedence(t *testing.T) {
 			flagVal: "FLAG_PREFIX",
 			changed: map[string]bool{"prefix": true},
 			env:     map[string]string{"ENVX_PREFIX": "ENV_PREFIX"},
-			manifest: manifest.Settings{
+			manifest: Settings{
 				Prefix: "MANIFEST_PREFIX",
 			},
-			project: manifest.Project{
+			project: Project{
 				Path: "x",
-				Settings: manifest.Settings{
+				Settings: Settings{
 					Prefix: "PROJECT_PREFIX",
 				},
 			},
@@ -222,12 +220,12 @@ func TestResolvePrefixPrecedence(t *testing.T) {
 			flagVal: "",
 			changed: map[string]bool{},
 			env:     map[string]string{"ENVX_PREFIX": "ENV_PREFIX"},
-			manifest: manifest.Settings{
+			manifest: Settings{
 				Prefix: "MANIFEST_PREFIX",
 			},
-			project: manifest.Project{
+			project: Project{
 				Path: "x",
-				Settings: manifest.Settings{
+				Settings: Settings{
 					Prefix: "PROJECT_PREFIX",
 				},
 			},
@@ -238,12 +236,12 @@ func TestResolvePrefixPrecedence(t *testing.T) {
 			flagVal: "",
 			changed: map[string]bool{},
 			env:     map[string]string{},
-			manifest: manifest.Settings{
+			manifest: Settings{
 				Prefix: "MANIFEST_PREFIX",
 			},
-			project: manifest.Project{
+			project: Project{
 				Path: "x",
-				Settings: manifest.Settings{
+				Settings: Settings{
 					Prefix: "PROJECT_PREFIX",
 				},
 			},
@@ -254,10 +252,10 @@ func TestResolvePrefixPrecedence(t *testing.T) {
 			flagVal: "",
 			changed: map[string]bool{},
 			env:     map[string]string{},
-			manifest: manifest.Settings{
+			manifest: Settings{
 				Prefix: "MANIFEST_PREFIX",
 			},
-			project: manifest.Project{
+			project: Project{
 				Path: "x",
 			},
 			want: "MANIFEST_PREFIX",
@@ -267,8 +265,8 @@ func TestResolvePrefixPrecedence(t *testing.T) {
 			flagVal:  "",
 			changed:  map[string]bool{},
 			env:      map[string]string{},
-			manifest: manifest.Settings{},
-			project: manifest.Project{
+			manifest: Settings{},
+			project: Project{
 				Path: "x",
 			},
 			want: "",
@@ -279,10 +277,10 @@ func TestResolvePrefixPrecedence(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			r := &Resolver{LookupEnv: mockEnv(tt.env)}
-			m := &manifest.Manifest{
+			m := &Manifest{
 				Settings:     tt.manifest,
 				Environments: []string{"dev"},
-				Projects:     map[string]manifest.Project{"a": {Path: "x"}},
+				Projects:     map[string]Project{"a": {Path: "x"}},
 			}
 			flags := RawFlags{Prefix: tt.flagVal}
 			cfg := r.Resolve(flags, &mockFlagSet{changed: tt.changed}, m, &tt.project)
@@ -304,8 +302,8 @@ func TestResolveSuffixPrecedence(t *testing.T) {
 		flagVal  string
 		changed  map[string]bool
 		env      map[string]string
-		manifest manifest.Settings
-		project  manifest.Project
+		manifest Settings
+		project  Project
 		want     string
 	}{
 		{
@@ -313,12 +311,12 @@ func TestResolveSuffixPrecedence(t *testing.T) {
 			flagVal: "FLAG_SUFFIX",
 			changed: map[string]bool{"suffix": true},
 			env:     map[string]string{"ENVX_SUFFIX": "ENV_SUFFIX"},
-			manifest: manifest.Settings{
+			manifest: Settings{
 				Suffix: "MANIFEST_SUFFIX",
 			},
-			project: manifest.Project{
+			project: Project{
 				Path: "x",
-				Settings: manifest.Settings{
+				Settings: Settings{
 					Suffix: "PROJECT_SUFFIX",
 				},
 			},
@@ -329,12 +327,12 @@ func TestResolveSuffixPrecedence(t *testing.T) {
 			flagVal: "",
 			changed: map[string]bool{},
 			env:     map[string]string{"ENVX_SUFFIX": "ENV_SUFFIX"},
-			manifest: manifest.Settings{
+			manifest: Settings{
 				Suffix: "MANIFEST_SUFFIX",
 			},
-			project: manifest.Project{
+			project: Project{
 				Path: "x",
-				Settings: manifest.Settings{
+				Settings: Settings{
 					Suffix: "PROJECT_SUFFIX",
 				},
 			},
@@ -345,12 +343,12 @@ func TestResolveSuffixPrecedence(t *testing.T) {
 			flagVal: "",
 			changed: map[string]bool{},
 			env:     map[string]string{},
-			manifest: manifest.Settings{
+			manifest: Settings{
 				Suffix: "MANIFEST_SUFFIX",
 			},
-			project: manifest.Project{
+			project: Project{
 				Path: "x",
-				Settings: manifest.Settings{
+				Settings: Settings{
 					Suffix: "PROJECT_SUFFIX",
 				},
 			},
@@ -361,10 +359,10 @@ func TestResolveSuffixPrecedence(t *testing.T) {
 			flagVal: "",
 			changed: map[string]bool{},
 			env:     map[string]string{},
-			manifest: manifest.Settings{
+			manifest: Settings{
 				Suffix: "MANIFEST_SUFFIX",
 			},
-			project: manifest.Project{
+			project: Project{
 				Path: "x",
 			},
 			want: "MANIFEST_SUFFIX",
@@ -375,10 +373,10 @@ func TestResolveSuffixPrecedence(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			r := &Resolver{LookupEnv: mockEnv(tt.env)}
-			m := &manifest.Manifest{
+			m := &Manifest{
 				Settings:     tt.manifest,
 				Environments: []string{"dev"},
-				Projects:     map[string]manifest.Project{"a": {Path: "x"}},
+				Projects:     map[string]Project{"a": {Path: "x"}},
 			}
 			flags := RawFlags{Suffix: tt.flagVal}
 			cfg := r.Resolve(flags, &mockFlagSet{changed: tt.changed}, m, &tt.project)
@@ -400,8 +398,8 @@ func TestResolveNamespacePrefixPrecedence(t *testing.T) {
 		flagVal  bool
 		changed  map[string]bool
 		env      map[string]string
-		manifest manifest.Settings
-		project  manifest.Project
+		manifest Settings
+		project  Project
 		want     bool
 	}{
 		{
@@ -409,10 +407,10 @@ func TestResolveNamespacePrefixPrecedence(t *testing.T) {
 			flagVal:  false,
 			changed:  map[string]bool{"namespace-prefix": true},
 			env:      map[string]string{"ENVX_NAMESPACE_PREFIX": "true"},
-			manifest: manifest.Settings{NamespacePrefix: new(true)},
-			project: manifest.Project{
+			manifest: Settings{NamespacePrefix: new(true)},
+			project: Project{
 				Path:     "x",
-				Settings: manifest.Settings{NamespacePrefix: new(true)},
+				Settings: Settings{NamespacePrefix: new(true)},
 			},
 			want: false,
 		},
@@ -421,10 +419,10 @@ func TestResolveNamespacePrefixPrecedence(t *testing.T) {
 			flagVal:  true,
 			changed:  map[string]bool{},
 			env:      map[string]string{"ENVX_NAMESPACE_PREFIX": "false"},
-			manifest: manifest.Settings{NamespacePrefix: new(true)},
-			project: manifest.Project{
+			manifest: Settings{NamespacePrefix: new(true)},
+			project: Project{
 				Path:     "x",
-				Settings: manifest.Settings{NamespacePrefix: new(true)},
+				Settings: Settings{NamespacePrefix: new(true)},
 			},
 			want: false,
 		},
@@ -433,10 +431,10 @@ func TestResolveNamespacePrefixPrecedence(t *testing.T) {
 			flagVal:  true,
 			changed:  map[string]bool{},
 			env:      map[string]string{},
-			manifest: manifest.Settings{NamespacePrefix: new(true)},
-			project: manifest.Project{
+			manifest: Settings{NamespacePrefix: new(true)},
+			project: Project{
 				Path:     "x",
-				Settings: manifest.Settings{NamespacePrefix: new(false)},
+				Settings: Settings{NamespacePrefix: new(false)},
 			},
 			want: false,
 		},
@@ -445,8 +443,8 @@ func TestResolveNamespacePrefixPrecedence(t *testing.T) {
 			flagVal:  true,
 			changed:  map[string]bool{},
 			env:      map[string]string{},
-			manifest: manifest.Settings{NamespacePrefix: new(false)},
-			project:  manifest.Project{Path: "x"},
+			manifest: Settings{NamespacePrefix: new(false)},
+			project:  Project{Path: "x"},
 			want:     false,
 		},
 		{
@@ -454,8 +452,8 @@ func TestResolveNamespacePrefixPrecedence(t *testing.T) {
 			flagVal:  true,
 			changed:  map[string]bool{},
 			env:      map[string]string{},
-			manifest: manifest.Settings{},
-			project:  manifest.Project{Path: "x"},
+			manifest: Settings{},
+			project:  Project{Path: "x"},
 			want:     true,
 		},
 		{
@@ -463,10 +461,10 @@ func TestResolveNamespacePrefixPrecedence(t *testing.T) {
 			flagVal:  true,
 			changed:  map[string]bool{},
 			env:      map[string]string{"ENVX_NAMESPACE_PREFIX": "not-a-bool"},
-			manifest: manifest.Settings{},
-			project: manifest.Project{
+			manifest: Settings{},
+			project: Project{
 				Path:     "x",
-				Settings: manifest.Settings{NamespacePrefix: new(false)},
+				Settings: Settings{NamespacePrefix: new(false)},
 			},
 			want: false,
 		},
@@ -476,10 +474,10 @@ func TestResolveNamespacePrefixPrecedence(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			r := &Resolver{LookupEnv: mockEnv(tt.env)}
-			m := &manifest.Manifest{
+			m := &Manifest{
 				Settings:     tt.manifest,
 				Environments: []string{"dev"},
-				Projects:     map[string]manifest.Project{"a": {Path: "x"}},
+				Projects:     map[string]Project{"a": {Path: "x"}},
 			}
 			flags := RawFlags{NamespacePrefix: tt.flagVal}
 			cfg := r.Resolve(flags, &mockFlagSet{changed: tt.changed}, m, &tt.project)
