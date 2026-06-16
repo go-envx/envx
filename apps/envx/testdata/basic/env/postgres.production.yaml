@@ -1,0 +1,5 @@
+host: prod-db.internal
+port: 5432
+credentials:
+  username: prod_user
+  password: prod-secret-rotated

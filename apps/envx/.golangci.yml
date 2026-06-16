@@ -14,23 +14,26 @@ linters:
     - errorlint     # Incorrect error wrapping (errors.Is/As)
 
     # Code quality — maintainability
+    - lll           # Maximum line length
     - misspell      # Typos in comments and strings
     - errname       # Error type naming conventions
     - exhaustive    # Switch statements handle all enum cases
     - gocritic      # Opinionated but catches real issues
 
+  settings:
+    exhaustive:
+      default-signifies-exhaustive: true
+    gocritic:
+      enabled-tags:
+        - diagnostic
+        - style
+        - performance
+    lll:
+      line-length: 88
+    gosec:
+      excludes:
+        - G104 # Covered by errcheck
+
 formatters:
   enable:
     - gofumpt
-
-linters-settings:
-  exhaustive:
-    default-signifies-exhaustive: true
-  gocritic:
-    enabled-tags:
-      - diagnostic
-      - style
-      - performance
-  gosec:
-    excludes:
-      - G104 # Covered by errcheck

@@ -5,6 +5,9 @@ import (
 	"testing"
 )
 
+// -------------------------------------------------------------------------------------
+// TestRootCommandShowsHelp verifies that running envx with no arguments
+// prints help output.
 func TestRootCommandShowsHelp(t *testing.T) {
 	t.Parallel()
 
@@ -24,6 +27,8 @@ func TestRootCommandShowsHelp(t *testing.T) {
 	}
 }
 
+// -------------------------------------------------------------------------------------
+// TestVersionFlag verifies that --version prints the injected version string.
 func TestVersionFlag(t *testing.T) {
 	t.Parallel()
 

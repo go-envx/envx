@@ -1,0 +1,3 @@
+host: dev-db.local
+credentials:
+  password: dev-secret
