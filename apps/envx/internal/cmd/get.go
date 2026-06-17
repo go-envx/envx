@@ -10,82 +10,59 @@ import (
 )
 
 const (
-	runUsage = "run <project> -- <command> [args...]"
-	runShort = "Run a command with the merged environment for a project"
-	runLong  = `
-		Run executes a command with environment variables loaded from the project's
-		namespace chain. Variables are merged in order (includes first, project last)
-		with later values winning.
-
-		By default, existing OS environment variables take precedence over file values.
-		Use --overload to let file values override OS env vars.
+	getUsage = "get <project> <key>"
+	getShort = "Get the value of an environment variable for a project"
+	getLong  = `
+		Get resolves the merged environment for a project and prints the value
+		of the specified key. The key is matched case-insensitively (uppercased).
 
 		The target environment is determined by --env flag, ENVX_ENV env var,
 		manifest default_environment setting, or defaults to "development".
 	`
-	runExample = `
-		envx run api-core -- npm start
-		envx run api-core --env=production -- node server.js
-		envx run api-core --strict -- ./run.sh
+	getExample = `
+		envx get api-core POSTGRES_HOST
+		envx get api-core postgres_host --env=production
 	`
 )
 
 // -------------------------------------------------------------------------------------
-// newRunCmd creates the "run" subcommand. It receives the shared App instance
+// newGetCmd creates the "get" subcommand. It receives the shared App instance
 // and pointers to the root-level --config and --env flag values so they can be
 // resolved at execution time (after all persistent flags have been parsed).
-func newRunCmd(application *app.App, configPath, envName *string) *cobra.Command {
+func newGetCmd(application *app.App, configPath, envName *string) *cobra.Command {
 	var flags manifest.RawFlags
 
 	cmd := &cobra.Command{
-		Use:           runUsage,
-		Short:         runShort,
-		Long:          str.Dedent(runLong),
-		Example:       str.Dedent(runExample, 2),
+		Use:           getUsage,
+		Short:         getShort,
+		Long:          str.Dedent(getLong),
+		Example:       str.Dedent(getExample, 2),
+		Args:          cobra.ExactArgs(2),
 		SilenceErrors: true,
 		SilenceUsage:  true,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			// Cobra splits args around "--". ArgsLenAtDash returns the index
-			// where "--" appeared, or -1 if it was absent. We require at least
-			// one positional arg (project) before the dash.
-			dashIdx := cmd.ArgsLenAtDash()
-			if dashIdx < 0 || dashIdx < 1 {
-				return fmt.Errorf("usage: %s", runUsage)
-			}
-
-			// Everything before "--" is positional (project);
-			// everything after is the child command and its arguments.
-			positional := args[:dashIdx]
-			childArgs := args[dashIdx:]
-
-			if len(positional) < 1 {
-				return fmt.Errorf("usage: %s", runUsage)
-			}
-			if len(childArgs) == 0 {
-				return fmt.Errorf("no command specified after --")
-			}
-
 			// Propagate root-level persistent flag values into the flags
 			// struct so the resolver can use them.
 			flags.ConfigPath = *configPath
 			flags.Environment = *envName
 
 			// Delegate to the application layer which handles manifest
-			// loading, environment merging, and child process execution.
-			return application.Run(
-				cmd.Context(),
+			// loading, environment merging, and key lookup.
+			val, err := application.Get(
 				app.PipelineInput{
 					ConfigPath: flags.ConfigPath,
-					ProjectRef: positional[0],
+					ProjectRef: args[0],
 					Flags:      &flags,
 					Changed:    cmd.Flags(),
 				},
-				app.RunOptions{
-					Args:   childArgs,
-					Stdout: cmd.OutOrStdout(),
-					Stderr: cmd.ErrOrStderr(),
-				},
+				args[1],
 			)
+			if err != nil {
+				return err
+			}
+
+			_, err = fmt.Fprintln(cmd.OutOrStdout(), val)
+			return err
 		},
 	}
 

@@ -36,9 +36,9 @@ func setupTestManifest(t *testing.T) string {
 		environments: [development, production]
 		projects:
 		  api-core:
-		    path: apps/api-core/env
 		    includes:
 		      - env/postgres
+		      - apps/api-core/env/api-core
 	`)
 
 	// Create env dir with files.
@@ -67,16 +67,15 @@ func TestResolvePipelineSuccess(t *testing.T) {
 	configPath := filepath.Join(dir, "envx.yaml")
 
 	app := New()
-	flags := manifest.RawFlags{}
-	changed := &mockFlagSet{changed: map[string]bool{}}
+	flags := manifest.RawFlags{Environment: "development"}
+	changed := &mockFlagSet{changed: map[string]bool{"env": true}}
 
-	pipeline, _, result, err := app.ResolvePipeline(
-		configPath,
-		"api-core",
-		"development",
-		flags,
-		changed,
-	)
+	pipeline, _, result, err := app.ResolvePipeline(PipelineInput{
+		ConfigPath: configPath,
+		ProjectRef: "api-core",
+		Flags:      &flags,
+		Changed:    changed,
+	})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -108,16 +107,15 @@ func TestResolvePipelineInvalidProject(t *testing.T) {
 	configPath := filepath.Join(dir, "envx.yaml")
 
 	app := New()
-	flags := manifest.RawFlags{}
-	changed := &mockFlagSet{changed: map[string]bool{}}
+	flags := manifest.RawFlags{Environment: "development"}
+	changed := &mockFlagSet{changed: map[string]bool{"env": true}}
 
-	_, _, _, err := app.ResolvePipeline(
-		configPath,
-		"nonexistent",
-		"development",
-		flags,
-		changed,
-	)
+	_, _, _, err := app.ResolvePipeline(PipelineInput{
+		ConfigPath: configPath,
+		ProjectRef: "nonexistent",
+		Flags:      &flags,
+		Changed:    changed,
+	})
 	if err == nil {
 		t.Fatal("expected error for invalid project")
 	}
@@ -133,16 +131,15 @@ func TestResolvePipelineInvalidEnvironment(t *testing.T) {
 	configPath := filepath.Join(dir, "envx.yaml")
 
 	app := New()
-	flags := manifest.RawFlags{}
-	changed := &mockFlagSet{changed: map[string]bool{}}
+	flags := manifest.RawFlags{Environment: "nonexistent"}
+	changed := &mockFlagSet{changed: map[string]bool{"env": true}}
 
-	_, _, _, err := app.ResolvePipeline(
-		configPath,
-		"api-core",
-		"nonexistent",
-		flags,
-		changed,
-	)
+	_, _, _, err := app.ResolvePipeline(PipelineInput{
+		ConfigPath: configPath,
+		ProjectRef: "api-core",
+		Flags:      &flags,
+		Changed:    changed,
+	})
 	if err == nil {
 		t.Fatal("expected error for invalid environment")
 	}
@@ -155,16 +152,15 @@ func TestResolvePipelineBadConfigPath(t *testing.T) {
 	t.Parallel()
 
 	app := New()
-	flags := manifest.RawFlags{}
-	changed := &mockFlagSet{changed: map[string]bool{}}
+	flags := manifest.RawFlags{Environment: "development"}
+	changed := &mockFlagSet{changed: map[string]bool{"env": true}}
 
-	_, _, _, err := app.ResolvePipeline(
-		"/nonexistent/path/envx.yaml",
-		"api-core",
-		"development",
-		flags,
-		changed,
-	)
+	_, _, _, err := app.ResolvePipeline(PipelineInput{
+		ConfigPath: "/nonexistent/path/envx.yaml",
+		ProjectRef: "api-core",
+		Flags:      &flags,
+		Changed:    changed,
+	})
 	if err == nil {
 		t.Fatal("expected error for bad config path")
 	}
@@ -188,16 +184,17 @@ func TestRunWithMockRunner(t *testing.T) {
 		},
 	}
 
-	flags := manifest.RawFlags{}
-	changed := &mockFlagSet{changed: map[string]bool{}}
+	flags := manifest.RawFlags{Environment: "development"}
+	changed := &mockFlagSet{changed: map[string]bool{"env": true}}
 
 	err := app.Run(
 		context.Background(),
-		configPath,
-		"api-core",
-		"development",
-		flags,
-		changed,
+		PipelineInput{
+			ConfigPath: configPath,
+			ProjectRef: "api-core",
+			Flags:      &flags,
+			Changed:    changed,
+		},
 		RunOptions{
 			Args: []string{"echo", "test"},
 		},

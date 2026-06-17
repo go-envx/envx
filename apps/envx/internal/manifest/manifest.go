@@ -27,20 +27,21 @@ type Manifest struct {
 //
 // Precedence: CLI flags > env vars > project settings > manifest settings > defaults.
 type Settings struct {
-	Overload        *bool  `yaml:"overload"`
-	Strict          *bool  `yaml:"strict"`
-	Prefix          string `yaml:"prefix"`
-	Suffix          string `yaml:"suffix"`
-	NamespacePrefix *bool  `yaml:"namespace_prefix"`
+	Overload           *bool  `yaml:"overload"`
+	Strict             *bool  `yaml:"strict"`
+	Prefix             string `yaml:"prefix"`
+	Suffix             string `yaml:"suffix"`
+	NamespacePrefix    *bool  `yaml:"namespace_prefix"`
+	DefaultEnvironment string `yaml:"default_environment"`
 }
 
 // -------------------------------------------------------------------------------------
 // Project defines a single project's environment configuration within the
-// manifest. Path points to the directory holding the project's own env files,
-// and Includes lists shared namespaces to load before the project's own.
+// manifest. Includes lists the ordered set of namespaces to load and merge.
+// Each include is a relative path in the form "<dir>/<name>" which resolves to
+// files <dir>/<name>.yaml and <dir>/<name>.<env>.yaml.
 // Settings at the project level override the global manifest settings.
 type Project struct {
-	Path     string   `yaml:"path"`
 	Includes []string `yaml:"includes"`
 	Settings Settings `yaml:"settings"`
 }
@@ -53,17 +54,6 @@ func (m *Manifest) Dir() string {
 }
 
 // -------------------------------------------------------------------------------------
-// ProjectDir returns the fully resolved path to the project's env directory.
-// If the project path is already absolute it is returned as-is; otherwise it
-// is joined with the manifest directory.
-func (m *Manifest) ProjectDir(p *Project) string {
-	if filepath.IsAbs(p.Path) {
-		return p.Path
-	}
-	return filepath.Join(m.dir, p.Path)
-}
-
-// -------------------------------------------------------------------------------------
 // ProjectMatch holds the result of a project lookup. It bundles the canonical
 // project name with the project definition to avoid a 3-value return.
 type ProjectMatch struct {
@@ -72,19 +62,11 @@ type ProjectMatch struct {
 }
 
 // -------------------------------------------------------------------------------------
-// LookupProject finds a project by name or by path. It first tries an exact
-// name match against the projects map, then falls back to matching the path
-// field. Returns the match and whether one was found.
-func (m *Manifest) LookupProject(nameOrPath string) (ProjectMatch, bool) {
-	// Try direct name match first.
-	if p, ok := m.Projects[nameOrPath]; ok {
-		return ProjectMatch{Name: nameOrPath, Project: p}, true
-	}
-	// Try matching by path.
-	for name, p := range m.Projects {
-		if p.Path == nameOrPath {
-			return ProjectMatch{Name: name, Project: p}, true
-		}
+// LookupProject finds a project by name. Returns the match and whether one was
+// found.
+func (m *Manifest) LookupProject(name string) (ProjectMatch, bool) {
+	if p, ok := m.Projects[name]; ok {
+		return ProjectMatch{Name: name, Project: p}, true
 	}
 	return ProjectMatch{}, false
 }
@@ -95,4 +77,19 @@ func (m *Manifest) LookupProject(nameOrPath string) (ProjectMatch, bool) {
 // catch typos before any file I/O occurs.
 func (m *Manifest) HasEnvironment(env string) bool {
 	return slices.Contains(m.Environments, env)
+}
+
+// -------------------------------------------------------------------------------------
+// LookupInclude finds an include path across all projects by matching the full
+// include string. This is used by the set command to resolve a user-provided
+// include path to its directory and base name. Returns the resolved directory
+// and base name, and whether a match was found.
+func (m *Manifest) LookupInclude(includePath string) (dir, name string, ok bool) {
+	for _, p := range m.Projects {
+		if slices.Contains(p.Includes, includePath) {
+			absDir := filepath.Join(m.dir, filepath.Dir(includePath))
+			return absDir, filepath.Base(includePath), true
+		}
+	}
+	return "", "", false
 }

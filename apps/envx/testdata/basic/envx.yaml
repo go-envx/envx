@@ -6,11 +6,11 @@ settings:
 
 projects:
   api-core:
-    path: apps/api-core/env
     includes:
       - env/postgres
       - env/gateway
+      - apps/api-core/env/api-core
   web:
-    path: apps/web/env
     includes:
       - env/gateway
+      - apps/web/env/web

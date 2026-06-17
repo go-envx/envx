@@ -9,6 +9,7 @@ const (
 	rootUsage = "envx [command] [flags]"
 	rootShort = "envx is a CLI tool for managing environment variables."
 	rootFlag  = "path to envx.yaml manifest (env: ENVX_CONFIG, default: auto-discover)"
+	envFlag   = "target environment (env: ENVX_ENV, default: development)"
 )
 
 // -------------------------------------------------------------------------------------
@@ -17,6 +18,7 @@ const (
 // wires up each subcommand. Version is injected from main.go at build time.
 func NewRootCmd(version string) *cobra.Command {
 	var configPath string
+	var envName string
 	application := app.New()
 
 	cmd := &cobra.Command{
@@ -37,9 +39,17 @@ func NewRootCmd(version string) *cobra.Command {
 	// auto-discovery. Also settable via ENVX_CONFIG env var.
 	cmd.PersistentFlags().StringVar(&configPath, "config", "", rootFlag)
 
-	// Register subcommands. Each receives the shared App instance and a
-	// pointer to configPath so it can be resolved after flag parsing.
-	cmd.AddCommand(newRunCmd(application, &configPath))
+	// --env: persistent flag inherited by all subcommands. Sets the target
+	// environment. Also settable via ENVX_ENV env var, manifest
+	// default_environment, or defaults to "development".
+	cmd.PersistentFlags().StringVar(&envName, "env", "", envFlag)
+
+	// Register subcommands. Each receives the shared App instance and
+	// pointers to persistent flag values so they can be resolved after
+	// flag parsing.
+	cmd.AddCommand(newRunCmd(application, &configPath, &envName))
+	cmd.AddCommand(newGetCmd(application, &configPath, &envName))
+	cmd.AddCommand(newSetCmd(application, &configPath, &envName))
 
 	return cmd
 }

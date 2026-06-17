@@ -20,7 +20,8 @@ func TestDiscoverExplicitPath(t *testing.T) {
 		environments: [dev]
 		projects:
 		  a:
-		    path: x
+		    includes:
+		      - x/x
 	`)
 
 	got, err := Discover(path)
@@ -54,7 +55,8 @@ func TestDiscoverEnvVar(t *testing.T) {
 		environments: [dev]
 		projects:
 		  a:
-		    path: x
+		    includes:
+		      - x/x
 	`)
 
 	t.Setenv("ENVX_CONFIG", path)
@@ -90,7 +92,8 @@ func TestDiscoverWalkUp(t *testing.T) {
 		environments: [dev]
 		projects:
 		  a:
-		    path: x
+		    includes:
+		      - x/x
 	`)
 
 	// Create a nested dir and chdir into it.
@@ -133,7 +136,8 @@ func TestDiscoverWalkUpStopsAtGitRoot(t *testing.T) {
 		environments: [dev]
 		projects:
 		  a:
-		    path: x
+		    includes:
+		      - x/x
 	`)
 
 	// Create a nested "repo" with .git marker.

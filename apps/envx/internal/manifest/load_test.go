@@ -22,14 +22,14 @@ func TestLoadValidManifest(t *testing.T) {
 		  strict: true
 		projects:
 		  api-core:
-		    path: apps/api-core/env
 		    includes:
 		      - env/postgres
 		      - env/gateway
+		      - apps/api-core/env/api-core
 		  web:
-		    path: apps/web/env
 		    includes:
 		      - env/gateway
+		      - apps/web/env/web
 	`
 	file.Write(t, dir, "envx.yaml", content)
 
@@ -82,8 +82,8 @@ func TestLoadInvalidYAML(t *testing.T) {
 
 // -------------------------------------------------------------------------------------
 // TestValidationErrors verifies that structural constraint violations are
-// caught: missing environments, missing projects, empty paths, duplicate
-// paths, and empty includes.
+// caught: missing environments, missing projects, empty includes, and
+// projects with no includes.
 func TestValidationErrors(t *testing.T) {
 	t.Parallel()
 
@@ -97,7 +97,8 @@ func TestValidationErrors(t *testing.T) {
 			content: `
 				projects:
 				  app:
-				    path: x
+				    includes:
+				      - apps/app/env/app
 			`,
 			wantErr: "environments list must not be empty",
 		},
@@ -107,26 +108,14 @@ func TestValidationErrors(t *testing.T) {
 			wantErr: "at least one project must be defined",
 		},
 		{
-			name: "project missing path",
+			name: "project missing includes",
 			content: `
 				environments: [dev]
 				projects:
 				  app:
 				    includes: []
 			`,
-			wantErr: "has no path",
-		},
-		{
-			name: "duplicate paths",
-			content: `
-				environments: [dev]
-				projects:
-				  a:
-				    path: same
-				  b:
-				    path: same
-			`,
-			wantErr: "share the same path",
+			wantErr: "has no includes",
 		},
 		{
 			name: "empty include",
@@ -134,7 +123,6 @@ func TestValidationErrors(t *testing.T) {
 				environments: [dev]
 				projects:
 				  app:
-				    path: x
 				    includes:
 				      - ""
 			`,
@@ -174,7 +162,8 @@ func TestLoadParsesSettings(t *testing.T) {
 		  namespace_prefix: false
 		projects:
 		  app:
-		    path: apps/app/env
+		    includes:
+		      - apps/app/env/app
 		    settings:
 		      overload: true
 	`

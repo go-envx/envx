@@ -89,14 +89,14 @@ func TestResolveOverloadPrecedence(t *testing.T) {
 			m := &Manifest{
 				Settings:     tt.manifest,
 				Environments: []string{"dev"},
-				Projects:     map[string]Project{"a": {Path: "x"}},
+				Projects:     map[string]Project{"a": {Includes: []string{"x/x"}}},
 			}
 			flags := RawFlags{Overload: tt.flagVal}
 			cfg := r.Resolve(
-				flags,
+				&flags,
 				&mockFlagSet{changed: tt.changed},
 				m,
-				&Project{Path: "x"},
+				&Project{Includes: []string{"x/x"}},
 			)
 			if cfg.Overload != tt.want {
 				t.Errorf("Overload = %v, want %v", cfg.Overload, tt.want)
@@ -168,14 +168,14 @@ func TestResolveStrictPrecedence(t *testing.T) {
 			m := &Manifest{
 				Settings:     tt.manifest,
 				Environments: []string{"dev"},
-				Projects:     map[string]Project{"a": {Path: "x"}},
+				Projects:     map[string]Project{"a": {Includes: []string{"x/x"}}},
 			}
 			flags := RawFlags{Strict: tt.flagVal}
 			cfg := r.Resolve(
-				flags,
+				&flags,
 				&mockFlagSet{changed: tt.changed},
 				m,
-				&Project{Path: "x"},
+				&Project{Includes: []string{"x/x"}},
 			)
 			if cfg.Strict != tt.want {
 				t.Errorf("Strict = %v, want %v", cfg.Strict, tt.want)
@@ -208,7 +208,7 @@ func TestResolvePrefixPrecedence(t *testing.T) {
 				Prefix: "MANIFEST_PREFIX",
 			},
 			project: Project{
-				Path: "x",
+				Includes: []string{"x/x"},
 				Settings: Settings{
 					Prefix: "PROJECT_PREFIX",
 				},
@@ -224,7 +224,7 @@ func TestResolvePrefixPrecedence(t *testing.T) {
 				Prefix: "MANIFEST_PREFIX",
 			},
 			project: Project{
-				Path: "x",
+				Includes: []string{"x/x"},
 				Settings: Settings{
 					Prefix: "PROJECT_PREFIX",
 				},
@@ -240,7 +240,7 @@ func TestResolvePrefixPrecedence(t *testing.T) {
 				Prefix: "MANIFEST_PREFIX",
 			},
 			project: Project{
-				Path: "x",
+				Includes: []string{"x/x"},
 				Settings: Settings{
 					Prefix: "PROJECT_PREFIX",
 				},
@@ -256,7 +256,7 @@ func TestResolvePrefixPrecedence(t *testing.T) {
 				Prefix: "MANIFEST_PREFIX",
 			},
 			project: Project{
-				Path: "x",
+				Includes: []string{"x/x"},
 			},
 			want: "MANIFEST_PREFIX",
 		},
@@ -267,7 +267,7 @@ func TestResolvePrefixPrecedence(t *testing.T) {
 			env:      map[string]string{},
 			manifest: Settings{},
 			project: Project{
-				Path: "x",
+				Includes: []string{"x/x"},
 			},
 			want: "",
 		},
@@ -280,10 +280,10 @@ func TestResolvePrefixPrecedence(t *testing.T) {
 			m := &Manifest{
 				Settings:     tt.manifest,
 				Environments: []string{"dev"},
-				Projects:     map[string]Project{"a": {Path: "x"}},
+				Projects:     map[string]Project{"a": {Includes: []string{"x/x"}}},
 			}
 			flags := RawFlags{Prefix: tt.flagVal}
-			cfg := r.Resolve(flags, &mockFlagSet{changed: tt.changed}, m, &tt.project)
+			cfg := r.Resolve(&flags, &mockFlagSet{changed: tt.changed}, m, &tt.project)
 			if cfg.Prefix != tt.want {
 				t.Errorf("Prefix = %q, want %q", cfg.Prefix, tt.want)
 			}
@@ -315,7 +315,7 @@ func TestResolveSuffixPrecedence(t *testing.T) {
 				Suffix: "MANIFEST_SUFFIX",
 			},
 			project: Project{
-				Path: "x",
+				Includes: []string{"x/x"},
 				Settings: Settings{
 					Suffix: "PROJECT_SUFFIX",
 				},
@@ -331,7 +331,7 @@ func TestResolveSuffixPrecedence(t *testing.T) {
 				Suffix: "MANIFEST_SUFFIX",
 			},
 			project: Project{
-				Path: "x",
+				Includes: []string{"x/x"},
 				Settings: Settings{
 					Suffix: "PROJECT_SUFFIX",
 				},
@@ -347,7 +347,7 @@ func TestResolveSuffixPrecedence(t *testing.T) {
 				Suffix: "MANIFEST_SUFFIX",
 			},
 			project: Project{
-				Path: "x",
+				Includes: []string{"x/x"},
 				Settings: Settings{
 					Suffix: "PROJECT_SUFFIX",
 				},
@@ -363,7 +363,7 @@ func TestResolveSuffixPrecedence(t *testing.T) {
 				Suffix: "MANIFEST_SUFFIX",
 			},
 			project: Project{
-				Path: "x",
+				Includes: []string{"x/x"},
 			},
 			want: "MANIFEST_SUFFIX",
 		},
@@ -376,10 +376,10 @@ func TestResolveSuffixPrecedence(t *testing.T) {
 			m := &Manifest{
 				Settings:     tt.manifest,
 				Environments: []string{"dev"},
-				Projects:     map[string]Project{"a": {Path: "x"}},
+				Projects:     map[string]Project{"a": {Includes: []string{"x/x"}}},
 			}
 			flags := RawFlags{Suffix: tt.flagVal}
-			cfg := r.Resolve(flags, &mockFlagSet{changed: tt.changed}, m, &tt.project)
+			cfg := r.Resolve(&flags, &mockFlagSet{changed: tt.changed}, m, &tt.project)
 			if cfg.Suffix != tt.want {
 				t.Errorf("Suffix = %q, want %q", cfg.Suffix, tt.want)
 			}
@@ -409,7 +409,7 @@ func TestResolveNamespacePrefixPrecedence(t *testing.T) {
 			env:      map[string]string{"ENVX_NAMESPACE_PREFIX": "true"},
 			manifest: Settings{NamespacePrefix: new(true)},
 			project: Project{
-				Path:     "x",
+				Includes: []string{"x/x"},
 				Settings: Settings{NamespacePrefix: new(true)},
 			},
 			want: false,
@@ -421,7 +421,7 @@ func TestResolveNamespacePrefixPrecedence(t *testing.T) {
 			env:      map[string]string{"ENVX_NAMESPACE_PREFIX": "false"},
 			manifest: Settings{NamespacePrefix: new(true)},
 			project: Project{
-				Path:     "x",
+				Includes: []string{"x/x"},
 				Settings: Settings{NamespacePrefix: new(true)},
 			},
 			want: false,
@@ -433,7 +433,7 @@ func TestResolveNamespacePrefixPrecedence(t *testing.T) {
 			env:      map[string]string{},
 			manifest: Settings{NamespacePrefix: new(true)},
 			project: Project{
-				Path:     "x",
+				Includes: []string{"x/x"},
 				Settings: Settings{NamespacePrefix: new(false)},
 			},
 			want: false,
@@ -444,17 +444,17 @@ func TestResolveNamespacePrefixPrecedence(t *testing.T) {
 			changed:  map[string]bool{},
 			env:      map[string]string{},
 			manifest: Settings{NamespacePrefix: new(false)},
-			project:  Project{Path: "x"},
+			project:  Project{Includes: []string{"x/x"}},
 			want:     false,
 		},
 		{
-			name:     "defaults to true when nothing set",
-			flagVal:  true,
+			name:     "defaults to false when nothing set",
+			flagVal:  false,
 			changed:  map[string]bool{},
 			env:      map[string]string{},
 			manifest: Settings{},
-			project:  Project{Path: "x"},
-			want:     true,
+			project:  Project{Includes: []string{"x/x"}},
+			want:     false,
 		},
 		{
 			name:     "invalid env var falls through to project",
@@ -463,7 +463,7 @@ func TestResolveNamespacePrefixPrecedence(t *testing.T) {
 			env:      map[string]string{"ENVX_NAMESPACE_PREFIX": "not-a-bool"},
 			manifest: Settings{},
 			project: Project{
-				Path:     "x",
+				Includes: []string{"x/x"},
 				Settings: Settings{NamespacePrefix: new(false)},
 			},
 			want: false,
@@ -477,10 +477,10 @@ func TestResolveNamespacePrefixPrecedence(t *testing.T) {
 			m := &Manifest{
 				Settings:     tt.manifest,
 				Environments: []string{"dev"},
-				Projects:     map[string]Project{"a": {Path: "x"}},
+				Projects:     map[string]Project{"a": {Includes: []string{"x/x"}}},
 			}
 			flags := RawFlags{NamespacePrefix: tt.flagVal}
-			cfg := r.Resolve(flags, &mockFlagSet{changed: tt.changed}, m, &tt.project)
+			cfg := r.Resolve(&flags, &mockFlagSet{changed: tt.changed}, m, &tt.project)
 			if cfg.NamespacePrefix != tt.want {
 				t.Errorf("NamespacePrefix = %v, want %v", cfg.NamespacePrefix, tt.want)
 			}

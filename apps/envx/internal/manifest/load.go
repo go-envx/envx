@@ -44,8 +44,8 @@ func parse(data []byte, dir string) (*Manifest, error) {
 // validate checks structural constraints on the manifest:
 //   - At least one environment must be declared.
 //   - At least one project must be defined.
-//   - Every project must have a non-empty path.
-//   - No two projects may share the same path.
+//   - Every project must have at least one include.
+//   - No include entry may be empty.
 func validate(m *Manifest) error {
 	if len(m.Environments) == 0 {
 		return errors.New("manifest: environments list must not be empty")
@@ -54,20 +54,10 @@ func validate(m *Manifest) error {
 		return errors.New("manifest: at least one project must be defined")
 	}
 
-	// Check for duplicate paths.
-	paths := make(map[string]string) // path → project name
 	for name, p := range m.Projects {
-		if p.Path == "" {
-			return fmt.Errorf("manifest: project %q has no path", name)
+		if len(p.Includes) == 0 {
+			return fmt.Errorf("manifest: project %q has no includes", name)
 		}
-		if other, exists := paths[p.Path]; exists {
-			return fmt.Errorf("manifest: projects %q and %q share the same path %q",
-				other,
-				name,
-				p.Path,
-			)
-		}
-		paths[p.Path] = name
 		if slices.Contains(p.Includes, "") {
 			return fmt.Errorf("manifest: project %q contains an empty include", name)
 		}

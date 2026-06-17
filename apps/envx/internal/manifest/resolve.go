@@ -22,6 +22,7 @@ type FlagSet interface {
 // Resolve along with the manifest and project to produce the final config.
 type RawFlags struct {
 	ConfigPath      string
+	Environment     string
 	Overload        bool
 	Strict          bool
 	Prefix          string
@@ -34,6 +35,7 @@ type RawFlags struct {
 // precedence chain. This is the single source of truth passed to application
 // logic — no further env var lookups or flag checks happen downstream.
 type ResolvedConfig struct {
+	Environment     string
 	Overload        bool
 	Strict          bool
 	Prefix          string
@@ -60,12 +62,23 @@ func NewResolver() *Resolver {
 // The flags parameter indicates which flags were explicitly set by the user
 // (vs. retaining their default values).
 func (r *Resolver) Resolve(
-	flags RawFlags,
+	flags *RawFlags,
 	changed FlagSet,
 	m *Manifest,
 	proj *Project,
 ) ResolvedConfig {
+	env := r.resolveString(
+		"env", flags.Environment, changed,
+		"ENVX_ENV",
+		proj.Settings.DefaultEnvironment,
+		m.Settings.DefaultEnvironment,
+	)
+	if env == "" {
+		env = "development"
+	}
+
 	return ResolvedConfig{
+		Environment: env,
 		Overload: r.resolveBool(
 			"overload", flags.Overload, changed,
 			"ENVX_OVERLOAD",
@@ -90,7 +103,7 @@ func (r *Resolver) Resolve(
 			"namespace-prefix", flags.NamespacePrefix, changed,
 			"ENVX_NAMESPACE_PREFIX",
 			proj.Settings.NamespacePrefix,
-			m.Settings.NamespacePrefix, true,
+			m.Settings.NamespacePrefix, false,
 		),
 	}
 }

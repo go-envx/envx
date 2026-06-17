@@ -33,49 +33,52 @@ func TestRunCommand(t *testing.T) {
 			name: "api-core development merges all namespaces",
 			args: []string{
 				"run", "--config", filepath.Join(fixtureDir, "envx.yaml"),
-				"api-core", "development", "--", "env",
+				"--env", "development",
+				"api-core", "--", "env",
 			},
 			wantEnv: map[string]string{
 				// postgres.development overrides base
-				"POSTGRES_HOST": "dev-db.local",
+				"HOST": "dev-db.local",
 				// api-core.development wins (last)
-				"API_CORE_PORT": "3001",
+				"PORT": "3001",
 				// from postgres base
-				"POSTGRES_CREDENTIALS_USERNAME": "postgres",
+				"CREDENTIALS_USERNAME": "postgres",
 				// postgres.development overrides
-				"POSTGRES_CREDENTIALS_PASSWORD": "dev-secret",
+				"CREDENTIALS_PASSWORD": "dev-secret",
 				// gateway.development
-				"GATEWAY_URL": "http://localhost:8080",
+				"URL": "http://localhost:8080",
 				// gateway.development
-				"GATEWAY_TIMEOUT": "5",
+				"TIMEOUT": "5",
 				// api-core base
-				"API_CORE_APP_NAME": "api-core",
+				"APP_NAME": "api-core",
 				// api-core.development
-				"API_CORE_LOG_LEVEL": "debug",
+				"LOG_LEVEL": "debug",
 			},
 		},
 		{
 			name: "web development merges gateway + web",
 			args: []string{
 				"run", "--config", filepath.Join(fixtureDir, "envx.yaml"),
-				"web", "development", "--", "env",
+				"--env", "development",
+				"web", "--", "env",
 			},
 			wantEnv: map[string]string{
 				// gateway.development
-				"GATEWAY_URL": "http://localhost:8080",
+				"URL": "http://localhost:8080",
 				// gateway.development
-				"GATEWAY_TIMEOUT": "5",
+				"TIMEOUT": "5",
 				// web base
-				"WEB_APP_NAME": "web",
-				// web.development wins over gateway
-				"WEB_PORT": "4001",
+				"APP_NAME": "web",
+				// web.development wins
+				"PORT": "4001",
 			},
 		},
 		{
 			name: "invalid environment",
 			args: []string{
 				"run", "--config", filepath.Join(fixtureDir, "envx.yaml"),
-				"api-core", "nonexistent", "--", "env",
+				"--env", "nonexistent",
+				"api-core", "--", "env",
 			},
 			wantErr: "not declared in the manifest",
 		},
@@ -83,7 +86,8 @@ func TestRunCommand(t *testing.T) {
 			name: "invalid project",
 			args: []string{
 				"run", "--config", filepath.Join(fixtureDir, "envx.yaml"),
-				"no-such-project", "development", "--", "env",
+				"--env", "development",
+				"no-such-project", "--", "env",
 			},
 			wantErr: "not found in manifest",
 		},
@@ -94,7 +98,6 @@ func TestRunCommand(t *testing.T) {
 				"--config",
 				filepath.Join(fixtureDir, "envx.yaml"),
 				"api-core",
-				"development",
 			},
 			wantErr: "usage:",
 		},
@@ -150,7 +153,8 @@ func TestRunCommandExitCode(t *testing.T) {
 
 	_, _, err := execCmd(
 		"run", "--config", filepath.Join(fixtureDir, "envx.yaml"),
-		"api-core", "development", "--", "sh", "-c", "exit 7",
+		"--env", "development",
+		"api-core", "--", "sh", "-c", "exit 7",
 	)
 	if err == nil {
 		t.Fatal("expected error for non-zero exit")
@@ -180,7 +184,8 @@ func TestRunStrictFlag(t *testing.T) {
 	// staging has no overlay files — strict mode should error.
 	_, _, err := execCmd(
 		"run", "--config", filepath.Join(fixtureDir, "envx.yaml"),
-		"--strict", "api-core", "staging", "--", "env",
+		"--env", "staging", "--strict",
+		"api-core", "--", "env",
 	)
 	if err == nil {
 		t.Fatal("expected error in strict mode for missing overlay")
@@ -188,9 +193,9 @@ func TestRunStrictFlag(t *testing.T) {
 }
 
 // -------------------------------------------------------------------------------------
-// TestRunNamespacePrefixDisabled verifies that --namespace-prefix=false
-// produces unprefixed env var keys.
-func TestRunNamespacePrefixDisabled(t *testing.T) {
+// TestRunNamespacePrefixEnabled verifies that --namespace-prefix=true
+// produces prefixed env var keys.
+func TestRunNamespacePrefixEnabled(t *testing.T) {
 	t.Parallel()
 
 	if runtime.GOOS == "windows" {
@@ -201,20 +206,21 @@ func TestRunNamespacePrefixDisabled(t *testing.T) {
 
 	stdout, _, err := execCmd(
 		"run", "--config", filepath.Join(fixtureDir, "envx.yaml"),
-		"--namespace-prefix=false", "api-core", "development", "--", "env",
+		"--env", "development", "--namespace-prefix=true",
+		"api-core", "--", "env",
 	)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
 	envOutput := parseEnvOutput(stdout.String())
-	// Without namespace prefix, keys should NOT have the namespace name.
-	// e.g. "PORT" instead of "API_CORE_PORT"
-	if _, ok := envOutput["PORT"]; !ok {
-		t.Error("expected 'PORT' key when namespace-prefix is disabled")
+	// With namespace prefix, keys should have the namespace name.
+	// e.g. "API_CORE_PORT" instead of "PORT"
+	if _, ok := envOutput["API_CORE_PORT"]; !ok {
+		t.Error("expected 'API_CORE_PORT' key when namespace-prefix is enabled")
 	}
-	if _, ok := envOutput["API_CORE_PORT"]; ok {
-		t.Error("did not expect 'API_CORE_PORT' key when namespace-prefix is disabled")
+	if _, ok := envOutput["PORT"]; ok {
+		t.Error("did not expect bare 'PORT' key when namespace-prefix is enabled")
 	}
 }
 
@@ -229,35 +235,37 @@ func TestRunOverloadFlag(t *testing.T) {
 	fixtureDir := testdataDir(t, "basic")
 
 	// Set an env var that will conflict with a file value.
-	t.Setenv("POSTGRES_HOST", "os-set-value")
+	t.Setenv("HOST", "os-set-value")
 
 	// Without overload: OS env should win.
 	stdout, _, err := execCmd(
 		"run", "--config", filepath.Join(fixtureDir, "envx.yaml"),
-		"api-core", "development", "--", "env",
+		"--env", "development",
+		"api-core", "--", "env",
 	)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
 	envOutput := parseEnvOutput(stdout.String())
-	if got := envOutput["POSTGRES_HOST"]; got != "os-set-value" {
-		t.Errorf("without --overload: POSTGRES_HOST = %q, want %q", got, "os-set-value")
+	if got := envOutput["HOST"]; got != "os-set-value" {
+		t.Errorf("without --overload: HOST = %q, want %q", got, "os-set-value")
 	}
 
 	// With overload: file value should win.
 	stdout, _, err = execCmd(
 		"run", "--config", filepath.Join(fixtureDir, "envx.yaml"),
-		"--overload", "api-core", "development", "--", "env",
+		"--env", "development", "--overload",
+		"api-core", "--", "env",
 	)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
 	envOutput = parseEnvOutput(stdout.String())
-	if got := envOutput["POSTGRES_HOST"]; got == "os-set-value" {
+	if got := envOutput["HOST"]; got == "os-set-value" {
 		t.Errorf(
-			"with --overload: POSTGRES_HOST should be file value, got OS value %q",
+			"with --overload: HOST should be file value, got OS value %q",
 			got,
 		)
 	}
@@ -277,17 +285,18 @@ func TestRunPrefixSuffixFlags(t *testing.T) {
 
 	stdout, _, err := execCmd(
 		"run", "--config", filepath.Join(fixtureDir, "envx.yaml"),
+		"--env", "development",
 		"--prefix", "MYAPP", "--suffix", "V2",
-		"api-core", "development", "--", "env",
+		"api-core", "--", "env",
 	)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
 	envOutput := parseEnvOutput(stdout.String())
-	// With prefix MYAPP and suffix V2, keys should be like MYAPP_POSTGRES_HOST_V2
-	if _, ok := envOutput["MYAPP_POSTGRES_HOST_V2"]; !ok {
-		t.Error("expected 'MYAPP_POSTGRES_HOST_V2' key with --prefix and --suffix")
+	// With prefix MYAPP and suffix V2, keys should be like MYAPP_HOST_V2
+	if _, ok := envOutput["MYAPP_HOST_V2"]; !ok {
+		t.Error("expected 'MYAPP_HOST_V2' key with --prefix and --suffix")
 	}
 }
 

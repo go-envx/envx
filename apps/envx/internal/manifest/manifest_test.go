@@ -18,11 +18,12 @@ func TestLookupProjectByName(t *testing.T) {
 		environments: [dev]
 		projects:
 		  api-core:
-		    path: apps/api-core/env
 		    includes:
 		      - env/postgres
+		      - apps/api-core/env/api-core
 		  web:
-		    path: apps/web/env
+		    includes:
+		      - apps/web/env/web
 	`)
 
 	m, err := Load(filepath.Join(dir, "envx.yaml"))
@@ -37,45 +38,14 @@ func TestLookupProjectByName(t *testing.T) {
 	if match.Name != "api-core" {
 		t.Errorf("name = %q, want %q", match.Name, "api-core")
 	}
-	if match.Project.Path != "apps/api-core/env" {
-		t.Errorf("path = %q, want %q", match.Project.Path, "apps/api-core/env")
-	}
-	if len(match.Project.Includes) != 1 {
-		t.Errorf("includes = %d, want 1", len(match.Project.Includes))
-	}
-}
-
-// -------------------------------------------------------------------------------------
-// TestLookupProjectByPath verifies that LookupProject falls back to matching
-// by the project's path field.
-func TestLookupProjectByPath(t *testing.T) {
-	t.Parallel()
-
-	dir := t.TempDir()
-	file.Write(t, dir, "envx.yaml", `
-		environments: [dev]
-		projects:
-		  myapp:
-		    path: apps/myapp/env
-	`)
-
-	m, err := Load(filepath.Join(dir, "envx.yaml"))
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	match, ok := m.LookupProject("apps/myapp/env")
-	if !ok {
-		t.Fatal("LookupProject by path not found")
-	}
-	if match.Name != "myapp" {
-		t.Errorf("name = %q, want %q", match.Name, "myapp")
+	if len(match.Project.Includes) != 2 {
+		t.Errorf("includes = %d, want 2", len(match.Project.Includes))
 	}
 }
 
 // -------------------------------------------------------------------------------------
 // TestLookupProjectNotFound verifies that LookupProject returns false for
-// a nonexistent project name or path.
+// a nonexistent project name.
 func TestLookupProjectNotFound(t *testing.T) {
 	t.Parallel()
 
@@ -84,7 +54,8 @@ func TestLookupProjectNotFound(t *testing.T) {
 		environments: [dev]
 		projects:
 		  app:
-		    path: apps/app/env
+		    includes:
+		      - apps/app/env/app
 	`)
 
 	m, err := Load(filepath.Join(dir, "envx.yaml"))
@@ -109,7 +80,8 @@ func TestHasEnvironment(t *testing.T) {
 		environments: [development, production]
 		projects:
 		  app:
-		    path: apps/app/env
+		    includes:
+		      - apps/app/env/app
 	`)
 
 	m, err := Load(filepath.Join(dir, "envx.yaml"))
@@ -126,31 +98,45 @@ func TestHasEnvironment(t *testing.T) {
 }
 
 // -------------------------------------------------------------------------------------
-// TestProjectDirRelative verifies that ProjectDir joins relative paths
-// with the manifest directory.
-func TestProjectDirRelative(t *testing.T) {
+// TestLookupIncludeFound verifies that LookupInclude resolves an include path
+// to its absolute directory and base name.
+func TestLookupIncludeFound(t *testing.T) {
 	t.Parallel()
 
-	m := &Manifest{dir: "/workspace"}
-	p := Project{Path: "apps/api/env"}
-	got := m.ProjectDir(&p)
-	want := "/workspace/apps/api/env"
-	if got != want {
-		t.Errorf("ProjectDir() = %q, want %q", got, want)
+	m := &Manifest{
+		dir: "/workspace",
+		Projects: map[string]Project{
+			"api-core": {Includes: []string{"env/postgres", "env/gateway"}},
+		},
+	}
+
+	dir, name, ok := m.LookupInclude("env/postgres")
+	if !ok {
+		t.Fatal("LookupInclude(env/postgres) not found")
+	}
+	if dir != "/workspace/env" {
+		t.Errorf("dir = %q, want %q", dir, "/workspace/env")
+	}
+	if name != "postgres" {
+		t.Errorf("name = %q, want %q", name, "postgres")
 	}
 }
 
 // -------------------------------------------------------------------------------------
-// TestProjectDirAbsolute verifies that ProjectDir returns absolute paths
-// as-is without joining.
-func TestProjectDirAbsolute(t *testing.T) {
+// TestLookupIncludeNotFound verifies that LookupInclude returns false for
+// an include path not present in any project.
+func TestLookupIncludeNotFound(t *testing.T) {
 	t.Parallel()
 
-	m := &Manifest{dir: "/workspace"}
-	p := Project{Path: "/absolute/path/env"}
-	got := m.ProjectDir(&p)
-	want := "/absolute/path/env"
-	if got != want {
-		t.Errorf("ProjectDir() = %q, want %q", got, want)
+	m := &Manifest{
+		dir: "/workspace",
+		Projects: map[string]Project{
+			"api-core": {Includes: []string{"env/postgres"}},
+		},
+	}
+
+	_, _, ok := m.LookupInclude("env/nonexistent")
+	if ok {
+		t.Error("expected LookupInclude to return false for unknown include")
 	}
 }
