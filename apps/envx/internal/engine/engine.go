@@ -1,9 +1,9 @@
-// Package engine owns environment resolution: project lookup, environment
-// validation, namespace building, deep-merge, and origin tracking. The scattered
-// "manifest -> namespace -> merge" pipeline lives entirely behind ResolveEnv,
-// which returns one immutable Result. The merge internals are unexported
-// (merge.go) because the engine is their only consumer — actions depend on the
-// engine, never on merge directly.
+// Package engine owns environment resolution: defaulting + validation of the
+// target environment, namespace building, deep-merge, and origin tracking. It
+// consumes a plain engine.Config (built by the config package) and imports
+// nothing else internal, so the "namespace -> merge" pipeline lives entirely
+// behind Resolve and returns one immutable Result. The merge internals are
+// unexported (merge.go) because the engine is their only consumer.
 package engine
 
 import (
@@ -11,21 +11,9 @@ import (
 	"fmt"
 	"maps"
 	"path/filepath"
+	"slices"
 	"sort"
-
-	"github.com/go-envx/envx/apps/envx/internal/config"
 )
-
-// -------------------------------------------------------------------------------------
-// Request is the input contract for ResolveEnv: the loaded manifest, the target
-// project, and the fully-resolved settings (including the target environment).
-// All precedence resolution happens at the action edge, so the engine merely
-// validates and merges.
-type Request struct {
-	Config   *config.Config
-	Project  string
-	Settings Settings
-}
 
 // -------------------------------------------------------------------------------------
 // Result is the immutable outcome of resolution. Its maps are unexported;
@@ -88,47 +76,43 @@ func (r *Result) Keys() []string {
 }
 
 // -------------------------------------------------------------------------------------
-// ResolveEnv is the single entry point: it looks up the project, validates the
-// resolved target environment, builds the namespace chain from the project's
-// includes, deep-merges them, and returns an immutable Result. This is the only
-// effectful engine call an action makes.
-func ResolveEnv(req *Request) (*Result, error) {
-	cfg := req.Config
-	if cfg == nil {
-		return nil, errors.New("engine: no manifest loaded")
+// Resolve is the single entry point: it applies the default environment,
+// validates it against the declared set, builds the namespace chain from the
+// include list, deep-merges them, and returns an immutable Result. It performs no
+// precedence resolution and reads no files beyond the namespace overlays.
+func Resolve(c *Config) (*Result, error) {
+	if c == nil {
+		return nil, errors.New("engine: nil config")
 	}
 
-	match, ok := cfg.LookupProject(req.Project)
-	if !ok {
-		return nil, fmt.Errorf("project %q not found in manifest", req.Project)
+	env := c.Settings.Env
+	if env == "" {
+		env = DefaultEnv
 	}
-	proj := match.Project
-
-	env := req.Settings.Env
-	if !cfg.HasEnvironment(env) {
+	if !slices.Contains(c.Environments, env) {
 		return nil, fmt.Errorf(
 			"environment %q is not declared in the manifest (available: %v)",
-			env, cfg.Environments,
+			env, c.Environments,
 		)
 	}
 
 	opts := mergeOptions{
-		strict:          req.Settings.Strict,
-		prefix:          req.Settings.Prefix,
-		suffix:          req.Settings.Suffix,
-		namespacePrefix: req.Settings.NamespacePrefix,
+		strict:          c.Settings.Strict,
+		prefix:          c.Settings.Prefix,
+		suffix:          c.Settings.Suffix,
+		namespacePrefix: c.Settings.NamespacePrefix,
 	}
-	return mergeNamespaces(buildNamespaces(cfg, &proj), env, opts)
+	return mergeNamespaces(buildNamespaces(c.Dir, c.Includes), env, opts)
 }
 
 // -------------------------------------------------------------------------------------
-// buildNamespaces resolves each of a project's includes into an absolute
-// namespace (directory + base name), preserving declaration order.
-func buildNamespaces(cfg *config.Config, proj *config.Project) []namespace {
-	out := make([]namespace, 0, len(proj.Includes))
-	for _, inc := range proj.Includes {
-		dir := filepath.Join(cfg.Dir(), filepath.Dir(inc))
-		out = append(out, namespace{dir: dir, name: filepath.Base(inc)})
+// buildNamespaces resolves each include into an absolute namespace (directory +
+// base name), preserving declaration order. Includes are relative to dir.
+func buildNamespaces(dir string, includes []string) []namespace {
+	out := make([]namespace, 0, len(includes))
+	for _, inc := range includes {
+		d := filepath.Join(dir, filepath.Dir(inc))
+		out = append(out, namespace{dir: d, name: filepath.Base(inc)})
 	}
 	return out
 }

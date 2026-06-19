@@ -6,21 +6,8 @@ import (
 	"io"
 	"testing"
 
-	"github.com/go-envx/envx/apps/envx/internal/config"
 	"github.com/go-envx/envx/apps/envx/internal/fixtures"
 )
-
-// -------------------------------------------------------------------------------------
-// loadGlobal loads the shared "basic" fixture into a root context for the
-// development environment.
-func loadGlobal(t *testing.T) config.Global {
-	t.Helper()
-	cfg, err := config.Load(fixtures.Manifest("basic"))
-	if err != nil {
-		t.Fatalf("load fixture: %v", err)
-	}
-	return config.Global{Config: cfg}
-}
 
 // -------------------------------------------------------------------------------------
 // TestExecuteOverloadFromEnv verifies ENVX_OVERLOAD lets file values win over an
@@ -29,9 +16,9 @@ func TestExecuteOverloadFromEnv(t *testing.T) {
 	t.Setenv("APP_NAME", "from-os")
 	t.Setenv("ENVX_OVERLOAD", "true")
 
-	g := loadGlobal(t)
+	path := fixtures.Manifest("basic")
 	var stdout bytes.Buffer
-	c := &actionConfig{Global: &g, Changed: noChange{}}
+	c := &actionConfig{ConfigPath: &path, Changed: noChange{}}
 	err := execute(context.Background(), actionParams{
 		Project:  "api-core",
 		ExecArgs: []string{"printenv", "APP_NAME"},

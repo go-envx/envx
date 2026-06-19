@@ -9,6 +9,7 @@ import (
 	"github.com/go-envx/envx/apps/envx/internal/config"
 	"github.com/go-envx/envx/apps/envx/internal/engine"
 	"github.com/go-envx/envx/apps/envx/internal/fixtures"
+	"github.com/go-envx/envx/apps/envx/internal/manifest"
 )
 
 // -------------------------------------------------------------------------------------
@@ -21,18 +22,18 @@ func (noChange) Changed(string) bool { return false }
 
 // -------------------------------------------------------------------------------------
 // resolveBasic loads the shared "basic" fixture and resolves the api-core
-// environment for the development environment.
+// project for the default (development) environment.
 func resolveBasic(t *testing.T) *engine.Result {
 	t.Helper()
-	cfg, err := config.Load(fixtures.Manifest("basic"))
+	m, err := manifest.New(fixtures.Manifest("basic"))
 	if err != nil {
 		t.Fatalf("load fixture: %v", err)
 	}
-	env, err := engine.ResolveEnv(&engine.Request{
-		Config:   cfg,
-		Project:  "api-core",
-		Settings: engine.Settings{Env: "development"},
-	})
+	ec, err := config.Resolve(m, "api-core", engine.Settings{}, noChange{})
+	if err != nil {
+		t.Fatalf("resolve fixture: %v", err)
+	}
+	env, err := engine.Resolve(ec)
 	if err != nil {
 		t.Fatalf("resolve fixture: %v", err)
 	}

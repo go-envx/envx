@@ -6,12 +6,12 @@ import (
 )
 
 // -------------------------------------------------------------------------------------
-// actionConfig is the get action's composed, typed config. Field types reflect
-// each value's role: Global is a shared pointer filled by cli.PreRunE, Settings
-// holds the raw flag values cobra binds (resolved via actions.ResolveSettings),
-// and Changed is the behavioral handle that drives settings precedence.
+// actionConfig is the get action's composed, typed config. ConfigPath points at
+// the persistent --config flag (loaded into a manifest in execute), Settings
+// holds the raw flag values cobra binds (resolved via config.Resolve), and
+// Changed is the behavioral handle that drives settings precedence.
 type actionConfig struct {
-	Global   *config.Global
-	Settings engine.Settings
-	Changed  config.FlagSet
+	ConfigPath *string
+	Settings   engine.Settings
+	Changed    config.FlagSet
 }

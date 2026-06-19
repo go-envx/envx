@@ -1,10 +1,8 @@
-// Package config owns the *mechanism* of configuration: discovery, loading,
-// parsing, and precedence resolution, plus the global manifest schema. It does
-// not dictate what any single action needs — actions compose their own typed
-// config from the shared pieces exported here. The package imports the pure
-// flags catalog but no CLI framework, so it stays reusable by a non-cobra
-// frontend.
-package config
+// Package manifest discovers, loads, parses, and validates the envx.yaml
+// workspace manifest. It owns the on-disk schema and read helpers but knows
+// nothing about precedence, CLI flags, or the engine — it is the single,
+// frontend-agnostic outlet for reading the manifest file.
+package manifest
 
 import (
 	"path/filepath"
@@ -12,9 +10,9 @@ import (
 )
 
 // -------------------------------------------------------------------------------------
-// Config is the parsed, validated envx.yaml. It holds the declared
+// Manifest is the parsed, validated envx.yaml. It holds the declared
 // environments, project definitions, and runtime settings.
-type Config struct {
+type Manifest struct {
 	Settings     Settings           `yaml:"settings"`
 	Environments []string           `yaml:"environments"`
 	Projects     map[string]Project `yaml:"projects"`
@@ -25,14 +23,9 @@ type Config struct {
 }
 
 // -------------------------------------------------------------------------------------
-// DefaultEnv is the environment used when none is selected via the --env flag,
-// the ENVX_ENV variable, or a manifest env setting.
-const DefaultEnv = "development"
-
-// -------------------------------------------------------------------------------------
 // Settings holds runtime configuration declared in the manifest. Booleans are
 // pointers so an explicitly-set false is distinguishable from "unset", which
-// matters for the precedence chain.
+// matters for the precedence chain applied downstream by the config package.
 type Settings struct {
 	Overload        *bool  `yaml:"overload"`
 	Strict          *bool  `yaml:"strict"`
@@ -61,27 +54,17 @@ type ProjectMatch struct {
 }
 
 // -------------------------------------------------------------------------------------
-// Global is the resolved root context shared by every action: the loaded
-// manifest and the path it came from. It is built once by cli.PersistentPreRunE
-// so every action observes the same immutable root. The target environment is no
-// longer part of this context — each action resolves it as a per-action setting.
-type Global struct {
-	Config     *Config
-	ConfigPath string
-}
-
-// -------------------------------------------------------------------------------------
 // Dir returns the absolute path to the directory containing the manifest. All
 // relative include paths are resolved against this directory.
-func (c *Config) Dir() string {
-	return c.dir
+func (m *Manifest) Dir() string {
+	return m.dir
 }
 
 // -------------------------------------------------------------------------------------
 // LookupProject finds a project by name, returning the match and whether one
 // was found.
-func (c *Config) LookupProject(name string) (ProjectMatch, bool) {
-	if p, ok := c.Projects[name]; ok {
+func (m *Manifest) LookupProject(name string) (ProjectMatch, bool) {
+	if p, ok := m.Projects[name]; ok {
 		return ProjectMatch{Name: name, Project: p}, true
 	}
 	return ProjectMatch{}, false
@@ -91,18 +74,18 @@ func (c *Config) LookupProject(name string) (ProjectMatch, bool) {
 // HasEnvironment reports whether env is declared in the manifest's environments
 // list. Undeclared environments are rejected early to catch typos before any
 // file I/O occurs.
-func (c *Config) HasEnvironment(env string) bool {
-	return slices.Contains(c.Environments, env)
+func (m *Manifest) HasEnvironment(env string) bool {
+	return slices.Contains(m.Environments, env)
 }
 
 // -------------------------------------------------------------------------------------
 // LookupInclude finds an include path across all projects by matching the full
 // include string. Returns the resolved absolute directory, the base name, and
 // whether a match was found. Used by the set action to locate a target overlay.
-func (c *Config) LookupInclude(includePath string) (dir, name string, ok bool) {
-	for _, p := range c.Projects {
+func (m *Manifest) LookupInclude(includePath string) (dir, name string, ok bool) {
+	for _, p := range m.Projects {
 		if slices.Contains(p.Includes, includePath) {
-			absDir := filepath.Join(c.dir, filepath.Dir(includePath))
+			absDir := filepath.Join(m.dir, filepath.Dir(includePath))
 			return absDir, filepath.Base(includePath), true
 		}
 	}

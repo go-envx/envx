@@ -4,7 +4,6 @@ package set
 
 import (
 	"github.com/go-envx/envx/apps/envx/internal/actions"
-	"github.com/go-envx/envx/apps/envx/internal/config"
 	"github.com/go-envx/envx/apps/envx/internal/shared/str"
 	"github.com/spf13/cobra"
 )
@@ -33,8 +32,9 @@ const (
 // -------------------------------------------------------------------------------------
 // NewCommand builds the "set" command. It parses the three positional args and
 // delegates to the shell, which resolves the target overlay without a project
-// (set never merges an environment). g is the shared root context.
-func NewCommand(g *config.Global) *cobra.Command {
+// (set never merges an environment). configPath points at the persistent
+// --config flag.
+func NewCommand(configPath *string) *cobra.Command {
 	var cfg actionConfig
 
 	cmd := &cobra.Command{
@@ -44,7 +44,7 @@ func NewCommand(g *config.Global) *cobra.Command {
 		Example: str.Dedent(example, 2),
 		Args:    cobra.ExactArgs(3),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			cfg.Global = g
+			cfg.ConfigPath = configPath
 			cfg.Changed = cmd.Flags()
 			return execute(actionParams{
 				IncludePath: args[0],

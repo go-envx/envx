@@ -4,22 +4,15 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
-
-	"github.com/go-envx/envx/apps/envx/internal/config"
 )
 
 // -------------------------------------------------------------------------------------
-// setupWorkspace builds a temp workspace with a manifest and one namespace and
-// returns the loaded manifest.
-func setupWorkspace(t *testing.T, manifest string) *config.Config {
+// setupWorkspace creates a temp workspace with one namespace (env/postgres) and
+// returns the workspace dir. The engine reads only the namespace overlays, never
+// the manifest, so no envx.yaml is needed.
+func setupWorkspace(t *testing.T) string {
 	t.Helper()
 	dir := t.TempDir()
-
-	if err := os.WriteFile(
-		filepath.Join(dir, "envx.yaml"), []byte(manifest), 0o600,
-	); err != nil {
-		t.Fatal(err)
-	}
 	envDir := filepath.Join(dir, "env")
 	if err := os.MkdirAll(envDir, 0o750); err != nil {
 		t.Fatal(err)
@@ -36,35 +29,30 @@ func setupWorkspace(t *testing.T, manifest string) *config.Config {
 	); err != nil {
 		t.Fatal(err)
 	}
-
-	cfg, err := config.Load(filepath.Join(dir, "envx.yaml"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	return cfg
+	return dir
 }
 
-const baseManifest = `
-environments: [development, production]
-projects:
-  db:
-    includes:
-      - env/postgres
-`
+// -------------------------------------------------------------------------------------
+// baseConfig builds an engine.Config for the temp workspace declaring the
+// development and production environments.
+func baseConfig(dir string) *Config {
+	return &Config{
+		Dir:          dir,
+		Includes:     []string{"env/postgres"},
+		Environments: []string{"development", "production"},
+	}
+}
 
 // -------------------------------------------------------------------------------------
-// TestResolveEnvSuccess verifies a project resolves to its merged environment.
-func TestResolveEnvSuccess(t *testing.T) {
+// TestResolveSuccess verifies a config resolves to its merged environment.
+func TestResolveSuccess(t *testing.T) {
 	t.Parallel()
 
-	g := setupWorkspace(t, baseManifest)
-	res, err := ResolveEnv(&Request{
-		Config:   g,
-		Project:  "db",
-		Settings: Settings{Env: "development"},
-	})
+	c := baseConfig(setupWorkspace(t))
+	c.Settings = Settings{Env: "development"}
+	res, err := Resolve(c)
 	if err != nil {
-		t.Fatalf("ResolveEnv: %v", err)
+		t.Fatalf("Resolve: %v", err)
 	}
 	if v, _ := res.Get("HOST"); v != "localhost" {
 		t.Errorf("HOST = %q, want localhost (development overlay absent)", v)
@@ -72,19 +60,31 @@ func TestResolveEnvSuccess(t *testing.T) {
 }
 
 // -------------------------------------------------------------------------------------
-// TestResolveEnvOverride verifies the resolved Settings.Env selects that
-// environment's overlay (as diff relies on, passing each side).
-func TestResolveEnvOverride(t *testing.T) {
+// TestResolveDefaultEnv verifies an empty Settings.Env falls back to DefaultEnv.
+func TestResolveDefaultEnv(t *testing.T) {
 	t.Parallel()
 
-	g := setupWorkspace(t, baseManifest)
-	res, err := ResolveEnv(&Request{
-		Config:   g,
-		Project:  "db",
-		Settings: Settings{Env: "production"},
-	})
+	c := baseConfig(setupWorkspace(t))
+	res, err := Resolve(c)
 	if err != nil {
-		t.Fatalf("ResolveEnv: %v", err)
+		t.Fatalf("Resolve: %v", err)
+	}
+	if v, _ := res.Get("HOST"); v != "localhost" {
+		t.Errorf("HOST = %q, want localhost (default env %q)", v, DefaultEnv)
+	}
+}
+
+// -------------------------------------------------------------------------------------
+// TestResolveOverride verifies Settings.Env selects that environment's overlay
+// (as diff relies on, passing each side).
+func TestResolveOverride(t *testing.T) {
+	t.Parallel()
+
+	c := baseConfig(setupWorkspace(t))
+	c.Settings = Settings{Env: "production"}
+	res, err := Resolve(c)
+	if err != nil {
+		t.Fatalf("Resolve: %v", err)
 	}
 	if v, _ := res.Get("HOST"); v != "prod-db" {
 		t.Errorf("HOST = %q, want prod-db", v)
@@ -92,23 +92,17 @@ func TestResolveEnvOverride(t *testing.T) {
 }
 
 // -------------------------------------------------------------------------------------
-// TestResolveEnvErrors verifies unknown projects and undeclared environments
-// fail.
-func TestResolveEnvErrors(t *testing.T) {
+// TestResolveErrors verifies an undeclared environment and a nil config fail.
+func TestResolveErrors(t *testing.T) {
 	t.Parallel()
 
-	g := setupWorkspace(t, baseManifest)
-
-	if _, err := ResolveEnv(&Request{
-		Config: g, Project: "missing",
-		Settings: Settings{Env: "development"},
-	}); err == nil {
-		t.Error("expected error for unknown project")
+	c := baseConfig(setupWorkspace(t))
+	c.Settings = Settings{Env: "nope"}
+	if _, err := Resolve(c); err == nil {
+		t.Error("expected error for undeclared environment")
 	}
 
-	if _, err := ResolveEnv(&Request{
-		Config: g, Project: "db", Settings: Settings{Env: "nope"},
-	}); err == nil {
-		t.Error("expected error for undeclared environment")
+	if _, err := Resolve(nil); err == nil {
+		t.Error("expected error for nil config")
 	}
 }

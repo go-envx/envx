@@ -7,37 +7,36 @@ import (
 	"path/filepath"
 
 	"github.com/go-envx/envx/apps/envx/internal/config"
-	"github.com/go-envx/envx/apps/envx/internal/flags"
+	"github.com/go-envx/envx/apps/envx/internal/engine"
+	"github.com/go-envx/envx/apps/envx/internal/manifest"
 	"github.com/go-envx/envx/apps/envx/internal/shared/file"
 	"gopkg.in/yaml.v3"
 )
 
 // -------------------------------------------------------------------------------------
-// execute is the imperative shell: it resolves the target environment
-// (--env > ENVX_ENV > manifest env > "development"), resolves the target overlay
-// from the include path, reads the current document, applies the pure transform,
-// and writes the result back atomically. set never calls engine.ResolveEnv — with
-// no project there is nothing to merge.
+// execute is the imperative shell: it loads the manifest, resolves the target
+// environment (--env > ENVX_ENV > manifest env > engine.DefaultEnv), resolves the
+// target overlay from the include path, reads the current document, applies the
+// pure transform, and writes the result back atomically. set never invokes the
+// engine — with no project there is nothing to merge.
 func execute(p actionParams, c actionConfig) error {
-	cfg := c.Global.Config
-	if cfg == nil {
-		return errors.New("set: no manifest loaded")
+	m, err := manifest.New(*c.ConfigPath)
+	if err != nil {
+		return err
 	}
 
-	env := config.NewResolver().String(
-		flags.Env, c.Changed, c.Env, cfg.Settings.Env,
-	)
+	env := config.ResolveEnv(m, c.Env, c.Changed)
 	if env == "" {
-		env = config.DefaultEnv
+		env = engine.DefaultEnv
 	}
-	if !cfg.HasEnvironment(env) {
+	if !m.HasEnvironment(env) {
 		return fmt.Errorf(
 			"environment %q is not declared in the manifest (available: %v)",
-			env, cfg.Environments,
+			env, m.Environments,
 		)
 	}
 
-	dir, name, ok := cfg.LookupInclude(p.IncludePath)
+	dir, name, ok := m.LookupInclude(p.IncludePath)
 	if !ok {
 		return fmt.Errorf("include %q not found in manifest", p.IncludePath)
 	}

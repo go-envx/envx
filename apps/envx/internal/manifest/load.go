@@ -1,4 +1,4 @@
-package config
+package manifest
 
 import (
 	"errors"
@@ -11,10 +11,22 @@ import (
 )
 
 // -------------------------------------------------------------------------------------
+// New discovers the manifest path (honoring an explicit --config value, then
+// ENVX_CONFIG, then a walk-up search) and loads it. It is the primary entry
+// point for obtaining a ready-to-use *Manifest.
+func New(path string) (*Manifest, error) {
+	found, err := Discover(path)
+	if err != nil {
+		return nil, err
+	}
+	return Load(found)
+}
+
+// -------------------------------------------------------------------------------------
 // Load reads, parses, and validates the manifest at path, returning a
-// ready-to-use *Config or an error describing what went wrong (file not found,
+// ready-to-use *Manifest or an error describing what went wrong (file not found,
 // parse error, or validation failure).
-func Load(path string) (*Config, error) {
+func Load(path string) (*Manifest, error) {
 	clean := filepath.Clean(path)
 	//nolint:gosec // path is user-controlled CLI input; Clean mitigates traversal
 	data, err := os.ReadFile(clean)
@@ -25,34 +37,34 @@ func Load(path string) (*Config, error) {
 }
 
 // -------------------------------------------------------------------------------------
-// parse unmarshals raw YAML into a Config, records the workspace root, and runs
+// parse unmarshals raw YAML into a Manifest, records the workspace root, and runs
 // structural validation.
-func parse(data []byte, dir string) (*Config, error) {
-	var c Config
-	if err := yaml.Unmarshal(data, &c); err != nil {
+func parse(data []byte, dir string) (*Manifest, error) {
+	var m Manifest
+	if err := yaml.Unmarshal(data, &m); err != nil {
 		return nil, fmt.Errorf("parsing manifest: %w", err)
 	}
-	c.dir = dir
+	m.dir = dir
 
-	if err := validate(&c); err != nil {
+	if err := validate(&m); err != nil {
 		return nil, err
 	}
-	return &c, nil
+	return &m, nil
 }
 
 // -------------------------------------------------------------------------------------
 // validate enforces structural constraints: at least one environment and one
 // project must be declared, every project must have at least one include, and
 // no include entry may be empty.
-func validate(c *Config) error {
-	if len(c.Environments) == 0 {
+func validate(m *Manifest) error {
+	if len(m.Environments) == 0 {
 		return errors.New("manifest: environments list must not be empty")
 	}
-	if len(c.Projects) == 0 {
+	if len(m.Projects) == 0 {
 		return errors.New("manifest: at least one project must be defined")
 	}
 
-	for name, p := range c.Projects {
+	for name, p := range m.Projects {
 		if len(p.Includes) == 0 {
 			return fmt.Errorf("manifest: project %q has no includes", name)
 		}

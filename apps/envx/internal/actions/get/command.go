@@ -6,7 +6,6 @@ import (
 	"fmt"
 
 	"github.com/go-envx/envx/apps/envx/internal/actions"
-	"github.com/go-envx/envx/apps/envx/internal/config"
 	"github.com/go-envx/envx/apps/envx/internal/shared/str"
 	"github.com/spf13/cobra"
 )
@@ -30,8 +29,8 @@ const (
 // -------------------------------------------------------------------------------------
 // NewCommand builds the "get" command. It is the only exported symbol: it parses
 // args into the action's params/config, calls the shell, and writes the value to
-// stdout. g is the shared root context populated by cli.PersistentPreRunE.
-func NewCommand(g *config.Global) *cobra.Command {
+// stdout. configPath points at the persistent --config flag.
+func NewCommand(configPath *string) *cobra.Command {
 	var cfg actionConfig
 
 	cmd := &cobra.Command{
@@ -41,7 +40,7 @@ func NewCommand(g *config.Global) *cobra.Command {
 		Example: str.Dedent(example, 2),
 		Args:    cobra.ExactArgs(2),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			cfg.Global = g
+			cfg.ConfigPath = configPath
 			cfg.Changed = cmd.Flags()
 
 			res, err := execute(actionParams{Project: args[0], Key: args[1]}, &cfg)

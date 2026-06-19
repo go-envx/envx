@@ -8,7 +8,6 @@ import (
 	"fmt"
 
 	"github.com/go-envx/envx/apps/envx/internal/actions"
-	"github.com/go-envx/envx/apps/envx/internal/config"
 	"github.com/go-envx/envx/apps/envx/internal/flags"
 	"github.com/go-envx/envx/apps/envx/internal/shared/str"
 	"github.com/spf13/cobra"
@@ -38,8 +37,9 @@ const (
 // -------------------------------------------------------------------------------------
 // NewCommand builds the "run" command. It splits args at "--" (a project before
 // it, the child command after), binds the engine flag group plus the run-local
-// --overload, and delegates to the shell. g is the shared root context.
-func NewCommand(g *config.Global) *cobra.Command {
+// --overload, and delegates to the shell. configPath points at the persistent
+// --config flag.
+func NewCommand(configPath *string) *cobra.Command {
 	var cfg actionConfig
 
 	cmd := &cobra.Command{
@@ -58,7 +58,7 @@ func NewCommand(g *config.Global) *cobra.Command {
 				return errors.New("no command specified after --")
 			}
 
-			cfg.Global = g
+			cfg.ConfigPath = configPath
 			cfg.Changed = cmd.Flags()
 
 			return execute(cmd.Context(), actionParams{

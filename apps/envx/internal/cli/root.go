@@ -1,8 +1,8 @@
 // Package cli builds the root "envx" cobra command and registers each action.
-// It owns the persistent --config flag and resolves the shared config.Global
-// exactly once in PersistentPreRunE, so every action observes the same immutable
-// root context. The target environment is not a root concern — each action
-// resolves it as a per-action setting.
+// It owns the persistent --config flag and forwards its value (a path string) to
+// every subcommand, which loads and resolves the manifest on demand. The target
+// environment is not a root concern — each action resolves it as a per-action
+// setting.
 package cli
 
 import (
@@ -11,7 +11,6 @@ import (
 	"github.com/go-envx/envx/apps/envx/internal/actions/get"
 	"github.com/go-envx/envx/apps/envx/internal/actions/run"
 	"github.com/go-envx/envx/apps/envx/internal/actions/set"
-	"github.com/go-envx/envx/apps/envx/internal/config"
 	"github.com/go-envx/envx/apps/envx/internal/flags"
 	"github.com/spf13/cobra"
 )
@@ -24,16 +23,11 @@ const (
 )
 
 // -------------------------------------------------------------------------------------
-// NewRootCmd builds the command tree. It registers the persistent --config flag,
-// resolves the shared config.Global once in PersistentPreRunE (skipped for
-// help/version and for the bare root), and hands a *config.Global to every action
-// so they share one immutable root context. version is injected from main at
-// build time.
+// NewRootCmd builds the command tree. It registers the persistent --config flag
+// and forwards its address to every action, which loads and resolves the
+// manifest on demand. version is injected from main at build time.
 func NewRootCmd(version string) *cobra.Command {
-	var (
-		configPath string
-		global     config.Global
-	)
+	var configPath string
 
 	root := &cobra.Command{
 		Use:           rootUsage,
@@ -52,26 +46,12 @@ func NewRootCmd(version string) *cobra.Command {
 		flags.Config.HelpText(),
 	)
 
-	root.PersistentPreRunE = func(cmd *cobra.Command, _ []string) error {
-		cmd.SilenceUsage = true
-		// The bare root (help/usage) needs no manifest; only subcommands do.
-		if !cmd.HasParent() {
-			return nil
-		}
-		g, err := config.Resolve(configPath)
-		if err != nil {
-			return err
-		}
-		global = g
-		return nil
-	}
-
 	root.AddCommand(
-		get.NewCommand(&global),
-		run.NewCommand(&global),
-		set.NewCommand(&global),
-		explain.NewCommand(&global),
-		diff.NewCommand(&global),
+		get.NewCommand(&configPath),
+		run.NewCommand(&configPath),
+		set.NewCommand(&configPath),
+		explain.NewCommand(&configPath),
+		diff.NewCommand(&configPath),
 	)
 	return root
 }

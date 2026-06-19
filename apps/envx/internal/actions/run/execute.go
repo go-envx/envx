@@ -3,23 +3,26 @@ package run
 import (
 	"context"
 
-	"github.com/go-envx/envx/apps/envx/internal/actions"
 	"github.com/go-envx/envx/apps/envx/internal/config"
 	"github.com/go-envx/envx/apps/envx/internal/engine"
 	"github.com/go-envx/envx/apps/envx/internal/flags"
+	"github.com/go-envx/envx/apps/envx/internal/manifest"
 )
 
 // -------------------------------------------------------------------------------------
-// execute is the imperative shell: resolve the settings precedence and the
-// environment, then the overload setting (flag > ENVX_OVERLOAD), then exec the
-// child process with it.
+// execute is the imperative shell: load and resolve the manifest into an
+// engine.Config, run the engine, resolve the overload setting (flag >
+// ENVX_OVERLOAD), then exec the child process with the merged environment.
 func execute(ctx context.Context, p actionParams, c *actionConfig) error {
-	settings := actions.ResolveSettings(c.Global, p.Project, c.Settings, c.Changed)
-	env, err := engine.ResolveEnv(&engine.Request{
-		Config:   c.Global.Config,
-		Project:  p.Project,
-		Settings: settings,
-	})
+	m, err := manifest.New(*c.ConfigPath)
+	if err != nil {
+		return err
+	}
+	ec, err := config.Resolve(m, p.Project, c.Settings, c.Changed)
+	if err != nil {
+		return err
+	}
+	env, err := engine.Resolve(ec)
 	if err != nil {
 		return err
 	}

@@ -11,7 +11,6 @@ import (
 	"text/tabwriter"
 
 	"github.com/go-envx/envx/apps/envx/internal/actions"
-	"github.com/go-envx/envx/apps/envx/internal/config"
 	"github.com/go-envx/envx/apps/envx/internal/flags"
 	"github.com/go-envx/envx/apps/envx/internal/shared/str"
 	"github.com/spf13/cobra"
@@ -49,8 +48,9 @@ type jsonEntry struct {
 // -------------------------------------------------------------------------------------
 // NewCommand builds the "explain" command. When the key arg is absent it leaves
 // params.Key empty (explain all keys). It binds the engine flag group plus
-// --reveal and --output, then renders the result.
-func NewCommand(g *config.Global) *cobra.Command {
+// --reveal and --output, then renders the result. configPath points at the
+// persistent --config flag.
+func NewCommand(configPath *string) *cobra.Command {
 	var cfg actionConfig
 
 	cmd := &cobra.Command{
@@ -60,7 +60,7 @@ func NewCommand(g *config.Global) *cobra.Command {
 		Example: str.Dedent(example, 2),
 		Args:    cobra.RangeArgs(1, 2),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			cfg.Global = g
+			cfg.ConfigPath = configPath
 			cfg.Changed = cmd.Flags()
 
 			p := actionParams{Project: args[0]}

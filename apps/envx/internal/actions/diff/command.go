@@ -11,7 +11,6 @@ import (
 	"text/tabwriter"
 
 	"github.com/go-envx/envx/apps/envx/internal/actions"
-	"github.com/go-envx/envx/apps/envx/internal/config"
 	"github.com/go-envx/envx/apps/envx/internal/flags"
 	"github.com/go-envx/envx/apps/envx/internal/shared/str"
 	"github.com/spf13/cobra"
@@ -55,7 +54,8 @@ type jsonResult struct {
 // -------------------------------------------------------------------------------------
 // NewCommand builds the "diff" command. It binds the engine flag group plus
 // --reveal and --output, runs the shell, and renders the structured diff.
-func NewCommand(g *config.Global) *cobra.Command {
+// configPath points at the persistent --config flag.
+func NewCommand(configPath *string) *cobra.Command {
 	var cfg actionConfig
 
 	cmd := &cobra.Command{
@@ -65,7 +65,7 @@ func NewCommand(g *config.Global) *cobra.Command {
 		Example: str.Dedent(example, 2),
 		Args:    cobra.ExactArgs(3),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			cfg.Global = g
+			cfg.ConfigPath = configPath
 			cfg.Changed = cmd.Flags()
 
 			res, err := execute(actionParams{
