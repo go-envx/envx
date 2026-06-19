@@ -4,11 +4,10 @@ import (
 	"bytes"
 	"context"
 	"io"
-	"path/filepath"
-	"runtime"
 	"testing"
 
 	"github.com/go-envx/envx/apps/envx/internal/config"
+	"github.com/go-envx/envx/apps/envx/internal/fixtures"
 )
 
 // -------------------------------------------------------------------------------------
@@ -16,11 +15,7 @@ import (
 // development environment.
 func loadGlobal(t *testing.T) config.Global {
 	t.Helper()
-	_, thisFile, _, _ := runtime.Caller(0)
-	cfgPath := filepath.Join(
-		filepath.Dir(thisFile), "..", "..", "..", "testdata", "basic", "envx.yaml",
-	)
-	cfg, err := config.Load(cfgPath)
+	cfg, err := config.Load(fixtures.Manifest("basic"))
 	if err != nil {
 		t.Fatalf("load fixture: %v", err)
 	}

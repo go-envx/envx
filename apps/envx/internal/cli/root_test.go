@@ -5,9 +5,10 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
-	"runtime"
 	"strings"
 	"testing"
+
+	"github.com/go-envx/envx/apps/envx/internal/fixtures"
 )
 
 // -------------------------------------------------------------------------------------
@@ -22,26 +23,6 @@ func execCmd(args ...string) (stdout, stderr *bytes.Buffer, err error) {
 	cmd.SetArgs(args)
 	err = cmd.Execute()
 	return stdout, stderr, err
-}
-
-// -------------------------------------------------------------------------------------
-// testdataDir returns the absolute path to a testdata subdirectory, resolved
-// relative to this test file.
-func testdataDir(t *testing.T, name string) string {
-	t.Helper()
-	_, thisFile, _, ok := runtime.Caller(0)
-	if !ok {
-		t.Fatal("cannot determine test file location")
-	}
-	dir := filepath.Join(filepath.Dir(thisFile), "..", "..", "testdata", name)
-	abs, err := filepath.Abs(dir)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if _, err := os.Stat(abs); err != nil {
-		t.Fatalf("testdata dir %q not found: %v", abs, err)
-	}
-	return abs
 }
 
 // -------------------------------------------------------------------------------------
@@ -71,13 +52,6 @@ func copyTree(t *testing.T, src, dst string) {
 			t.Fatal(err)
 		}
 	}
-}
-
-// -------------------------------------------------------------------------------------
-// basicManifest returns the path to the read-only "basic" fixture manifest.
-func basicManifest(t *testing.T) string {
-	t.Helper()
-	return filepath.Join(testdataDir(t, "basic"), "envx.yaml")
 }
 
 // -------------------------------------------------------------------------------------
@@ -114,7 +88,7 @@ func TestVersionFlag(t *testing.T) {
 func TestGet(t *testing.T) {
 	t.Parallel()
 
-	cfg := basicManifest(t)
+	cfg := fixtures.Manifest("basic")
 
 	tests := []struct {
 		name    string
@@ -176,7 +150,7 @@ func TestGet(t *testing.T) {
 func TestRun(t *testing.T) {
 	t.Parallel()
 
-	cfg := basicManifest(t)
+	cfg := fixtures.Manifest("basic")
 	stdout, _, err := execCmd(
 		"run", "--config", cfg, "--env", "development", "--overload",
 		"api-core", "--", "printenv", "APP_NAME",
@@ -194,7 +168,7 @@ func TestRun(t *testing.T) {
 func TestRunRequiresCommand(t *testing.T) {
 	t.Parallel()
 
-	cfg := basicManifest(t)
+	cfg := fixtures.Manifest("basic")
 	if _, _, err := execCmd("run", "--config", cfg, "api-core"); err == nil {
 		t.Fatal("expected error when no command follows --")
 	}
@@ -206,7 +180,7 @@ func TestSetRoundTrip(t *testing.T) {
 	t.Parallel()
 
 	work := t.TempDir()
-	copyTree(t, testdataDir(t, "basic"), work)
+	copyTree(t, fixtures.Testdata("basic"), work)
 	cfg := filepath.Join(work, "envx.yaml")
 
 	if _, _, err := execCmd(
@@ -233,7 +207,7 @@ func TestSetRoundTrip(t *testing.T) {
 func TestExplain(t *testing.T) {
 	t.Parallel()
 
-	cfg := basicManifest(t)
+	cfg := fixtures.Manifest("basic")
 
 	t.Run("masks by default", func(t *testing.T) {
 		t.Parallel()
@@ -290,7 +264,7 @@ func TestExplain(t *testing.T) {
 func TestDiff(t *testing.T) {
 	t.Parallel()
 
-	cfg := basicManifest(t)
+	cfg := fixtures.Manifest("basic")
 	stdout, _, err := execCmd(
 		"diff", "--config", cfg, "--reveal", "--output", "json",
 		"api-core", "development", "production",

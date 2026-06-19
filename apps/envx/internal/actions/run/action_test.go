@@ -4,12 +4,11 @@ import (
 	"bytes"
 	"context"
 	"io"
-	"path/filepath"
-	"runtime"
 	"testing"
 
 	"github.com/go-envx/envx/apps/envx/internal/config"
 	"github.com/go-envx/envx/apps/envx/internal/engine"
+	"github.com/go-envx/envx/apps/envx/internal/fixtures"
 )
 
 // -------------------------------------------------------------------------------------
@@ -25,11 +24,7 @@ func (noChange) Changed(string) bool { return false }
 // environment for the development environment.
 func resolveBasic(t *testing.T) *engine.Result {
 	t.Helper()
-	_, thisFile, _, _ := runtime.Caller(0)
-	cfgPath := filepath.Join(
-		filepath.Dir(thisFile), "..", "..", "..", "testdata", "basic", "envx.yaml",
-	)
-	cfg, err := config.Load(cfgPath)
+	cfg, err := config.Load(fixtures.Manifest("basic"))
 	if err != nil {
 		t.Fatalf("load fixture: %v", err)
 	}

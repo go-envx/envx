@@ -47,27 +47,3 @@ func TestDedent(t *testing.T) {
 		})
 	}
 }
-
-// -------------------------------------------------------------------------------------
-// TestContains verifies substring detection including the empty-substring and
-// too-long-substring edge cases.
-func TestContains(t *testing.T) {
-	t.Parallel()
-
-	tests := []struct {
-		s, substr string
-		want      bool
-	}{
-		{"hello world", "world", true},
-		{"hello", "", true},
-		{"hi", "hello", false},
-		{"abc", "abc", true},
-		{"abc", "d", false},
-	}
-
-	for _, tt := range tests {
-		if got := Contains(tt.s, tt.substr); got != tt.want {
-			t.Errorf("Contains(%q, %q) = %v, want %v", tt.s, tt.substr, got, tt.want)
-		}
-	}
-}

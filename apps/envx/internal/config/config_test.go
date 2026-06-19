@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/go-envx/envx/apps/envx/internal/fixtures"
 	"github.com/go-envx/envx/apps/envx/internal/flags"
 )
 
@@ -117,10 +118,7 @@ projects:
 func TestDiscoverExplicit(t *testing.T) {
 	t.Parallel()
 
-	path := writeManifest(t,
-		"environments: [development]\nprojects:\n  api:\n    includes: [env/x]\n",
-	)
-	got, err := Discover(path)
+	got, err := Discover(fixtures.Manifest("basic"))
 	if err != nil {
 		t.Fatalf("Discover: %v", err)
 	}
@@ -130,6 +128,41 @@ func TestDiscoverExplicit(t *testing.T) {
 
 	if _, err := Discover(filepath.Join(t.TempDir(), "missing.yaml")); err == nil {
 		t.Error("expected error for missing explicit path")
+	}
+}
+
+// -------------------------------------------------------------------------------------
+// TestDiscoverWalkUp verifies that with no explicit path or ENVX_CONFIG the
+// search walks up from the working directory to the nearest envx.yaml.
+func TestDiscoverWalkUp(t *testing.T) {
+	// t.Chdir and t.Setenv forbid t.Parallel.
+	t.Setenv(flags.Config.Env, "")
+
+	manifest := fixtures.Manifest("basic")
+	t.Chdir(filepath.Join(filepath.Dir(manifest), "apps", "api-core", "env"))
+
+	got, err := Discover("")
+	if err != nil {
+		t.Fatalf("Discover: %v", err)
+	}
+	if got != manifest {
+		t.Errorf("Discover() = %q, want %q", got, manifest)
+	}
+}
+
+// -------------------------------------------------------------------------------------
+// TestDiscoverEnvVar verifies ENVX_CONFIG is honored when no explicit path is
+// supplied.
+func TestDiscoverEnvVar(t *testing.T) {
+	manifest := fixtures.Manifest("basic")
+	t.Setenv(flags.Config.Env, manifest)
+
+	got, err := Discover("")
+	if err != nil {
+		t.Fatalf("Discover: %v", err)
+	}
+	if got != manifest {
+		t.Errorf("Discover() = %q, want %q", got, manifest)
 	}
 }
 
