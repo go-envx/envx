@@ -1,7 +1,7 @@
-// Package fixtures resolves absolute paths into the shared test-fixture tree
-// (apps/envx/testdata) from a single, fixed location. Test files across packages
-// use it instead of computing fragile "../.." offsets that depend on how deep
-// the calling package sits in the tree.
+// Package fixtures is a small collection of helpers for tapping into well-known
+// local directories from any package, regardless of how deep the caller sits in
+// the tree. It hands back stable absolute paths (e.g. the testdata fixture tree)
+// so tests never rely on fragile "../.." offsets.
 package fixtures
 
 import (
