@@ -17,15 +17,15 @@ func TestErrorMessage(t *testing.T) {
 }
 
 // -------------------------------------------------------------------------------------
-// TestErrorAs verifies the type is detectable via errors.As so main can recover
-// the code from a wrapped error.
-func TestErrorAs(t *testing.T) {
+// TestErrorAsType verifies the type is recoverable via errors.AsType so main
+// can extract the code from a wrapped error — mirroring the consumer path.
+func TestErrorAsType(t *testing.T) {
 	t.Parallel()
 
 	wrapped := errors.Join(errors.New("context"), &Error{Code: 7})
-	var ec *Error
-	if !errors.As(wrapped, &ec) {
-		t.Fatal("expected errors.As to find *Error")
+	ec, ok := errors.AsType[*Error](wrapped)
+	if !ok {
+		t.Fatal("expected errors.AsType to find *Error")
 	}
 	if ec.Code != 7 {
 		t.Errorf("Code = %d, want 7", ec.Code)

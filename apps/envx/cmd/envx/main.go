@@ -11,7 +11,7 @@ import (
 	"os/signal"
 
 	"github.com/go-envx/envx/apps/envx/internal/cli"
-	"github.com/go-envx/envx/apps/envx/internal/shared/exitcode"
+	"github.com/go-envx/envx/apps/envx/internal/exitcode"
 )
 
 // version is injected at build time via -ldflags.
@@ -32,9 +32,8 @@ func run() int {
 	defer stop()
 
 	if err := cli.NewRootCmd(version).ExecuteContext(ctx); err != nil {
-		var ec *exitcode.Error
-		if errors.As(err, &ec) {
-			return ec.Code
+		if exitErr, ok := errors.AsType[*exitcode.Error](err); ok {
+			return exitErr.Code
 		}
 		fmt.Fprintln(os.Stderr, "Error:", err)
 		return 1

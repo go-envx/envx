@@ -6,7 +6,7 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/go-envx/envx/apps/envx/internal/shared/exitcode"
+	"github.com/go-envx/envx/apps/envx/internal/exitcode"
 )
 
 // -------------------------------------------------------------------------------------

@@ -16,7 +16,7 @@ import (
 	"os/signal"
 	"syscall"
 
-	"github.com/go-envx/envx/apps/envx/internal/shared/exitcode"
+	"github.com/go-envx/envx/apps/envx/internal/exitcode"
 )
 
 // -------------------------------------------------------------------------------------
