@@ -8,8 +8,8 @@ import (
 
 	"github.com/go-envx/envx/apps/envx/internal/config"
 	"github.com/go-envx/envx/apps/envx/internal/engine"
+	"github.com/go-envx/envx/apps/envx/internal/file"
 	"github.com/go-envx/envx/apps/envx/internal/manifest"
-	"github.com/go-envx/envx/apps/envx/internal/shared/file"
 	"gopkg.in/yaml.v3"
 )
 

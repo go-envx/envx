@@ -9,7 +9,7 @@ import (
 
 	"github.com/go-envx/envx/apps/envx/internal/actions"
 	"github.com/go-envx/envx/apps/envx/internal/flags"
-	"github.com/go-envx/envx/apps/envx/internal/shared/str"
+	"github.com/go-envx/envx/apps/envx/internal/str"
 	"github.com/spf13/cobra"
 )
 

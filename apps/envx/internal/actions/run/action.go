@@ -5,7 +5,7 @@ import (
 	"io"
 
 	"github.com/go-envx/envx/apps/envx/internal/engine"
-	"github.com/go-envx/envx/apps/envx/internal/shared/runner"
+	"github.com/go-envx/envx/apps/envx/internal/runner"
 )
 
 // -------------------------------------------------------------------------------------
