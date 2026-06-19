@@ -1,15 +1,19 @@
 package explain
 
-import "github.com/go-envx/envx/apps/envx/internal/engine"
+import (
+	"github.com/go-envx/envx/apps/envx/internal/actions"
+	"github.com/go-envx/envx/apps/envx/internal/engine"
+)
 
 // -------------------------------------------------------------------------------------
-// execute is the imperative shell: one engine.ResolveEnv, then the pure core.
+// execute is the imperative shell: resolve settings, one engine.ResolveEnv, then
+// the pure core.
 func execute(p actionParams, c *actionConfig) (actionResult, error) {
+	settings := actions.ResolveSettings(c.Global, p.Project, c.Settings, c.Changed)
 	env, err := engine.ResolveEnv(&engine.Request{
-		Global:  *c.Global,
-		Project: p.Project,
-		Flags:   c.Flags,
-		Changed: c.Changed,
+		Config:   c.Global.Config,
+		Project:  p.Project,
+		Settings: settings,
 	})
 	if err != nil {
 		return actionResult{}, err

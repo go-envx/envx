@@ -29,9 +29,9 @@ func resolveBasic(t *testing.T) *engine.Result {
 		t.Fatalf("load fixture: %v", err)
 	}
 	env, err := engine.ResolveEnv(&engine.Request{
-		Global:  config.Global{Config: cfg, Environment: "development"},
-		Project: "api-core",
-		Changed: noChange{},
+		Config:   cfg,
+		Project:  "api-core",
+		Settings: engine.Settings{Env: "development"},
 	})
 	if err != nil {
 		t.Fatalf("resolve fixture: %v", err)

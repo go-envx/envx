@@ -3,20 +3,22 @@ package run
 import (
 	"context"
 
+	"github.com/go-envx/envx/apps/envx/internal/actions"
 	"github.com/go-envx/envx/apps/envx/internal/config"
 	"github.com/go-envx/envx/apps/envx/internal/engine"
 	"github.com/go-envx/envx/apps/envx/internal/flags"
 )
 
 // -------------------------------------------------------------------------------------
-// execute is the imperative shell: resolve the environment and the overload
-// setting (flag > ENVX_OVERLOAD), then exec the child process with it.
+// execute is the imperative shell: resolve the settings precedence and the
+// environment, then the overload setting (flag > ENVX_OVERLOAD), then exec the
+// child process with it.
 func execute(ctx context.Context, p actionParams, c *actionConfig) error {
+	settings := actions.ResolveSettings(c.Global, p.Project, c.Settings, c.Changed)
 	env, err := engine.ResolveEnv(&engine.Request{
-		Global:  *c.Global,
-		Project: p.Project,
-		Flags:   c.Flags,
-		Changed: c.Changed,
+		Config:   c.Global.Config,
+		Project:  p.Project,
+		Settings: settings,
 	})
 	if err != nil {
 		return err

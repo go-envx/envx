@@ -10,14 +10,6 @@ import (
 )
 
 // -------------------------------------------------------------------------------------
-// noChange is a config.FlagSet stub reporting that no flag was set.
-type noChange struct{}
-
-// -------------------------------------------------------------------------------------
-// Changed always reports false.
-func (noChange) Changed(string) bool { return false }
-
-// -------------------------------------------------------------------------------------
 // resolveBasic loads the shared "basic" fixture and resolves the api-core
 // environment for the development environment.
 func resolveBasic(t *testing.T) *engine.Result {
@@ -27,9 +19,9 @@ func resolveBasic(t *testing.T) *engine.Result {
 		t.Fatalf("load fixture: %v", err)
 	}
 	env, err := engine.ResolveEnv(&engine.Request{
-		Global:  config.Global{Config: cfg, Environment: "development"},
-		Project: "api-core",
-		Changed: noChange{},
+		Config:   cfg,
+		Project:  "api-core",
+		Settings: engine.Settings{Env: "development"},
 	})
 	if err != nil {
 		t.Fatalf("resolve fixture: %v", err)

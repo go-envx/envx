@@ -19,7 +19,7 @@ func loadGlobal(t *testing.T) config.Global {
 	if err != nil {
 		t.Fatalf("load fixture: %v", err)
 	}
-	return config.Global{Config: cfg, Environment: "development"}
+	return config.Global{Config: cfg}
 }
 
 // -------------------------------------------------------------------------------------

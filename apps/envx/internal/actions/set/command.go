@@ -3,6 +3,7 @@
 package set
 
 import (
+	"github.com/go-envx/envx/apps/envx/internal/actions"
 	"github.com/go-envx/envx/apps/envx/internal/config"
 	"github.com/go-envx/envx/apps/envx/internal/shared/str"
 	"github.com/spf13/cobra"
@@ -20,7 +21,7 @@ const (
 		exactly (e.g. "env/postgres", "apps/api-core/env/api-core").
 
 		The target environment is determined by the --env flag, the ENVX_ENV env
-		var, a manifest default_environment setting, or defaults to "development".
+		var, a manifest env setting, or defaults to "development".
 	`
 	example = `
 		envx set env/postgres password insecure-password
@@ -42,8 +43,9 @@ func NewCommand(g *config.Global) *cobra.Command {
 		Long:    str.Dedent(long),
 		Example: str.Dedent(example, 2),
 		Args:    cobra.ExactArgs(3),
-		RunE: func(_ *cobra.Command, args []string) error {
+		RunE: func(cmd *cobra.Command, args []string) error {
 			cfg.Global = g
+			cfg.Changed = cmd.Flags()
 			return execute(actionParams{
 				IncludePath: args[0],
 				Key:         args[1],
@@ -52,5 +54,6 @@ func NewCommand(g *config.Global) *cobra.Command {
 		},
 	}
 
+	actions.RegisterEnvFlag(cmd, &cfg.Env)
 	return cmd
 }

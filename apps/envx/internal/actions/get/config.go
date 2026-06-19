@@ -7,11 +7,11 @@ import (
 
 // -------------------------------------------------------------------------------------
 // actionConfig is the get action's composed, typed config. Field types reflect
-// each value's role: Global is a shared pointer filled by cli.PreRunE, Flags is
-// owned locally (cobra binds into it), and Changed is the behavioral handle that
-// drives settings precedence.
+// each value's role: Global is a shared pointer filled by cli.PreRunE, Settings
+// holds the raw flag values cobra binds (resolved via actions.ResolveSettings),
+// and Changed is the behavioral handle that drives settings precedence.
 type actionConfig struct {
-	Global  *config.Global
-	Flags   engine.Flags
-	Changed config.FlagSet
+	Global   *config.Global
+	Settings engine.Settings
+	Changed  config.FlagSet
 }

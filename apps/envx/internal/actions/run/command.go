@@ -26,7 +26,7 @@ const (
 		values; use --overload to let file values win instead.
 
 		The target environment is determined by the --env flag, the ENVX_ENV env
-		var, a manifest default_environment setting, or defaults to "development".
+		var, a manifest env setting, or defaults to "development".
 	`
 	example = `
 		envx run api-core -- npm start
@@ -70,7 +70,8 @@ func NewCommand(g *config.Global) *cobra.Command {
 		},
 	}
 
-	actions.RegisterEngineFlags(cmd, &cfg.Flags)
+	actions.RegisterEngineFlags(cmd, &cfg.Settings)
+	actions.RegisterEnvFlag(cmd, &cfg.Settings.Env)
 	cmd.Flags().BoolVarP(
 		&cfg.Overload, flags.Overload.Name, flags.Overload.Short, false,
 		flags.Overload.HelpText(),

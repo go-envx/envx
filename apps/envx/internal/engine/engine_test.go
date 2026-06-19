@@ -9,19 +9,9 @@ import (
 )
 
 // -------------------------------------------------------------------------------------
-// engineFlagSet is a test double for config.FlagSet.
-type engineFlagSet struct {
-	changed map[string]bool
-}
-
-// -------------------------------------------------------------------------------------
-// Changed reports whether name was marked changed in the fixture.
-func (f engineFlagSet) Changed(name string) bool { return f.changed[name] }
-
-// -------------------------------------------------------------------------------------
 // setupWorkspace builds a temp workspace with a manifest and one namespace and
-// returns the loaded global context.
-func setupWorkspace(t *testing.T, manifest string) config.Global {
+// returns the loaded manifest.
+func setupWorkspace(t *testing.T, manifest string) *config.Config {
 	t.Helper()
 	dir := t.TempDir()
 
@@ -51,7 +41,7 @@ func setupWorkspace(t *testing.T, manifest string) config.Global {
 	if err != nil {
 		t.Fatal(err)
 	}
-	return config.Global{Config: cfg, Environment: "development"}
+	return cfg
 }
 
 const baseManifest = `
@@ -69,9 +59,9 @@ func TestResolveEnvSuccess(t *testing.T) {
 
 	g := setupWorkspace(t, baseManifest)
 	res, err := ResolveEnv(&Request{
-		Global:  g,
-		Project: "db",
-		Changed: engineFlagSet{changed: map[string]bool{}},
+		Config:   g,
+		Project:  "db",
+		Settings: Settings{Env: "development"},
 	})
 	if err != nil {
 		t.Fatalf("ResolveEnv: %v", err)
@@ -82,51 +72,22 @@ func TestResolveEnvSuccess(t *testing.T) {
 }
 
 // -------------------------------------------------------------------------------------
-// TestResolveEnvOverride verifies an explicit Request.Environment selects that
-// environment's overlay (as diff relies on).
+// TestResolveEnvOverride verifies the resolved Settings.Env selects that
+// environment's overlay (as diff relies on, passing each side).
 func TestResolveEnvOverride(t *testing.T) {
 	t.Parallel()
 
 	g := setupWorkspace(t, baseManifest)
 	res, err := ResolveEnv(&Request{
-		Global:      g,
-		Project:     "db",
-		Environment: "production",
-		Changed:     engineFlagSet{changed: map[string]bool{}},
+		Config:   g,
+		Project:  "db",
+		Settings: Settings{Env: "production"},
 	})
 	if err != nil {
 		t.Fatalf("ResolveEnv: %v", err)
 	}
 	if v, _ := res.Get("HOST"); v != "prod-db" {
 		t.Errorf("HOST = %q, want prod-db", v)
-	}
-}
-
-// -------------------------------------------------------------------------------------
-// TestResolveEnvProjectDefault verifies a project default_environment is used
-// when neither --env nor ENVX_ENV is set.
-func TestResolveEnvProjectDefault(t *testing.T) {
-	g := setupWorkspace(t, `
-environments: [development, production]
-projects:
-  db:
-    settings:
-      default_environment: production
-    includes:
-      - env/postgres
-`)
-	// Global.Environment defaults to development; the project default should
-	// win because the user did not set --env / ENVX_ENV.
-	res, err := ResolveEnv(&Request{
-		Global:  g,
-		Project: "db",
-		Changed: engineFlagSet{changed: map[string]bool{}},
-	})
-	if err != nil {
-		t.Fatalf("ResolveEnv: %v", err)
-	}
-	if v, _ := res.Get("HOST"); v != "prod-db" {
-		t.Errorf("HOST = %q, want prod-db (project default)", v)
 	}
 }
 
@@ -139,15 +100,14 @@ func TestResolveEnvErrors(t *testing.T) {
 	g := setupWorkspace(t, baseManifest)
 
 	if _, err := ResolveEnv(&Request{
-		Global: g, Project: "missing",
-		Changed: engineFlagSet{changed: map[string]bool{}},
+		Config: g, Project: "missing",
+		Settings: Settings{Env: "development"},
 	}); err == nil {
 		t.Error("expected error for unknown project")
 	}
 
 	if _, err := ResolveEnv(&Request{
-		Global: g, Project: "db", Environment: "nope",
-		Changed: engineFlagSet{changed: map[string]bool{}},
+		Config: g, Project: "db", Settings: Settings{Env: "nope"},
 	}); err == nil {
 		t.Error("expected error for undeclared environment")
 	}

@@ -80,7 +80,7 @@ func NewCommand(g *config.Global) *cobra.Command {
 		},
 	}
 
-	actions.RegisterEngineFlags(cmd, &cfg.Flags)
+	actions.RegisterEngineFlags(cmd, &cfg.Settings)
 	cmd.Flags().BoolVar(&cfg.Reveal, flags.Reveal.Name, false, flags.Reveal.HelpText())
 	cmd.Flags().StringVarP(
 		&cfg.Output, flags.Output.Name, flags.Output.Short, "table",

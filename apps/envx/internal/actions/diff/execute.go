@@ -1,28 +1,34 @@
 package diff
 
-import "github.com/go-envx/envx/apps/envx/internal/engine"
+import (
+	"github.com/go-envx/envx/apps/envx/internal/actions"
+	"github.com/go-envx/envx/apps/envx/internal/engine"
+)
 
 // -------------------------------------------------------------------------------------
-// execute is the imperative shell: it resolves the project once per environment
-// (passing each side via Request.Environment) and feeds both results to the pure
-// core.
+// execute is the imperative shell: it resolves the merge settings once, then
+// resolves the project under each environment (overriding Settings.Env with each
+// positional side) and feeds both results to the pure core.
 func execute(p actionParams, c *actionConfig) (actionResult, error) {
+	settings := actions.ResolveSettings(c.Global, p.Project, c.Settings, c.Changed)
+
+	leftSettings := settings
+	leftSettings.Env = p.LeftEnv
 	left, err := engine.ResolveEnv(&engine.Request{
-		Global:      *c.Global,
-		Project:     p.Project,
-		Environment: p.LeftEnv,
-		Flags:       c.Flags,
-		Changed:     c.Changed,
+		Config:   c.Global.Config,
+		Project:  p.Project,
+		Settings: leftSettings,
 	})
 	if err != nil {
 		return actionResult{}, err
 	}
+
+	rightSettings := settings
+	rightSettings.Env = p.RightEnv
 	right, err := engine.ResolveEnv(&engine.Request{
-		Global:      *c.Global,
-		Project:     p.Project,
-		Environment: p.RightEnv,
-		Flags:       c.Flags,
-		Changed:     c.Changed,
+		Config:   c.Global.Config,
+		Project:  p.Project,
+		Settings: rightSettings,
 	})
 	if err != nil {
 		return actionResult{}, err

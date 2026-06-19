@@ -14,19 +14,17 @@ import (
 	"sort"
 
 	"github.com/go-envx/envx/apps/envx/internal/config"
-	"github.com/go-envx/envx/apps/envx/internal/flags"
 )
 
 // -------------------------------------------------------------------------------------
-// Request is the input contract for ResolveEnv. Environment is an optional
-// per-call override (diff passes each side); when empty the engine derives the
-// environment from the shared Global plus project/manifest defaults.
+// Request is the input contract for ResolveEnv: the loaded manifest, the target
+// project, and the fully-resolved settings (including the target environment).
+// All precedence resolution happens at the action edge, so the engine merely
+// validates and merges.
 type Request struct {
-	Global      config.Global
-	Project     string
-	Environment string
-	Flags       Flags
-	Changed     config.FlagSet
+	Config   *config.Config
+	Project  string
+	Settings Settings
 }
 
 // -------------------------------------------------------------------------------------
@@ -90,12 +88,12 @@ func (r *Result) Keys() []string {
 }
 
 // -------------------------------------------------------------------------------------
-// ResolveEnv is the single entry point: it looks up the project, resolves and
-// validates the target environment, resolves the merge settings, builds the
-// namespace chain from the project's includes, deep-merges them, and returns an
-// immutable Result. This is the only effectful engine call an action makes.
+// ResolveEnv is the single entry point: it looks up the project, validates the
+// resolved target environment, builds the namespace chain from the project's
+// includes, deep-merges them, and returns an immutable Result. This is the only
+// effectful engine call an action makes.
 func ResolveEnv(req *Request) (*Result, error) {
-	cfg := req.Global.Config
+	cfg := req.Config
 	if cfg == nil {
 		return nil, errors.New("engine: no manifest loaded")
 	}
@@ -106,8 +104,7 @@ func ResolveEnv(req *Request) (*Result, error) {
 	}
 	proj := match.Project
 
-	resolver := config.NewResolver()
-	env := resolveEnvironment(req, &proj, resolver)
+	env := req.Settings.Env
 	if !cfg.HasEnvironment(env) {
 		return nil, fmt.Errorf(
 			"environment %q is not declared in the manifest (available: %v)",
@@ -115,63 +112,13 @@ func ResolveEnv(req *Request) (*Result, error) {
 		)
 	}
 
-	opts := resolveOptions(req, &proj, cfg, resolver)
+	opts := mergeOptions{
+		strict:          req.Settings.Strict,
+		prefix:          req.Settings.Prefix,
+		suffix:          req.Settings.Suffix,
+		namespacePrefix: req.Settings.NamespacePrefix,
+	}
 	return mergeNamespaces(buildNamespaces(cfg, &proj), env, opts)
-}
-
-// -------------------------------------------------------------------------------------
-// resolveEnvironment applies the environment precedence (first non-empty wins):
-// explicit per-call override > --env/ENVX_ENV > project default > the base
-// Global.Environment (which already folds in the global default and the
-// "development" fallback).
-func resolveEnvironment(
-	req *Request, proj *config.Project, resolver *config.Resolver,
-) string {
-	if req.Environment != "" {
-		return req.Environment
-	}
-
-	explicit := req.Changed != nil && req.Changed.Changed(flags.Env.Name)
-	if !explicit {
-		if _, ok := resolver.LookupEnv(flags.Env.Env); ok {
-			explicit = true
-		}
-	}
-	if explicit {
-		return req.Global.Environment
-	}
-
-	if proj.Settings.DefaultEnvironment != "" {
-		return proj.Settings.DefaultEnvironment
-	}
-	return req.Global.Environment
-}
-
-// -------------------------------------------------------------------------------------
-// resolveOptions resolves the merge settings (strict/prefix/suffix/namespace)
-// using the precedence flag > ENVX_* > project setting > global setting > zero.
-func resolveOptions(
-	req *Request, proj *config.Project, cfg *config.Config,
-	resolver *config.Resolver,
-) mergeOptions {
-	return mergeOptions{
-		strict: resolver.Bool(
-			flags.Strict, req.Changed, req.Flags.Strict,
-			proj.Settings.Strict, cfg.Settings.Strict,
-		),
-		prefix: resolver.String(
-			flags.Prefix, req.Changed, req.Flags.Prefix,
-			proj.Settings.Prefix, cfg.Settings.Prefix,
-		),
-		suffix: resolver.String(
-			flags.Suffix, req.Changed, req.Flags.Suffix,
-			proj.Settings.Suffix, cfg.Settings.Suffix,
-		),
-		namespacePrefix: resolver.Bool(
-			flags.NamespacePrefix, req.Changed, req.Flags.NamespacePrefix,
-			proj.Settings.NamespacePrefix, cfg.Settings.NamespacePrefix,
-		),
-	}
 }
 
 // -------------------------------------------------------------------------------------

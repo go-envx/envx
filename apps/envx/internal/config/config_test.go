@@ -167,40 +167,33 @@ func TestDiscoverEnvVar(t *testing.T) {
 }
 
 // -------------------------------------------------------------------------------------
-// TestResolveEnvironmentPrecedence verifies the base environment follows
-// flag > ENVX_ENV > manifest default > "development".
-func TestResolveEnvironmentPrecedence(t *testing.T) {
-	body := `
+// TestResolveLoadsManifest verifies Resolve discovers and loads the manifest
+// into the shared root context. Environment selection is no longer part of the
+// root context — each action resolves its own target environment.
+func TestResolveLoadsManifest(t *testing.T) {
+	t.Parallel()
+
+	path := writeManifest(t, `
 environments: [development, staging, production]
 settings:
-  default_environment: staging
+  env: staging
 projects:
   api:
     includes: [env/x]
-`
-	t.Run("flag wins", func(t *testing.T) {
-		path := writeManifest(t, body)
-		changed := fakeFlagSet{changed: map[string]bool{flags.Env.Name: true}}
-		g, err := Resolve(path, "production", changed)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if g.Environment != "production" {
-			t.Errorf("Environment = %q, want production", g.Environment)
-		}
-	})
-
-	t.Run("manifest default when unset", func(t *testing.T) {
-		path := writeManifest(t, body)
-		changed := fakeFlagSet{changed: map[string]bool{}}
-		g, err := Resolve(path, "", changed)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if g.Environment != "staging" {
-			t.Errorf("Environment = %q, want staging", g.Environment)
-		}
-	})
+`)
+	g, err := Resolve(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if g.Config == nil {
+		t.Fatal("expected manifest to be loaded")
+	}
+	if g.ConfigPath != path {
+		t.Errorf("ConfigPath = %q, want %q", g.ConfigPath, path)
+	}
+	if g.Config.Settings.Env != "staging" {
+		t.Errorf("Settings.Env = %q, want staging", g.Config.Settings.Env)
+	}
 }
 
 // -------------------------------------------------------------------------------------

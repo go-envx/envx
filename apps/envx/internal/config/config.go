@@ -25,16 +25,21 @@ type Config struct {
 }
 
 // -------------------------------------------------------------------------------------
+// DefaultEnv is the environment used when none is selected via the --env flag,
+// the ENVX_ENV variable, or a manifest env setting.
+const DefaultEnv = "development"
+
+// -------------------------------------------------------------------------------------
 // Settings holds runtime configuration declared in the manifest. Booleans are
 // pointers so an explicitly-set false is distinguishable from "unset", which
 // matters for the precedence chain.
 type Settings struct {
-	Overload           *bool  `yaml:"overload"`
-	Strict             *bool  `yaml:"strict"`
-	Prefix             string `yaml:"prefix"`
-	Suffix             string `yaml:"suffix"`
-	NamespacePrefix    *bool  `yaml:"namespace_prefix"`
-	DefaultEnvironment string `yaml:"default_environment"`
+	Overload        *bool  `yaml:"overload"`
+	Strict          *bool  `yaml:"strict"`
+	Prefix          string `yaml:"prefix"`
+	Suffix          string `yaml:"suffix"`
+	NamespacePrefix *bool  `yaml:"namespace_prefix"`
+	Env             string `yaml:"env"`
 }
 
 // -------------------------------------------------------------------------------------
@@ -57,12 +62,12 @@ type ProjectMatch struct {
 
 // -------------------------------------------------------------------------------------
 // Global is the resolved root context shared by every action: the loaded
-// manifest, the path it came from, and the base environment. It is built once
-// by cli.PersistentPreRunE so every action observes the same immutable root.
+// manifest and the path it came from. It is built once by cli.PersistentPreRunE
+// so every action observes the same immutable root. The target environment is no
+// longer part of this context — each action resolves it as a per-action setting.
 type Global struct {
-	Config      *Config
-	ConfigPath  string
-	Environment string // flag > ENVX_ENV > manifest default > "development"
+	Config     *Config
+	ConfigPath string
 }
 
 // -------------------------------------------------------------------------------------

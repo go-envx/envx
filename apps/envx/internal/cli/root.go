@@ -1,7 +1,8 @@
 // Package cli builds the root "envx" cobra command and registers each action.
-// It owns the persistent --config and --env flags and resolves the shared
-// config.Global exactly once in PersistentPreRunE, so every action observes the
-// same immutable root context.
+// It owns the persistent --config flag and resolves the shared config.Global
+// exactly once in PersistentPreRunE, so every action observes the same immutable
+// root context. The target environment is not a root concern — each action
+// resolves it as a per-action setting.
 package cli
 
 import (
@@ -23,15 +24,14 @@ const (
 )
 
 // -------------------------------------------------------------------------------------
-// NewRootCmd builds the command tree. It registers the persistent --config and
-// --env flags, resolves the shared config.Global once in PersistentPreRunE
-// (skipped for help/version and for the bare root), and hands a *config.Global
-// to every action so they share one immutable root context. version is injected
-// from main at build time.
+// NewRootCmd builds the command tree. It registers the persistent --config flag,
+// resolves the shared config.Global once in PersistentPreRunE (skipped for
+// help/version and for the bare root), and hands a *config.Global to every action
+// so they share one immutable root context. version is injected from main at
+// build time.
 func NewRootCmd(version string) *cobra.Command {
 	var (
 		configPath string
-		envName    string
 		global     config.Global
 	)
 
@@ -51,9 +51,6 @@ func NewRootCmd(version string) *cobra.Command {
 		&configPath, flags.Config.Name, flags.Config.Short, "",
 		flags.Config.HelpText(),
 	)
-	pf.StringVarP(
-		&envName, flags.Env.Name, flags.Env.Short, "", flags.Env.HelpText(),
-	)
 
 	root.PersistentPreRunE = func(cmd *cobra.Command, _ []string) error {
 		cmd.SilenceUsage = true
@@ -61,7 +58,7 @@ func NewRootCmd(version string) *cobra.Command {
 		if !cmd.HasParent() {
 			return nil
 		}
-		g, err := config.Resolve(configPath, envName, cmd.Flags())
+		g, err := config.Resolve(configPath)
 		if err != nil {
 			return err
 		}

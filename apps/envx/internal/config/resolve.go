@@ -21,11 +21,10 @@ type FlagSet interface {
 }
 
 // -------------------------------------------------------------------------------------
-// Resolve assembles the shared Global root context: it discovers and loads the
-// manifest, then resolves the base environment via the precedence
-// flag > ENVX_ENV > manifest default > "development". The returned Global is
-// what every action observes through cli's PersistentPreRunE.
-func Resolve(configFlag, envFlag string, changed FlagSet) (Global, error) {
+// Resolve assembles the shared Global root context by discovering and loading
+// the manifest. Environment selection is no longer part of the root context:
+// each action resolves its own target environment as a per-action setting.
+func Resolve(configFlag string) (Global, error) {
 	path, err := Discover(configFlag)
 	if err != nil {
 		return Global{}, err
@@ -35,18 +34,9 @@ func Resolve(configFlag, envFlag string, changed FlagSet) (Global, error) {
 		return Global{}, err
 	}
 
-	env := NewResolver().String(
-		flags.Env, changed, envFlag,
-		cfg.Settings.DefaultEnvironment,
-	)
-	if env == "" {
-		env = "development"
-	}
-
 	return Global{
-		Config:      cfg,
-		ConfigPath:  path,
-		Environment: env,
+		Config:     cfg,
+		ConfigPath: path,
 	}, nil
 }
 
