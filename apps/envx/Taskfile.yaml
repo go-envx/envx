@@ -1,6 +1,14 @@
 version: '3'
 
 tasks:
+  all:
+    desc: 'Run the full pipeline in series: check, test, build, install'
+    cmds:
+      - task: check
+      - task: test
+      - task: build
+      - task: install
+
   run:
     desc: 'Run the CLI on the fly (usage: task run -- <args>)'
     cmds:
