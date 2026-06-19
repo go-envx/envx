@@ -215,6 +215,30 @@ Example: `  myapp deploy staging
 - Use Cobra's `doc.GenMarkdownTree` or `doc.GenManTree` to auto-generate reference documentation.
 - Review generated help output as part of development. Help text is UX.
 
+### Code Comments
+
+**Every `func` and `type` — exported or not, no matter how trivial — must be
+preceded by a block-header doc comment. This is mandatory and is never skipped.**
+The header is a full-width divider line followed by a Go-style doc comment that
+begins with the symbol's name and clearly states its purpose:
+
+```go
+// -------------------------------------------------------------------------------------
+// newServeCmd creates the "serve" subcommand. It wires flag and argument
+// parsing to the feature's core logic and writes results to the command's
+// output stream.
+func newServeCmd(deps *Deps) *cobra.Command { ... }
+
+// -------------------------------------------------------------------------------------
+// Options holds the resolved settings a command hands to its core logic.
+type Options struct { ... }
+```
+
+- The divider makes symbol boundaries easy to scan in large files.
+- Begin the prose with the identifier name (standard Go doc-comment form), then
+  describe what it does and why — not how.
+- Apply it to one-line helpers and tiny structs too; uniformity is the point.
+
 ## 13. Shell Completions
 
 - Ship a `completion` subcommand — Cobra provides built-in support for bash, zsh, fish, and PowerShell.
@@ -319,6 +343,7 @@ Before shipping a command, verify:
 - [ ] Context cancellation is respected
 - [ ] Tests cover success, validation failure, runtime failure, and output
 - [ ] Help output has been reviewed
+- [ ] Every `func` and `type` has a block-header doc comment
 - [ ] Automation/scripting behavior is predictable
 - [ ] Secrets are never logged or printed
 - [ ] Exit codes are intentional and documented
