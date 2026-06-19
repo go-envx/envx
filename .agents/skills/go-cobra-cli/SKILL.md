@@ -9,24 +9,48 @@ You are an expert Go developer specializing in CLI applications built with Cobra
 
 ## 1. Project Structure
 
+Organize by **feature (vertical slices)**, not by technical layer. Each feature
+owns its command wiring and its business logic in one self-contained package, so
+related code lives together and a feature can be understood — or removed — in
+isolation.
+
 ```text
-cmd/<binary>/main.go          # Minimal entrypoint — exit code handling only
-internal/cmd/                 # Cobra command constructors
-internal/app/                 # Application services and orchestration
-internal/config/              # Configuration loading and validation
-internal/runner/              # External process execution, if needed
+cmd/<binary>/main.go      # Minimal entrypoint — dependency wiring + exit codes only
+internal/
+├── <feature>/            # One package per feature/domain (e.g. user, order)
+│   ├── command.go        # Cobra wiring: parse flags/args, format output (the "shell")
+│   ├── <feature>.go      # Pure business logic: no Cobra, no global I/O (the "core")
+│   └── config.go         # The feature's typed config (shared pieces + local flags)
+├── <feature2>/
+├── config/               # Shared: configuration loading and validation
+├── flags/                # Shared: single source of truth for flag definitions
+└── runner/               # Shared: external process execution, if needed
 ```
 
-- **Keep `main.go` minimal.** It should construct dependencies, execute the root command, and map errors to exit codes. Nothing else.
-- **One file per command** under `internal/cmd/`. Each file defines a command constructor function.
-- **Separate business logic from CLI wiring.** Cobra commands parse input and format output. Application logic lives in packages that have no knowledge of Cobra.
+- **Slice vertically by feature, not horizontally by layer.** Prefer
+  `internal/user/` holding that feature's command, logic, and types together
+  over scattering them across `internal/cmd/`, `internal/service/`, and
+  `internal/model/`. Vertical slices keep change localized and make
+  feature-to-feature dependencies explicit.
+- **Keep `main.go` minimal.** Construct dependencies, execute the root command,
+  and map errors to exit codes. Nothing else.
+- **Functional core, imperative shell.** Within a feature, separate pure logic
+  (deterministic, no Cobra or I/O — trivially table-testable) from the thin
+  shell that parses input, performs effects, and formats output. `command.go` is
+  the shell; the core is plain functions over plain data.
+- **Separate business logic from CLI wiring.** Core logic has no knowledge of
+  Cobra, so it can be reused by another frontend (API, TUI) and tested without
+  constructing commands.
+- **Minimize each feature's exported surface.** Export the command constructor
+  (e.g. `NewCommand`) plus the few types callers truly need; keep params,
+  results, and helpers unexported so internals stay free to change.
 
 ```go
 func main() {
     ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
     defer stop()
 
-    root := cmd.NewRootCommand(deps)
+    root := cli.NewRootCommand(deps)
     root.SetContext(ctx)
 
     if err := root.Execute(); err != nil {
@@ -94,6 +118,14 @@ PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 - Use `MarkFlagsRequiredTogether` and `MarkFlagsMutuallyExclusive` for flag relationships.
 - Keep flag names long, explicit, and stable. Use shorthand only for very common options.
 - Make defaults visible in help text.
+- **Define each shared flag once.** When a flag appears on multiple commands,
+  declare its identity (name, shorthand, env-var fallback, usage) in a single
+  place and reference it everywhere, so the flag and its env var can never drift
+  apart. Reuse that one definition for both registration and precedence resolution.
+- **Bind flags at the Cobra edge into typed structs.** Register via
+  `cmd.Flags()` / `cmd.PersistentFlags()` in command constructors; keep core
+  logic free of the flag library. Prefer explicit, typed registration over
+  reflection or struct-tag–driven "registries."
 
 ### Arguments
 
@@ -262,7 +294,7 @@ _ = cmd.Flags().MarkDeprecated("old-flag", "use --new-flag instead")
 | `os.Exit()` inside handlers | Return errors; exit only in `main.go` |
 | Global mutable command variables | Use constructor functions with DI |
 | Printing error AND returning it | Do one or the other |
-| Business logic inside `RunE` | Delegate to application packages |
+| Business logic inside `RunE` | Delegate to the feature's core (pure functions) |
 | Usage printed on runtime errors | `SilenceUsage = true` after parsing |
 | Persistent flags where local flags suffice | Scope flags to the command that needs them |
 | Writing to `fmt.Println` directly | Use `cmd.OutOrStdout()` / `cmd.ErrOrStderr()` |
@@ -302,6 +334,7 @@ These are not Cobra-specific but are consistently important when building CLI to
 - **Use sentinel or typed errors sparingly** — only when callers must branch on them.
 - **Keep interfaces small** (1–3 methods) and define them in the consuming package, not the provider.
 - **Prefer concrete types** unless an interface provides clear testability or decoupling value.
+- **Accept interfaces, return structs.** Take interfaces as parameters where they aid testing or decoupling, but return concrete types so callers keep full access. Expose behavior on returned structs through methods rather than pre-emptively wrapping them in interfaces.
 - **Avoid `init()` functions.** Explicit initialization in `main` or constructors is easier to reason about and test.
 - **Use `context.Context` as the first parameter** for any function that does I/O, calls external services, or may need cancellation.
 - **Table-driven tests** reduce duplication for parsing, validation, and formatting logic.
