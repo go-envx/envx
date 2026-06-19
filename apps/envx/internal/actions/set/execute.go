@@ -18,7 +18,7 @@ import (
 // environment (--env > ENVX_ENV > manifest env > engine.DefaultEnv), resolves the
 // target overlay from the include path, reads the current document, applies the
 // pure transform, and writes the result back atomically. set never invokes the
-// engine — with no project there is nothing to merge.
+// engine since no project means there is nothing to merge.
 func execute(p actionParams, c actionConfig) error {
 	m, err := manifest.New(*c.ConfigPath)
 	if err != nil {

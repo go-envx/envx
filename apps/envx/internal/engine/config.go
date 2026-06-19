@@ -3,7 +3,7 @@ package engine
 // -------------------------------------------------------------------------------------
 // Config is the engine's input contract: a plain data bag the caller fully
 // populates (the config package builds it from a manifest plus CLI overrides).
-// The engine knows nothing about envx.yaml, cobra, or precedence — every field
+// The engine knows nothing about envx.yaml, cobra, or precedence. Every field
 // is optional and the engine fills in terminal defaults itself.
 type Config struct {
 	Dir          string   // workspace root; include paths resolve against it

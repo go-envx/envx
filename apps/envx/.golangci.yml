@@ -4,7 +4,7 @@ version: "2"
 
 linters:
   enable:
-    # Correctness — catches bugs
+    # Correctness: catches bugs
     - errcheck      # Unchecked error returns
     - staticcheck   # Type-aware analysis (Go's most powerful linter)
     - govet         # Subtle correctness issues
@@ -13,7 +13,7 @@ linters:
     - noctx         # HTTP requests missing context
     - errorlint     # Incorrect error wrapping (errors.Is/As)
 
-    # Code quality — maintainability
+    # Code quality: maintainability
     - lll           # Maximum line length
     - misspell      # Typos in comments and strings
     - errname       # Error type naming conventions

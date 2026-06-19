@@ -19,7 +19,7 @@ type Spec struct {
 }
 
 // -------------------------------------------------------------------------------------
-// Catalog — every envx flag, in one block you can scan top to bottom.
+// Catalog every envx flag in one block.
 var (
 	// Config selects the manifest path (auto-discovered when unset).
 	Config = Spec{

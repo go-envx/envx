@@ -1,6 +1,5 @@
 // Command envx is the entry point for the envx CLI. It wires signal handling,
-// executes the root command, and maps errors to exit codes — the only place
-// os.Exit is called.
+// executes the root command, and maps errors to exit codes.
 package main
 
 import (

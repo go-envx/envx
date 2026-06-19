@@ -13,7 +13,7 @@ type actionParams struct {
 
 // -------------------------------------------------------------------------------------
 // apply is the pure kernel: it returns doc with the key set, creating doc when
-// nil. Plain data in, plain data out — no file I/O.
+// nil. Plain data in, plain data out; no file I/O.
 func apply(doc map[string]any, p actionParams) map[string]any {
 	if doc == nil {
 		doc = make(map[string]any)

@@ -24,7 +24,7 @@ type actionResult struct {
 
 // -------------------------------------------------------------------------------------
 // runAction is the pure core: a case-insensitive lookup against an already
-// resolved environment. Plain data in, plain data out — no engine call, no I/O,
+// resolved environment. Plain data in, plain data out; no engine call, no I/O,
 // no cobra.
 func runAction(env *engine.Result, p actionParams) (actionResult, error) {
 	key := strings.ToUpper(p.Key)
