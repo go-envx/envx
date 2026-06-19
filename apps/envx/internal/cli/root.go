@@ -15,6 +15,8 @@ import (
 	"github.com/spf13/cobra"
 )
 
+// -------------------------------------------------------------------------------------
+// Define the root command's usage and description.
 const (
 	rootUsage = "envx [command] [flags]"
 	rootShort = "envx is a CLI tool for managing environment variables"
