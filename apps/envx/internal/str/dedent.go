@@ -1,6 +1,3 @@
-// Package str provides small, domain-agnostic string helpers used across envx.
-// Nothing here knows anything about envx semantics; each helper could be lifted
-// into any Go project unchanged.
 package str
 
 import (
