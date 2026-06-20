@@ -7,6 +7,7 @@ import (
 )
 
 // -------------------------------------------------------------------------------------
+
 // WriteAtomic writes data to path durably: it writes to a temporary file in the
 // same directory, fixes the mode to 0600, then renames it over the target. The
 // temp+rename dance guarantees a crash never leaves a half-written file in

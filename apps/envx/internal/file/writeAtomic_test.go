@@ -8,6 +8,7 @@ import (
 )
 
 // -------------------------------------------------------------------------------------
+
 // TestWriteAtomicCreates verifies a new file is created with 0600 permissions
 // and the exact contents.
 func TestWriteAtomicCreates(t *testing.T) {
@@ -39,6 +40,7 @@ func TestWriteAtomicCreates(t *testing.T) {
 }
 
 // -------------------------------------------------------------------------------------
+
 // TestWriteAtomicOverwrites verifies an existing file is fully replaced and no
 // temp artifacts are left behind in the directory.
 func TestWriteAtomicOverwrites(t *testing.T) {
