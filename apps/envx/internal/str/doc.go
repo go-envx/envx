@@ -1,5 +1,2 @@
-// Package str provides small, domain-agnostic string helpers.
-//
-// All methods are pure functions with no side effects.
-// Each could be lifted into any Go project unchanged.
+// Package str provides pure utility functions for strings.
 package str

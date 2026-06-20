@@ -1,5 +1,3 @@
-// Package fixtures is a small collection of helpers for tapping into well-known
-// local directories from any package, regardless of how deep the caller sits in
-// the tree. It hands back stable absolute paths (e.g. the testdata fixture tree)
-// so tests never rely on fragile "../.." offsets.
+// Package fixtures provides functions for accessing well-known local directories
+// via stable absolute paths. The most common use case is the testdata fixture tree.
 package fixtures
