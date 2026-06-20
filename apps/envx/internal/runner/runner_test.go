@@ -10,6 +10,7 @@ import (
 )
 
 // -------------------------------------------------------------------------------------
+
 // TestRunInjectsEnv verifies the merged env is passed to the child and that file
 // values appear in its environment.
 func TestRunInjectsEnv(t *testing.T) {
@@ -30,6 +31,7 @@ func TestRunInjectsEnv(t *testing.T) {
 }
 
 // -------------------------------------------------------------------------------------
+
 // TestRunPropagatesExitCode verifies a non-zero child exit surfaces as an
 // exitcode.Error carrying the same code.
 func TestRunPropagatesExitCode(t *testing.T) {
@@ -49,6 +51,7 @@ func TestRunPropagatesExitCode(t *testing.T) {
 }
 
 // -------------------------------------------------------------------------------------
+
 // TestRunOverloadPrecedence verifies that Overload lets file values win over an
 // OS env var of the same name.
 func TestRunOverloadPrecedence(t *testing.T) {
@@ -70,6 +73,7 @@ func TestRunOverloadPrecedence(t *testing.T) {
 }
 
 // -------------------------------------------------------------------------------------
+
 // TestRunDefaultPrecedence verifies that without Overload the OS env var wins.
 func TestRunDefaultPrecedence(t *testing.T) {
 	t.Setenv("SHARED_KEY", "from-os")
@@ -89,6 +93,7 @@ func TestRunDefaultPrecedence(t *testing.T) {
 }
 
 // -------------------------------------------------------------------------------------
+
 // TestRunNoCommand verifies an empty argument list is rejected.
 func TestRunNoCommand(t *testing.T) {
 	t.Parallel()
