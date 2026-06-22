@@ -25,12 +25,15 @@ var (
 		Usage: "path to envx.yaml",
 	}
 
-	// Env selects the target environment.
+	// Env selects the target environment. Its default mirrors DefaultEnv so the
+	// flag's --help advertises "development"; resolution still gates on whether
+	// the user actually set the flag (cobra's Changed), not on this value.
 	Env = Spec{
-		Name:  "env",
-		Short: "E",
-		Env:   "ENVX_ENV",
-		Usage: "target environment",
+		Name:    "env",
+		Short:   "E",
+		Env:     "ENVX_ENV",
+		Usage:   "target environment",
+		Default: DefaultEnv,
 	}
 
 	// Strict requires every overlay file in the namespace chain to exist.

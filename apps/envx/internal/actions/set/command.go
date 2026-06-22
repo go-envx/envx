@@ -1,7 +1,7 @@
 package set
 
 import (
-	"github.com/go-envx/envx/apps/envx/internal/config"
+	"github.com/go-envx/envx/apps/envx/internal/flags"
 	"github.com/go-envx/envx/apps/envx/internal/settings"
 	"github.com/go-envx/envx/apps/envx/internal/str"
 	"github.com/spf13/cobra"
@@ -53,6 +53,6 @@ func NewCommand(configPath *string) *cobra.Command {
 		},
 	}
 
-	config.BindString(cmd, &cfg.Settings.Env, &settings.Env)
+	flags.BindString(cmd, &cfg.Settings.Env, &settings.Env)
 	return cmd
 }

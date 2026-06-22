@@ -1,4 +1,4 @@
-package config
+package flags
 
 import (
 	"github.com/go-envx/envx/apps/envx/internal/settings"

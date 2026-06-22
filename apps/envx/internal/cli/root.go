@@ -6,7 +6,7 @@ import (
 	"github.com/go-envx/envx/apps/envx/internal/actions/get"
 	"github.com/go-envx/envx/apps/envx/internal/actions/run"
 	"github.com/go-envx/envx/apps/envx/internal/actions/set"
-	"github.com/go-envx/envx/apps/envx/internal/config"
+	"github.com/go-envx/envx/apps/envx/internal/flags"
 	"github.com/go-envx/envx/apps/envx/internal/settings"
 	"github.com/spf13/cobra"
 )
@@ -35,7 +35,7 @@ func NewRootCmd(version string) *cobra.Command {
 		},
 	}
 
-	config.BindPersistentString(root, &configPath, &settings.Config)
+	flags.BindPersistentString(root, &configPath, &settings.Config)
 
 	root.AddCommand(
 		get.NewCommand(&configPath),

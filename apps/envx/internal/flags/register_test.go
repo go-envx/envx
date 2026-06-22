@@ -1,4 +1,4 @@
-package config
+package flags
 
 import (
 	"testing"
@@ -75,6 +75,24 @@ func TestBindString(t *testing.T) {
 	}
 	if env != "production" {
 		t.Errorf("env = %q, want production", env)
+	}
+}
+
+// -------------------------------------------------------------------------------------
+// TestBindEnvDefault verifies --env advertises and defaults to settings.DefaultEnv
+// when the user sets nothing, so the help output explicitly shows "development".
+func TestBindEnvDefault(t *testing.T) {
+	t.Parallel()
+
+	var env string
+	cmd := newTestCmd()
+	BindString(cmd, &env, &settings.Env)
+
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("execute: %v", err)
+	}
+	if env != settings.DefaultEnv {
+		t.Errorf("env default = %q, want %q", env, settings.DefaultEnv)
 	}
 }
 
