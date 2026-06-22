@@ -33,9 +33,9 @@ const (
 // -------------------------------------------------------------------------------------
 // jsonChange is the exported, tagged view of a change used for JSON output.
 type jsonChange struct {
-	Key   string `json:"key"`
-	Left  string `json:"left,omitempty"`
-	Right string `json:"right,omitempty"`
+	Key  string `json:"key"`
+	EnvA string `json:"env_a,omitempty"`
+	EnvB string `json:"env_b,omitempty"`
 }
 
 // -------------------------------------------------------------------------------------
@@ -66,9 +66,9 @@ func NewCommand(configPath *string) *cobra.Command {
 			cfg.Changed = cmd.Flags()
 
 			res, err := execute(actionParams{
-				Project:  args[0],
-				LeftEnv:  args[1],
-				RightEnv: args[2],
+				Project: args[0],
+				EnvA:    args[1],
+				EnvB:    args[2],
 			}, &cfg)
 			if err != nil {
 				return err
@@ -106,11 +106,11 @@ func maskResult(res actionResult, reveal bool) actionResult {
 	mask := func(in []change) []change {
 		out := make([]change, len(in))
 		for i, c := range in {
-			if c.Left != "" {
-				c.Left = redacted
+			if c.EnvA != "" {
+				c.EnvA = redacted
 			}
-			if c.Right != "" {
-				c.Right = redacted
+			if c.EnvB != "" {
+				c.EnvB = redacted
 			}
 			out[i] = c
 		}
@@ -152,18 +152,18 @@ func toJSONChanges(in []change) []jsonChange {
 func renderTable(w io.Writer, res actionResult) error {
 	tw := tabwriter.NewWriter(w, 0, 4, 2, ' ', 0)
 	for _, c := range res.Added {
-		if _, err := fmt.Fprintf(tw, "+\t%s\t%s\n", c.Key, c.Right); err != nil {
+		if _, err := fmt.Fprintf(tw, "+\t%s\t%s\n", c.Key, c.EnvB); err != nil {
 			return err
 		}
 	}
 	for _, c := range res.Removed {
-		if _, err := fmt.Fprintf(tw, "-\t%s\t%s\n", c.Key, c.Left); err != nil {
+		if _, err := fmt.Fprintf(tw, "-\t%s\t%s\n", c.Key, c.EnvA); err != nil {
 			return err
 		}
 	}
 	for _, c := range res.Changed {
 		if _, err := fmt.Fprintf(
-			tw, "~\t%s\t%s -> %s\n", c.Key, c.Left, c.Right,
+			tw, "~\t%s\t%s -> %s\n", c.Key, c.EnvA, c.EnvB,
 		); err != nil {
 			return err
 		}
