@@ -50,7 +50,10 @@ func NewCommand(configPath *string) *cobra.Command {
 		},
 	}
 
-	flags.NewEngineFlags(cmd, &cfg.Settings)
+	flags.NewStrictFlag(cmd, &cfg.Settings.Strict)
+	flags.NewPrefixFlag(cmd, &cfg.Settings.Prefix)
+	flags.NewSuffixFlag(cmd, &cfg.Settings.Suffix)
+	flags.NewNamespacePrefixFlag(cmd, &cfg.Settings.NamespacePrefix)
 	flags.NewEnvFlag(cmd, &cfg.Settings.Env)
 	return cmd
 }

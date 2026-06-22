@@ -48,9 +48,10 @@ type jsonResult struct {
 }
 
 // -------------------------------------------------------------------------------------
-// NewCommand builds the "diff" command. It binds the engine flag group plus
-// --reveal and --output, runs the shell, and renders the structured diff.
-// configPath points at the persistent --config flag.
+// NewCommand builds the "diff" command. It registers the engine-setting flags
+// plus --reveal and --output (but no --env; the two environments are positional),
+// runs the shell, and renders the structured diff. configPath points at the
+// persistent --config flag.
 func NewCommand(configPath *string) *cobra.Command {
 	var cfg actionConfig
 
@@ -76,7 +77,10 @@ func NewCommand(configPath *string) *cobra.Command {
 		},
 	}
 
-	flags.NewEngineFlags(cmd, &cfg.Settings)
+	flags.NewStrictFlag(cmd, &cfg.Settings.Strict)
+	flags.NewPrefixFlag(cmd, &cfg.Settings.Prefix)
+	flags.NewSuffixFlag(cmd, &cfg.Settings.Suffix)
+	flags.NewNamespacePrefixFlag(cmd, &cfg.Settings.NamespacePrefix)
 	flags.NewRevealFlag(cmd, &cfg.Reveal)
 	flags.NewOutputFlag(cmd, &cfg.Output)
 	return cmd

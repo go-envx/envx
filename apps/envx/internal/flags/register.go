@@ -1,7 +1,6 @@
 package flags
 
 import (
-	"github.com/go-envx/envx/apps/envx/internal/engine"
 	"github.com/spf13/cobra"
 )
 
@@ -17,9 +16,8 @@ func NewConfigFlag(cmd *cobra.Command, dst *string) {
 
 // -------------------------------------------------------------------------------------
 // NewEnvFlag binds the --env flag onto cmd, writing the parsed value into dst.
-// It is registered per-action (get/run/explain/set) rather than as part of the
-// engine flag group, so positional-environment commands like diff never gain an
-// --env flag.
+// Actions register it individually (get/run/explain/set), so positional-
+// environment commands like diff can simply omit it.
 func NewEnvFlag(cmd *cobra.Command, dst *string) {
 	bindString(cmd, dst, &Env)
 }
@@ -71,18 +69,6 @@ func NewRevealFlag(cmd *cobra.Command, dst *bool) {
 // dst. Its default ("table") comes straight from the Output spec.
 func NewOutputFlag(cmd *cobra.Command, dst *string) {
 	bindString(cmd, dst, &Output)
-}
-
-// -------------------------------------------------------------------------------------
-// NewEngineFlags binds the engine settings group (strict/prefix/suffix/
-// namespace-prefix) onto cmd, writing parsed values into dst. The --env flag is
-// registered separately (see NewEnvFlag) so positional-environment commands like
-// diff stay free of it.
-func NewEngineFlags(cmd *cobra.Command, dst *engine.Settings) {
-	NewStrictFlag(cmd, &dst.Strict)
-	NewPrefixFlag(cmd, &dst.Prefix)
-	NewSuffixFlag(cmd, &dst.Suffix)
-	NewNamespacePrefixFlag(cmd, &dst.NamespacePrefix)
 }
 
 // -------------------------------------------------------------------------------------

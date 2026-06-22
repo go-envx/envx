@@ -32,9 +32,9 @@ const (
 
 // -------------------------------------------------------------------------------------
 // NewCommand builds the "run" command. It splits args at "--" (a project before
-// it, the child command after), binds the engine flag group plus the run-local
-// --overload, and delegates to the shell. configPath points at the persistent
-// --config flag.
+// it, the child command after), registers the engine-setting flags plus --env
+// and the run-local --overload, and delegates to the shell. configPath points at
+// the persistent --config flag.
 func NewCommand(configPath *string) *cobra.Command {
 	var cfg actionConfig
 
@@ -66,7 +66,10 @@ func NewCommand(configPath *string) *cobra.Command {
 		},
 	}
 
-	flags.NewEngineFlags(cmd, &cfg.Settings)
+	flags.NewStrictFlag(cmd, &cfg.Settings.Strict)
+	flags.NewPrefixFlag(cmd, &cfg.Settings.Prefix)
+	flags.NewSuffixFlag(cmd, &cfg.Settings.Suffix)
+	flags.NewNamespacePrefixFlag(cmd, &cfg.Settings.NamespacePrefix)
 	flags.NewEnvFlag(cmd, &cfg.Settings.Env)
 	flags.NewOverloadFlag(cmd, &cfg.Overload)
 	return cmd

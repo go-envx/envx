@@ -3,7 +3,6 @@ package flags
 import (
 	"testing"
 
-	"github.com/go-envx/envx/apps/envx/internal/engine"
 	"github.com/spf13/cobra"
 )
 
@@ -16,14 +15,20 @@ func newTestCmd() *cobra.Command {
 }
 
 // -------------------------------------------------------------------------------------
-// TestNewEngineFlags verifies the engine flag group is bound onto a command and
-// that parsing writes through to the destination Settings.
-func TestNewEngineFlags(t *testing.T) {
+// TestEngineSettingFlags verifies the individual engine-setting constructors
+// bind onto a command and that parsing writes through to their destinations.
+func TestEngineSettingFlags(t *testing.T) {
 	t.Parallel()
 
-	var dst engine.Settings
+	var (
+		strict, nsPrefix bool
+		prefix, suffix   string
+	)
 	cmd := newTestCmd()
-	NewEngineFlags(cmd, &dst)
+	NewStrictFlag(cmd, &strict)
+	NewPrefixFlag(cmd, &prefix)
+	NewSuffixFlag(cmd, &suffix)
+	NewNamespacePrefixFlag(cmd, &nsPrefix)
 
 	for _, name := range []string{
 		Strict.Name, Prefix.Name, Suffix.Name, NamespacePrefix.Name,
@@ -40,11 +45,11 @@ func TestNewEngineFlags(t *testing.T) {
 		t.Fatalf("execute: %v", err)
 	}
 
-	if !dst.Strict || !dst.NamespacePrefix {
-		t.Errorf("bool flags not applied: %+v", dst)
+	if !strict || !nsPrefix {
+		t.Errorf("bool flags not applied: strict=%v nsPrefix=%v", strict, nsPrefix)
 	}
-	if dst.Prefix != "APP" || dst.Suffix != "V2" {
-		t.Errorf("string flags not applied: %+v", dst)
+	if prefix != "APP" || suffix != "V2" {
+		t.Errorf("string flags not applied: prefix=%q suffix=%q", prefix, suffix)
 	}
 }
 

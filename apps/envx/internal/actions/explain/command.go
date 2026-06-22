@@ -43,8 +43,8 @@ type jsonEntry struct {
 
 // -------------------------------------------------------------------------------------
 // NewCommand builds the "explain" command. When the key arg is absent it leaves
-// params.Key empty (explain all keys). It binds the engine flag group plus
-// --reveal and --output, then renders the result. configPath points at the
+// params.Key empty (explain all keys). It registers the engine-setting flags plus
+// --env, --reveal and --output, then renders the result. configPath points at the
 // persistent --config flag.
 func NewCommand(configPath *string) *cobra.Command {
 	var cfg actionConfig
@@ -72,7 +72,10 @@ func NewCommand(configPath *string) *cobra.Command {
 		},
 	}
 
-	flags.NewEngineFlags(cmd, &cfg.Settings)
+	flags.NewStrictFlag(cmd, &cfg.Settings.Strict)
+	flags.NewPrefixFlag(cmd, &cfg.Settings.Prefix)
+	flags.NewSuffixFlag(cmd, &cfg.Settings.Suffix)
+	flags.NewNamespacePrefixFlag(cmd, &cfg.Settings.NamespacePrefix)
 	flags.NewEnvFlag(cmd, &cfg.Settings.Env)
 	flags.NewRevealFlag(cmd, &cfg.Reveal)
 	flags.NewOutputFlag(cmd, &cfg.Output)
