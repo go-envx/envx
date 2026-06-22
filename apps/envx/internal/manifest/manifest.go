@@ -3,13 +3,15 @@ package manifest
 import (
 	"path/filepath"
 	"slices"
+
+	"github.com/go-envx/envx/apps/envx/internal/settings"
 )
 
 // -------------------------------------------------------------------------------------
 // Manifest is the parsed, validated envx.yaml. It holds the declared
 // environments, project definitions, and runtime settings.
 type Manifest struct {
-	Settings     Settings           `yaml:"settings"`
+	Settings     settings.File      `yaml:"settings"`
 	Environments []string           `yaml:"environments"`
 	Projects     map[string]Project `yaml:"projects"`
 
@@ -19,26 +21,13 @@ type Manifest struct {
 }
 
 // -------------------------------------------------------------------------------------
-// Settings holds runtime configuration declared in the manifest. Booleans are
-// pointers so an explicitly-set false is distinguishable from "unset", which
-// matters for the precedence chain applied downstream by the config package.
-type Settings struct {
-	Overload        *bool  `yaml:"overload"`
-	Strict          *bool  `yaml:"strict"`
-	Prefix          string `yaml:"prefix"`
-	Suffix          string `yaml:"suffix"`
-	NamespacePrefix *bool  `yaml:"namespace_prefix"`
-	Env             string `yaml:"env"`
-}
-
-// -------------------------------------------------------------------------------------
 // Project defines one project's environment configuration. Includes lists the
 // ordered namespaces to load and merge; each entry is a relative path of the
 // form "<dir>/<name>" resolving to <dir>/<name>.yaml and
 // <dir>/<name>.<env>.yaml. Project settings override the global settings.
 type Project struct {
-	Includes []string `yaml:"includes"`
-	Settings Settings `yaml:"settings"`
+	Includes []string      `yaml:"includes"`
+	Settings settings.File `yaml:"settings"`
 }
 
 // -------------------------------------------------------------------------------------

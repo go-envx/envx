@@ -3,7 +3,7 @@ package config
 import (
 	"testing"
 
-	"github.com/go-envx/envx/apps/envx/internal/flags"
+	"github.com/go-envx/envx/apps/envx/internal/settings"
 	"github.com/spf13/cobra"
 )
 
@@ -16,9 +16,10 @@ func newTestCmd() *cobra.Command {
 }
 
 // -------------------------------------------------------------------------------------
-// TestEngineSettingFlags verifies the individual engine-setting constructors
-// bind onto a command and that parsing writes through to their destinations.
-func TestEngineSettingFlags(t *testing.T) {
+// TestBindEngineSettingFlags verifies the generic binders register the engine-
+// setting specs onto a command and that parsing writes through to their
+// destinations.
+func TestBindEngineSettingFlags(t *testing.T) {
 	t.Parallel()
 
 	var (
@@ -26,14 +27,14 @@ func TestEngineSettingFlags(t *testing.T) {
 		prefix, suffix   string
 	)
 	cmd := newTestCmd()
-	NewStrictFlag(cmd, &strict)
-	NewPrefixFlag(cmd, &prefix)
-	NewSuffixFlag(cmd, &suffix)
-	NewNamespacePrefixFlag(cmd, &nsPrefix)
+	BindBool(cmd, &strict, &settings.Strict)
+	BindString(cmd, &prefix, &settings.Prefix)
+	BindString(cmd, &suffix, &settings.Suffix)
+	BindBool(cmd, &nsPrefix, &settings.NamespacePrefix)
 
 	for _, name := range []string{
-		flags.Strict.Name, flags.Prefix.Name, flags.Suffix.Name,
-		flags.NamespacePrefix.Name,
+		settings.Strict.Name, settings.Prefix.Name, settings.Suffix.Name,
+		settings.NamespacePrefix.Name,
 	} {
 		if cmd.Flags().Lookup(name) == nil {
 			t.Errorf("flag %q was not registered", name)
@@ -56,17 +57,17 @@ func TestEngineSettingFlags(t *testing.T) {
 }
 
 // -------------------------------------------------------------------------------------
-// TestNewEnvFlag verifies the --env flag is bound onto a command and that parsing
-// writes through to the destination.
-func TestNewEnvFlag(t *testing.T) {
+// TestBindString verifies BindString binds a string flag onto a command and that
+// parsing writes through to the destination.
+func TestBindString(t *testing.T) {
 	t.Parallel()
 
 	var env string
 	cmd := newTestCmd()
-	NewEnvFlag(cmd, &env)
+	BindString(cmd, &env, &settings.Env)
 
-	if cmd.Flags().Lookup(flags.Env.Name) == nil {
-		t.Fatalf("flag %q was not registered", flags.Env.Name)
+	if cmd.Flags().Lookup(settings.Env.Name) == nil {
+		t.Fatalf("flag %q was not registered", settings.Env.Name)
 	}
 	cmd.SetArgs([]string{"--env", "production"})
 	if err := cmd.Execute(); err != nil {
@@ -78,29 +79,29 @@ func TestNewEnvFlag(t *testing.T) {
 }
 
 // -------------------------------------------------------------------------------------
-// TestNewConfigFlag verifies the --config flag is bound as a persistent flag so
-// it applies to subcommands.
-func TestNewConfigFlag(t *testing.T) {
+// TestBindPersistentString verifies BindPersistentString binds a persistent flag
+// so it applies to subcommands.
+func TestBindPersistentString(t *testing.T) {
 	t.Parallel()
 
 	var path string
 	cmd := newTestCmd()
-	NewConfigFlag(cmd, &path)
+	BindPersistentString(cmd, &path, &settings.Config)
 
-	if cmd.PersistentFlags().Lookup(flags.Config.Name) == nil {
-		t.Fatalf("flag %q was not registered as persistent", flags.Config.Name)
+	if cmd.PersistentFlags().Lookup(settings.Config.Name) == nil {
+		t.Fatalf("flag %q was not registered as persistent", settings.Config.Name)
 	}
 }
 
 // -------------------------------------------------------------------------------------
-// TestNewOutputFlagDefault verifies the --output flag carries its "table"
-// default straight from the Output spec when the user sets nothing.
-func TestNewOutputFlagDefault(t *testing.T) {
+// TestBindStringDefault verifies BindString carries a spec's default (Output's
+// "table") through to the destination when the user sets nothing.
+func TestBindStringDefault(t *testing.T) {
 	t.Parallel()
 
 	var out string
 	cmd := newTestCmd()
-	NewOutputFlag(cmd, &out)
+	BindString(cmd, &out, &settings.Output)
 
 	if err := cmd.Execute(); err != nil {
 		t.Fatalf("execute: %v", err)

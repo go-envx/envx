@@ -6,8 +6,8 @@ import (
 	"strconv"
 
 	"github.com/go-envx/envx/apps/envx/internal/engine"
-	"github.com/go-envx/envx/apps/envx/internal/flags"
 	"github.com/go-envx/envx/apps/envx/internal/manifest"
+	"github.com/go-envx/envx/apps/envx/internal/settings"
 )
 
 // -------------------------------------------------------------------------------------
@@ -29,7 +29,7 @@ type FlagSet interface {
 // handle that drives precedence. Resolve turns it into an *engine.Config.
 type Input struct {
 	ConfigPath *string
-	Settings   engine.Settings
+	Settings   settings.Resolved
 	Changed    FlagSet
 }
 
@@ -62,25 +62,25 @@ func resolveManifest(
 	proj := pm.Project
 
 	r := NewResolver()
-	settings := engine.Settings{
+	resolved := settings.Resolved{
 		Env: r.String(
-			&flags.Env, in.Changed, in.Settings.Env,
+			&settings.Env, in.Changed, in.Settings.Env,
 			proj.Settings.Env, m.Settings.Env,
 		),
 		Strict: r.Bool(
-			&flags.Strict, in.Changed, in.Settings.Strict,
+			&settings.Strict, in.Changed, in.Settings.Strict,
 			proj.Settings.Strict, m.Settings.Strict,
 		),
 		Prefix: r.String(
-			&flags.Prefix, in.Changed, in.Settings.Prefix,
+			&settings.Prefix, in.Changed, in.Settings.Prefix,
 			proj.Settings.Prefix, m.Settings.Prefix,
 		),
 		Suffix: r.String(
-			&flags.Suffix, in.Changed, in.Settings.Suffix,
+			&settings.Suffix, in.Changed, in.Settings.Suffix,
 			proj.Settings.Suffix, m.Settings.Suffix,
 		),
 		NamespacePrefix: r.Bool(
-			&flags.NamespacePrefix, in.Changed, in.Settings.NamespacePrefix,
+			&settings.NamespacePrefix, in.Changed, in.Settings.NamespacePrefix,
 			proj.Settings.NamespacePrefix, m.Settings.NamespacePrefix,
 		),
 	}
@@ -88,7 +88,7 @@ func resolveManifest(
 		Dir:          m.Dir(),
 		Includes:     proj.Includes,
 		Environments: m.Environments,
-		Settings:     settings,
+		Settings:     resolved,
 	}, nil
 }
 
@@ -100,7 +100,7 @@ func manifestPath(in *Input) string {
 	if in.ConfigPath != nil && *in.ConfigPath != "" {
 		return *in.ConfigPath
 	}
-	if v := os.Getenv(flags.Config.Env); v != "" {
+	if v := os.Getenv(settings.Config.Env); v != "" {
 		return v
 	}
 	return ""
@@ -110,9 +110,9 @@ func manifestPath(in *Input) string {
 // ResolveEnv meshes only the target environment (flag > ENVX_ENV > manifest
 // global env) for callers that have no project — notably the set action, which
 // writes a single overlay file and never invokes the engine. The terminal
-// "development" fallback is left to the caller (engine.DefaultEnv).
+// "development" fallback is left to the caller (settings.DefaultEnv).
 func ResolveEnv(m *manifest.Manifest, rawEnv string, changed FlagSet) string {
-	return NewResolver().String(&flags.Env, changed, rawEnv, m.Settings.Env)
+	return NewResolver().String(&settings.Env, changed, rawEnv, m.Settings.Env)
 }
 
 // -------------------------------------------------------------------------------------
@@ -120,12 +120,12 @@ func ResolveEnv(m *manifest.Manifest, rawEnv string, changed FlagSet) string {
 // the run action. Overload is not an engine setting and carries no manifest
 // layer, so it is resolved on its own rather than riding along in Resolve.
 func ResolveOverload(rawOverload bool, changed FlagSet) bool {
-	return NewResolver().Bool(&flags.Overload, changed, rawOverload)
+	return NewResolver().Bool(&settings.Overload, changed, rawOverload)
 }
 
 // -------------------------------------------------------------------------------------
 // ResolveTarget loads the manifest and resolves the overlay one set call writes:
-// the target environment (flag > ENVX_ENV > manifest global > engine.DefaultEnv),
+// the target environment (flag > ENVX_ENV > manifest global > settings.DefaultEnv),
 // validated against the declared set, plus the directory and base name for
 // includePath. It serves the set action, which mutates a single overlay file
 // without merging an environment, so it never builds an engine result.
@@ -136,7 +136,7 @@ func ResolveTarget(in *Input, includePath string) (env, dir, name string, err er
 	}
 	env = ResolveEnv(m, in.Settings.Env, in.Changed)
 	if env == "" {
-		env = engine.DefaultEnv
+		env = settings.DefaultEnv
 	}
 	if !m.HasEnvironment(env) {
 		return "", "", "", fmt.Errorf(
@@ -154,7 +154,7 @@ func ResolveTarget(in *Input, includePath string) (env, dir, name string, err er
 // -------------------------------------------------------------------------------------
 // Resolver applies the precedence "explicit flag > ENVX_* env var > layered
 // defaults". It reads each flag's name and ENVX_* fallback straight from its
-// flags.Spec, so registration and resolution can never disagree about a name.
+// settings.Spec, so registration and resolution can never disagree about a name.
 type Resolver struct {
 	LookupEnv EnvLookup
 }
@@ -170,7 +170,7 @@ func NewResolver() *Resolver {
 // then the ENVX_* var, then the first non-empty layer (e.g. project then global
 // default), and finally "".
 func (r *Resolver) String(
-	s *flags.Spec, changed FlagSet, flagVal string, layers ...string,
+	s *settings.Spec, changed FlagSet, flagVal string, layers ...string,
 ) string {
 	if changed != nil && changed.Changed(s.Name) {
 		return flagVal
@@ -193,7 +193,7 @@ func (r *Resolver) String(
 // then the ENVX_* var (parsed), then the first non-nil layer (e.g. project then
 // global setting), and finally false.
 func (r *Resolver) Bool(
-	s *flags.Spec, changed FlagSet, flagVal bool, layers ...*bool,
+	s *settings.Spec, changed FlagSet, flagVal bool, layers ...*bool,
 ) bool {
 	if changed != nil && changed.Changed(s.Name) {
 		return flagVal

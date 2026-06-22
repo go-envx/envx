@@ -7,6 +7,8 @@ import (
 	"path/filepath"
 	"slices"
 	"sort"
+
+	"github.com/go-envx/envx/apps/envx/internal/settings"
 )
 
 // -------------------------------------------------------------------------------------
@@ -81,7 +83,7 @@ func Build(c *Config) (*Result, error) {
 
 	env := c.Settings.Env
 	if env == "" {
-		env = DefaultEnv
+		env = settings.DefaultEnv
 	}
 	if !slices.Contains(c.Environments, env) {
 		return nil, fmt.Errorf(

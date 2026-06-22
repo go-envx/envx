@@ -1,11 +1,12 @@
-package flags
+package settings
 
 import "fmt"
 
 // -------------------------------------------------------------------------------------
-// Spec is one flag's identity. Both registration (the New*Flag constructors) and
-// the config resolver read the SAME Spec, so a flag's name, its ENVX_* env-var
-// fallback, and its default are defined exactly once and can never drift apart.
+// Spec is one setting's CLI identity. Both registration (the config binders) and
+// the config resolver read the SAME Spec, so a setting's flag name, its ENVX_*
+// env-var fallback, and its default are defined exactly once and can never drift
+// apart.
 type Spec struct {
 	Name    string // --<Name>
 	Short   string // -<Short> ("" = none)
@@ -15,7 +16,7 @@ type Spec struct {
 }
 
 // -------------------------------------------------------------------------------------
-// Catalog every envx flag in one block.
+// Catalog every envx setting in one block.
 var (
 	// Config selects the manifest path (auto-discovered when unset).
 	Config = Spec{
@@ -84,7 +85,7 @@ var (
 
 // -------------------------------------------------------------------------------------
 // HelpText renders the usage string with the env-var hint appended when the
-// flag has an ENVX_* fallback, e.g. "target environment (env: ENVX_ENV)". The
+// setting has an ENVX_* fallback, e.g. "target environment (env: ENVX_ENV)". The
 // result is used directly as the cobra usage string.
 func (s *Spec) HelpText() string {
 	if s.Env == "" {

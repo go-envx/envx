@@ -1,10 +1,10 @@
-package flags
+package settings
 
 import "testing"
 
 // -------------------------------------------------------------------------------------
 // TestSpecHelpText verifies that HelpText appends the ENVX_* hint only when the
-// flag declares an env-var fallback.
+// setting declares an env-var fallback.
 func TestSpecHelpText(t *testing.T) {
 	t.Parallel()
 
@@ -36,7 +36,7 @@ func TestSpecHelpText(t *testing.T) {
 }
 
 // -------------------------------------------------------------------------------------
-// TestCatalogEnvVarsUnique guards against two flags accidentally sharing an
+// TestCatalogEnvVarsUnique guards against two settings accidentally sharing an
 // ENVX_* fallback, which would make env-driven config ambiguous.
 func TestCatalogEnvVarsUnique(t *testing.T) {
 	t.Parallel()

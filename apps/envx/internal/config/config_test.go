@@ -4,10 +4,9 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/go-envx/envx/apps/envx/internal/engine"
 	"github.com/go-envx/envx/apps/envx/internal/fixtures"
-	"github.com/go-envx/envx/apps/envx/internal/flags"
 	"github.com/go-envx/envx/apps/envx/internal/manifest"
+	"github.com/go-envx/envx/apps/envx/internal/settings"
 )
 
 // -------------------------------------------------------------------------------------
@@ -26,11 +25,11 @@ func (f fakeFlagSet) Changed(name string) bool { return f.changed[name] }
 func testManifest() *manifest.Manifest {
 	return &manifest.Manifest{
 		Environments: []string{"development", "staging", "production"},
-		Settings:     manifest.Settings{Env: "staging"},
+		Settings:     settings.File{Env: "staging"},
 		Projects: map[string]manifest.Project{
 			"api": {
 				Includes: []string{"env/x"},
-				Settings: manifest.Settings{Env: "production"},
+				Settings: settings.File{Env: "production"},
 			},
 			"web": {Includes: []string{"env/y"}},
 		},
@@ -48,8 +47,8 @@ func TestResolveManifest(t *testing.T) {
 
 	t.Run("flag wins", func(t *testing.T) {
 		ec, err := resolveManifest(m, &Input{
-			Settings: engine.Settings{Env: "from-flag"},
-			Changed:  fakeFlagSet{changed: map[string]bool{flags.Env.Name: true}},
+			Settings: settings.Resolved{Env: "from-flag"},
+			Changed:  fakeFlagSet{changed: map[string]bool{settings.Env.Name: true}},
 		}, "api")
 		if err != nil {
 			t.Fatal(err)
@@ -93,9 +92,9 @@ func TestResolveManifest(t *testing.T) {
 	})
 	t.Run("options and includes pass through", func(t *testing.T) {
 		ec, err := resolveManifest(m, &Input{
-			Settings: engine.Settings{Prefix: "APP", Strict: true},
+			Settings: settings.Resolved{Prefix: "APP", Strict: true},
 			Changed: fakeFlagSet{changed: map[string]bool{
-				flags.Prefix.Name: true, flags.Strict.Name: true,
+				settings.Prefix.Name: true, settings.Strict.Name: true,
 			}},
 		}, "api")
 		if err != nil {
@@ -139,21 +138,21 @@ func TestResolve(t *testing.T) {
 // then ENVX_CONFIG, then empty (which defers to the manifest walk-up).
 func TestManifestPath(t *testing.T) {
 	t.Run("flag wins over env", func(t *testing.T) {
-		t.Setenv(flags.Config.Env, "from-env")
+		t.Setenv(settings.Config.Env, "from-env")
 		flag := "from-flag"
 		if got := manifestPath(&Input{ConfigPath: &flag}); got != "from-flag" {
 			t.Errorf("got %q, want from-flag", got)
 		}
 	})
 	t.Run("env when flag empty", func(t *testing.T) {
-		t.Setenv(flags.Config.Env, "from-env")
+		t.Setenv(settings.Config.Env, "from-env")
 		empty := ""
 		if got := manifestPath(&Input{ConfigPath: &empty}); got != "from-env" {
 			t.Errorf("got %q, want from-env", got)
 		}
 	})
 	t.Run("empty when neither set", func(t *testing.T) {
-		t.Setenv(flags.Config.Env, "")
+		t.Setenv(settings.Config.Env, "")
 		if got := manifestPath(&Input{}); got != "" {
 			t.Errorf("got %q, want empty", got)
 		}
@@ -165,7 +164,7 @@ func TestManifestPath(t *testing.T) {
 func TestResolveOverload(t *testing.T) {
 	t.Parallel()
 
-	changed := fakeFlagSet{changed: map[string]bool{flags.Overload.Name: true}}
+	changed := fakeFlagSet{changed: map[string]bool{settings.Overload.Name: true}}
 	if !ResolveOverload(true, changed) {
 		t.Error("expected flag value true to win")
 	}
@@ -188,8 +187,8 @@ func TestResolveTarget(t *testing.T) {
 		if err != nil {
 			t.Fatalf("ResolveTarget: %v", err)
 		}
-		if env != engine.DefaultEnv {
-			t.Errorf("env = %q, want %q", env, engine.DefaultEnv)
+		if env != settings.DefaultEnv {
+			t.Errorf("env = %q, want %q", env, settings.DefaultEnv)
 		}
 		if name != "postgres" {
 			t.Errorf("name = %q, want postgres", name)
@@ -207,8 +206,8 @@ func TestResolveTarget(t *testing.T) {
 	t.Run("undeclared env errors", func(t *testing.T) {
 		in := &Input{
 			ConfigPath: &path,
-			Settings:   engine.Settings{Env: "nope"},
-			Changed:    fakeFlagSet{changed: map[string]bool{flags.Env.Name: true}},
+			Settings:   settings.Resolved{Env: "nope"},
+			Changed:    fakeFlagSet{changed: map[string]bool{settings.Env.Name: true}},
 		}
 		_, _, _, err := ResolveTarget(in, "env/postgres")
 		if err == nil {
@@ -227,7 +226,7 @@ func TestResolveEnv(t *testing.T) {
 	t.Run("flag wins", func(t *testing.T) {
 		got := ResolveEnv(
 			m, "from-flag",
-			fakeFlagSet{changed: map[string]bool{flags.Env.Name: true}},
+			fakeFlagSet{changed: map[string]bool{settings.Env.Name: true}},
 		)
 		if got != "from-flag" {
 			t.Errorf("got %q, want from-flag", got)
@@ -251,7 +250,7 @@ func TestResolveEnv(t *testing.T) {
 func TestResolverString(t *testing.T) {
 	t.Parallel()
 
-	spec := flags.Prefix
+	spec := settings.Prefix
 	t.Run("flag wins", func(t *testing.T) {
 		r := &Resolver{LookupEnv: func(string) (string, bool) { return "from-env", true }}
 		changed := fakeFlagSet{changed: map[string]bool{spec.Name: true}}
@@ -281,7 +280,7 @@ func TestResolverString(t *testing.T) {
 func TestResolverBool(t *testing.T) {
 	t.Parallel()
 
-	spec := flags.Strict
+	spec := settings.Strict
 	tru := true
 	t.Run("flag wins", func(t *testing.T) {
 		r := &Resolver{LookupEnv: func(string) (string, bool) { return "false", true }}

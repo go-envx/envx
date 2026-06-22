@@ -4,6 +4,8 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/go-envx/envx/apps/envx/internal/settings"
 )
 
 // -------------------------------------------------------------------------------------
@@ -49,7 +51,7 @@ func TestResolveSuccess(t *testing.T) {
 	t.Parallel()
 
 	c := baseConfig(setupWorkspace(t))
-	c.Settings = Settings{Env: "development"}
+	c.Settings = settings.Resolved{Env: "development"}
 	res, err := Build(c)
 	if err != nil {
 		t.Fatalf("Resolve: %v", err)
@@ -70,7 +72,7 @@ func TestResolveDefaultEnv(t *testing.T) {
 		t.Fatalf("Resolve: %v", err)
 	}
 	if v, _ := res.Get("HOST"); v != "localhost" {
-		t.Errorf("HOST = %q, want localhost (default env %q)", v, DefaultEnv)
+		t.Errorf("HOST = %q, want localhost (default env %q)", v, settings.DefaultEnv)
 	}
 }
 
@@ -81,7 +83,7 @@ func TestResolveOverride(t *testing.T) {
 	t.Parallel()
 
 	c := baseConfig(setupWorkspace(t))
-	c.Settings = Settings{Env: "production"}
+	c.Settings = settings.Resolved{Env: "production"}
 	res, err := Build(c)
 	if err != nil {
 		t.Fatalf("Resolve: %v", err)
@@ -97,7 +99,7 @@ func TestResolveErrors(t *testing.T) {
 	t.Parallel()
 
 	c := baseConfig(setupWorkspace(t))
-	c.Settings = Settings{Env: "nope"}
+	c.Settings = settings.Resolved{Env: "nope"}
 	if _, err := Build(c); err == nil {
 		t.Error("expected error for undeclared environment")
 	}
