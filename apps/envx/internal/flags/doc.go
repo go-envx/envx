@@ -1,8 +1,6 @@
-// Package flags is the single source of truth for every envx CLI flag. It owns
-// both halves of a flag's lifecycle: the Spec catalog (name, shorthand, ENVX_*
-// fallback, usage, and default) that the config and manifest packages read for
-// precedence resolution, and the cobra registration constructors (New<X>Flag)
-// that bind those same specs onto commands. Because it registers flags it imports
-// cobra; the resolution layers still read the same catalog, so a flag's name and
-// its env-var fallback can never drift apart.
+// Package flags is the single source of truth for every envx CLI flag's identity:
+// the Spec catalog (name, shorthand, ENVX_* fallback, usage, and default) that the
+// config and manifest packages read for precedence resolution. It is a pure leaf
+// that imports only fmt — no CLI framework. Binding these specs onto cobra
+// commands lives in the config package, which owns the input boundary.
 package flags

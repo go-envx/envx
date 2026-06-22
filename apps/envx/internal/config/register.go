@@ -1,6 +1,7 @@
-package flags
+package config
 
 import (
+	"github.com/go-envx/envx/apps/envx/internal/flags"
 	"github.com/spf13/cobra"
 )
 
@@ -8,9 +9,9 @@ import (
 // NewConfigFlag binds the --config flag onto cmd as a persistent flag (so it
 // applies to every subcommand), writing the parsed path into dst.
 func NewConfigFlag(cmd *cobra.Command, dst *string) {
-	def, _ := Config.Default.(string)
+	def, _ := flags.Config.Default.(string)
 	cmd.PersistentFlags().StringVarP(
-		dst, Config.Name, Config.Short, def, Config.HelpText(),
+		dst, flags.Config.Name, flags.Config.Short, def, flags.Config.HelpText(),
 	)
 }
 
@@ -19,63 +20,63 @@ func NewConfigFlag(cmd *cobra.Command, dst *string) {
 // Actions register it individually (get/run/explain/set), so positional-
 // environment commands like diff can simply omit it.
 func NewEnvFlag(cmd *cobra.Command, dst *string) {
-	bindString(cmd, dst, &Env)
+	bindString(cmd, dst, &flags.Env)
 }
 
 // -------------------------------------------------------------------------------------
 // NewStrictFlag binds the --strict flag onto cmd, writing the parsed value into
 // dst.
 func NewStrictFlag(cmd *cobra.Command, dst *bool) {
-	bindBool(cmd, dst, &Strict)
+	bindBool(cmd, dst, &flags.Strict)
 }
 
 // -------------------------------------------------------------------------------------
 // NewPrefixFlag binds the --prefix flag onto cmd, writing the parsed value into
 // dst.
 func NewPrefixFlag(cmd *cobra.Command, dst *string) {
-	bindString(cmd, dst, &Prefix)
+	bindString(cmd, dst, &flags.Prefix)
 }
 
 // -------------------------------------------------------------------------------------
 // NewSuffixFlag binds the --suffix flag onto cmd, writing the parsed value into
 // dst.
 func NewSuffixFlag(cmd *cobra.Command, dst *string) {
-	bindString(cmd, dst, &Suffix)
+	bindString(cmd, dst, &flags.Suffix)
 }
 
 // -------------------------------------------------------------------------------------
 // NewNamespacePrefixFlag binds the --namespace-prefix flag onto cmd, writing the
 // parsed value into dst.
 func NewNamespacePrefixFlag(cmd *cobra.Command, dst *bool) {
-	bindBool(cmd, dst, &NamespacePrefix)
+	bindBool(cmd, dst, &flags.NamespacePrefix)
 }
 
 // -------------------------------------------------------------------------------------
 // NewOverloadFlag binds the --overload flag onto cmd, writing the parsed value
 // into dst.
 func NewOverloadFlag(cmd *cobra.Command, dst *bool) {
-	bindBool(cmd, dst, &Overload)
+	bindBool(cmd, dst, &flags.Overload)
 }
 
 // -------------------------------------------------------------------------------------
 // NewRevealFlag binds the --reveal flag onto cmd, writing the parsed value into
 // dst.
 func NewRevealFlag(cmd *cobra.Command, dst *bool) {
-	bindBool(cmd, dst, &Reveal)
+	bindBool(cmd, dst, &flags.Reveal)
 }
 
 // -------------------------------------------------------------------------------------
 // NewOutputFlag binds the --output flag onto cmd, writing the parsed value into
 // dst. Its default ("table") comes straight from the Output spec.
 func NewOutputFlag(cmd *cobra.Command, dst *string) {
-	bindString(cmd, dst, &Output)
+	bindString(cmd, dst, &flags.Output)
 }
 
 // -------------------------------------------------------------------------------------
 // bindString registers spec as a string flag on cmd's local flag set, sourcing
 // the name, shorthand, default, and usage from the spec so registration can
 // never disagree with resolution.
-func bindString(cmd *cobra.Command, dst *string, spec *Spec) {
+func bindString(cmd *cobra.Command, dst *string, spec *flags.Spec) {
 	def, _ := spec.Default.(string)
 	cmd.Flags().StringVarP(dst, spec.Name, spec.Short, def, spec.HelpText())
 }
@@ -84,7 +85,7 @@ func bindString(cmd *cobra.Command, dst *string, spec *Spec) {
 // bindBool registers spec as a bool flag on cmd's local flag set, sourcing the
 // name, shorthand, default, and usage from the spec so registration can never
 // disagree with resolution.
-func bindBool(cmd *cobra.Command, dst *bool, spec *Spec) {
+func bindBool(cmd *cobra.Command, dst *bool, spec *flags.Spec) {
 	def, _ := spec.Default.(bool)
 	cmd.Flags().BoolVarP(dst, spec.Name, spec.Short, def, spec.HelpText())
 }

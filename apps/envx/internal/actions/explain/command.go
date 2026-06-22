@@ -7,7 +7,7 @@ import (
 	"strings"
 	"text/tabwriter"
 
-	"github.com/go-envx/envx/apps/envx/internal/flags"
+	"github.com/go-envx/envx/apps/envx/internal/config"
 	"github.com/go-envx/envx/apps/envx/internal/str"
 	"github.com/spf13/cobra"
 )
@@ -72,13 +72,13 @@ func NewCommand(configPath *string) *cobra.Command {
 		},
 	}
 
-	flags.NewStrictFlag(cmd, &cfg.Settings.Strict)
-	flags.NewPrefixFlag(cmd, &cfg.Settings.Prefix)
-	flags.NewSuffixFlag(cmd, &cfg.Settings.Suffix)
-	flags.NewNamespacePrefixFlag(cmd, &cfg.Settings.NamespacePrefix)
-	flags.NewEnvFlag(cmd, &cfg.Settings.Env)
-	flags.NewRevealFlag(cmd, &cfg.Reveal)
-	flags.NewOutputFlag(cmd, &cfg.Output)
+	config.NewStrictFlag(cmd, &cfg.Settings.Strict)
+	config.NewPrefixFlag(cmd, &cfg.Settings.Prefix)
+	config.NewSuffixFlag(cmd, &cfg.Settings.Suffix)
+	config.NewNamespacePrefixFlag(cmd, &cfg.Settings.NamespacePrefix)
+	config.NewEnvFlag(cmd, &cfg.Settings.Env)
+	config.NewRevealFlag(cmd, &cfg.Reveal)
+	config.NewOutputFlag(cmd, &cfg.Output)
 	return cmd
 }
 

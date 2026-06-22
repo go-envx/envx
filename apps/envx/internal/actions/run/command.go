@@ -4,7 +4,7 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/go-envx/envx/apps/envx/internal/flags"
+	"github.com/go-envx/envx/apps/envx/internal/config"
 	"github.com/go-envx/envx/apps/envx/internal/str"
 	"github.com/spf13/cobra"
 )
@@ -66,11 +66,11 @@ func NewCommand(configPath *string) *cobra.Command {
 		},
 	}
 
-	flags.NewStrictFlag(cmd, &cfg.Settings.Strict)
-	flags.NewPrefixFlag(cmd, &cfg.Settings.Prefix)
-	flags.NewSuffixFlag(cmd, &cfg.Settings.Suffix)
-	flags.NewNamespacePrefixFlag(cmd, &cfg.Settings.NamespacePrefix)
-	flags.NewEnvFlag(cmd, &cfg.Settings.Env)
-	flags.NewOverloadFlag(cmd, &cfg.Overload)
+	config.NewStrictFlag(cmd, &cfg.Settings.Strict)
+	config.NewPrefixFlag(cmd, &cfg.Settings.Prefix)
+	config.NewSuffixFlag(cmd, &cfg.Settings.Suffix)
+	config.NewNamespacePrefixFlag(cmd, &cfg.Settings.NamespacePrefix)
+	config.NewEnvFlag(cmd, &cfg.Settings.Env)
+	config.NewOverloadFlag(cmd, &cfg.Overload)
 	return cmd
 }

@@ -1,8 +1,9 @@
-package flags
+package config
 
 import (
 	"testing"
 
+	"github.com/go-envx/envx/apps/envx/internal/flags"
 	"github.com/spf13/cobra"
 )
 
@@ -31,7 +32,8 @@ func TestEngineSettingFlags(t *testing.T) {
 	NewNamespacePrefixFlag(cmd, &nsPrefix)
 
 	for _, name := range []string{
-		Strict.Name, Prefix.Name, Suffix.Name, NamespacePrefix.Name,
+		flags.Strict.Name, flags.Prefix.Name, flags.Suffix.Name,
+		flags.NamespacePrefix.Name,
 	} {
 		if cmd.Flags().Lookup(name) == nil {
 			t.Errorf("flag %q was not registered", name)
@@ -63,8 +65,8 @@ func TestNewEnvFlag(t *testing.T) {
 	cmd := newTestCmd()
 	NewEnvFlag(cmd, &env)
 
-	if cmd.Flags().Lookup(Env.Name) == nil {
-		t.Fatalf("flag %q was not registered", Env.Name)
+	if cmd.Flags().Lookup(flags.Env.Name) == nil {
+		t.Fatalf("flag %q was not registered", flags.Env.Name)
 	}
 	cmd.SetArgs([]string{"--env", "production"})
 	if err := cmd.Execute(); err != nil {
@@ -85,8 +87,8 @@ func TestNewConfigFlag(t *testing.T) {
 	cmd := newTestCmd()
 	NewConfigFlag(cmd, &path)
 
-	if cmd.PersistentFlags().Lookup(Config.Name) == nil {
-		t.Fatalf("flag %q was not registered as persistent", Config.Name)
+	if cmd.PersistentFlags().Lookup(flags.Config.Name) == nil {
+		t.Fatalf("flag %q was not registered as persistent", flags.Config.Name)
 	}
 }
 

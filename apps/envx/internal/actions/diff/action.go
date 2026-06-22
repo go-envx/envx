@@ -3,6 +3,7 @@ package diff
 import (
 	"sort"
 
+	"github.com/go-envx/envx/apps/envx/internal/config"
 	"github.com/go-envx/envx/apps/envx/internal/engine"
 )
 
@@ -31,6 +32,40 @@ type actionResult struct {
 	Added   []change
 	Removed []change
 	Changed []change
+}
+
+// -------------------------------------------------------------------------------------
+// actionConfig is the diff action's composed config: the shared resolution input
+// (the two environments come from positional args, not --env) plus the --reveal
+// toggle and the --output format.
+type actionConfig struct {
+	config.Input
+	Reveal bool
+	Output string
+}
+
+// -------------------------------------------------------------------------------------
+// execute is the imperative shell: resolve the merge settings once, then build
+// the environment under each positional environment (overriding Settings.Env per
+// side) and feed both results to the pure core.
+func execute(p actionParams, c *actionConfig) (actionResult, error) {
+	ec, err := config.Resolve(&c.Input, p.Project)
+	if err != nil {
+		return actionResult{}, err
+	}
+
+	ec.Settings.Env = p.LeftEnv
+	left, err := engine.Build(ec)
+	if err != nil {
+		return actionResult{}, err
+	}
+
+	ec.Settings.Env = p.RightEnv
+	right, err := engine.Build(ec)
+	if err != nil {
+		return actionResult{}, err
+	}
+	return runAction(left, right), nil
 }
 
 // -------------------------------------------------------------------------------------

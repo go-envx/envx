@@ -50,7 +50,7 @@ func TestResolveSuccess(t *testing.T) {
 
 	c := baseConfig(setupWorkspace(t))
 	c.Settings = Settings{Env: "development"}
-	res, err := Resolve(c)
+	res, err := Build(c)
 	if err != nil {
 		t.Fatalf("Resolve: %v", err)
 	}
@@ -65,7 +65,7 @@ func TestResolveDefaultEnv(t *testing.T) {
 	t.Parallel()
 
 	c := baseConfig(setupWorkspace(t))
-	res, err := Resolve(c)
+	res, err := Build(c)
 	if err != nil {
 		t.Fatalf("Resolve: %v", err)
 	}
@@ -82,7 +82,7 @@ func TestResolveOverride(t *testing.T) {
 
 	c := baseConfig(setupWorkspace(t))
 	c.Settings = Settings{Env: "production"}
-	res, err := Resolve(c)
+	res, err := Build(c)
 	if err != nil {
 		t.Fatalf("Resolve: %v", err)
 	}
@@ -98,11 +98,11 @@ func TestResolveErrors(t *testing.T) {
 
 	c := baseConfig(setupWorkspace(t))
 	c.Settings = Settings{Env: "nope"}
-	if _, err := Resolve(c); err == nil {
+	if _, err := Build(c); err == nil {
 		t.Error("expected error for undeclared environment")
 	}
 
-	if _, err := Resolve(nil); err == nil {
+	if _, err := Build(nil); err == nil {
 		t.Error("expected error for nil config")
 	}
 }

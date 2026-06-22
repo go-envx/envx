@@ -24,13 +24,36 @@ type FlagSet interface {
 }
 
 // -------------------------------------------------------------------------------------
-// Resolve meshes the raw flag values, ENVX_* vars, and manifest layers into the
+// Input is the raw user input one action gathers at the cobra edge: the
+// persistent --config path, the flag-bound engine settings, and the changed-flag
+// handle that drives precedence. Resolve turns it into an *engine.Config.
+type Input struct {
+	ConfigPath *string
+	Settings   engine.Settings
+	Changed    FlagSet
+}
+
+// -------------------------------------------------------------------------------------
+// Resolve loads the manifest (honoring --config, then ENVX_CONFIG, then a walk-up
+// search) and meshes it with the input's flag values and ENVX_* vars into the
 // *engine.Config for one project, applying the precedence
 // flag > ENVX_* > project setting > global setting. Terminal fallbacks (e.g. the
 // default environment) are left to the engine, so an unset env stays empty here.
 // A missing project yields the canonical "project not found" error.
-func Resolve(
-	m *manifest.Manifest, project string, raw engine.Settings, changed FlagSet,
+func Resolve(in *Input, project string) (*engine.Config, error) {
+	m, err := manifest.New(manifestPath(in))
+	if err != nil {
+		return nil, err
+	}
+	return resolveManifest(m, in, project)
+}
+
+// -------------------------------------------------------------------------------------
+// resolveManifest applies the precedence layering against an already-loaded
+// manifest. It is split from Resolve so the precedence chain stays unit-testable
+// with an in-memory manifest.
+func resolveManifest(
+	m *manifest.Manifest, in *Input, project string,
 ) (*engine.Config, error) {
 	pm, ok := m.LookupProject(project)
 	if !ok {
@@ -41,22 +64,23 @@ func Resolve(
 	r := NewResolver()
 	settings := engine.Settings{
 		Env: r.String(
-			&flags.Env, changed, raw.Env, proj.Settings.Env, m.Settings.Env,
+			&flags.Env, in.Changed, in.Settings.Env,
+			proj.Settings.Env, m.Settings.Env,
 		),
 		Strict: r.Bool(
-			&flags.Strict, changed, raw.Strict,
+			&flags.Strict, in.Changed, in.Settings.Strict,
 			proj.Settings.Strict, m.Settings.Strict,
 		),
 		Prefix: r.String(
-			&flags.Prefix, changed, raw.Prefix,
+			&flags.Prefix, in.Changed, in.Settings.Prefix,
 			proj.Settings.Prefix, m.Settings.Prefix,
 		),
 		Suffix: r.String(
-			&flags.Suffix, changed, raw.Suffix,
+			&flags.Suffix, in.Changed, in.Settings.Suffix,
 			proj.Settings.Suffix, m.Settings.Suffix,
 		),
 		NamespacePrefix: r.Bool(
-			&flags.NamespacePrefix, changed, raw.NamespacePrefix,
+			&flags.NamespacePrefix, in.Changed, in.Settings.NamespacePrefix,
 			proj.Settings.NamespacePrefix, m.Settings.NamespacePrefix,
 		),
 	}
@@ -69,12 +93,62 @@ func Resolve(
 }
 
 // -------------------------------------------------------------------------------------
+// manifestPath resolves where the manifest lives, honoring the precedence
+// --config flag > ENVX_CONFIG env var > "" (an empty result lets the manifest
+// package walk up from the working directory).
+func manifestPath(in *Input) string {
+	if in.ConfigPath != nil && *in.ConfigPath != "" {
+		return *in.ConfigPath
+	}
+	if v := os.Getenv(flags.Config.Env); v != "" {
+		return v
+	}
+	return ""
+}
+
+// -------------------------------------------------------------------------------------
 // ResolveEnv meshes only the target environment (flag > ENVX_ENV > manifest
 // global env) for callers that have no project — notably the set action, which
 // writes a single overlay file and never invokes the engine. The terminal
 // "development" fallback is left to the caller (engine.DefaultEnv).
 func ResolveEnv(m *manifest.Manifest, rawEnv string, changed FlagSet) string {
 	return NewResolver().String(&flags.Env, changed, rawEnv, m.Settings.Env)
+}
+
+// -------------------------------------------------------------------------------------
+// ResolveOverload meshes only the --overload toggle (flag > ENVX_OVERLOAD) for
+// the run action. Overload is not an engine setting and carries no manifest
+// layer, so it is resolved on its own rather than riding along in Resolve.
+func ResolveOverload(rawOverload bool, changed FlagSet) bool {
+	return NewResolver().Bool(&flags.Overload, changed, rawOverload)
+}
+
+// -------------------------------------------------------------------------------------
+// ResolveTarget loads the manifest and resolves the overlay one set call writes:
+// the target environment (flag > ENVX_ENV > manifest global > engine.DefaultEnv),
+// validated against the declared set, plus the directory and base name for
+// includePath. It serves the set action, which mutates a single overlay file
+// without merging an environment, so it never builds an engine result.
+func ResolveTarget(in *Input, includePath string) (env, dir, name string, err error) {
+	m, err := manifest.New(manifestPath(in))
+	if err != nil {
+		return "", "", "", err
+	}
+	env = ResolveEnv(m, in.Settings.Env, in.Changed)
+	if env == "" {
+		env = engine.DefaultEnv
+	}
+	if !m.HasEnvironment(env) {
+		return "", "", "", fmt.Errorf(
+			"environment %q is not declared in the manifest (available: %v)",
+			env, m.Environments,
+		)
+	}
+	dir, name, ok := m.LookupInclude(includePath)
+	if !ok {
+		return "", "", "", fmt.Errorf("include %q not found in manifest", includePath)
+	}
+	return env, dir, name, nil
 }
 
 // -------------------------------------------------------------------------------------

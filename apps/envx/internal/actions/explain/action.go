@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/go-envx/envx/apps/envx/internal/config"
 	"github.com/go-envx/envx/apps/envx/internal/engine"
 )
 
@@ -30,6 +31,30 @@ type entry struct {
 // actionResult is the full set of explain rows, sorted by key.
 type actionResult struct {
 	Entries []entry
+}
+
+// -------------------------------------------------------------------------------------
+// actionConfig is the explain action's composed config: the shared resolution
+// input plus the --reveal toggle and the --output format.
+type actionConfig struct {
+	config.Input
+	Reveal bool
+	Output string
+}
+
+// -------------------------------------------------------------------------------------
+// execute is the imperative shell: resolve the input into an engine.Config, build
+// the merged environment, then hand the result to the pure core.
+func execute(p actionParams, c *actionConfig) (actionResult, error) {
+	ec, err := config.Resolve(&c.Input, p.Project)
+	if err != nil {
+		return actionResult{}, err
+	}
+	env, err := engine.Build(ec)
+	if err != nil {
+		return actionResult{}, err
+	}
+	return runAction(env, p, c.Reveal)
 }
 
 // -------------------------------------------------------------------------------------

@@ -5,28 +5,23 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-
-	"github.com/go-envx/envx/apps/envx/internal/flags"
 )
 
 // defaultFilename is the conventional name for the workspace manifest.
 const defaultFilename = "envx.yaml"
 
 // -------------------------------------------------------------------------------------
-// Discover locates the manifest file using a three-tier strategy:
+// Discover locates the manifest file using a two-tier strategy:
 //
-//  1. Explicit path (from the --config flag) — highest priority.
-//  2. The ENVX_CONFIG environment variable.
-//  3. Walk-up search from cwd until envx.yaml is found or the git/filesystem
-//     root is reached.
+//  1. An explicit path (already resolved by the caller from the --config flag or
+//     ENVX_CONFIG) — highest priority.
+//  2. A walk-up search from the working directory until envx.yaml is found or the
+//     git/filesystem root is reached.
 //
 // It returns the absolute path to the manifest or an error if none is found.
 func Discover(explicitPath string) (string, error) {
 	if explicitPath != "" {
 		return resolveExplicit(explicitPath, "manifest not found at %q")
-	}
-	if envPath := os.Getenv(flags.Config.Env); envPath != "" {
-		return resolveExplicit(envPath, flags.Config.Env+"=%q")
 	}
 	return walkUp()
 }

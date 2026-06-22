@@ -6,7 +6,6 @@ import (
 	"testing"
 
 	"github.com/go-envx/envx/apps/envx/internal/fixtures"
-	"github.com/go-envx/envx/apps/envx/internal/flags"
 )
 
 // -------------------------------------------------------------------------------------
@@ -136,30 +135,12 @@ func TestDiscoverExplicit(t *testing.T) {
 }
 
 // -------------------------------------------------------------------------------------
-// TestDiscoverWalkUp verifies that with no explicit path or ENVX_CONFIG the
-// search walks up from the working directory to the nearest envx.yaml.
+// TestDiscoverWalkUp verifies that with no explicit path the search walks up from
+// the working directory to the nearest envx.yaml.
 func TestDiscoverWalkUp(t *testing.T) {
-	// t.Chdir and t.Setenv forbid t.Parallel.
-	t.Setenv(flags.Config.Env, "")
-
+	// t.Chdir forbids t.Parallel.
 	man := fixtures.Manifest("basic")
 	t.Chdir(filepath.Join(filepath.Dir(man), "apps", "api-core", "env"))
-
-	got, err := Discover("")
-	if err != nil {
-		t.Fatalf("Discover: %v", err)
-	}
-	if got != man {
-		t.Errorf("Discover() = %q, want %q", got, man)
-	}
-}
-
-// -------------------------------------------------------------------------------------
-// TestDiscoverEnvVar verifies ENVX_CONFIG is honored when no explicit path is
-// supplied.
-func TestDiscoverEnvVar(t *testing.T) {
-	man := fixtures.Manifest("basic")
-	t.Setenv(flags.Config.Env, man)
 
 	got, err := Discover("")
 	if err != nil {

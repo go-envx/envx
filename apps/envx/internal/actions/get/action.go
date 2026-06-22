@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/go-envx/envx/apps/envx/internal/config"
 	"github.com/go-envx/envx/apps/envx/internal/engine"
 )
 
@@ -20,6 +21,29 @@ type actionParams struct {
 type actionResult struct {
 	Value  string
 	Source string
+}
+
+// -------------------------------------------------------------------------------------
+// actionConfig is the get action's composed config: the shared resolution input
+// (config path, raw flag values, changed-flag handle) gathered at the cobra edge
+// and turned into an engine.Config by config.Resolve.
+type actionConfig struct {
+	config.Input
+}
+
+// -------------------------------------------------------------------------------------
+// execute is the imperative shell: resolve the input into an engine.Config, build
+// the merged environment, and hand the immutable result to the pure core.
+func execute(p actionParams, c *actionConfig) (actionResult, error) {
+	ec, err := config.Resolve(&c.Input, p.Project)
+	if err != nil {
+		return actionResult{}, err
+	}
+	env, err := engine.Build(ec)
+	if err != nil {
+		return actionResult{}, err
+	}
+	return runAction(env, p)
 }
 
 // -------------------------------------------------------------------------------------

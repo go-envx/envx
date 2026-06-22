@@ -6,6 +6,7 @@ import (
 	"io"
 	"testing"
 
+	"github.com/go-envx/envx/apps/envx/internal/config"
 	"github.com/go-envx/envx/apps/envx/internal/fixtures"
 )
 
@@ -18,7 +19,7 @@ func TestExecuteOverloadFromEnv(t *testing.T) {
 
 	path := fixtures.Manifest("basic")
 	var stdout bytes.Buffer
-	c := &actionConfig{ConfigPath: &path, Changed: noChange{}}
+	c := &actionConfig{Input: config.Input{ConfigPath: &path, Changed: noChange{}}}
 	err := execute(context.Background(), actionParams{
 		Project:  "api-core",
 		ExecArgs: []string{"printenv", "APP_NAME"},

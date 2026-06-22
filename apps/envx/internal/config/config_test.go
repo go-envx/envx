@@ -1,9 +1,11 @@
 package config
 
 import (
+	"path/filepath"
 	"testing"
 
 	"github.com/go-envx/envx/apps/envx/internal/engine"
+	"github.com/go-envx/envx/apps/envx/internal/fixtures"
 	"github.com/go-envx/envx/apps/envx/internal/flags"
 	"github.com/go-envx/envx/apps/envx/internal/manifest"
 )
@@ -36,19 +38,19 @@ func testManifest() *manifest.Manifest {
 }
 
 // -------------------------------------------------------------------------------------
-// TestResolve verifies project lookup, the env precedence (flag > project >
-// global), option layering, and pass-through of includes/environments into the
-// engine.Config. Terminal defaults are left to the engine, so an unset env stays
-// empty here.
-func TestResolve(t *testing.T) {
+// TestResolveManifest verifies project lookup, the env precedence (flag > project
+// > global), option layering, and pass-through of includes/environments into the
+// engine.Config against an in-memory manifest. Terminal defaults are left to the
+// engine, so an unset env stays empty here.
+func TestResolveManifest(t *testing.T) {
 	m := testManifest()
 	none := fakeFlagSet{changed: map[string]bool{}}
 
 	t.Run("flag wins", func(t *testing.T) {
-		ec, err := Resolve(
-			m, "api", engine.Settings{Env: "from-flag"},
-			fakeFlagSet{changed: map[string]bool{flags.Env.Name: true}},
-		)
+		ec, err := resolveManifest(m, &Input{
+			Settings: engine.Settings{Env: "from-flag"},
+			Changed:  fakeFlagSet{changed: map[string]bool{flags.Env.Name: true}},
+		}, "api")
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -57,7 +59,7 @@ func TestResolve(t *testing.T) {
 		}
 	})
 	t.Run("project default", func(t *testing.T) {
-		ec, err := Resolve(m, "api", engine.Settings{}, none)
+		ec, err := resolveManifest(m, &Input{Changed: none}, "api")
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -66,7 +68,7 @@ func TestResolve(t *testing.T) {
 		}
 	})
 	t.Run("global default", func(t *testing.T) {
-		ec, err := Resolve(m, "web", engine.Settings{}, none)
+		ec, err := resolveManifest(m, &Input{Changed: none}, "web")
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -81,7 +83,7 @@ func TestResolve(t *testing.T) {
 				"api": {Includes: []string{"env/x"}},
 			},
 		}
-		ec, err := Resolve(bare, "api", engine.Settings{}, none)
+		ec, err := resolveManifest(bare, &Input{Changed: none}, "api")
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -90,12 +92,12 @@ func TestResolve(t *testing.T) {
 		}
 	})
 	t.Run("options and includes pass through", func(t *testing.T) {
-		ec, err := Resolve(
-			m, "api", engine.Settings{Prefix: "APP", Strict: true},
-			fakeFlagSet{changed: map[string]bool{
+		ec, err := resolveManifest(m, &Input{
+			Settings: engine.Settings{Prefix: "APP", Strict: true},
+			Changed: fakeFlagSet{changed: map[string]bool{
 				flags.Prefix.Name: true, flags.Strict.Name: true,
 			}},
-		)
+		}, "api")
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -110,8 +112,107 @@ func TestResolve(t *testing.T) {
 		}
 	})
 	t.Run("unknown project errors", func(t *testing.T) {
-		if _, err := Resolve(m, "ghost", engine.Settings{}, none); err == nil {
+		if _, err := resolveManifest(m, &Input{Changed: none}, "ghost"); err == nil {
 			t.Error("expected error for unknown project")
+		}
+	})
+}
+
+// -------------------------------------------------------------------------------------
+// TestResolve verifies the facade loads the manifest from the input's config path
+// and resolves a known fixture project end to end.
+func TestResolve(t *testing.T) {
+	t.Parallel()
+
+	path := fixtures.Manifest("basic")
+	ec, err := Resolve(&Input{ConfigPath: &path}, "api-core")
+	if err != nil {
+		t.Fatalf("Resolve: %v", err)
+	}
+	if len(ec.Includes) == 0 {
+		t.Error("expected includes from the fixture project")
+	}
+}
+
+// -------------------------------------------------------------------------------------
+// TestManifestPath verifies the manifest-location precedence: --config flag wins,
+// then ENVX_CONFIG, then empty (which defers to the manifest walk-up).
+func TestManifestPath(t *testing.T) {
+	t.Run("flag wins over env", func(t *testing.T) {
+		t.Setenv(flags.Config.Env, "from-env")
+		flag := "from-flag"
+		if got := manifestPath(&Input{ConfigPath: &flag}); got != "from-flag" {
+			t.Errorf("got %q, want from-flag", got)
+		}
+	})
+	t.Run("env when flag empty", func(t *testing.T) {
+		t.Setenv(flags.Config.Env, "from-env")
+		empty := ""
+		if got := manifestPath(&Input{ConfigPath: &empty}); got != "from-env" {
+			t.Errorf("got %q, want from-env", got)
+		}
+	})
+	t.Run("empty when neither set", func(t *testing.T) {
+		t.Setenv(flags.Config.Env, "")
+		if got := manifestPath(&Input{}); got != "" {
+			t.Errorf("got %q, want empty", got)
+		}
+	})
+}
+
+// -------------------------------------------------------------------------------------
+// TestResolveOverload verifies the overload toggle precedence (flag > default).
+func TestResolveOverload(t *testing.T) {
+	t.Parallel()
+
+	changed := fakeFlagSet{changed: map[string]bool{flags.Overload.Name: true}}
+	if !ResolveOverload(true, changed) {
+		t.Error("expected flag value true to win")
+	}
+	if ResolveOverload(false, fakeFlagSet{changed: map[string]bool{}}) {
+		t.Error("expected default false")
+	}
+}
+
+// -------------------------------------------------------------------------------------
+// TestResolveTarget verifies the set action's overlay resolution: the default
+// environment, the include lookup, and the error paths for an unknown include or
+// an undeclared environment.
+func TestResolveTarget(t *testing.T) {
+	t.Parallel()
+
+	path := fixtures.Manifest("basic")
+
+	t.Run("default env and include", func(t *testing.T) {
+		env, dir, name, err := ResolveTarget(&Input{ConfigPath: &path}, "env/postgres")
+		if err != nil {
+			t.Fatalf("ResolveTarget: %v", err)
+		}
+		if env != engine.DefaultEnv {
+			t.Errorf("env = %q, want %q", env, engine.DefaultEnv)
+		}
+		if name != "postgres" {
+			t.Errorf("name = %q, want postgres", name)
+		}
+		if filepath.Base(dir) != "env" {
+			t.Errorf("dir = %q, want .../env", dir)
+		}
+	})
+	t.Run("unknown include errors", func(t *testing.T) {
+		_, _, _, err := ResolveTarget(&Input{ConfigPath: &path}, "env/ghost")
+		if err == nil {
+			t.Error("expected error for unknown include")
+		}
+	})
+	t.Run("undeclared env errors", func(t *testing.T) {
+		in := &Input{
+			ConfigPath: &path,
+			Settings:   engine.Settings{Env: "nope"},
+			Changed:    fakeFlagSet{changed: map[string]bool{flags.Env.Name: true}},
+		}
+		_, _, _, err := ResolveTarget(in, "env/postgres")
+		if err == nil {
+			t.Error("expected error for undeclared environment")
 		}
 	})
 }

@@ -11,9 +11,9 @@ import (
 )
 
 // -------------------------------------------------------------------------------------
-// New discovers the manifest path (honoring an explicit --config value, then
-// ENVX_CONFIG, then a walk-up search) and loads it. It is the primary entry
-// point for obtaining a ready-to-use *Manifest.
+// New discovers the manifest path (an explicit path, else a walk-up search) and
+// loads it. The caller resolves the --config flag and ENVX_CONFIG precedence into
+// path; New does the rest. It is the primary entry point for a ready *Manifest.
 func New(path string) (*Manifest, error) {
 	found, err := Discover(path)
 	if err != nil {

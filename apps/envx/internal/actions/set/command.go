@@ -1,7 +1,7 @@
 package set
 
 import (
-	"github.com/go-envx/envx/apps/envx/internal/flags"
+	"github.com/go-envx/envx/apps/envx/internal/config"
 	"github.com/go-envx/envx/apps/envx/internal/str"
 	"github.com/spf13/cobra"
 )
@@ -48,10 +48,10 @@ func NewCommand(configPath *string) *cobra.Command {
 				IncludePath: args[0],
 				Key:         args[1],
 				Value:       args[2],
-			}, cfg)
+			}, &cfg)
 		},
 	}
 
-	flags.NewEnvFlag(cmd, &cfg.Env)
+	config.NewEnvFlag(cmd, &cfg.Settings.Env)
 	return cmd
 }

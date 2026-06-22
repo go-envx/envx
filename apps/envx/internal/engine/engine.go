@@ -70,11 +70,11 @@ func (r *Result) Keys() []string {
 }
 
 // -------------------------------------------------------------------------------------
-// Resolve is the single entry point: it applies the default environment,
+// Build is the single entry point: it applies the default environment,
 // validates it against the declared set, builds the namespace chain from the
 // include list, deep-merges them, and returns an immutable Result. It performs no
 // precedence resolution and reads no files beyond the namespace overlays.
-func Resolve(c *Config) (*Result, error) {
+func Build(c *Config) (*Result, error) {
 	if c == nil {
 		return nil, errors.New("engine: nil config")
 	}
