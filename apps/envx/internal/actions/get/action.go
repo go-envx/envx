@@ -24,7 +24,7 @@ type actionConfig struct {
 // actionResult is the data the get action returns.
 type actionResult struct {
 	// Value is the resolved value of the requested key.
-	Value  string
+	Value string
 	// Source is the file that provided the resolved value.
 	Source string
 }
