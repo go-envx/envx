@@ -154,21 +154,21 @@ func TestResolverString(t *testing.T) {
 	t.Run("flag wins", func(t *testing.T) {
 		r := &Resolver{LookupEnv: func(string) (string, bool) { return "from-env", true }}
 		changed := fakeFlagSet{changed: map[string]bool{spec.Name: true}}
-		if got := r.String(spec, changed, "from-flag", "layer"); got != "from-flag" {
+		if got := r.String(&spec, changed, "from-flag", "layer"); got != "from-flag" {
 			t.Errorf("got %q, want from-flag", got)
 		}
 	})
 	t.Run("env wins over layers", func(t *testing.T) {
 		r := &Resolver{LookupEnv: func(string) (string, bool) { return "from-env", true }}
 		changed := fakeFlagSet{changed: map[string]bool{}}
-		if got := r.String(spec, changed, "from-flag", "layer"); got != "from-env" {
+		if got := r.String(&spec, changed, "from-flag", "layer"); got != "from-env" {
 			t.Errorf("got %q, want from-env", got)
 		}
 	})
 	t.Run("first non-empty layer", func(t *testing.T) {
 		r := &Resolver{LookupEnv: func(string) (string, bool) { return "", false }}
 		changed := fakeFlagSet{changed: map[string]bool{}}
-		if got := r.String(spec, changed, "from-flag", "", "layer2"); got != "layer2" {
+		if got := r.String(&spec, changed, "from-flag", "", "layer2"); got != "layer2" {
 			t.Errorf("got %q, want layer2", got)
 		}
 	})
@@ -185,28 +185,28 @@ func TestResolverBool(t *testing.T) {
 	t.Run("flag wins", func(t *testing.T) {
 		r := &Resolver{LookupEnv: func(string) (string, bool) { return "false", true }}
 		changed := fakeFlagSet{changed: map[string]bool{spec.Name: true}}
-		if !r.Bool(spec, changed, true, &tru) {
+		if !r.Bool(&spec, changed, true, &tru) {
 			t.Error("expected flag value true to win")
 		}
 	})
 	t.Run("env parsed", func(t *testing.T) {
 		r := &Resolver{LookupEnv: func(string) (string, bool) { return "true", true }}
 		changed := fakeFlagSet{changed: map[string]bool{}}
-		if !r.Bool(spec, changed, false) {
+		if !r.Bool(&spec, changed, false) {
 			t.Error("expected env value true")
 		}
 	})
 	t.Run("layer pointer", func(t *testing.T) {
 		r := &Resolver{LookupEnv: func(string) (string, bool) { return "", false }}
 		changed := fakeFlagSet{changed: map[string]bool{}}
-		if !r.Bool(spec, changed, false, nil, &tru) {
+		if !r.Bool(&spec, changed, false, nil, &tru) {
 			t.Error("expected first non-nil layer true")
 		}
 	})
 	t.Run("default false", func(t *testing.T) {
 		r := &Resolver{LookupEnv: func(string) (string, bool) { return "", false }}
 		changed := fakeFlagSet{changed: map[string]bool{}}
-		if r.Bool(spec, changed, false, nil) {
+		if r.Bool(&spec, changed, false, nil) {
 			t.Error("expected default false")
 		}
 	})

@@ -3,14 +3,15 @@ package flags
 import "fmt"
 
 // -------------------------------------------------------------------------------------
-// Spec is one flag's identity. Both registration (cmd.Flags().XVarP) and the
-// config resolver read the SAME Spec, so a flag's name and its ENVX_* env-var
-// fallback are defined exactly once and can never drift apart.
+// Spec is one flag's identity. Both registration (the New*Flag constructors) and
+// the config resolver read the SAME Spec, so a flag's name, its ENVX_* env-var
+// fallback, and its default are defined exactly once and can never drift apart.
 type Spec struct {
-	Name  string // --<Name>
-	Short string // -<Short> ("" = none)
-	Env   string // ENVX_* fallback ("" = none)
-	Usage string // human-readable description
+	Name    string // --<Name>
+	Short   string // -<Short> ("" = none)
+	Env     string // ENVX_* fallback ("" = none)
+	Usage   string // human-readable description
+	Default any    // default flag value (nil = the type's zero value)
 }
 
 // -------------------------------------------------------------------------------------
@@ -74,9 +75,10 @@ var (
 
 	// Output selects the rendering format for tabular commands.
 	Output = Spec{
-		Name:  "output",
-		Short: "o",
-		Usage: "output format: table|json",
+		Name:    "output",
+		Short:   "o",
+		Usage:   "output format: table|json",
+		Default: "table",
 	}
 )
 
@@ -84,7 +86,7 @@ var (
 // HelpText renders the usage string with the env-var hint appended when the
 // flag has an ENVX_* fallback, e.g. "target environment (env: ENVX_ENV)". The
 // result is used directly as the cobra usage string.
-func (s Spec) HelpText() string {
+func (s *Spec) HelpText() string {
 	if s.Env == "" {
 		return s.Usage
 	}

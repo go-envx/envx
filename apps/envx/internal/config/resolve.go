@@ -41,22 +41,22 @@ func Resolve(
 	r := NewResolver()
 	settings := engine.Settings{
 		Env: r.String(
-			flags.Env, changed, raw.Env, proj.Settings.Env, m.Settings.Env,
+			&flags.Env, changed, raw.Env, proj.Settings.Env, m.Settings.Env,
 		),
 		Strict: r.Bool(
-			flags.Strict, changed, raw.Strict,
+			&flags.Strict, changed, raw.Strict,
 			proj.Settings.Strict, m.Settings.Strict,
 		),
 		Prefix: r.String(
-			flags.Prefix, changed, raw.Prefix,
+			&flags.Prefix, changed, raw.Prefix,
 			proj.Settings.Prefix, m.Settings.Prefix,
 		),
 		Suffix: r.String(
-			flags.Suffix, changed, raw.Suffix,
+			&flags.Suffix, changed, raw.Suffix,
 			proj.Settings.Suffix, m.Settings.Suffix,
 		),
 		NamespacePrefix: r.Bool(
-			flags.NamespacePrefix, changed, raw.NamespacePrefix,
+			&flags.NamespacePrefix, changed, raw.NamespacePrefix,
 			proj.Settings.NamespacePrefix, m.Settings.NamespacePrefix,
 		),
 	}
@@ -74,7 +74,7 @@ func Resolve(
 // writes a single overlay file and never invokes the engine. The terminal
 // "development" fallback is left to the caller (engine.DefaultEnv).
 func ResolveEnv(m *manifest.Manifest, rawEnv string, changed FlagSet) string {
-	return NewResolver().String(flags.Env, changed, rawEnv, m.Settings.Env)
+	return NewResolver().String(&flags.Env, changed, rawEnv, m.Settings.Env)
 }
 
 // -------------------------------------------------------------------------------------
@@ -96,7 +96,7 @@ func NewResolver() *Resolver {
 // then the ENVX_* var, then the first non-empty layer (e.g. project then global
 // default), and finally "".
 func (r *Resolver) String(
-	s flags.Spec, changed FlagSet, flagVal string, layers ...string,
+	s *flags.Spec, changed FlagSet, flagVal string, layers ...string,
 ) string {
 	if changed != nil && changed.Changed(s.Name) {
 		return flagVal
@@ -119,7 +119,7 @@ func (r *Resolver) String(
 // then the ENVX_* var (parsed), then the first non-nil layer (e.g. project then
 // global setting), and finally false.
 func (r *Resolver) Bool(
-	s flags.Spec, changed FlagSet, flagVal bool, layers ...*bool,
+	s *flags.Spec, changed FlagSet, flagVal bool, layers ...*bool,
 ) bool {
 	if changed != nil && changed.Changed(s.Name) {
 		return flagVal

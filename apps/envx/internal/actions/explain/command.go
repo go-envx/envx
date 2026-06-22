@@ -7,7 +7,6 @@ import (
 	"strings"
 	"text/tabwriter"
 
-	"github.com/go-envx/envx/apps/envx/internal/actions"
 	"github.com/go-envx/envx/apps/envx/internal/flags"
 	"github.com/go-envx/envx/apps/envx/internal/str"
 	"github.com/spf13/cobra"
@@ -73,13 +72,10 @@ func NewCommand(configPath *string) *cobra.Command {
 		},
 	}
 
-	actions.RegisterEngineFlags(cmd, &cfg.Settings)
-	actions.RegisterEnvFlag(cmd, &cfg.Settings.Env)
-	cmd.Flags().BoolVar(&cfg.Reveal, flags.Reveal.Name, false, flags.Reveal.HelpText())
-	cmd.Flags().StringVarP(
-		&cfg.Output, flags.Output.Name, flags.Output.Short, "table",
-		flags.Output.HelpText(),
-	)
+	flags.NewEngineFlags(cmd, &cfg.Settings)
+	flags.NewEnvFlag(cmd, &cfg.Settings.Env)
+	flags.NewRevealFlag(cmd, &cfg.Reveal)
+	flags.NewOutputFlag(cmd, &cfg.Output)
 	return cmd
 }
 

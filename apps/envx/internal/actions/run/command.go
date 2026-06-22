@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/go-envx/envx/apps/envx/internal/actions"
 	"github.com/go-envx/envx/apps/envx/internal/flags"
 	"github.com/go-envx/envx/apps/envx/internal/str"
 	"github.com/spf13/cobra"
@@ -67,11 +66,8 @@ func NewCommand(configPath *string) *cobra.Command {
 		},
 	}
 
-	actions.RegisterEngineFlags(cmd, &cfg.Settings)
-	actions.RegisterEnvFlag(cmd, &cfg.Settings.Env)
-	cmd.Flags().BoolVarP(
-		&cfg.Overload, flags.Overload.Name, flags.Overload.Short, false,
-		flags.Overload.HelpText(),
-	)
+	flags.NewEngineFlags(cmd, &cfg.Settings)
+	flags.NewEnvFlag(cmd, &cfg.Settings.Env)
+	flags.NewOverloadFlag(cmd, &cfg.Overload)
 	return cmd
 }

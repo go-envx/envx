@@ -26,6 +26,6 @@ func execute(ctx context.Context, p actionParams, c *actionConfig) error {
 	if err != nil {
 		return err
 	}
-	overload := config.NewResolver().Bool(flags.Overload, c.Changed, c.Overload)
+	overload := config.NewResolver().Bool(&flags.Overload, c.Changed, c.Overload)
 	return runAction(ctx, env, p, overload)
 }

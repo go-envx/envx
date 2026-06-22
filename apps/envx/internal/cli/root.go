@@ -10,14 +10,13 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// -------------------------------------------------------------------------------------
-// Define the root command's usage and description.
 const (
 	rootUsage = "envx [command] [flags]"
 	rootShort = "envx is a CLI tool for managing environment variables"
 )
 
 // -------------------------------------------------------------------------------------
+
 // NewRootCmd builds the command tree. It registers the persistent --config flag
 // and forwards its address to every action, which loads and resolves the
 // manifest on demand. version is injected from main at build time.
@@ -35,11 +34,7 @@ func NewRootCmd(version string) *cobra.Command {
 		},
 	}
 
-	pf := root.PersistentFlags()
-	pf.StringVarP(
-		&configPath, flags.Config.Name, flags.Config.Short, "",
-		flags.Config.HelpText(),
-	)
+	flags.NewConfigFlag(root, &configPath)
 
 	root.AddCommand(
 		get.NewCommand(&configPath),

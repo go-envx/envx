@@ -12,6 +12,7 @@ import (
 )
 
 // -------------------------------------------------------------------------------------
+
 // execCmd builds a root command wired to fresh stdout/stderr buffers, sets the
 // given args, and executes it. It returns the captured buffers and any error.
 func execCmd(args ...string) (stdout, stderr *bytes.Buffer, err error) {
@@ -26,6 +27,7 @@ func execCmd(args ...string) (stdout, stderr *bytes.Buffer, err error) {
 }
 
 // -------------------------------------------------------------------------------------
+
 // copyTree recursively copies the directory tree at src into dst.
 func copyTree(t *testing.T, src, dst string) {
 	t.Helper()
@@ -55,6 +57,7 @@ func copyTree(t *testing.T, src, dst string) {
 }
 
 // -------------------------------------------------------------------------------------
+
 // TestRootShowsHelp verifies bare invocation prints help and does not require a
 // manifest.
 func TestRootShowsHelp(t *testing.T) {
@@ -70,6 +73,7 @@ func TestRootShowsHelp(t *testing.T) {
 }
 
 // -------------------------------------------------------------------------------------
+
 // TestVersionFlag verifies --version prints the injected version.
 func TestVersionFlag(t *testing.T) {
 	t.Parallel()
@@ -84,6 +88,7 @@ func TestVersionFlag(t *testing.T) {
 }
 
 // -------------------------------------------------------------------------------------
+
 // TestGet verifies get prints a resolved value and reports missing keys.
 func TestGet(t *testing.T) {
 	t.Parallel()
@@ -146,6 +151,7 @@ func TestGet(t *testing.T) {
 }
 
 // -------------------------------------------------------------------------------------
+
 // TestRun verifies run injects the merged environment into the child process.
 func TestRun(t *testing.T) {
 	t.Parallel()
@@ -164,6 +170,7 @@ func TestRun(t *testing.T) {
 }
 
 // -------------------------------------------------------------------------------------
+
 // TestRunRequiresCommand verifies run rejects a missing "-- command".
 func TestRunRequiresCommand(t *testing.T) {
 	t.Parallel()
@@ -175,6 +182,7 @@ func TestRunRequiresCommand(t *testing.T) {
 }
 
 // -------------------------------------------------------------------------------------
+
 // TestSetRoundTrip verifies set writes a value that get can read back.
 func TestSetRoundTrip(t *testing.T) {
 	t.Parallel()
@@ -203,6 +211,7 @@ func TestSetRoundTrip(t *testing.T) {
 }
 
 // -------------------------------------------------------------------------------------
+
 // TestExplain verifies masking by default, --reveal, and JSON output.
 func TestExplain(t *testing.T) {
 	t.Parallel()
@@ -260,6 +269,7 @@ func TestExplain(t *testing.T) {
 }
 
 // -------------------------------------------------------------------------------------
+
 // TestDiff verifies diff reports changed keys across two environments.
 func TestDiff(t *testing.T) {
 	t.Parallel()
