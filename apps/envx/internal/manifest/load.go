@@ -1,11 +1,9 @@
 package manifest
 
 import (
-	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
-	"slices"
 
 	"gopkg.in/yaml.v3"
 
@@ -52,32 +50,8 @@ func parse(data []byte) (*schema.Manifest, error) {
 		return nil, fmt.Errorf("parsing manifest: %w", err)
 	}
 
-	if err := validate(&m); err != nil {
+	if err := m.Validate(); err != nil {
 		return nil, err
 	}
 	return &m, nil
-}
-
-// -------------------------------------------------------------------------------------
-// validate enforces structural constraints: at least one environment and one
-// project must be declared, every project must have at least one include, and
-// no include entry may be empty.
-func validate(m *schema.Manifest) error {
-	if len(m.Environments) == 0 {
-		return errors.New("manifest: environments list must not be empty")
-	}
-	if len(m.Projects) == 0 {
-		return errors.New("manifest: at least one project must be defined")
-	}
-
-	for name, p := range m.Projects {
-		if len(p.Includes) == 0 {
-			return fmt.Errorf("manifest: project %q has no includes", name)
-		}
-		if slices.Contains(p.Includes, "") {
-			return fmt.Errorf("manifest: project %q contains an empty include", name)
-		}
-	}
-
-	return nil
 }

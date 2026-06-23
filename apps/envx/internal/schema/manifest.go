@@ -1,6 +1,10 @@
 package schema
 
-import "slices"
+import (
+	"errors"
+	"fmt"
+	"slices"
+)
 
 // -------------------------------------------------------------------------------------
 
@@ -95,4 +99,30 @@ func (m *Manifest) HasInclude(includePath string) bool {
 func (m *Manifest) LookupProject(name string) (Project, bool) {
 	p, ok := m.Projects[name]
 	return p, ok
+}
+
+// -------------------------------------------------------------------------------------
+
+// Validate enforces the manifest's structural constraints: at least one
+// environment and one project must be declared, every project must have at least
+// one include, and no include entry may be empty. It reads only the declared
+// schema and performs no I/O.
+func (m *Manifest) Validate() error {
+	if len(m.Environments) == 0 {
+		return errors.New("manifest: environments list must not be empty")
+	}
+	if len(m.Projects) == 0 {
+		return errors.New("manifest: at least one project must be defined")
+	}
+
+	for name, p := range m.Projects {
+		if len(p.Includes) == 0 {
+			return fmt.Errorf("manifest: project %q has no includes", name)
+		}
+		if slices.Contains(p.Includes, "") {
+			return fmt.Errorf("manifest: project %q contains an empty include", name)
+		}
+	}
+
+	return nil
 }

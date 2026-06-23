@@ -91,3 +91,41 @@ func TestHasInclude(t *testing.T) {
 		t.Error(`HasInclude("env/ghost") = true, want false`)
 	}
 }
+
+// -------------------------------------------------------------------------------------
+
+// TestValidate verifies the structural constraints: a well-formed manifest
+// passes, while a missing environment/project, an absent include list, or an
+// empty include entry each report an error.
+func TestValidate(t *testing.T) {
+	t.Parallel()
+
+	if err := testManifest().Validate(); err != nil {
+		t.Errorf("Validate() on a well-formed manifest: %v", err)
+	}
+
+	tests := map[string]*Manifest{
+		"no environments": {
+			Projects: map[string]Project{"api": {Includes: []string{"env/x"}}},
+		},
+		"no projects": {
+			Environments: []string{"development"},
+		},
+		"no includes": {
+			Environments: []string{"development"},
+			Projects:     map[string]Project{"api": {Includes: []string{}}},
+		},
+		"empty include": {
+			Environments: []string{"development"},
+			Projects:     map[string]Project{"api": {Includes: []string{""}}},
+		},
+	}
+	for name, m := range tests {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			if err := m.Validate(); err == nil {
+				t.Error("expected validation error")
+			}
+		})
+	}
+}
