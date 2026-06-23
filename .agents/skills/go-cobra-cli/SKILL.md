@@ -219,24 +219,36 @@ Example: `  myapp deploy staging
 
 **Every `func` and `type` — exported or not, no matter how trivial — must be
 preceded by a block-header doc comment. This is mandatory and is never skipped.**
-The header is a full-width divider line followed by a Go-style doc comment that
-begins with the symbol's name and clearly states its purpose:
+The header is a full-width divider line, then a blank line, then a Go-style doc
+comment that begins with the symbol's name and clearly states its purpose:
 
 ```go
 // -------------------------------------------------------------------------------------
+
 // newServeCmd creates the "serve" subcommand. It wires flag and argument
 // parsing to the feature's core logic and writes results to the command's
 // output stream.
 func newServeCmd(deps *Deps) *cobra.Command { ... }
 
 // -------------------------------------------------------------------------------------
+
 // Options holds the resolved settings a command hands to its core logic.
-type Options struct { ... }
+type Options struct {
+	// Project is the project name to resolve.
+	Project string
+	// Reveal shows plaintext values instead of masking them.
+	Reveal bool
+}
 ```
 
 - The divider makes symbol boundaries easy to scan in large files.
+- **Leave one blank line between the divider and the doc comment.** The gap
+  separates the visual divider from the prose so both read cleanly in the IDE —
+  the divider is never glued to the first line of the comment.
 - Begin the prose with the identifier name (standard Go doc-comment form), then
   describe what it does and why — not how.
+- **Give every struct field its own brief doc comment**, on the line directly
+  above the field. Keep them short — one line stating what the field holds.
 - Apply it to one-line helpers and tiny structs too; uniformity is the point.
 
 ## 13. Shell Completions

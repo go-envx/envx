@@ -20,16 +20,17 @@ import (
 type Options struct {
 	// Env is the merged set of env vars to inject into the child process.
 	Env map[string]string
-
 	// Overload controls env-var precedence:
 	//   false (default): existing OS env vars take priority over file values.
 	//   true:            file values override existing OS env vars.
 	Overload bool
-
-	// Stdout and Stderr override where the child's output is written. When nil,
-	// os.Stdout / os.Stderr are used (normal interactive mode). These are
-	// configurable primarily for in-process testing.
+	// Stdout override where the child's output is written.
+	// When nil, os.Stdout is used (normal interactive mode).
+	// This is configurable primarily for in-process testing.
 	Stdout io.Writer
+	// Stderr override where the child's error output is written.
+	// When nil, os.Stderr is used (normal interactive mode).
+	// This is configurable primarily for in-process testing.
 	Stderr io.Writer
 }
 

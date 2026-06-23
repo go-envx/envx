@@ -1,4 +1,5 @@
-// Package run implements "envx run <project> -- <command> [args...]": resolve a
-// project's environment and execute a child process with it. Its only export is
-// NewCommand.
+// Package run implements "envx run <project> -- <command> [args...]"
+//
+// It resolves a project's environment and executes the specified child process with
+// the resolved environment.
 package run

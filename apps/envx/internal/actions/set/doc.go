@@ -1,3 +1,4 @@
-// Package set implements "envx set <include-path> <key> <value>": write a
-// key/value into an environment overlay file. Its only export is NewCommand.
+// Package set implements "envx set <include-path> <key> <value>"
+//
+// It writes a key/value into an environment overlay file.
 package set

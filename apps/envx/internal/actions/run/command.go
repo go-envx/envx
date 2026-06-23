@@ -32,10 +32,10 @@ const (
 )
 
 // -------------------------------------------------------------------------------------
-// NewCommand builds the "run" command. It splits args at "--" (a project before
-// it, the child command after), registers the engine-setting flags plus --env
-// and the run-local --overload, and delegates to the shell. configPath points at
-// the persistent --config flag.
+
+// NewCommand builds the "run" command, which parses args into the action's
+// params/config, executes the action, and runs the specified command with the
+// merged environment for a project.
 func NewCommand(configPath *string) *cobra.Command {
 	var cfg actionConfig
 
@@ -45,25 +45,30 @@ func NewCommand(configPath *string) *cobra.Command {
 		Long:    str.Dedent(long),
 		Example: str.Dedent(example, 2),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			cfg.ConfigPath = configPath
+			cfg.Changed = cmd.Flags()
+
+			// validate args
 			dashIdx := cmd.ArgsLenAtDash()
 			if dashIdx < 1 {
 				return fmt.Errorf("usage: %s", usage)
 			}
-			project := args[:dashIdx]
 			childArgs := args[dashIdx:]
 			if len(childArgs) == 0 {
 				return errors.New("no command specified after --")
 			}
 
-			cfg.ConfigPath = configPath
-			cfg.Changed = cmd.Flags()
-
-			return execute(cmd.Context(), actionParams{
-				Project:  project[0],
+			// map args to action params
+			p := actionParams{
+				Project:  args[0],
 				ExecArgs: childArgs,
-				Stdout:   cmd.OutOrStdout(),
-				Stderr:   cmd.ErrOrStderr(),
-			}, &cfg)
+			}
+
+			// execute the action
+			return execute(cmd.Context(), p, &cfg, streams{
+				Stdout: cmd.OutOrStdout(),
+				Stderr: cmd.ErrOrStderr(),
+			})
 		},
 	}
 

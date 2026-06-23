@@ -29,10 +29,9 @@ const (
 )
 
 // -------------------------------------------------------------------------------------
-// NewCommand builds the "set" command. It parses the three positional args and
-// delegates to the shell, which resolves the target overlay without a project
-// (set never merges an environment). configPath points at the persistent
-// --config flag.
+
+// NewCommand builds the "set" command, which parses args into the action's
+// params/config and executes the action.
 func NewCommand(configPath *string) *cobra.Command {
 	var cfg actionConfig
 
@@ -45,11 +44,16 @@ func NewCommand(configPath *string) *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cfg.ConfigPath = configPath
 			cfg.Changed = cmd.Flags()
-			return execute(actionParams{
+
+			// map args to action params
+			p := actionParams{
 				IncludePath: args[0],
 				Key:         args[1],
 				Value:       args[2],
-			}, &cfg)
+			}
+
+			// execute the action
+			return execute(p, &cfg)
 		},
 	}
 

@@ -6,6 +6,7 @@ import (
 )
 
 // -------------------------------------------------------------------------------------
+
 // TestApplyFlatKey verifies a flat key is set on a fresh document.
 func TestApplyFlatKey(t *testing.T) {
 	t.Parallel()
@@ -18,6 +19,7 @@ func TestApplyFlatKey(t *testing.T) {
 }
 
 // -------------------------------------------------------------------------------------
+
 // TestApplyNestedKey verifies dotted keys create intermediate maps.
 func TestApplyNestedKey(t *testing.T) {
 	t.Parallel()
@@ -39,6 +41,7 @@ func TestApplyNestedKey(t *testing.T) {
 }
 
 // -------------------------------------------------------------------------------------
+
 // TestSetNestedKeyOverwritesScalar verifies a scalar blocking a nested path is
 // replaced with a map.
 func TestSetNestedKeyOverwritesScalar(t *testing.T) {

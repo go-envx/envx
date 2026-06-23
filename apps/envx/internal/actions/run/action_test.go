@@ -7,58 +7,60 @@ import (
 	"testing"
 
 	"github.com/go-envx/envx/apps/envx/internal/config"
-	"github.com/go-envx/envx/apps/envx/internal/engine"
 	"github.com/go-envx/envx/apps/envx/internal/fixtures"
 )
 
 // -------------------------------------------------------------------------------------
+
 // noChange is a config.FlagSet stub reporting that no flag was set.
 type noChange struct{}
 
 // -------------------------------------------------------------------------------------
+
 // Changed always reports false.
 func (noChange) Changed(string) bool { return false }
 
 // -------------------------------------------------------------------------------------
-// resolveBasic loads the shared "basic" fixture and resolves the api-core
-// project for the default (development) environment.
-func resolveBasic(t *testing.T) *engine.Result {
-	t.Helper()
-	path := fixtures.Manifest("basic")
-	ec, err := config.Resolve(
-		&config.Input{ConfigPath: &path, Changed: noChange{}}, "api-core",
-	)
-	if err != nil {
-		t.Fatalf("resolve fixture: %v", err)
-	}
-	env, err := engine.Build(ec)
-	if err != nil {
-		t.Fatalf("resolve fixture: %v", err)
-	}
-	return env
-}
 
-// -------------------------------------------------------------------------------------
-// TestRunActionInjectsEnv verifies the resolved environment reaches the child
-// process when overload lets file values win.
-func TestRunActionInjectsEnv(t *testing.T) {
+// TestExecuteInjectsEnv verifies the resolved environment reaches the child
+// process under the default (no-overload) settings.
+func TestExecuteInjectsEnv(t *testing.T) {
 	t.Parallel()
 
-	env := resolveBasic(t)
+	path := fixtures.Manifest("basic")
 	var stdout bytes.Buffer
-	err := runAction(
-		context.Background(), env,
-		actionParams{
-			ExecArgs: []string{"printenv", "APP_NAME"},
-			Stdout:   &stdout,
-			Stderr:   io.Discard,
-		},
-		true,
-	)
+	c := &actionConfig{Input: config.Input{ConfigPath: &path, Changed: noChange{}}}
+	err := execute(context.Background(), actionParams{
+		Project:  "api-core",
+		ExecArgs: []string{"printenv", "APP_NAME"},
+	}, c, streams{Stdout: &stdout, Stderr: io.Discard})
 	if err != nil {
-		t.Fatalf("runAction: %v", err)
+		t.Fatalf("execute: %v", err)
 	}
 	if got := stdout.String(); got != "api-core\n" {
 		t.Errorf("child APP_NAME = %q, want api-core", got)
+	}
+}
+
+// -------------------------------------------------------------------------------------
+
+// TestExecuteOverloadFromEnv verifies ENVX_OVERLOAD lets file values win over an
+// OS env var even without the --overload flag.
+func TestExecuteOverloadFromEnv(t *testing.T) {
+	t.Setenv("APP_NAME", "from-os")
+	t.Setenv("ENVX_OVERLOAD", "true")
+
+	path := fixtures.Manifest("basic")
+	var stdout bytes.Buffer
+	c := &actionConfig{Input: config.Input{ConfigPath: &path, Changed: noChange{}}}
+	err := execute(context.Background(), actionParams{
+		Project:  "api-core",
+		ExecArgs: []string{"printenv", "APP_NAME"},
+	}, c, streams{Stdout: &stdout, Stderr: io.Discard})
+	if err != nil {
+		t.Fatalf("execute: %v", err)
+	}
+	if got := stdout.String(); got != "api-core\n" {
+		t.Errorf("APP_NAME = %q, want api-core (file wins via ENVX_OVERLOAD)", got)
 	}
 }

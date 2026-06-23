@@ -42,17 +42,17 @@ type Project struct {
 // global over CLI input.
 type Settings struct {
 	// Env is the target environment to load.
-	Env             string `yaml:"env"`
+	Env string `yaml:"env"`
 	// NamespacePrefix prefixes each key with its namespace name, if true.
-	NamespacePrefix *bool  `yaml:"namespace_prefix"`
+	NamespacePrefix *bool `yaml:"namespace_prefix"`
 	// Overload lets file values override existing OS env vars, if true.
-	Overload        *bool  `yaml:"overload"`
+	Overload *bool `yaml:"overload"`
 	// Prefix is prepended to every resolved env-var key.
-	Prefix          string `yaml:"prefix"`
+	Prefix string `yaml:"prefix"`
 	// Strict requires every environment overlay file in the namespace chain to exist.
-	Strict          *bool  `yaml:"strict"`
+	Strict *bool `yaml:"strict"`
 	// Suffix is appended to every resolved env-var key.
-	Suffix          string `yaml:"suffix"`
+	Suffix string `yaml:"suffix"`
 }
 
 // -------------------------------------------------------------------------------------

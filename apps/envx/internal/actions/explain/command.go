@@ -1,12 +1,7 @@
 package explain
 
 import (
-	"encoding/json"
-	"fmt"
-	"io"
-	"strings"
-	"text/tabwriter"
-
+	"github.com/go-envx/envx/apps/envx/internal/arg"
 	"github.com/go-envx/envx/apps/envx/internal/flags"
 	"github.com/go-envx/envx/apps/envx/internal/schema"
 	"github.com/go-envx/envx/apps/envx/internal/str"
@@ -32,21 +27,11 @@ const (
 )
 
 // -------------------------------------------------------------------------------------
-// jsonEntry is the exported, tagged view of an entry used for JSON output
-// (entry's own fields are unexported).
-type jsonEntry struct {
-	Key       string   `json:"key"`
-	Value     string   `json:"value"`
-	Source    string   `json:"source"`
-	SourceKey string   `json:"sourceKey"`
-	Shadowed  []string `json:"shadowed,omitempty"`
-}
 
-// -------------------------------------------------------------------------------------
-// NewCommand builds the "explain" command. When the key arg is absent it leaves
-// params.Key empty (explain all keys). It registers the engine-setting flags plus
-// --env, --reveal and --output, then renders the result. configPath points at the
-// persistent --config flag.
+// NewCommand builds the "explain" command, which parses args into the action's
+// params/config, executes the action, and renders the result in the specified format.
+// It accepts a project and an optional key. If the key is present it explains just
+// that key. If the key is absent it explains all keys.
 func NewCommand(configPath *string) *cobra.Command {
 	var cfg actionConfig
 
@@ -60,16 +45,25 @@ func NewCommand(configPath *string) *cobra.Command {
 			cfg.ConfigPath = configPath
 			cfg.Changed = cmd.Flags()
 
-			p := actionParams{Project: args[0]}
-			if len(args) == 2 {
-				p.Key = args[1]
+			// map args to action params
+			p := actionParams{
+				Project: args[0],
+				Key:     arg.Optional(args, 1),
 			}
 
+			// execute the action
 			res, err := execute(p, &cfg)
 			if err != nil {
 				return err
 			}
-			return render(cmd.OutOrStdout(), res, cfg.Output)
+
+			// render the result
+			return render(&renderParams{
+				Writer: cmd.OutOrStdout(),
+				Result: res,
+				Format: cfg.Output,
+				Reveal: cfg.Reveal,
+			})
 		},
 	}
 
@@ -81,41 +75,4 @@ func NewCommand(configPath *string) *cobra.Command {
 	flags.BindBool(cmd, &cfg.Reveal, &schema.Reveal)
 	flags.BindString(cmd, &cfg.Output, &schema.Output)
 	return cmd
-}
-
-// -------------------------------------------------------------------------------------
-// render writes the result to w in the requested format ("json" or the default
-// aligned table).
-func render(w io.Writer, res actionResult, format string) error {
-	if strings.EqualFold(format, "json") {
-		return renderJSON(w, res)
-	}
-	return renderTable(w, res)
-}
-
-// -------------------------------------------------------------------------------------
-// renderJSON writes the entries as a JSON array.
-func renderJSON(w io.Writer, res actionResult) error {
-	out := make([]jsonEntry, 0, len(res.Entries))
-	for _, e := range res.Entries {
-		out = append(out, jsonEntry(e))
-	}
-	enc := json.NewEncoder(w)
-	enc.SetIndent("", "  ")
-	return enc.Encode(out)
-}
-
-// -------------------------------------------------------------------------------------
-// renderTable writes the entries as an aligned KEY/VALUE/SOURCE table.
-func renderTable(w io.Writer, res actionResult) error {
-	tw := tabwriter.NewWriter(w, 0, 4, 2, ' ', 0)
-	if _, err := fmt.Fprintln(tw, "KEY\tVALUE\tSOURCE"); err != nil {
-		return err
-	}
-	for _, e := range res.Entries {
-		if _, err := fmt.Fprintf(tw, "%s\t%s\t%s\n", e.Key, e.Value, e.Source); err != nil {
-			return err
-		}
-	}
-	return tw.Flush()
 }

@@ -1,8 +1,6 @@
 package get
 
 import (
-	"fmt"
-
 	"github.com/go-envx/envx/apps/envx/internal/flags"
 	"github.com/go-envx/envx/apps/envx/internal/schema"
 	"github.com/go-envx/envx/apps/envx/internal/str"
@@ -26,9 +24,9 @@ const (
 )
 
 // -------------------------------------------------------------------------------------
-// NewCommand builds the "get" command. It is the only exported symbol: it parses
-// args into the action's params/config, calls the shell, and writes the value to
-// stdout. configPath points at the persistent --config flag.
+
+// NewCommand builds the "get" command, which parses args into the action's
+// params/config, executes the action, and writes the value to stdout.
 func NewCommand(configPath *string) *cobra.Command {
 	var cfg actionConfig
 
@@ -42,12 +40,23 @@ func NewCommand(configPath *string) *cobra.Command {
 			cfg.ConfigPath = configPath
 			cfg.Changed = cmd.Flags()
 
-			res, err := execute(actionParams{Project: args[0], Key: args[1]}, &cfg)
+			// map args to action params
+			p := actionParams{
+				Project: args[0],
+				Key:     args[1],
+			}
+
+			// execute the action
+			res, err := execute(p, &cfg)
 			if err != nil {
 				return err
 			}
-			_, err = fmt.Fprintln(cmd.OutOrStdout(), res.Value)
-			return err
+
+			// render the result
+			return render(&renderParams{
+				Writer: cmd.OutOrStdout(),
+				Result: res,
+			})
 		},
 	}
 

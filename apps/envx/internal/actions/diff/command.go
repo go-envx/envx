@@ -1,12 +1,6 @@
 package diff
 
 import (
-	"encoding/json"
-	"fmt"
-	"io"
-	"strings"
-	"text/tabwriter"
-
 	"github.com/go-envx/envx/apps/envx/internal/flags"
 	"github.com/go-envx/envx/apps/envx/internal/schema"
 	"github.com/go-envx/envx/apps/envx/internal/str"
@@ -28,31 +22,13 @@ const (
 		envx diff api-core development production --reveal
 		envx diff api-core development production --output=json
 	`
-	redacted = "********"
 )
 
 // -------------------------------------------------------------------------------------
-// jsonChange is the exported, tagged view of a change used for JSON output.
-type jsonChange struct {
-	Key  string `json:"key"`
-	EnvA string `json:"env_a,omitempty"`
-	EnvB string `json:"env_b,omitempty"`
-}
 
-// -------------------------------------------------------------------------------------
-// jsonResult is the exported, tagged view of the whole diff used for JSON
-// output.
-type jsonResult struct {
-	Added   []jsonChange `json:"added,omitempty"`
-	Removed []jsonChange `json:"removed,omitempty"`
-	Changed []jsonChange `json:"changed,omitempty"`
-}
-
-// -------------------------------------------------------------------------------------
-// NewCommand builds the "diff" command. It registers the engine-setting flags
-// plus --reveal and --output (but no --env; the two environments are positional),
-// runs the shell, and renders the structured diff. configPath points at the
-// persistent --config flag.
+// NewCommand builds the "diff" command, which parses args into the action's
+// params/config, executes the action, and renders the structured diff in the
+// specified format.
 func NewCommand(configPath *string) *cobra.Command {
 	var cfg actionConfig
 
@@ -66,15 +42,26 @@ func NewCommand(configPath *string) *cobra.Command {
 			cfg.ConfigPath = configPath
 			cfg.Changed = cmd.Flags()
 
-			res, err := execute(actionParams{
+			// map args to action params
+			p := actionParams{
 				Project: args[0],
 				EnvA:    args[1],
 				EnvB:    args[2],
-			}, &cfg)
+			}
+
+			// execute the action
+			res, err := execute(p, &cfg)
 			if err != nil {
 				return err
 			}
-			return render(cmd.OutOrStdout(), res, cfg.Output, cfg.Reveal)
+
+			// render the result
+			return render(&renderParams{
+				Writer: cmd.OutOrStdout(),
+				Result: res,
+				Format: cfg.Output,
+				Reveal: cfg.Reveal,
+			})
 		},
 	}
 
@@ -85,89 +72,4 @@ func NewCommand(configPath *string) *cobra.Command {
 	flags.BindBool(cmd, &cfg.Reveal, &schema.Reveal)
 	flags.BindString(cmd, &cfg.Output, &schema.Output)
 	return cmd
-}
-
-// -------------------------------------------------------------------------------------
-// render writes the diff to w in the requested format, masking values unless
-// reveal is set.
-func render(w io.Writer, res actionResult, format string, reveal bool) error {
-	masked := maskResult(res, reveal)
-	if strings.EqualFold(format, "json") {
-		return renderJSON(w, masked)
-	}
-	return renderTable(w, masked)
-}
-
-// -------------------------------------------------------------------------------------
-// maskResult returns a copy of res with values redacted unless reveal is set.
-func maskResult(res actionResult, reveal bool) actionResult {
-	if reveal {
-		return res
-	}
-	mask := func(in []change) []change {
-		out := make([]change, len(in))
-		for i, c := range in {
-			if c.EnvA != "" {
-				c.EnvA = redacted
-			}
-			if c.EnvB != "" {
-				c.EnvB = redacted
-			}
-			out[i] = c
-		}
-		return out
-	}
-	return actionResult{
-		Added:   mask(res.Added),
-		Removed: mask(res.Removed),
-		Changed: mask(res.Changed),
-	}
-}
-
-// -------------------------------------------------------------------------------------
-// renderJSON writes the diff as an indented JSON object.
-func renderJSON(w io.Writer, res actionResult) error {
-	view := jsonResult{
-		Added:   toJSONChanges(res.Added),
-		Removed: toJSONChanges(res.Removed),
-		Changed: toJSONChanges(res.Changed),
-	}
-	enc := json.NewEncoder(w)
-	enc.SetIndent("", "  ")
-	return enc.Encode(view)
-}
-
-// -------------------------------------------------------------------------------------
-// toJSONChanges converts internal changes to their tagged JSON view.
-func toJSONChanges(in []change) []jsonChange {
-	out := make([]jsonChange, 0, len(in))
-	for _, c := range in {
-		out = append(out, jsonChange(c))
-	}
-	return out
-}
-
-// -------------------------------------------------------------------------------------
-// renderTable writes the diff as aligned, sign-prefixed rows (+ added, - removed,
-// ~ changed).
-func renderTable(w io.Writer, res actionResult) error {
-	tw := tabwriter.NewWriter(w, 0, 4, 2, ' ', 0)
-	for _, c := range res.Added {
-		if _, err := fmt.Fprintf(tw, "+\t%s\t%s\n", c.Key, c.EnvB); err != nil {
-			return err
-		}
-	}
-	for _, c := range res.Removed {
-		if _, err := fmt.Fprintf(tw, "-\t%s\t%s\n", c.Key, c.EnvA); err != nil {
-			return err
-		}
-	}
-	for _, c := range res.Changed {
-		if _, err := fmt.Fprintf(
-			tw, "~\t%s\t%s -> %s\n", c.Key, c.EnvA, c.EnvB,
-		); err != nil {
-			return err
-		}
-	}
-	return tw.Flush()
 }

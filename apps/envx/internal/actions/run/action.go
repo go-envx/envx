@@ -10,50 +10,60 @@ import (
 )
 
 // -------------------------------------------------------------------------------------
-// actionParams are the inputs to the run action: the project, the child command
-// and its arguments, and the output streams to wire to the child.
+
+// actionParams are the positional inputs to the run action.
 type actionParams struct {
-	Project  string
+	// Project is the project name to resolve.
+	Project string
+	// ExecArgs is the child command and its arguments to run.
 	ExecArgs []string
-	Stdout   io.Writer
-	Stderr   io.Writer
 }
 
 // -------------------------------------------------------------------------------------
-// actionConfig is the run action's composed config: the shared resolution input
-// plus the run-local --overload toggle.
+
+// actionConfig is the run action's composed config.
 type actionConfig struct {
 	config.Input
+	// Overload lets file values win over existing OS environment variables.
 	Overload bool
 }
 
 // -------------------------------------------------------------------------------------
+
+// streams bundles the output sinks the run action wires the child process to.
+type streams struct {
+	// Stdout is the sink for the child process's standard output.
+	Stdout io.Writer
+	// Stderr is the sink for the child process's standard error.
+	Stderr io.Writer
+}
+
+// -------------------------------------------------------------------------------------
+
 // execute is the imperative shell: resolve the input into an engine.Config, build
 // the merged environment, resolve the overload setting (flag > ENVX_OVERLOAD),
-// then exec the child process with the merged environment.
-func execute(ctx context.Context, p actionParams, c *actionConfig) error {
+// then run the child process with the merged environment.
+func execute(ctx context.Context, p actionParams, c *actionConfig, s streams) error {
+	// resolve the input config
 	ec, err := config.Resolve(&c.Input, p.Project)
 	if err != nil {
 		return err
 	}
+
+	// build the merged environment
 	env, err := engine.Build(ec)
 	if err != nil {
 		return err
 	}
-	overload := config.ResolveOverload(c.Overload, c.Changed)
-	return runAction(ctx, env, p, overload)
-}
 
-// -------------------------------------------------------------------------------------
-// runAction is effectful by nature (it executes a child process) and so stays
-// thin: it injects the resolved environment and delegates to the runner.
-func runAction(
-	ctx context.Context, env *engine.Result, p actionParams, overload bool,
-) error {
+	// resolve the overload setting (flag > ENVX_OVERLOAD)
+	overload := config.ResolveOverload(c.Overload, c.Changed)
+
+	// run the child process with the merged environment
 	return runner.Run(ctx, p.ExecArgs, runner.Options{
 		Env:      env.All(),
 		Overload: overload,
-		Stdout:   p.Stdout,
-		Stderr:   p.Stderr,
+		Stdout:   s.Stdout,
+		Stderr:   s.Stderr,
 	})
 }

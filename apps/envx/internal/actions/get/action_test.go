@@ -10,6 +10,7 @@ import (
 )
 
 // -------------------------------------------------------------------------------------
+
 // resolveBasic loads the shared "basic" fixture and resolves the api-core
 // project for the default (development) environment.
 func resolveBasic(t *testing.T) *engine.Result {
@@ -27,6 +28,7 @@ func resolveBasic(t *testing.T) *engine.Result {
 }
 
 // -------------------------------------------------------------------------------------
+
 // TestRunActionFound verifies a case-insensitive hit returns the value and its
 // source file.
 func TestRunActionFound(t *testing.T) {
@@ -46,6 +48,7 @@ func TestRunActionFound(t *testing.T) {
 }
 
 // -------------------------------------------------------------------------------------
+
 // TestRunActionMissing verifies an unknown key is an error.
 func TestRunActionMissing(t *testing.T) {
 	t.Parallel()
