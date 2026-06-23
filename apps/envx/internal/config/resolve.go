@@ -7,7 +7,7 @@ import (
 
 	"github.com/go-envx/envx/apps/envx/internal/engine"
 	"github.com/go-envx/envx/apps/envx/internal/manifest"
-	"github.com/go-envx/envx/apps/envx/internal/settings"
+	"github.com/go-envx/envx/apps/envx/internal/schema"
 )
 
 // -------------------------------------------------------------------------------------
@@ -29,7 +29,7 @@ type FlagSet interface {
 // handle that drives precedence. Resolve turns it into an *engine.Config.
 type Input struct {
 	ConfigPath *string
-	Settings   settings.Resolved
+	Settings   engine.Settings
 	Changed    FlagSet
 }
 
@@ -53,39 +53,38 @@ func Resolve(in *Input, project string) (*engine.Config, error) {
 // manifest. It is split from Resolve so the precedence chain stays unit-testable
 // with an in-memory manifest.
 func resolveManifest(
-	m *manifest.Manifest, in *Input, project string,
+	m *manifest.Loaded, in *Input, project string,
 ) (*engine.Config, error) {
-	pm, ok := m.LookupProject(project)
+	proj, ok := m.LookupProject(project)
 	if !ok {
 		return nil, fmt.Errorf("project %q not found in manifest", project)
 	}
-	proj := pm.Project
 
 	r := NewResolver()
-	resolved := settings.Resolved{
+	resolved := engine.Settings{
 		Env: r.String(
-			&settings.Env, in.Changed, in.Settings.Env,
+			&schema.Env, in.Changed, in.Settings.Env,
 			proj.Settings.Env, m.Settings.Env,
 		),
 		Strict: r.Bool(
-			&settings.Strict, in.Changed, in.Settings.Strict,
+			&schema.Strict, in.Changed, in.Settings.Strict,
 			proj.Settings.Strict, m.Settings.Strict,
 		),
 		Prefix: r.String(
-			&settings.Prefix, in.Changed, in.Settings.Prefix,
+			&schema.Prefix, in.Changed, in.Settings.Prefix,
 			proj.Settings.Prefix, m.Settings.Prefix,
 		),
 		Suffix: r.String(
-			&settings.Suffix, in.Changed, in.Settings.Suffix,
+			&schema.Suffix, in.Changed, in.Settings.Suffix,
 			proj.Settings.Suffix, m.Settings.Suffix,
 		),
 		NamespacePrefix: r.Bool(
-			&settings.NamespacePrefix, in.Changed, in.Settings.NamespacePrefix,
+			&schema.NamespacePrefix, in.Changed, in.Settings.NamespacePrefix,
 			proj.Settings.NamespacePrefix, m.Settings.NamespacePrefix,
 		),
 	}
 	return &engine.Config{
-		Dir:          m.Dir(),
+		Dir:          m.Dir,
 		Includes:     proj.Includes,
 		Environments: m.Environments,
 		Settings:     resolved,
@@ -100,7 +99,7 @@ func manifestPath(in *Input) string {
 	if in.ConfigPath != nil && *in.ConfigPath != "" {
 		return *in.ConfigPath
 	}
-	if v := os.Getenv(settings.Config.Env); v != "" {
+	if v := os.Getenv(schema.Config.Env); v != "" {
 		return v
 	}
 	return ""
@@ -110,9 +109,10 @@ func manifestPath(in *Input) string {
 // ResolveEnv meshes only the target environment (flag > ENVX_ENV > manifest
 // global env) for callers that have no project — notably the set action, which
 // writes a single overlay file and never invokes the engine. The terminal
-// "development" fallback is left to the caller (settings.DefaultEnv).
-func ResolveEnv(m *manifest.Manifest, rawEnv string, changed FlagSet) string {
-	return NewResolver().String(&settings.Env, changed, rawEnv, m.Settings.Env)
+// first-declared-environment fallback is left to the caller
+// (schema.DefaultEnvironment).
+func ResolveEnv(m *manifest.Loaded, rawEnv string, changed FlagSet) string {
+	return NewResolver().String(&schema.Env, changed, rawEnv, m.Settings.Env)
 }
 
 // -------------------------------------------------------------------------------------
@@ -120,12 +120,12 @@ func ResolveEnv(m *manifest.Manifest, rawEnv string, changed FlagSet) string {
 // the run action. Overload is not an engine setting and carries no manifest
 // layer, so it is resolved on its own rather than riding along in Resolve.
 func ResolveOverload(rawOverload bool, changed FlagSet) bool {
-	return NewResolver().Bool(&settings.Overload, changed, rawOverload)
+	return NewResolver().Bool(&schema.Overload, changed, rawOverload)
 }
 
 // -------------------------------------------------------------------------------------
 // ResolveTarget loads the manifest and resolves the overlay one set call writes:
-// the target environment (flag > ENVX_ENV > manifest global > settings.DefaultEnv),
+// the target environment (flag > ENVX_ENV > manifest global > first declared),
 // validated against the declared set, plus the directory and base name for
 // includePath. It serves the set action, which mutates a single overlay file
 // without merging an environment, so it never builds an engine result.
@@ -136,7 +136,7 @@ func ResolveTarget(in *Input, includePath string) (env, dir, name string, err er
 	}
 	env = ResolveEnv(m, in.Settings.Env, in.Changed)
 	if env == "" {
-		env = settings.DefaultEnv
+		env = m.DefaultEnvironment()
 	}
 	if !m.HasEnvironment(env) {
 		return "", "", "", fmt.Errorf(
@@ -154,7 +154,8 @@ func ResolveTarget(in *Input, includePath string) (env, dir, name string, err er
 // -------------------------------------------------------------------------------------
 // Resolver applies the precedence "explicit flag > ENVX_* env var > layered
 // defaults". It reads each flag's name and ENVX_* fallback straight from its
-// settings.Spec, so registration and resolution can never disagree about a name.
+// schema.FlagSpec, so registration and resolution can never disagree about a
+// name.
 type Resolver struct {
 	LookupEnv EnvLookup
 }
@@ -170,7 +171,7 @@ func NewResolver() *Resolver {
 // then the ENVX_* var, then the first non-empty layer (e.g. project then global
 // default), and finally "".
 func (r *Resolver) String(
-	s *settings.Spec, changed FlagSet, flagVal string, layers ...string,
+	s *schema.FlagSpec, changed FlagSet, flagVal string, layers ...string,
 ) string {
 	if changed != nil && changed.Changed(s.Name) {
 		return flagVal
@@ -193,7 +194,7 @@ func (r *Resolver) String(
 // then the ENVX_* var (parsed), then the first non-nil layer (e.g. project then
 // global setting), and finally false.
 func (r *Resolver) Bool(
-	s *settings.Spec, changed FlagSet, flagVal bool, layers ...*bool,
+	s *schema.FlagSpec, changed FlagSet, flagVal bool, layers ...*bool,
 ) bool {
 	if changed != nil && changed.Changed(s.Name) {
 		return flagVal

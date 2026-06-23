@@ -3,11 +3,12 @@ package flags
 import (
 	"testing"
 
-	"github.com/go-envx/envx/apps/envx/internal/settings"
+	"github.com/go-envx/envx/apps/envx/internal/schema"
 	"github.com/spf13/cobra"
 )
 
 // -------------------------------------------------------------------------------------
+
 // newTestCmd returns a no-op command suitable for binding flags onto in tests.
 func newTestCmd() *cobra.Command {
 	return &cobra.Command{Use: "x", RunE: func(*cobra.Command, []string) error {
@@ -16,6 +17,7 @@ func newTestCmd() *cobra.Command {
 }
 
 // -------------------------------------------------------------------------------------
+
 // TestBindEngineSettingFlags verifies the generic binders register the engine-
 // setting specs onto a command and that parsing writes through to their
 // destinations.
@@ -27,14 +29,14 @@ func TestBindEngineSettingFlags(t *testing.T) {
 		prefix, suffix   string
 	)
 	cmd := newTestCmd()
-	BindBool(cmd, &strict, &settings.Strict)
-	BindString(cmd, &prefix, &settings.Prefix)
-	BindString(cmd, &suffix, &settings.Suffix)
-	BindBool(cmd, &nsPrefix, &settings.NamespacePrefix)
+	BindBool(cmd, &strict, &schema.Strict)
+	BindString(cmd, &prefix, &schema.Prefix)
+	BindString(cmd, &suffix, &schema.Suffix)
+	BindBool(cmd, &nsPrefix, &schema.NamespacePrefix)
 
 	for _, name := range []string{
-		settings.Strict.Name, settings.Prefix.Name, settings.Suffix.Name,
-		settings.NamespacePrefix.Name,
+		schema.Strict.Name, schema.Prefix.Name, schema.Suffix.Name,
+		schema.NamespacePrefix.Name,
 	} {
 		if cmd.Flags().Lookup(name) == nil {
 			t.Errorf("flag %q was not registered", name)
@@ -57,6 +59,7 @@ func TestBindEngineSettingFlags(t *testing.T) {
 }
 
 // -------------------------------------------------------------------------------------
+
 // TestBindString verifies BindString binds a string flag onto a command and that
 // parsing writes through to the destination.
 func TestBindString(t *testing.T) {
@@ -64,10 +67,10 @@ func TestBindString(t *testing.T) {
 
 	var env string
 	cmd := newTestCmd()
-	BindString(cmd, &env, &settings.Env)
+	BindString(cmd, &env, &schema.Env)
 
-	if cmd.Flags().Lookup(settings.Env.Name) == nil {
-		t.Fatalf("flag %q was not registered", settings.Env.Name)
+	if cmd.Flags().Lookup(schema.Env.Name) == nil {
+		t.Fatalf("flag %q was not registered", schema.Env.Name)
 	}
 	cmd.SetArgs([]string{"--env", "production"})
 	if err := cmd.Execute(); err != nil {
@@ -79,24 +82,27 @@ func TestBindString(t *testing.T) {
 }
 
 // -------------------------------------------------------------------------------------
-// TestBindEnvDefault verifies --env advertises and defaults to settings.DefaultEnv
-// when the user sets nothing, so the help output explicitly shows "development".
+
+// TestBindEnvDefault verifies --env advertises no static default: with nothing set
+// the bound value stays empty, leaving the terminal fallback (the first declared
+// environment) to resolution.
 func TestBindEnvDefault(t *testing.T) {
 	t.Parallel()
 
 	var env string
 	cmd := newTestCmd()
-	BindString(cmd, &env, &settings.Env)
+	BindString(cmd, &env, &schema.Env)
 
 	if err := cmd.Execute(); err != nil {
 		t.Fatalf("execute: %v", err)
 	}
-	if env != settings.DefaultEnv {
-		t.Errorf("env default = %q, want %q", env, settings.DefaultEnv)
+	if env != "" {
+		t.Errorf("env default = %q, want empty", env)
 	}
 }
 
 // -------------------------------------------------------------------------------------
+
 // TestBindPersistentString verifies BindPersistentString binds a persistent flag
 // so it applies to subcommands.
 func TestBindPersistentString(t *testing.T) {
@@ -104,27 +110,9 @@ func TestBindPersistentString(t *testing.T) {
 
 	var path string
 	cmd := newTestCmd()
-	BindPersistentString(cmd, &path, &settings.Config)
+	BindPersistentString(cmd, &path, &schema.Config)
 
-	if cmd.PersistentFlags().Lookup(settings.Config.Name) == nil {
-		t.Fatalf("flag %q was not registered as persistent", settings.Config.Name)
-	}
-}
-
-// -------------------------------------------------------------------------------------
-// TestBindStringDefault verifies BindString carries a spec's default (Output's
-// "table") through to the destination when the user sets nothing.
-func TestBindStringDefault(t *testing.T) {
-	t.Parallel()
-
-	var out string
-	cmd := newTestCmd()
-	BindString(cmd, &out, &settings.Output)
-
-	if err := cmd.Execute(); err != nil {
-		t.Fatalf("execute: %v", err)
-	}
-	if out != "table" {
-		t.Errorf("output default = %q, want table", out)
+	if cmd.PersistentFlags().Lookup(schema.Config.Name) == nil {
+		t.Fatalf("flag %q was not registered as persistent", schema.Config.Name)
 	}
 }

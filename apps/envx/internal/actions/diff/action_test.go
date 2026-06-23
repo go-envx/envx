@@ -4,7 +4,6 @@ import (
 	"testing"
 
 	"github.com/go-envx/envx/apps/envx/internal/engine"
-	"github.com/go-envx/envx/apps/envx/internal/settings"
 )
 
 // -------------------------------------------------------------------------------------
@@ -16,7 +15,7 @@ func TestBuildEngineDoesNotMutateConfig(t *testing.T) {
 
 	ec := &engine.Config{
 		Environments: []string{"development", "production"},
-		Settings:     settings.Resolved{Env: "development", Prefix: "P_"},
+		Settings:     engine.Settings{Env: "development", Prefix: "P_"},
 	}
 
 	if _, err := buildEngine(ec, "production"); err != nil {

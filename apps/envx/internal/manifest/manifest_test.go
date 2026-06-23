@@ -37,8 +37,8 @@ projects:
 	if err != nil {
 		t.Fatalf("Load: %v", err)
 	}
-	if m.Dir() != filepath.Dir(path) {
-		t.Errorf("Dir() = %q, want %q", m.Dir(), filepath.Dir(path))
+	if m.Dir != filepath.Dir(path) {
+		t.Errorf("Dir = %q, want %q", m.Dir, filepath.Dir(path))
 	}
 	if !m.HasEnvironment("production") {
 		t.Error("expected production environment to be present")
@@ -109,7 +109,7 @@ projects:
 	if name != "api" {
 		t.Errorf("name = %q, want api", name)
 	}
-	wantDir := filepath.Join(m.Dir(), "apps", "api", "env")
+	wantDir := filepath.Join(m.Dir, "apps", "api", "env")
 	if dir != wantDir {
 		t.Errorf("dir = %q, want %q", dir, wantDir)
 	}

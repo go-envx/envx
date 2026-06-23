@@ -8,7 +8,7 @@ import (
 	"text/tabwriter"
 
 	"github.com/go-envx/envx/apps/envx/internal/flags"
-	"github.com/go-envx/envx/apps/envx/internal/settings"
+	"github.com/go-envx/envx/apps/envx/internal/schema"
 	"github.com/go-envx/envx/apps/envx/internal/str"
 	"github.com/spf13/cobra"
 )
@@ -78,12 +78,12 @@ func NewCommand(configPath *string) *cobra.Command {
 		},
 	}
 
-	flags.BindBool(cmd, &cfg.Settings.Strict, &settings.Strict)
-	flags.BindString(cmd, &cfg.Settings.Prefix, &settings.Prefix)
-	flags.BindString(cmd, &cfg.Settings.Suffix, &settings.Suffix)
-	flags.BindBool(cmd, &cfg.Settings.NamespacePrefix, &settings.NamespacePrefix)
-	flags.BindBool(cmd, &cfg.Reveal, &settings.Reveal)
-	flags.BindString(cmd, &cfg.Output, &settings.Output)
+	flags.BindBool(cmd, &cfg.Settings.Strict, &schema.Strict)
+	flags.BindString(cmd, &cfg.Settings.Prefix, &schema.Prefix)
+	flags.BindString(cmd, &cfg.Settings.Suffix, &schema.Suffix)
+	flags.BindBool(cmd, &cfg.Settings.NamespacePrefix, &schema.NamespacePrefix)
+	flags.BindBool(cmd, &cfg.Reveal, &schema.Reveal)
+	flags.BindString(cmd, &cfg.Output, &schema.Output)
 	return cmd
 }
 

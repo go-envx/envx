@@ -5,7 +5,7 @@ import (
 	"fmt"
 
 	"github.com/go-envx/envx/apps/envx/internal/flags"
-	"github.com/go-envx/envx/apps/envx/internal/settings"
+	"github.com/go-envx/envx/apps/envx/internal/schema"
 	"github.com/go-envx/envx/apps/envx/internal/str"
 	"github.com/spf13/cobra"
 )
@@ -67,11 +67,11 @@ func NewCommand(configPath *string) *cobra.Command {
 		},
 	}
 
-	flags.BindBool(cmd, &cfg.Settings.Strict, &settings.Strict)
-	flags.BindString(cmd, &cfg.Settings.Prefix, &settings.Prefix)
-	flags.BindString(cmd, &cfg.Settings.Suffix, &settings.Suffix)
-	flags.BindBool(cmd, &cfg.Settings.NamespacePrefix, &settings.NamespacePrefix)
-	flags.BindString(cmd, &cfg.Settings.Env, &settings.Env)
-	flags.BindBool(cmd, &cfg.Overload, &settings.Overload)
+	flags.BindBool(cmd, &cfg.Settings.Strict, &schema.Strict)
+	flags.BindString(cmd, &cfg.Settings.Prefix, &schema.Prefix)
+	flags.BindString(cmd, &cfg.Settings.Suffix, &schema.Suffix)
+	flags.BindBool(cmd, &cfg.Settings.NamespacePrefix, &schema.NamespacePrefix)
+	flags.BindString(cmd, &cfg.Settings.Env, &schema.Env)
+	flags.BindBool(cmd, &cfg.Overload, &schema.Overload)
 	return cmd
 }

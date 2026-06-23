@@ -1,6 +1,8 @@
 // Package manifest discovers, loads, parses, and validates the envx.yaml
-// workspace manifest. It owns the on-disk structure and read helpers but knows
-// nothing about precedence, CLI binding, or the engine; the settings blocks it
-// parses use the shared settings.File schema. It is the single, frontend-agnostic
+// workspace manifest. It owns the on-disk concerns — locating the file and
+// pairing the parsed schema.Manifest with its directory as a *Loaded — but knows
+// nothing about precedence, CLI binding, or the engine. The declared structure it
+// parses (manifest, projects, settings block) lives in the schema package; this
+// package adds only the location-aware reads. It is the single, frontend-agnostic
 // outlet for reading the manifest file.
 package manifest

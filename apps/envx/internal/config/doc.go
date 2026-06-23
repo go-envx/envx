@@ -3,7 +3,7 @@
 // engine consumes, applying the precedence flag > ENVX_* > project > global. It is
 // framework-agnostic — no cobra — reading flag state only through the small
 // FlagSet interface. Loading the manifest belongs to the manifest package; the
-// setting catalog and terminal defaults belong to the settings package; binding
+// setting catalog and terminal defaults belong to the schema package; binding
 // specs onto cobra commands belongs to the flags package; and applying terminal
 // defaults belongs to the engine. This package owns only the precedence layering.
 package config

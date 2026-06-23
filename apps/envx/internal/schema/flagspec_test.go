@@ -1,8 +1,9 @@
-package settings
+package schema
 
 import "testing"
 
 // -------------------------------------------------------------------------------------
+
 // TestSpecHelpText verifies that HelpText appends the ENVX_* hint only when the
 // setting declares an env-var fallback.
 func TestSpecHelpText(t *testing.T) {
@@ -10,17 +11,17 @@ func TestSpecHelpText(t *testing.T) {
 
 	tests := []struct {
 		name string
-		spec Spec
+		spec FlagSpec
 		want string
 	}{
 		{
 			name: "with env var",
-			spec: Spec{Name: "env", Env: "ENVX_ENV", Usage: "target environment"},
+			spec: FlagSpec{Name: "env", Env: "ENVX_ENV", Usage: "target environment"},
 			want: "target environment (env: ENVX_ENV)",
 		},
 		{
 			name: "without env var",
-			spec: Spec{Name: "reveal", Usage: "print values instead of masking"},
+			spec: FlagSpec{Name: "reveal", Usage: "print values instead of masking"},
 			want: "print values instead of masking",
 		},
 	}
@@ -36,12 +37,13 @@ func TestSpecHelpText(t *testing.T) {
 }
 
 // -------------------------------------------------------------------------------------
+
 // TestCatalogEnvVarsUnique guards against two settings accidentally sharing an
 // ENVX_* fallback, which would make env-driven config ambiguous.
 func TestCatalogEnvVarsUnique(t *testing.T) {
 	t.Parallel()
 
-	specs := []Spec{
+	specs := []FlagSpec{
 		Config, Env, Strict, Prefix, Suffix, NamespacePrefix, Overload,
 		Reveal, Output,
 	}

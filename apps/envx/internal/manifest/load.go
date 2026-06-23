@@ -8,13 +8,15 @@ import (
 	"slices"
 
 	"gopkg.in/yaml.v3"
+
+	"github.com/go-envx/envx/apps/envx/internal/schema"
 )
 
 // -------------------------------------------------------------------------------------
 // New discovers the manifest path (an explicit path, else a walk-up search) and
 // loads it. The caller resolves the --config flag and ENVX_CONFIG precedence into
-// path; New does the rest. It is the primary entry point for a ready *Manifest.
-func New(path string) (*Manifest, error) {
+// path; New does the rest. It is the primary entry point for a ready *Loaded.
+func New(path string) (*Loaded, error) {
 	found, err := Discover(path)
 	if err != nil {
 		return nil, err
@@ -24,27 +26,31 @@ func New(path string) (*Manifest, error) {
 
 // -------------------------------------------------------------------------------------
 // Load reads, parses, and validates the manifest at path, returning a
-// ready-to-use *Manifest or an error describing what went wrong (file not found,
-// parse error, or validation failure).
-func Load(path string) (*Manifest, error) {
+// ready-to-use *Loaded (the parsed schema paired with its workspace dir) or an
+// error describing what went wrong (file not found, parse error, or validation
+// failure).
+func Load(path string) (*Loaded, error) {
 	clean := filepath.Clean(path)
 	//nolint:gosec // path is user-controlled CLI input; Clean mitigates traversal
 	data, err := os.ReadFile(clean)
 	if err != nil {
 		return nil, fmt.Errorf("reading manifest: %w", err)
 	}
-	return parse(data, filepath.Dir(clean))
+	m, err := parse(data)
+	if err != nil {
+		return nil, err
+	}
+	return &Loaded{Manifest: m, Dir: filepath.Dir(clean)}, nil
 }
 
 // -------------------------------------------------------------------------------------
-// parse unmarshals raw YAML into a Manifest, records the workspace root, and runs
-// structural validation.
-func parse(data []byte, dir string) (*Manifest, error) {
-	var m Manifest
+// parse unmarshals raw YAML into a schema.Manifest and runs structural
+// validation. The on-disk location is recorded separately by Load.
+func parse(data []byte) (*schema.Manifest, error) {
+	var m schema.Manifest
 	if err := yaml.Unmarshal(data, &m); err != nil {
 		return nil, fmt.Errorf("parsing manifest: %w", err)
 	}
-	m.dir = dir
 
 	if err := validate(&m); err != nil {
 		return nil, err
@@ -56,7 +62,7 @@ func parse(data []byte, dir string) (*Manifest, error) {
 // validate enforces structural constraints: at least one environment and one
 // project must be declared, every project must have at least one include, and
 // no include entry may be empty.
-func validate(m *Manifest) error {
+func validate(m *schema.Manifest) error {
 	if len(m.Environments) == 0 {
 		return errors.New("manifest: environments list must not be empty")
 	}
