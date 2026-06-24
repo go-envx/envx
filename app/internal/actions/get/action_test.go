@@ -5,7 +5,7 @@ import (
 	"testing"
 
 	"github.com/go-envx/envx/app/internal/config"
-	"github.com/go-envx/envx/app/internal/engine"
+	"github.com/go-envx/envx/app/internal/envmerge"
 	"github.com/go-envx/envx/app/internal/fixtures"
 )
 
@@ -13,14 +13,14 @@ import (
 
 // resolveBasic loads the shared "basic" fixture and resolves the api-core
 // project for the default (development) environment.
-func resolveBasic(t *testing.T) *engine.Result {
+func resolveBasic(t *testing.T) *envmerge.Result {
 	t.Helper()
 	path := fixtures.Manifest("basic")
 	ec, err := config.Resolve(&config.Input{ConfigPath: &path}, "api-core")
 	if err != nil {
 		t.Fatalf("resolve fixture: %v", err)
 	}
-	env, err := engine.Build(ec)
+	env, err := envmerge.Build(ec)
 	if err != nil {
 		t.Fatalf("resolve fixture: %v", err)
 	}

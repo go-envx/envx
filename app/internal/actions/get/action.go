@@ -5,7 +5,7 @@ import (
 	"strings"
 
 	"github.com/go-envx/envx/app/internal/config"
-	"github.com/go-envx/envx/app/internal/engine"
+	"github.com/go-envx/envx/app/internal/envmerge"
 )
 
 // -------------------------------------------------------------------------------------
@@ -37,7 +37,7 @@ type actionResult struct {
 
 // -------------------------------------------------------------------------------------
 
-// execute is the imperative shell: resolve the input into an engine.Config, build
+// execute is the imperative shell: resolve the input into an envmerge.Config, build
 // the merged environment, and hand the result to the pure core.
 func execute(p actionParams, c *actionConfig) (actionResult, error) {
 	// resolve the input config
@@ -47,7 +47,7 @@ func execute(p actionParams, c *actionConfig) (actionResult, error) {
 	}
 
 	// build the merged environment
-	env, err := engine.Build(ec)
+	env, err := envmerge.Build(ec)
 	if err != nil {
 		return actionResult{}, err
 	}
@@ -60,7 +60,7 @@ func execute(p actionParams, c *actionConfig) (actionResult, error) {
 
 // runAction performs a case-insensitive lookup against the specified environment,
 // returning a single value for the given key.
-func runAction(env *engine.Result, p actionParams) (actionResult, error) {
+func runAction(env *envmerge.Result, p actionParams) (actionResult, error) {
 	// look up the key case-insensitively
 	key := strings.ToUpper(p.Key)
 	val, ok := env.Get(key)

@@ -4,25 +4,25 @@ import (
 	"testing"
 
 	"github.com/go-envx/envx/app/internal/config"
-	"github.com/go-envx/envx/app/internal/engine"
+	"github.com/go-envx/envx/app/internal/envmerge"
 	"github.com/go-envx/envx/app/internal/fixtures"
 )
 
 // -------------------------------------------------------------------------------------
 
-// TestBuildEngineDoesNotMutateConfig verifies buildEngine resolves a side from a
+// TestBuildEnvDoesNotMutateConfig verifies buildEnv resolves a side from a
 // copy of the shared config, leaving the caller's Settings untouched so both diff
 // sides resolve from identical settings save for the overridden environment.
-func TestBuildEngineDoesNotMutateConfig(t *testing.T) {
+func TestBuildEnvDoesNotMutateConfig(t *testing.T) {
 	t.Parallel()
 
-	ec := &engine.Config{
+	ec := &envmerge.Config{
 		Environments: []string{"development", "production"},
-		Settings:     engine.Settings{Env: "development", Prefix: "P_"},
+		Settings:     envmerge.Settings{Env: "development", Prefix: "P_"},
 	}
 
-	if _, err := buildEngine(ec, "production"); err != nil {
-		t.Fatalf("buildEngine: %v", err)
+	if _, err := buildEnv(ec, "production"); err != nil {
+		t.Fatalf("buildEnv: %v", err)
 	}
 
 	if ec.Settings.Env != "development" {
@@ -94,21 +94,21 @@ func TestRunActionIdenticalEnvs(t *testing.T) {
 // -------------------------------------------------------------------------------------
 
 // diffSides resolves the api-core project from the shared "basic" fixture and
-// builds it under two environments, returning both engine results.
-func diffSides(t *testing.T, envA, envB string) (a, b *engine.Result) {
+// builds it under two environments, returning both merged results.
+func diffSides(t *testing.T, envA, envB string) (a, b *envmerge.Result) {
 	t.Helper()
 	path := fixtures.Manifest("basic")
 	ec, err := config.Resolve(&config.Input{ConfigPath: &path}, "api-core")
 	if err != nil {
 		t.Fatalf("resolve fixture: %v", err)
 	}
-	a, err = buildEngine(ec, envA)
+	a, err = buildEnv(ec, envA)
 	if err != nil {
-		t.Fatalf("buildEngine %s: %v", envA, err)
+		t.Fatalf("buildEnv %s: %v", envA, err)
 	}
-	b, err = buildEngine(ec, envB)
+	b, err = buildEnv(ec, envB)
 	if err != nil {
-		t.Fatalf("buildEngine %s: %v", envB, err)
+		t.Fatalf("buildEnv %s: %v", envB, err)
 	}
 	return a, b
 }

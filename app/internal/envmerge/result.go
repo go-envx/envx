@@ -1,4 +1,4 @@
-package engine
+package envmerge
 
 import (
 	"maps"

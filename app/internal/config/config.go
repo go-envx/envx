@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 	"strconv"
 
-	"github.com/go-envx/envx/app/internal/engine"
+	"github.com/go-envx/envx/app/internal/envmerge"
 	"github.com/go-envx/envx/app/internal/manifest"
 	"github.com/go-envx/envx/app/internal/schema"
 )
@@ -26,22 +26,22 @@ type FlagSet interface {
 
 // -------------------------------------------------------------------------------------
 // Input is the raw user input one action gathers at the cobra edge: the
-// persistent --config path, the flag-bound engine settings, and the changed-flag
-// handle that drives precedence. Resolve turns it into an *engine.Config.
+// persistent --config path, the flag-bound envmerge settings, and the changed-flag
+// handle that drives precedence. Resolve turns it into an *envmerge.Config.
 type Input struct {
 	ConfigPath *string
-	Settings   engine.Settings
+	Settings   envmerge.Settings
 	Changed    FlagSet
 }
 
 // -------------------------------------------------------------------------------------
 // Resolve loads the manifest (honoring --config, then ENVX_CONFIG, then a walk-up
 // search) and meshes it with the input's flag values and ENVX_* vars into the
-// *engine.Config for one project, applying the precedence
+// *envmerge.Config for one project, applying the precedence
 // flag > ENVX_* > project setting > global setting. Terminal fallbacks (e.g. the
-// default environment) are left to the engine, so an unset env stays empty here.
+// default environment) are left to envmerge, so an unset env stays empty here.
 // A missing project yields the canonical "project not found" error.
-func Resolve(in *Input, project string) (*engine.Config, error) {
+func Resolve(in *Input, project string) (*envmerge.Config, error) {
 	m, manifestFile, err := manifest.Load(manifestPath(in))
 	if err != nil {
 		return nil, err
@@ -55,14 +55,14 @@ func Resolve(in *Input, project string) (*engine.Config, error) {
 // with an in-memory manifest.
 func resolveManifest(
 	m *schema.Manifest, dir string, in *Input, project string,
-) (*engine.Config, error) {
+) (*envmerge.Config, error) {
 	proj, ok := m.LookupProject(project)
 	if !ok {
 		return nil, fmt.Errorf("project %q not found in manifest", project)
 	}
 
 	r := NewResolver()
-	resolved := engine.Settings{
+	resolved := envmerge.Settings{
 		Env: r.String(
 			&schema.Env, in.Changed, in.Settings.Env,
 			proj.Settings.Env, m.Settings.Env,
@@ -84,7 +84,7 @@ func resolveManifest(
 			proj.Settings.NamespacePrefix, m.Settings.NamespacePrefix,
 		),
 	}
-	return &engine.Config{
+	return &envmerge.Config{
 		Dir:          dir,
 		Includes:     proj.Includes,
 		Environments: m.Environments,
@@ -109,7 +109,7 @@ func manifestPath(in *Input) string {
 // -------------------------------------------------------------------------------------
 // ResolveEnv meshes only the target environment (flag > ENVX_ENV > manifest
 // global env) for callers that have no project — notably the set action, which
-// writes a single overlay file and never invokes the engine. The terminal
+// writes a single overlay file and never invokes envmerge. The terminal
 // first-declared-environment fallback is left to the caller
 // (schema.DefaultEnvironment).
 func ResolveEnv(m *schema.Manifest, rawEnv string, changed FlagSet) string {
@@ -118,7 +118,7 @@ func ResolveEnv(m *schema.Manifest, rawEnv string, changed FlagSet) string {
 
 // -------------------------------------------------------------------------------------
 // ResolveOverload meshes only the --overload toggle (flag > ENVX_OVERLOAD) for
-// the run action. Overload is not an engine setting and carries no manifest
+// the run action. Overload is not an envmerge setting and carries no manifest
 // layer, so it is resolved on its own rather than riding along in Resolve.
 func ResolveOverload(rawOverload bool, changed FlagSet) bool {
 	return NewResolver().Bool(&schema.Overload, changed, rawOverload)
@@ -130,7 +130,7 @@ func ResolveOverload(rawOverload bool, changed FlagSet) bool {
 // environment is meshed (flag > ENVX_ENV > manifest global > first declared) and
 // validated against the declared set, and includePath is joined against the
 // workspace directory. It serves the set action, which mutates a single overlay
-// file without merging an environment, so it never builds an engine result.
+// file without merging an environment, so it never builds an envmerge result.
 func ResolveOverlayPath(in *Input, includePath string) (string, error) {
 	m, manifestFile, err := manifest.Load(manifestPath(in))
 	if err != nil {

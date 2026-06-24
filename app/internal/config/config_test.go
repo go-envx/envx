@@ -4,7 +4,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/go-envx/envx/app/internal/engine"
+	"github.com/go-envx/envx/app/internal/envmerge"
 	"github.com/go-envx/envx/app/internal/fixtures"
 	"github.com/go-envx/envx/app/internal/schema"
 )
@@ -39,15 +39,15 @@ func testManifest() *schema.Manifest {
 // -------------------------------------------------------------------------------------
 // TestResolveManifest verifies project lookup, the env precedence (flag > project
 // > global), option layering, and pass-through of includes/environments into the
-// engine.Config against an in-memory manifest. Terminal defaults are left to the
-// engine, so an unset env stays empty here.
+// envmerge.Config against an in-memory manifest. Terminal defaults are left to the
+// envmerge, so an unset env stays empty here.
 func TestResolveManifest(t *testing.T) {
 	m := testManifest()
 	none := fakeFlagSet{changed: map[string]bool{}}
 
 	t.Run("flag wins", func(t *testing.T) {
 		ec, err := resolveManifest(m, "", &Input{
-			Settings: engine.Settings{Env: "from-flag"},
+			Settings: envmerge.Settings{Env: "from-flag"},
 			Changed:  fakeFlagSet{changed: map[string]bool{schema.Env.Name: true}},
 		}, "api")
 		if err != nil {
@@ -75,7 +75,7 @@ func TestResolveManifest(t *testing.T) {
 			t.Errorf("Env = %q, want staging", ec.Settings.Env)
 		}
 	})
-	t.Run("env left empty for engine default", func(t *testing.T) {
+	t.Run("env left empty for envmerge default", func(t *testing.T) {
 		bare := &schema.Manifest{
 			Environments: []string{"development"},
 			Projects: map[string]schema.Project{
@@ -87,12 +87,12 @@ func TestResolveManifest(t *testing.T) {
 			t.Fatal(err)
 		}
 		if ec.Settings.Env != "" {
-			t.Errorf("Env = %q, want empty (engine applies the default)", ec.Settings.Env)
+			t.Errorf("Env = %q, want empty (envmerge applies the default)", ec.Settings.Env)
 		}
 	})
 	t.Run("options and includes pass through", func(t *testing.T) {
 		ec, err := resolveManifest(m, "", &Input{
-			Settings: engine.Settings{Prefix: "APP", Strict: true},
+			Settings: envmerge.Settings{Prefix: "APP", Strict: true},
 			Changed: fakeFlagSet{changed: map[string]bool{
 				schema.Prefix.Name: true, schema.Strict.Name: true,
 			}},
@@ -205,7 +205,7 @@ func TestResolveOverlayPath(t *testing.T) {
 	t.Run("undeclared env errors", func(t *testing.T) {
 		in := &Input{
 			ConfigPath: &path,
-			Settings:   engine.Settings{Env: "nope"},
+			Settings:   envmerge.Settings{Env: "nope"},
 			Changed:    fakeFlagSet{changed: map[string]bool{schema.Env.Name: true}},
 		}
 		_, err := ResolveOverlayPath(in, "env/postgres")

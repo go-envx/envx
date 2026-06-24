@@ -18,10 +18,10 @@ func newTestCmd() *cobra.Command {
 
 // -------------------------------------------------------------------------------------
 
-// TestBindEngineSettingFlags verifies the generic binders register the engine-
+// TestBindEnvmergeSettingFlags verifies the generic binders register the envmerge-
 // setting specs onto a command and that parsing writes through to their
 // destinations.
-func TestBindEngineSettingFlags(t *testing.T) {
+func TestBindEnvmergeSettingFlags(t *testing.T) {
 	t.Parallel()
 
 	var (

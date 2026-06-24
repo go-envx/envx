@@ -38,7 +38,7 @@ type actionConfig struct {
 
 // execute is the imperative shell: it resolves the target overlay (environment +
 // include path) via config, reads the current document, applies the pure
-// transform, and writes the result back atomically. set never invokes the engine
+// transform, and writes the result back atomically. set never invokes envmerge
 // since no project means there is nothing to merge.
 func execute(p actionParams, c *actionConfig) error {
 	// resolve the target overlay file

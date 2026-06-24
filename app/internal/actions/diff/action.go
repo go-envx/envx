@@ -4,7 +4,7 @@ import (
 	"sort"
 
 	"github.com/go-envx/envx/app/internal/config"
-	"github.com/go-envx/envx/app/internal/engine"
+	"github.com/go-envx/envx/app/internal/envmerge"
 )
 
 // -------------------------------------------------------------------------------------
@@ -56,7 +56,7 @@ type actionResultChange struct {
 
 // -------------------------------------------------------------------------------------
 
-// execute is the imperative shell: resolve the input into a single engine.Config,
+// execute is the imperative shell: resolve the input into a single envmerge.Config,
 // build the merged environment for each specified environment, and hand both results
 // to the pure core.
 func execute(p actionParams, c *actionConfig) (actionResult, error) {
@@ -67,11 +67,11 @@ func execute(p actionParams, c *actionConfig) (actionResult, error) {
 	}
 
 	// build each side's environment
-	a, err := buildEngine(ec, p.EnvA)
+	a, err := buildEnv(ec, p.EnvA)
 	if err != nil {
 		return actionResult{}, err
 	}
-	b, err := buildEngine(ec, p.EnvB)
+	b, err := buildEnv(ec, p.EnvB)
 	if err != nil {
 		return actionResult{}, err
 	}
@@ -82,20 +82,20 @@ func execute(p actionParams, c *actionConfig) (actionResult, error) {
 
 // -------------------------------------------------------------------------------------
 
-// buildEngine copies the resolved config, overrides only its Env, and builds the
+// buildEnv copies the resolved config, overrides only its Env, and builds the
 // environment for one diff side. Copying leaves the shared config un-mutated so
 // both sides resolve from identical settings except the environment.
-func buildEngine(ec *engine.Config, env string) (*engine.Result, error) {
+func buildEnv(ec *envmerge.Config, env string) (*envmerge.Result, error) {
 	cfg := *ec
 	cfg.Settings.Env = env
-	return engine.Build(&cfg)
+	return envmerge.Build(&cfg)
 }
 
 // -------------------------------------------------------------------------------------
 
 // runAction is the pure core: a set comparison of two resolved environments.
 // Plain data in, structured diff out.
-func runAction(a, b *engine.Result) actionResult {
+func runAction(a, b *envmerge.Result) actionResult {
 	// collect both environments' values
 	aAll := a.All()
 	bAll := b.All()

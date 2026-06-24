@@ -5,7 +5,7 @@ import (
 	"io"
 
 	"github.com/go-envx/envx/app/internal/config"
-	"github.com/go-envx/envx/app/internal/engine"
+	"github.com/go-envx/envx/app/internal/envmerge"
 	"github.com/go-envx/envx/app/internal/exitcode"
 	"github.com/go-envx/envx/app/pkg/runner"
 )
@@ -41,7 +41,7 @@ type streams struct {
 
 // -------------------------------------------------------------------------------------
 
-// execute is the imperative shell: resolve the input into an engine.Config, build
+// execute is the imperative shell: resolve the input into an envmerge.Config, build
 // the merged environment, resolve the overload setting (flag > ENVX_OVERLOAD),
 // then run the child process with the merged environment.
 func execute(ctx context.Context, p actionParams, c *actionConfig, s streams) error {
@@ -52,7 +52,7 @@ func execute(ctx context.Context, p actionParams, c *actionConfig, s streams) er
 	}
 
 	// build the merged environment
-	env, err := engine.Build(ec)
+	env, err := envmerge.Build(ec)
 	if err != nil {
 		return err
 	}
