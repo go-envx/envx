@@ -10,8 +10,6 @@ import (
 	"os/exec"
 	"os/signal"
 	"syscall"
-
-	"github.com/go-envx/envx/app/internal/exitcode"
 )
 
 // -------------------------------------------------------------------------------------
@@ -32,6 +30,10 @@ type Options struct {
 	// When nil, os.Stderr is used (normal interactive mode).
 	// This is configurable primarily for in-process testing.
 	Stderr io.Writer
+	// ExitError maps a non-zero child exit code into the error Run returns,
+	// letting callers surface the code in their own error type. When nil, Run
+	// returns a generic error carrying the code.
+	ExitError func(code int) error
 }
 
 // -------------------------------------------------------------------------------------
@@ -39,8 +41,8 @@ type Options struct {
 // Run spawns the specified command as a child process with the merged
 // environment (respecting Overload precedence), forwarding SIGINT and SIGTERM
 // so the child can shut down gracefully, and propagating the child's exact exit
-// code as an exitcode.Error. Returns nil on success, an exitcode.Error for a
-// non-zero exit, or a wrapped error when the process fails to start.
+// code via Options.ExitError. Returns nil on success, the error from ExitError
+// for a non-zero exit, or a wrapped error when the process fails to start.
 func Run(ctx context.Context, args []string, opts Options) error {
 	if len(args) == 0 {
 		return errors.New("no command specified")
@@ -99,9 +101,21 @@ func Run(ctx context.Context, args []string, opts Options) error {
 	}
 
 	if exitErr, ok := errors.AsType[*exec.ExitError](err); ok {
-		return &exitcode.Error{Code: exitErr.ExitCode()}
+		return exitCodeError(opts, exitErr.ExitCode())
 	}
 	return fmt.Errorf("running command: %w", err)
+}
+
+// -------------------------------------------------------------------------------------
+
+// exitCodeError converts a non-zero child exit code into the error Run returns,
+// delegating to Options.ExitError when provided and falling back to a generic
+// error otherwise.
+func exitCodeError(opts Options, code int) error {
+	if opts.ExitError != nil {
+		return opts.ExitError(code)
+	}
+	return fmt.Errorf("exit status %d", code)
 }
 
 // -------------------------------------------------------------------------------------

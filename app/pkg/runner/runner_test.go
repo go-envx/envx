@@ -5,9 +5,22 @@ import (
 	"context"
 	"errors"
 	"testing"
-
-	"github.com/go-envx/envx/app/internal/exitcode"
 )
+
+// -------------------------------------------------------------------------------------
+
+// exitError is a test-local error type used to verify that a child's exit code
+// is surfaced through the Options.ExitError mapper.
+type exitError struct {
+	Code int
+}
+
+// -------------------------------------------------------------------------------------
+
+// Error returns a human-readable representation of the exit code.
+func (e *exitError) Error() string {
+	return "exit status"
+}
 
 // -------------------------------------------------------------------------------------
 
@@ -32,18 +45,19 @@ func TestRunInjectsEnv(t *testing.T) {
 
 // -------------------------------------------------------------------------------------
 
-// TestRunPropagatesExitCode verifies a non-zero child exit surfaces as an
-// exitcode.Error carrying the same code.
+// TestRunPropagatesExitCode verifies a non-zero child exit is surfaced through
+// the Options.ExitError mapper carrying the same code.
 func TestRunPropagatesExitCode(t *testing.T) {
 	t.Parallel()
 
 	err := Run(context.Background(), []string{"sh", "-c", "exit 3"}, Options{
-		Stdout: &bytes.Buffer{},
-		Stderr: &bytes.Buffer{},
+		Stdout:    &bytes.Buffer{},
+		Stderr:    &bytes.Buffer{},
+		ExitError: func(code int) error { return &exitError{Code: code} },
 	})
-	var ec *exitcode.Error
+	var ec *exitError
 	if !errors.As(err, &ec) {
-		t.Fatalf("expected *exitcode.Error, got %v", err)
+		t.Fatalf("expected *exitError, got %v", err)
 	}
 	if ec.Code != 3 {
 		t.Errorf("Code = %d, want 3", ec.Code)
