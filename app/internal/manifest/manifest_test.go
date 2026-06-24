@@ -91,7 +91,7 @@ func TestLoadDiscovers(t *testing.T) {
 func TestDiscoverExplicit(t *testing.T) {
 	t.Parallel()
 
-	got, err := Discover(fixtures.Manifest("basic"))
+	got, err := discover(fixtures.Manifest("basic"))
 	if err != nil {
 		t.Fatalf("Discover: %v", err)
 	}
@@ -99,7 +99,7 @@ func TestDiscoverExplicit(t *testing.T) {
 		t.Errorf("expected absolute path, got %q", got)
 	}
 
-	if _, err := Discover(filepath.Join(t.TempDir(), "missing.yaml")); err == nil {
+	if _, err := discover(filepath.Join(t.TempDir(), "missing.yaml")); err == nil {
 		t.Error("expected error for missing explicit path")
 	}
 }
@@ -112,7 +112,7 @@ func TestDiscoverWalkUp(t *testing.T) {
 	man := fixtures.Manifest("basic")
 	t.Chdir(filepath.Join(filepath.Dir(man), "apps", "api-core", "env"))
 
-	got, err := Discover("")
+	got, err := discover("")
 	if err != nil {
 		t.Fatalf("Discover: %v", err)
 	}

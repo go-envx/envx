@@ -8,6 +8,8 @@ import (
 	"strings"
 
 	"gopkg.in/yaml.v3"
+
+	"github.com/go-envx/envx/app/pkg/file"
 )
 
 // -------------------------------------------------------------------------------------
@@ -118,9 +120,7 @@ func loadNamespace(
 // wrapped os.ErrNotExist when the file is missing so callers can distinguish
 // "missing" from "malformed".
 func loadYAML(path string) (map[string]any, error) {
-	clean := filepath.Clean(path)
-	//nolint:gosec // paths are constructed from manifest config, not raw input
-	data, err := os.ReadFile(clean)
+	data, err := file.Read(path)
 	if err != nil {
 		return nil, err
 	}

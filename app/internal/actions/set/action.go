@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"path/filepath"
 	"strings"
 
 	"github.com/go-envx/envx/app/internal/config"
@@ -69,9 +68,7 @@ func execute(p actionParams, c *actionConfig) error {
 // readDoc loads an existing overlay into a generic map, returning an empty map
 // when the file does not yet exist.
 func readDoc(path string) (map[string]any, error) {
-	clean := filepath.Clean(path)
-	//nolint:gosec // path is derived from the validated manifest, not raw input
-	data, err := os.ReadFile(clean)
+	data, err := file.Read(path)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
 			return make(map[string]any), nil

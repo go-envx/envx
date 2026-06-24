@@ -22,12 +22,12 @@ const defaultFilename = "envx.yaml"
 // directory it was loaded from.
 func Load(path string) (m *schema.Manifest, dir string, err error) {
 	// discover the manifest path (explicit path, else walk-up search)
-	found, err := Discover(path)
+	found, err := discover(path)
 	if err != nil {
 		return nil, "", err
 	}
 	// read the manifest file from disk
-	data, err := os.ReadFile(found) //nolint:gosec // path is user-controlled CLI input
+	data, err := file.Read(found)
 	if err != nil {
 		return nil, "", fmt.Errorf("reading manifest: %w", err)
 	}
@@ -60,7 +60,7 @@ func parse(data []byte) (*schema.Manifest, error) {
 
 // -------------------------------------------------------------------------------------
 
-// Discover locates the manifest file using a two-tier strategy:
+// discover locates the manifest file using a two-tier strategy:
 //
 //  1. An explicit path (already resolved by the caller from the --config flag or
 //     ENVX_CONFIG) — highest priority.
@@ -68,9 +68,13 @@ func parse(data []byte) (*schema.Manifest, error) {
 //     git/filesystem root is reached.
 //
 // It returns the absolute path to the manifest or an error if none is found.
-func Discover(explicitPath string) (string, error) {
+func discover(explicitPath string) (string, error) {
 	if explicitPath != "" {
-		return resolveExplicit(explicitPath, "manifest not found at %q")
+		abs, err := file.AbsExisting(explicitPath)
+		if err != nil {
+			return "", fmt.Errorf("manifest not found at %q: %w", explicitPath, err)
+		}
+		return abs, nil
 	}
 
 	cwd, err := os.Getwd()
@@ -81,28 +85,13 @@ func Discover(explicitPath string) (string, error) {
 	// walk up from the working directory, stopping at the git repository root
 	found, err := file.FindUp(cwd, defaultFilename, ".git")
 	if errors.Is(err, file.ErrNotFound) {
-		return "", errors.New(
-			"envx.yaml not found (searched from cwd to git/filesystem root)",
+		return "", fmt.Errorf(
+			"%s not found (searched from cwd to git/filesystem root)",
+			defaultFilename,
 		)
 	}
 	if err != nil {
 		return "", fmt.Errorf("manifest discovery: %w", err)
 	}
 	return found, nil
-}
-
-// -------------------------------------------------------------------------------------
-
-// resolveExplicit validates that a user-provided manifest path exists and
-// returns its absolute form. msgFormat carries a single %q verb for the path.
-func resolveExplicit(path, msgFormat string) (string, error) {
-	clean := filepath.Clean(path)
-	if _, err := os.Stat(clean); err != nil {
-		return "", fmt.Errorf(msgFormat+": %w", path, err)
-	}
-	abs, err := filepath.Abs(clean)
-	if err != nil {
-		return "", err
-	}
-	return abs, nil
 }
