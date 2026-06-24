@@ -6,7 +6,6 @@ import (
 
 	"github.com/go-envx/envx/apps/envx/internal/engine"
 	"github.com/go-envx/envx/apps/envx/internal/fixtures"
-	"github.com/go-envx/envx/apps/envx/internal/manifest"
 	"github.com/go-envx/envx/apps/envx/internal/schema"
 )
 
@@ -23,18 +22,16 @@ func (f fakeFlagSet) Changed(name string) bool { return f.changed[name] }
 // -------------------------------------------------------------------------------------
 // testManifest builds an in-memory manifest with global and project-level env
 // settings for exercising the precedence chain.
-func testManifest() *manifest.Loaded {
-	return &manifest.Loaded{
-		Manifest: &schema.Manifest{
-			Environments: []string{"development", "staging", "production"},
-			Settings:     schema.Settings{Env: "staging"},
-			Projects: map[string]schema.Project{
-				"api": {
-					Includes: []string{"env/x"},
-					Settings: schema.Settings{Env: "production"},
-				},
-				"web": {Includes: []string{"env/y"}},
+func testManifest() *schema.Manifest {
+	return &schema.Manifest{
+		Environments: []string{"development", "staging", "production"},
+		Settings:     schema.Settings{Env: "staging"},
+		Projects: map[string]schema.Project{
+			"api": {
+				Includes: []string{"env/x"},
+				Settings: schema.Settings{Env: "production"},
 			},
+			"web": {Includes: []string{"env/y"}},
 		},
 	}
 }
@@ -49,7 +46,7 @@ func TestResolveManifest(t *testing.T) {
 	none := fakeFlagSet{changed: map[string]bool{}}
 
 	t.Run("flag wins", func(t *testing.T) {
-		ec, err := resolveManifest(m, &Input{
+		ec, err := resolveManifest(m, "", &Input{
 			Settings: engine.Settings{Env: "from-flag"},
 			Changed:  fakeFlagSet{changed: map[string]bool{schema.Env.Name: true}},
 		}, "api")
@@ -61,7 +58,7 @@ func TestResolveManifest(t *testing.T) {
 		}
 	})
 	t.Run("project default", func(t *testing.T) {
-		ec, err := resolveManifest(m, &Input{Changed: none}, "api")
+		ec, err := resolveManifest(m, "", &Input{Changed: none}, "api")
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -70,7 +67,7 @@ func TestResolveManifest(t *testing.T) {
 		}
 	})
 	t.Run("global default", func(t *testing.T) {
-		ec, err := resolveManifest(m, &Input{Changed: none}, "web")
+		ec, err := resolveManifest(m, "", &Input{Changed: none}, "web")
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -79,15 +76,13 @@ func TestResolveManifest(t *testing.T) {
 		}
 	})
 	t.Run("env left empty for engine default", func(t *testing.T) {
-		bare := &manifest.Loaded{
-			Manifest: &schema.Manifest{
-				Environments: []string{"development"},
-				Projects: map[string]schema.Project{
-					"api": {Includes: []string{"env/x"}},
-				},
+		bare := &schema.Manifest{
+			Environments: []string{"development"},
+			Projects: map[string]schema.Project{
+				"api": {Includes: []string{"env/x"}},
 			},
 		}
-		ec, err := resolveManifest(bare, &Input{Changed: none}, "api")
+		ec, err := resolveManifest(bare, "", &Input{Changed: none}, "api")
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -96,7 +91,7 @@ func TestResolveManifest(t *testing.T) {
 		}
 	})
 	t.Run("options and includes pass through", func(t *testing.T) {
-		ec, err := resolveManifest(m, &Input{
+		ec, err := resolveManifest(m, "", &Input{
 			Settings: engine.Settings{Prefix: "APP", Strict: true},
 			Changed: fakeFlagSet{changed: map[string]bool{
 				schema.Prefix.Name: true, schema.Strict.Name: true,
@@ -116,7 +111,7 @@ func TestResolveManifest(t *testing.T) {
 		}
 	})
 	t.Run("unknown project errors", func(t *testing.T) {
-		if _, err := resolveManifest(m, &Input{Changed: none}, "ghost"); err == nil {
+		if _, err := resolveManifest(m, "", &Input{Changed: none}, "ghost"); err == nil {
 			t.Error("expected error for unknown project")
 		}
 	})
@@ -179,33 +174,30 @@ func TestResolveOverload(t *testing.T) {
 }
 
 // -------------------------------------------------------------------------------------
-// TestResolveTarget verifies the set action's overlay resolution: the default
-// environment, the include lookup, and the error paths for an unknown include or
-// an undeclared environment.
-func TestResolveTarget(t *testing.T) {
+// TestResolveOverlayPath verifies the set action's overlay resolution: the
+// default environment feeds the overlay filename, and the error paths for an
+// unknown include or an undeclared environment.
+func TestResolveOverlayPath(t *testing.T) {
 	t.Parallel()
 
 	path := fixtures.Manifest("basic")
 
 	t.Run("default env and include", func(t *testing.T) {
-		env, dir, name, err := ResolveTarget(&Input{ConfigPath: &path}, "env/postgres")
+		target, err := ResolveOverlayPath(&Input{ConfigPath: &path}, "env/postgres")
 		if err != nil {
-			t.Fatalf("ResolveTarget: %v", err)
+			t.Fatalf("ResolveOverlayPath: %v", err)
 		}
 		// The basic fixture declares [development, staging, production], so the
 		// default resolves to the first declared environment.
-		if env != "development" {
-			t.Errorf("env = %q, want development", env)
+		if filepath.Base(target) != "postgres.development.yaml" {
+			t.Errorf("target = %q, want .../postgres.development.yaml", target)
 		}
-		if name != "postgres" {
-			t.Errorf("name = %q, want postgres", name)
-		}
-		if filepath.Base(dir) != "env" {
-			t.Errorf("dir = %q, want .../env", dir)
+		if filepath.Base(filepath.Dir(target)) != "env" {
+			t.Errorf("target dir = %q, want .../env", filepath.Dir(target))
 		}
 	})
 	t.Run("unknown include errors", func(t *testing.T) {
-		_, _, _, err := ResolveTarget(&Input{ConfigPath: &path}, "env/ghost")
+		_, err := ResolveOverlayPath(&Input{ConfigPath: &path}, "env/ghost")
 		if err == nil {
 			t.Error("expected error for unknown include")
 		}
@@ -216,7 +208,7 @@ func TestResolveTarget(t *testing.T) {
 			Settings:   engine.Settings{Env: "nope"},
 			Changed:    fakeFlagSet{changed: map[string]bool{schema.Env.Name: true}},
 		}
-		_, _, _, err := ResolveTarget(in, "env/postgres")
+		_, err := ResolveOverlayPath(in, "env/postgres")
 		if err == nil {
 			t.Error("expected error for undeclared environment")
 		}
@@ -245,9 +237,7 @@ func TestResolveEnv(t *testing.T) {
 		}
 	})
 	t.Run("empty when nothing set", func(t *testing.T) {
-		bare := &manifest.Loaded{
-			Manifest: &schema.Manifest{Environments: []string{"development"}},
-		}
+		bare := &schema.Manifest{Environments: []string{"development"}}
 		if got := ResolveEnv(bare, "", none); got != "" {
 			t.Errorf("got %q, want empty", got)
 		}

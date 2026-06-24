@@ -82,8 +82,8 @@ func (m *Manifest) HasEnvironment(env string) bool {
 // -------------------------------------------------------------------------------------
 
 // HasInclude reports whether any project declares includePath in its include
-// list. It is the pure schema predicate behind the loader's absolute include
-// lookup (manifest.Loaded.LookupInclude), which pairs it with the workspace dir.
+// list. It is the pure schema predicate config uses to validate a set target
+// before joining the include against the workspace directory.
 func (m *Manifest) HasInclude(includePath string) bool {
 	for _, p := range m.Projects {
 		if slices.Contains(p.Includes, includePath) {

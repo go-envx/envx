@@ -33,12 +33,12 @@ projects:
     includes:
       - env/postgres
 `)
-	m, err := Load(path)
+	m, dir, err := Load(path)
 	if err != nil {
 		t.Fatalf("Load: %v", err)
 	}
-	if m.Dir != filepath.Dir(path) {
-		t.Errorf("Dir = %q, want %q", m.Dir, filepath.Dir(path))
+	if dir != filepath.Dir(path) {
+		t.Errorf("Dir = %q, want %q", dir, filepath.Dir(path))
 	}
 	if !m.HasEnvironment("production") {
 		t.Error("expected production environment to be present")
@@ -64,7 +64,7 @@ func TestLoadInvalid(t *testing.T) {
 	for name, body := range tests {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
-			if _, err := Load(writeManifest(t, body)); err == nil {
+			if _, _, err := Load(writeManifest(t, body)); err == nil {
 				t.Error("expected validation error")
 			}
 		})
@@ -72,46 +72,16 @@ func TestLoadInvalid(t *testing.T) {
 }
 
 // -------------------------------------------------------------------------------------
-// TestNewLoadsManifest verifies New discovers an explicit path and loads it.
-func TestNewLoadsManifest(t *testing.T) {
+// TestLoadDiscovers verifies Load discovers an explicit path and loads it.
+func TestLoadDiscovers(t *testing.T) {
 	t.Parallel()
 
-	m, err := New(fixtures.Manifest("basic"))
+	m, _, err := Load(fixtures.Manifest("basic"))
 	if err != nil {
-		t.Fatalf("New: %v", err)
+		t.Fatalf("Load: %v", err)
 	}
 	if _, ok := m.LookupProject("api-core"); !ok {
 		t.Error("expected project api-core to be present")
-	}
-}
-
-// -------------------------------------------------------------------------------------
-// TestLookupInclude verifies an include path resolves to its absolute dir and
-// base name.
-func TestLookupInclude(t *testing.T) {
-	t.Parallel()
-
-	path := writeManifest(t, `
-environments: [development]
-projects:
-  api:
-    includes:
-      - apps/api/env/api
-`)
-	m, err := Load(path)
-	if err != nil {
-		t.Fatal(err)
-	}
-	dir, name, ok := m.LookupInclude("apps/api/env/api")
-	if !ok {
-		t.Fatal("expected include to be found")
-	}
-	if name != "api" {
-		t.Errorf("name = %q, want api", name)
-	}
-	wantDir := filepath.Join(m.Dir, "apps", "api", "env")
-	if dir != wantDir {
-		t.Errorf("dir = %q, want %q", dir, wantDir)
 	}
 }
 

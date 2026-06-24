@@ -28,7 +28,7 @@ type actionParams struct {
 
 // actionConfig holds the set action's config: the shared resolution input. set
 // only registers and uses --env (plus the persistent --config) since it mutates a
-// single overlay file rather than merging an environment; config.ResolveTarget
+// single overlay file rather than merging an environment; config.ResolveOverlayPath
 // turns the input into the target overlay path.
 // actionConfig is the set action's composed config.
 type actionConfig struct {
@@ -43,11 +43,10 @@ type actionConfig struct {
 // since no project means there is nothing to merge.
 func execute(p actionParams, c *actionConfig) error {
 	// resolve the target overlay file
-	env, dir, name, err := config.ResolveTarget(&c.Input, p.IncludePath)
+	target, err := config.ResolveOverlayPath(&c.Input, p.IncludePath)
 	if err != nil {
 		return err
 	}
-	target := filepath.Join(dir, name+"."+env+".yaml")
 
 	// read the current document
 	doc, err := readDoc(target)

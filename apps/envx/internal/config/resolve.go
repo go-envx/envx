@@ -3,6 +3,7 @@ package config
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"strconv"
 
 	"github.com/go-envx/envx/apps/envx/internal/engine"
@@ -41,11 +42,11 @@ type Input struct {
 // default environment) are left to the engine, so an unset env stays empty here.
 // A missing project yields the canonical "project not found" error.
 func Resolve(in *Input, project string) (*engine.Config, error) {
-	m, err := manifest.New(manifestPath(in))
+	m, dir, err := manifest.Load(manifestPath(in))
 	if err != nil {
 		return nil, err
 	}
-	return resolveManifest(m, in, project)
+	return resolveManifest(m, dir, in, project)
 }
 
 // -------------------------------------------------------------------------------------
@@ -53,7 +54,7 @@ func Resolve(in *Input, project string) (*engine.Config, error) {
 // manifest. It is split from Resolve so the precedence chain stays unit-testable
 // with an in-memory manifest.
 func resolveManifest(
-	m *manifest.Loaded, in *Input, project string,
+	m *schema.Manifest, dir string, in *Input, project string,
 ) (*engine.Config, error) {
 	proj, ok := m.LookupProject(project)
 	if !ok {
@@ -84,7 +85,7 @@ func resolveManifest(
 		),
 	}
 	return &engine.Config{
-		Dir:          m.Dir,
+		Dir:          dir,
 		Includes:     proj.Includes,
 		Environments: m.Environments,
 		Settings:     resolved,
@@ -111,7 +112,7 @@ func manifestPath(in *Input) string {
 // writes a single overlay file and never invokes the engine. The terminal
 // first-declared-environment fallback is left to the caller
 // (schema.DefaultEnvironment).
-func ResolveEnv(m *manifest.Loaded, rawEnv string, changed FlagSet) string {
+func ResolveEnv(m *schema.Manifest, rawEnv string, changed FlagSet) string {
 	return NewResolver().String(&schema.Env, changed, rawEnv, m.Settings.Env)
 }
 
@@ -124,31 +125,31 @@ func ResolveOverload(rawOverload bool, changed FlagSet) bool {
 }
 
 // -------------------------------------------------------------------------------------
-// ResolveTarget loads the manifest and resolves the overlay one set call writes:
-// the target environment (flag > ENVX_ENV > manifest global > first declared),
-// validated against the declared set, plus the directory and base name for
-// includePath. It serves the set action, which mutates a single overlay file
-// without merging an environment, so it never builds an engine result.
-func ResolveTarget(in *Input, includePath string) (env, dir, name string, err error) {
-	m, err := manifest.New(manifestPath(in))
+// ResolveOverlayPath loads the manifest and resolves the absolute path of the
+// overlay file one set call writes: <dir>/<name>.<env>.yaml. The target
+// environment is meshed (flag > ENVX_ENV > manifest global > first declared) and
+// validated against the declared set, and includePath is joined against the
+// workspace directory. It serves the set action, which mutates a single overlay
+// file without merging an environment, so it never builds an engine result.
+func ResolveOverlayPath(in *Input, includePath string) (string, error) {
+	m, dir, err := manifest.Load(manifestPath(in))
 	if err != nil {
-		return "", "", "", err
+		return "", err
 	}
-	env = ResolveEnv(m, in.Settings.Env, in.Changed)
+	env := ResolveEnv(m, in.Settings.Env, in.Changed)
 	if env == "" {
 		env = m.DefaultEnvironment()
 	}
 	if !m.HasEnvironment(env) {
-		return "", "", "", fmt.Errorf(
+		return "", fmt.Errorf(
 			"environment %q is not declared in the manifest (available: %v)",
 			env, m.Environments,
 		)
 	}
-	dir, name, ok := m.LookupInclude(includePath)
-	if !ok {
-		return "", "", "", fmt.Errorf("include %q not found in manifest", includePath)
+	if !m.HasInclude(includePath) {
+		return "", fmt.Errorf("include %q not found in manifest", includePath)
 	}
-	return env, dir, name, nil
+	return filepath.Join(dir, includePath) + "." + env + ".yaml", nil
 }
 
 // -------------------------------------------------------------------------------------
