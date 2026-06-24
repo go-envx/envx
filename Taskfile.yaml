@@ -2,8 +2,8 @@ version: '3'
 
 includes:
   envx:
-    taskfile: ./apps/envx/Taskfile.yaml
-    dir: ./apps/envx
+    taskfile: ./app/Taskfile.yaml
+    dir: ./app
 
 tasks:
   install:
