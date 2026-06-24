@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"path/filepath"
 
 	"gopkg.in/yaml.v3"
 
@@ -19,8 +18,8 @@ const defaultFilename = "envx.yaml"
 
 // Load discovers the manifest (an explicit path, else a walk-up search), then
 // reads, parses, and validates it. It returns the manifest struct and the
-// directory it was loaded from.
-func Load(path string) (m *schema.Manifest, dir string, err error) {
+// absolute path it was loaded from.
+func Load(path string) (m *schema.Manifest, manifestPath string, err error) {
 	// Discover the manifest path (explicit path, else walk-up search).
 	found, err := discover(path)
 	if err != nil {
@@ -39,8 +38,8 @@ func Load(path string) (m *schema.Manifest, dir string, err error) {
 		return nil, "", err
 	}
 
-	// Return the manifest struct and the directory it was loaded from.
-	return m, filepath.Dir(found), nil
+	// Return the manifest struct and the path it was loaded from.
+	return m, found, nil
 }
 
 // -------------------------------------------------------------------------------------
@@ -70,7 +69,7 @@ func parse(data []byte) (*schema.Manifest, error) {
 //
 //  1. An explicit path is provided via the --config flag or ENVX_CONFIG env variable.
 //  2. A walk-up search from the working directory until the manifest file is found
-// 	   or the search reaches the git repository root or filesystem root.
+//     or the search reaches the git repository root or filesystem root.
 //
 // It returns the absolute path to the manifest or an error if none is found.
 func discover(explicitPath string) (string, error) {

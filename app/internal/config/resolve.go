@@ -42,11 +42,11 @@ type Input struct {
 // default environment) are left to the engine, so an unset env stays empty here.
 // A missing project yields the canonical "project not found" error.
 func Resolve(in *Input, project string) (*engine.Config, error) {
-	m, dir, err := manifest.Load(manifestPath(in))
+	m, manifestFile, err := manifest.Load(manifestPath(in))
 	if err != nil {
 		return nil, err
 	}
-	return resolveManifest(m, dir, in, project)
+	return resolveManifest(m, filepath.Dir(manifestFile), in, project)
 }
 
 // -------------------------------------------------------------------------------------
@@ -132,10 +132,11 @@ func ResolveOverload(rawOverload bool, changed FlagSet) bool {
 // workspace directory. It serves the set action, which mutates a single overlay
 // file without merging an environment, so it never builds an engine result.
 func ResolveOverlayPath(in *Input, includePath string) (string, error) {
-	m, dir, err := manifest.Load(manifestPath(in))
+	m, manifestFile, err := manifest.Load(manifestPath(in))
 	if err != nil {
 		return "", err
 	}
+	dir := filepath.Dir(manifestFile)
 	env := ResolveEnv(m, in.Settings.Env, in.Changed)
 	if env == "" {
 		env = m.DefaultEnvironment()

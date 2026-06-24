@@ -22,7 +22,7 @@ func writeManifest(t *testing.T, body string) string {
 }
 
 // -------------------------------------------------------------------------------------
-// TestLoadValid verifies a well-formed manifest parses with its dir recorded.
+// TestLoadValid verifies a well-formed manifest parses with its path recorded.
 func TestLoadValid(t *testing.T) {
 	t.Parallel()
 
@@ -33,12 +33,12 @@ projects:
     includes:
       - env/postgres
 `)
-	m, dir, err := Load(path)
+	m, got, err := Load(path)
 	if err != nil {
 		t.Fatalf("Load: %v", err)
 	}
-	if dir != filepath.Dir(path) {
-		t.Errorf("Dir = %q, want %q", dir, filepath.Dir(path))
+	if got != path {
+		t.Errorf("path = %q, want %q", got, path)
 	}
 	if !m.HasEnvironment("production") {
 		t.Error("expected production environment to be present")
