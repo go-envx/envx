@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/go-envx/envx/app/internal/fixtures"
+	"github.com/go-envx/envx/app/pkg/file"
 )
 
 // -------------------------------------------------------------------------------------
@@ -45,12 +46,11 @@ func copyTree(t *testing.T, src, dst string) {
 			copyTree(t, s, d)
 			continue
 		}
-		data, err := os.ReadFile(s) //nolint:gosec // test fixture path
+		data, err := file.Read(s)
 		if err != nil {
 			t.Fatal(err)
 		}
-		//nolint:gosec // test fixture path
-		if err := os.WriteFile(d, data, 0o600); err != nil {
+		if err := file.WriteAtomic(d, data); err != nil {
 			t.Fatal(err)
 		}
 	}
