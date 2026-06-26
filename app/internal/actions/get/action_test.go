@@ -20,7 +20,7 @@ func resolveBasic(t *testing.T) *envmerge.Result {
 	if err != nil {
 		t.Fatalf("resolve fixture: %v", err)
 	}
-	env, err := envmerge.Build(ec)
+	env, err := envmerge.Build(*ec)
 	if err != nil {
 		t.Fatalf("resolve fixture: %v", err)
 	}

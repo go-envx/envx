@@ -88,7 +88,7 @@ func execute(p actionParams, c *actionConfig) (actionResult, error) {
 func buildEnv(ec *envmerge.Params, env string) (*envmerge.Result, error) {
 	cfg := *ec
 	cfg.Settings.Env = env
-	return envmerge.Build(&cfg)
+	return envmerge.Build(cfg)
 }
 
 // -------------------------------------------------------------------------------------

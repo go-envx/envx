@@ -66,7 +66,7 @@ func execute(p actionParams, c *actionConfig) (actionResult, error) {
 	}
 
 	// build the merged environment
-	env, err := envmerge.Build(ec)
+	env, err := envmerge.Build(*ec)
 	if err != nil {
 		return actionResult{}, err
 	}

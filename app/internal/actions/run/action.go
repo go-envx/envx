@@ -51,7 +51,7 @@ func execute(ctx context.Context, p actionParams, c *actionConfig, s streams) er
 	}
 
 	// build the merged environment
-	env, err := envmerge.Build(ec)
+	env, err := envmerge.Build(*ec)
 	if err != nil {
 		return err
 	}

@@ -37,8 +37,8 @@ func setupWorkspace(t *testing.T) string {
 
 // baseParams builds envmerge.Params for the temp workspace declaring the
 // development and production environments.
-func baseParams(dir string) *Params {
-	return &Params{
+func baseParams(dir string) Params {
+	return Params{
 		Includes:     []string{filepath.Join(dir, "env", "postgres")},
 		Environments: []string{"development", "production"},
 	}
@@ -99,7 +99,7 @@ func TestResolveOverride(t *testing.T) {
 
 // -------------------------------------------------------------------------------------
 
-// TestResolveErrors verifies an undeclared environment and nil params fail.
+// TestResolveErrors verifies an undeclared environment fails.
 func TestResolveErrors(t *testing.T) {
 	t.Parallel()
 
@@ -107,10 +107,6 @@ func TestResolveErrors(t *testing.T) {
 	p.Settings = Settings{Env: "nope"}
 	if _, err := Build(p); err == nil {
 		t.Error("expected error for undeclared environment")
-	}
-
-	if _, err := Build(nil); err == nil {
-		t.Error("expected error for nil params")
 	}
 }
 
