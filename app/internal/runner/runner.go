@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io"
 	"maps"
 	"os"
 	"os/exec"
@@ -13,27 +12,6 @@ import (
 
 	"github.com/go-envx/envx/app/internal/exitcode"
 )
-
-// -------------------------------------------------------------------------------------
-
-// Params configures a single child execution: the merged env to inject plus the
-// parameters controlling how Run runs the command.
-type Params struct {
-	// Env is the merged set of env vars to inject into the child process.
-	Env map[string]string
-	// Overload controls env-var precedence:
-	//   false (default): existing OS env vars take priority over file values.
-	//   true:            file values override existing OS env vars.
-	Overload bool
-	// Stdout override where the child's output is written.
-	// When nil, os.Stdout is used (normal interactive mode).
-	// This is configurable primarily for in-process testing.
-	Stdout io.Writer
-	// Stderr override where the child's error output is written.
-	// When nil, os.Stderr is used (normal interactive mode).
-	// This is configurable primarily for in-process testing.
-	Stderr io.Writer
-}
 
 // -------------------------------------------------------------------------------------
 
@@ -47,20 +25,13 @@ func Run(ctx context.Context, args []string, p Params) error {
 		return errors.New("no command specified")
 	}
 
-	stdout := p.Stdout
-	if stdout == nil {
-		stdout = os.Stdout
-	}
-	stderr := p.Stderr
-	if stderr == nil {
-		stderr = os.Stderr
-	}
+	normalizeParams(&p)
 
 	//nolint:gosec // subprocess execution is the explicit purpose of this package
 	cmd := exec.CommandContext(ctx, args[0], args[1:]...)
 	cmd.Stdin = os.Stdin
-	cmd.Stdout = stdout
-	cmd.Stderr = stderr
+	cmd.Stdout = p.Stdout
+	cmd.Stderr = p.Stderr
 	cmd.Env = buildEnv(p)
 
 	if err := cmd.Start(); err != nil {
