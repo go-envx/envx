@@ -22,7 +22,7 @@ func TestWriteAtomicCreates(t *testing.T) {
 		t.Fatalf("WriteAtomic: %v", err)
 	}
 
-	got, err := os.ReadFile(target) //nolint:gosec // path is a test-owned temp file
+	got, err := Read(target)
 	if err != nil {
 		t.Fatalf("reading back: %v", err)
 	}
@@ -56,7 +56,7 @@ func TestWriteAtomicOverwrites(t *testing.T) {
 		t.Fatalf("WriteAtomic: %v", err)
 	}
 
-	got, err := os.ReadFile(target) //nolint:gosec // path is a test-owned temp file
+	got, err := Read(target)
 	if err != nil {
 		t.Fatal(err)
 	}
