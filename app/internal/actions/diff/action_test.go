@@ -21,7 +21,7 @@ func TestBuildEnvDoesNotMutateConfig(t *testing.T) {
 		Settings:     envmerge.Settings{Env: "development", Prefix: "P_"},
 	}
 
-	if _, err := buildEnv(ec, "production"); err != nil {
+	if _, err := buildEnv(*ec, "production"); err != nil {
 		t.Fatalf("buildEnv: %v", err)
 	}
 
@@ -102,11 +102,11 @@ func diffSides(t *testing.T, envA, envB string) (a, b *envmerge.Result) {
 	if err != nil {
 		t.Fatalf("resolve fixture: %v", err)
 	}
-	a, err = buildEnv(ec, envA)
+	a, err = buildEnv(*ec, envA)
 	if err != nil {
 		t.Fatalf("buildEnv %s: %v", envA, err)
 	}
-	b, err = buildEnv(ec, envB)
+	b, err = buildEnv(*ec, envB)
 	if err != nil {
 		t.Fatalf("buildEnv %s: %v", envB, err)
 	}

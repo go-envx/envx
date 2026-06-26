@@ -67,11 +67,11 @@ func execute(p actionParams, c *actionConfig) (actionResult, error) {
 	}
 
 	// build each side's environment
-	a, err := buildEnv(ec, p.EnvA)
+	a, err := buildEnv(*ec, p.EnvA)
 	if err != nil {
 		return actionResult{}, err
 	}
-	b, err := buildEnv(ec, p.EnvB)
+	b, err := buildEnv(*ec, p.EnvB)
 	if err != nil {
 		return actionResult{}, err
 	}
@@ -82,13 +82,13 @@ func execute(p actionParams, c *actionConfig) (actionResult, error) {
 
 // -------------------------------------------------------------------------------------
 
-// buildEnv copies the resolved config, overrides only its Env, and builds the
-// environment for one diff side. Copying leaves the shared config un-mutated so
-// both sides resolve from identical settings except the environment.
-func buildEnv(ec *envmerge.Params, env string) (*envmerge.Result, error) {
-	cfg := *ec
-	cfg.Settings.Env = env
-	return envmerge.Build(cfg)
+// buildEnv overrides only the Env on its own copy of the resolved config and
+// builds the environment for one diff side. Taking Params by value leaves the
+// shared config un-mutated so both sides resolve from identical settings except
+// the environment.
+func buildEnv(ec envmerge.Params, env string) (*envmerge.Result, error) {
+	ec.Settings.Env = env
+	return envmerge.Build(ec)
 }
 
 // -------------------------------------------------------------------------------------
