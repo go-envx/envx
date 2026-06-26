@@ -41,7 +41,7 @@ type streams struct {
 
 // -------------------------------------------------------------------------------------
 
-// execute is the imperative shell: resolve the input into an envmerge.Config, build
+// execute is the imperative shell: resolve the input into an envmerge.Params, build
 // the merged environment, resolve the overload setting (flag > ENVX_OVERLOAD),
 // then run the child process with the merged environment.
 func execute(ctx context.Context, p actionParams, c *actionConfig, s streams) error {

@@ -56,7 +56,7 @@ type actionResultChange struct {
 
 // -------------------------------------------------------------------------------------
 
-// execute is the imperative shell: resolve the input into a single envmerge.Config,
+// execute is the imperative shell: resolve the input into a single envmerge.Params,
 // build the merged environment for each specified environment, and hand both results
 // to the pure core.
 func execute(p actionParams, c *actionConfig) (actionResult, error) {
@@ -85,7 +85,7 @@ func execute(p actionParams, c *actionConfig) (actionResult, error) {
 // buildEnv copies the resolved config, overrides only its Env, and builds the
 // environment for one diff side. Copying leaves the shared config un-mutated so
 // both sides resolve from identical settings except the environment.
-func buildEnv(ec *envmerge.Config, env string) (*envmerge.Result, error) {
+func buildEnv(ec *envmerge.Params, env string) (*envmerge.Result, error) {
 	cfg := *ec
 	cfg.Settings.Env = env
 	return envmerge.Build(&cfg)

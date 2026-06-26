@@ -1,5 +1,5 @@
 // Package config is the resolution pipeline: it meshes flag values, ENVX_*
-// environment variables, and the loaded manifest into the *envmerge.Config that
+// environment variables, and the loaded manifest into the *envmerge.Params that
 // envmerge consumes, applying the precedence flag > ENVX_* > project > global. It is
 // framework-agnostic — no cobra — reading flag state only through the small
 // FlagSet interface. Loading the manifest belongs to the manifest package; the

@@ -56,7 +56,7 @@ type actionResultEntry struct {
 
 // -------------------------------------------------------------------------------------
 
-// execute is the imperative shell: resolve the input into an envmerge.Config, build
+// execute is the imperative shell: resolve the input into an envmerge.Params, build
 // the merged environment, and hand the result to the pure core.
 func execute(p actionParams, c *actionConfig) (actionResult, error) {
 	// resolve the input config

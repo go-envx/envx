@@ -16,7 +16,7 @@ import (
 func TestBuildEnvDoesNotMutateConfig(t *testing.T) {
 	t.Parallel()
 
-	ec := &envmerge.Config{
+	ec := &envmerge.Params{
 		Environments: []string{"development", "production"},
 		Settings:     envmerge.Settings{Env: "development", Prefix: "P_"},
 	}

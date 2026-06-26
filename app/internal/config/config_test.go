@@ -39,7 +39,7 @@ func testManifest() *schema.Manifest {
 // -------------------------------------------------------------------------------------
 // TestResolveManifest verifies project lookup, the env precedence (flag > project
 // > global), option layering, and pass-through of includes/environments into the
-// envmerge.Config against an in-memory manifest. Terminal defaults are left to the
+// envmerge.Params against an in-memory manifest. Terminal defaults are left to the
 // envmerge, so an unset env stays empty here.
 func TestResolveManifest(t *testing.T) {
 	m := testManifest()

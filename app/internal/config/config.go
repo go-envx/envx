@@ -27,7 +27,7 @@ type FlagSet interface {
 // -------------------------------------------------------------------------------------
 // Input is the raw user input one action gathers at the cobra edge: the
 // persistent --config path, the flag-bound envmerge settings, and the changed-flag
-// handle that drives precedence. Resolve turns it into an *envmerge.Config.
+// handle that drives precedence. Resolve turns it into an *envmerge.Params.
 type Input struct {
 	ConfigPath *string
 	Settings   envmerge.Settings
@@ -37,11 +37,11 @@ type Input struct {
 // -------------------------------------------------------------------------------------
 // Resolve loads the manifest (honoring --config, then ENVX_CONFIG, then a walk-up
 // search) and meshes it with the input's flag values and ENVX_* vars into the
-// *envmerge.Config for one project, applying the precedence
+// *envmerge.Params for one project, applying the precedence
 // flag > ENVX_* > project setting > global setting. Terminal fallbacks (e.g. the
 // default environment) are left to envmerge, so an unset env stays empty here.
 // A missing project yields the canonical "project not found" error.
-func Resolve(in *Input, project string) (*envmerge.Config, error) {
+func Resolve(in *Input, project string) (*envmerge.Params, error) {
 	m, manifestFile, err := manifest.Load(manifestPath(in))
 	if err != nil {
 		return nil, err
@@ -55,7 +55,7 @@ func Resolve(in *Input, project string) (*envmerge.Config, error) {
 // with an in-memory manifest.
 func resolveManifest(
 	m *schema.Manifest, dir string, in *Input, project string,
-) (*envmerge.Config, error) {
+) (*envmerge.Params, error) {
 	proj, ok := m.LookupProject(project)
 	if !ok {
 		return nil, fmt.Errorf("project %q not found in manifest", project)
@@ -84,9 +84,12 @@ func resolveManifest(
 			proj.Settings.NamespacePrefix, m.Settings.NamespacePrefix,
 		),
 	}
-	return &envmerge.Config{
-		Dir:          dir,
-		Includes:     proj.Includes,
+	includes := make([]string, len(proj.Includes))
+	for i, inc := range proj.Includes {
+		includes[i] = filepath.Join(dir, inc)
+	}
+	return &envmerge.Params{
+		Includes:     includes,
 		Environments: m.Environments,
 		Settings:     resolved,
 	}, nil
