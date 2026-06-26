@@ -8,13 +8,12 @@ import (
 // -------------------------------------------------------------------------------------
 
 // Params is envmerge's input contract: a plain data bag the caller fully
-// populates (the config package builds it from a manifest plus CLI overrides).
-// envmerge knows nothing about envx.yaml, cobra, or precedence. Every field is
-// optional and envmerge fills in terminal defaults itself. The resolved knobs
-// live in Settings, the value form envmerge merges.
+// populates. envmerge knows nothing about where its inputs came from or how they
+// were produced. Every field is optional and envmerge fills in terminal defaults
+// itself. The resolved knobs live in Settings, the value form envmerge merges.
 type Params struct {
-	// Includes is one project's ordered namespace chain, as absolute paths the
-	// config package has already resolved against the workspace root.
+	// Includes is an ordered chain of namespaces to merge, given as absolute paths
+	// the caller has already resolved.
 	Includes []string
 	// Environments lists the declared environments, used to validate the target.
 	Environments []string
@@ -25,11 +24,9 @@ type Params struct {
 // -------------------------------------------------------------------------------------
 
 // Settings holds the fully-resolved env-resolution knobs envmerge consumes — a
-// plain value struct with no knowledge of CLI precedence or YAML. Zero values
+// plain value struct with no knowledge of how its values were sourced. Zero values
 // are valid: an empty Env falls back to the first declared environment and the
-// bool/string knobs default to off. The config package produces it by layering
-// the declared schema.Settings over CLI input. It is the effective counterpart
-// to the declared schema.Settings.
+// bool/string knobs default to off.
 type Settings struct {
 	// Env is the target environment to resolve; an empty value falls back to the
 	// first declared environment.
@@ -57,7 +54,7 @@ func normalizeParams(p *Params) error {
 	// Validate the resolved environment against the declared set.
 	if !slices.Contains(p.Environments, p.Settings.Env) {
 		return fmt.Errorf(
-			"environment %q is not declared in the manifest (available: %v)",
+			"environment %q is not declared (available: %v)",
 			p.Settings.Env, p.Environments,
 		)
 	}

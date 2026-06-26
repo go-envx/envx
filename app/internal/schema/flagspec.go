@@ -4,9 +4,9 @@ import "fmt"
 
 // -------------------------------------------------------------------------------------
 
-// FlagSpec is one setting's CLI identity. Both registration (the flag binders)
-// and the config resolver read the SAME FlagSpec, so a setting's flag name and
-// its ENVX_* env-var fallback are defined exactly once and can never drift apart.
+// FlagSpec is one setting's CLI identity. Flag registration and config resolution
+// read the SAME FlagSpec, so a setting's flag name and its ENVX_* env-var fallback
+// are defined exactly once and can never drift apart.
 type FlagSpec struct {
 	// Name is the long-form flag name, e.g. "env" for "--env".
 	Name string

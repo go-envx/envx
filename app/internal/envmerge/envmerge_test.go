@@ -8,9 +8,9 @@ import (
 
 // -------------------------------------------------------------------------------------
 
-// setupWorkspace creates a temp workspace with one namespace (env/postgres) and
-// returns the workspace dir. envmerge reads only the namespace overlays, never
-// the manifest, so no envx.yaml is needed.
+// setupWorkspace creates a temp directory with one namespace (env/postgres) and
+// returns its path. envmerge reads only the namespace overlays, so no other
+// files are needed.
 func setupWorkspace(t *testing.T) string {
 	t.Helper()
 	dir := t.TempDir()

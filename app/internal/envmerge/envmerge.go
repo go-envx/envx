@@ -25,8 +25,7 @@ type namespace struct {
 // Build is the single entry point: it normalizes the params (applying the
 // default environment and validating it against the declared set), builds the
 // namespace chain from the include list, deep-merges them, and returns an
-// immutable Result. It performs no precedence resolution and reads no files
-// beyond the namespace overlays.
+// immutable Result. It reads no files beyond the namespace overlays.
 func Build(p *Params) (*Result, error) {
 	if p == nil {
 		return nil, errors.New("envmerge: nil params")

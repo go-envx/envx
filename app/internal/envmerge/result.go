@@ -41,7 +41,7 @@ type Source struct {
 // -------------------------------------------------------------------------------------
 
 // Origin describes where a resolved value came from, plus every source it
-// shadowed during the merge. It powers the explain action.
+// shadowed during the merge.
 type Origin struct {
 	// Winner is the source whose value survived the merge.
 	Winner Source

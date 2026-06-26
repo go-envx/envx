@@ -1,6 +1,6 @@
 // Package schema is the single source of truth for envx's declarative surface:
-//   - FlagSpec catalog (flag name, shorthand, ENVX_* fallback, and usage) that the
-//     flag binders and the config resolver read.
+//   - FlagSpec catalog (flag name, shorthand, ENVX_* fallback, and usage) for each
+//     declared setting.
 //   - The Manifest schema, including the Settings, Environments, Projects, and
 //     pure query methods to easily read the manifest.
 //
