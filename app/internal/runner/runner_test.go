@@ -5,22 +5,9 @@ import (
 	"context"
 	"errors"
 	"testing"
+
+	"github.com/go-envx/envx/app/internal/exitcode"
 )
-
-// -------------------------------------------------------------------------------------
-
-// exitError is a test-local error type used to verify that a child's exit code
-// is surfaced through the Options.ExitError mapper.
-type exitError struct {
-	Code int
-}
-
-// -------------------------------------------------------------------------------------
-
-// Error returns a human-readable representation of the exit code.
-func (e *exitError) Error() string {
-	return "exit status"
-}
 
 // -------------------------------------------------------------------------------------
 
@@ -30,7 +17,7 @@ func TestRunInjectsEnv(t *testing.T) {
 	t.Parallel()
 
 	var stdout bytes.Buffer
-	err := Run(context.Background(), []string{"printenv", "FROM_FILE"}, Options{
+	err := Run(context.Background(), []string{"printenv", "FROM_FILE"}, Params{
 		Env:    map[string]string{"FROM_FILE": "yes"},
 		Stdout: &stdout,
 		Stderr: &bytes.Buffer{},
@@ -45,19 +32,18 @@ func TestRunInjectsEnv(t *testing.T) {
 
 // -------------------------------------------------------------------------------------
 
-// TestRunPropagatesExitCode verifies a non-zero child exit is surfaced through
-// the Options.ExitError mapper carrying the same code.
+// TestRunPropagatesExitCode verifies a non-zero child exit is surfaced as an
+// *exitcode.Error carrying the same code.
 func TestRunPropagatesExitCode(t *testing.T) {
 	t.Parallel()
 
-	err := Run(context.Background(), []string{"sh", "-c", "exit 3"}, Options{
-		Stdout:    &bytes.Buffer{},
-		Stderr:    &bytes.Buffer{},
-		ExitError: func(code int) error { return &exitError{Code: code} },
+	err := Run(context.Background(), []string{"sh", "-c", "exit 3"}, Params{
+		Stdout: &bytes.Buffer{},
+		Stderr: &bytes.Buffer{},
 	})
-	var ec *exitError
+	var ec *exitcode.Error
 	if !errors.As(err, &ec) {
-		t.Fatalf("expected *exitError, got %v", err)
+		t.Fatalf("expected *exitcode.Error, got %v", err)
 	}
 	if ec.Code != 3 {
 		t.Errorf("Code = %d, want 3", ec.Code)
@@ -72,7 +58,7 @@ func TestRunOverloadPrecedence(t *testing.T) {
 	t.Setenv("SHARED_KEY", "from-os")
 
 	var stdout bytes.Buffer
-	err := Run(context.Background(), []string{"printenv", "SHARED_KEY"}, Options{
+	err := Run(context.Background(), []string{"printenv", "SHARED_KEY"}, Params{
 		Env:      map[string]string{"SHARED_KEY": "from-file"},
 		Overload: true,
 		Stdout:   &stdout,
@@ -93,7 +79,7 @@ func TestRunDefaultPrecedence(t *testing.T) {
 	t.Setenv("SHARED_KEY", "from-os")
 
 	var stdout bytes.Buffer
-	err := Run(context.Background(), []string{"printenv", "SHARED_KEY"}, Options{
+	err := Run(context.Background(), []string{"printenv", "SHARED_KEY"}, Params{
 		Env:    map[string]string{"SHARED_KEY": "from-file"},
 		Stdout: &stdout,
 		Stderr: &bytes.Buffer{},
@@ -112,7 +98,7 @@ func TestRunDefaultPrecedence(t *testing.T) {
 func TestRunNoCommand(t *testing.T) {
 	t.Parallel()
 
-	if err := Run(context.Background(), nil, Options{}); err == nil {
+	if err := Run(context.Background(), nil, Params{}); err == nil {
 		t.Fatal("expected error for empty args")
 	}
 }

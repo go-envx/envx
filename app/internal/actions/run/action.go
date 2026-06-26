@@ -6,8 +6,7 @@ import (
 
 	"github.com/go-envx/envx/app/internal/config"
 	"github.com/go-envx/envx/app/internal/envmerge"
-	"github.com/go-envx/envx/app/internal/exitcode"
-	"github.com/go-envx/envx/app/pkg/runner"
+	"github.com/go-envx/envx/app/internal/runner"
 )
 
 // -------------------------------------------------------------------------------------
@@ -60,13 +59,12 @@ func execute(ctx context.Context, p actionParams, c *actionConfig, s streams) er
 	// resolve the overload setting (flag > ENVX_OVERLOAD)
 	overload := config.ResolveOverload(c.Overload, c.Changed)
 
-	// run the child process with the merged environment, mapping a non-zero
-	// child exit code into an exitcode.Error so main.go can propagate it.
-	return runner.Run(ctx, p.ExecArgs, runner.Options{
-		Env:       env.All(),
-		Overload:  overload,
-		Stdout:    s.Stdout,
-		Stderr:    s.Stderr,
-		ExitError: exitcode.New,
+	// run the child process with the merged environment; a non-zero child exit
+	// code surfaces as an *exitcode.Error so main.go can propagate it.
+	return runner.Run(ctx, p.ExecArgs, runner.Params{
+		Env:      env.All(),
+		Overload: overload,
+		Stdout:   s.Stdout,
+		Stderr:   s.Stderr,
 	})
 }

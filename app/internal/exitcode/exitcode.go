@@ -16,11 +16,3 @@ type Error struct {
 func (e *Error) Error() string {
 	return fmt.Sprintf("exit status %d", e.Code)
 }
-
-// -------------------------------------------------------------------------------------
-
-// New wraps a numeric exit code in an *Error. Its signature matches the exit-code
-// mapper that runner.Options.ExitError expects, so it can be passed directly.
-func New(code int) error {
-	return &Error{Code: code}
-}

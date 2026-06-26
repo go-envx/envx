@@ -10,12 +10,15 @@ import (
 	"os/exec"
 	"os/signal"
 	"syscall"
+
+	"github.com/go-envx/envx/app/internal/exitcode"
 )
 
 // -------------------------------------------------------------------------------------
 
-// Options configures the runner's behavior for a single child execution.
-type Options struct {
+// Params configures a single child execution: the merged env to inject plus the
+// parameters controlling how Run runs the command.
+type Params struct {
 	// Env is the merged set of env vars to inject into the child process.
 	Env map[string]string
 	// Overload controls env-var precedence:
@@ -30,10 +33,6 @@ type Options struct {
 	// When nil, os.Stderr is used (normal interactive mode).
 	// This is configurable primarily for in-process testing.
 	Stderr io.Writer
-	// ExitError maps a non-zero child exit code into the error Run returns,
-	// letting callers surface the code in their own error type. When nil, Run
-	// returns a generic error carrying the code.
-	ExitError func(code int) error
 }
 
 // -------------------------------------------------------------------------------------
@@ -41,18 +40,18 @@ type Options struct {
 // Run spawns the specified command as a child process with the merged
 // environment (respecting Overload precedence), forwarding SIGINT and SIGTERM
 // so the child can shut down gracefully, and propagating the child's exact exit
-// code via Options.ExitError. Returns nil on success, the error from ExitError
-// for a non-zero exit, or a wrapped error when the process fails to start.
-func Run(ctx context.Context, args []string, opts Options) error {
+// code as an *exitcode.Error. Returns nil on success, an *exitcode.Error for a
+// non-zero exit, or a wrapped error when the process fails to start.
+func Run(ctx context.Context, args []string, p Params) error {
 	if len(args) == 0 {
 		return errors.New("no command specified")
 	}
 
-	stdout := opts.Stdout
+	stdout := p.Stdout
 	if stdout == nil {
 		stdout = os.Stdout
 	}
-	stderr := opts.Stderr
+	stderr := p.Stderr
 	if stderr == nil {
 		stderr = os.Stderr
 	}
@@ -62,7 +61,7 @@ func Run(ctx context.Context, args []string, opts Options) error {
 	cmd.Stdin = os.Stdin
 	cmd.Stdout = stdout
 	cmd.Stderr = stderr
-	cmd.Env = buildEnv(opts)
+	cmd.Env = buildEnv(p)
 
 	if err := cmd.Start(); err != nil {
 		return fmt.Errorf("starting command: %w", err)
@@ -101,21 +100,9 @@ func Run(ctx context.Context, args []string, opts Options) error {
 	}
 
 	if exitErr, ok := errors.AsType[*exec.ExitError](err); ok {
-		return exitCodeError(opts, exitErr.ExitCode())
+		return &exitcode.Error{Code: exitErr.ExitCode()}
 	}
 	return fmt.Errorf("running command: %w", err)
-}
-
-// -------------------------------------------------------------------------------------
-
-// exitCodeError converts a non-zero child exit code into the error Run returns,
-// delegating to Options.ExitError when provided and falling back to a generic
-// error otherwise.
-func exitCodeError(opts Options, code int) error {
-	if opts.ExitError != nil {
-		return opts.ExitError(code)
-	}
-	return fmt.Errorf("exit status %d", code)
 }
 
 // -------------------------------------------------------------------------------------
@@ -124,14 +111,14 @@ func exitCodeError(opts Options, code int) error {
 // combining the OS environment with the merged file values. With Overload=false
 // (default) OS env wins, so CI-set vars cannot be clobbered by checked-in
 // files; with Overload=true file values win.
-func buildEnv(opts Options) []string {
+func buildEnv(p Params) []string {
 	var base, overlay map[string]string
 
 	osEnv := envToMap(os.Environ())
-	if opts.Overload {
-		base, overlay = osEnv, opts.Env
+	if p.Overload {
+		base, overlay = osEnv, p.Env
 	} else {
-		base, overlay = opts.Env, osEnv
+		base, overlay = p.Env, osEnv
 	}
 
 	env := make(map[string]string, len(base)+len(overlay))

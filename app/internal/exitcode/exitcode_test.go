@@ -33,18 +33,3 @@ func TestErrorAsType(t *testing.T) {
 		t.Errorf("Code = %d, want 7", ec.Code)
 	}
 }
-
-// -------------------------------------------------------------------------------------
-
-// TestNew verifies New wraps a code in a recoverable *Error.
-func TestNew(t *testing.T) {
-	t.Parallel()
-
-	ec, ok := errors.AsType[*Error](New(9))
-	if !ok {
-		t.Fatalf("expected *Error, got %T", New(9))
-	}
-	if ec.Code != 9 {
-		t.Errorf("Code = %d, want 9", ec.Code)
-	}
-}
