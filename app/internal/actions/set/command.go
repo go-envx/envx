@@ -1,6 +1,7 @@
 package set
 
 import (
+	"github.com/go-envx/envx/app/internal/config"
 	"github.com/go-envx/envx/app/internal/flags"
 	"github.com/go-envx/envx/app/internal/schema"
 	"github.com/go-envx/envx/app/pkg/str"
@@ -42,9 +43,6 @@ func NewCommand(configPath *string) *cobra.Command {
 		Example: str.Dedent(example, 2),
 		Args:    cobra.ExactArgs(3),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			cfg.ConfigPath = configPath
-			cfg.Changed = cmd.Flags()
-
 			// map args to action params
 			p := actionParams{
 				IncludePath: args[0],
@@ -53,10 +51,22 @@ func NewCommand(configPath *string) *cobra.Command {
 			}
 
 			// execute the action
-			return execute(p, &cfg)
+			in := cfg.input(cmd, configPath)
+			return execute(p, in)
 		},
 	}
 
-	flags.BindString(cmd, &cfg.Settings.Env, &schema.Env)
+	flags.BindString(cmd, &cfg.Env, &schema.Env)
 	return cmd
+}
+
+// -------------------------------------------------------------------------------------
+
+// input gathers the explicitly-set flags into a *config.Input for resolution,
+// marking --env present only when the user changed it on the command line.
+func (c *actionConfig) input(cmd *cobra.Command, configPath *string) *config.Input {
+	return &config.Input{
+		ConfigPath: configPath,
+		Env:        flags.OptionalString(cmd, &schema.Env, c.Env),
+	}
 }

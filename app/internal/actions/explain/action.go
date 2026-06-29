@@ -21,13 +21,20 @@ type actionParams struct {
 
 // -------------------------------------------------------------------------------------
 
-// actionConfig is the explain action's composed config.
+// actionConfig is the explain action's configurable surface: the envmerge
+// settings it resolves. Display knobs (--reveal, --output) bind to command-local
+// vars since they shape rendering, not resolution.
 type actionConfig struct {
-	config.Input
-	// Reveal shows plaintext values instead of masking them.
-	Reveal bool
-	// Output selects the output format ("table" or "json").
-	Output string
+	// Env is the target environment to resolve.
+	Env string
+	// Strict requires every overlay file in the namespace chain to exist.
+	Strict bool
+	// Prefix is prepended to every resolved key.
+	Prefix string
+	// Suffix is appended to every resolved key.
+	Suffix string
+	// NamespacePrefix prefixes each key with its namespace name.
+	NamespacePrefix bool
 }
 
 // -------------------------------------------------------------------------------------
@@ -58,15 +65,15 @@ type actionResultEntry struct {
 
 // execute is the imperative shell: resolve the input into an envmerge.Params, build
 // the merged environment, and hand the result to the pure core.
-func execute(p actionParams, c *actionConfig) (actionResult, error) {
+func execute(p actionParams, in *config.Input) (actionResult, error) {
 	// resolve the input config
-	ec, err := config.Resolve(&c.Input, p.Project)
+	resolved, err := config.Resolve(in, p.Project)
 	if err != nil {
 		return actionResult{}, err
 	}
 
 	// build the merged environment
-	env, err := envmerge.Build(*ec)
+	env, err := envmerge.Build(resolved.Envmerge)
 	if err != nil {
 		return actionResult{}, err
 	}

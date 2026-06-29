@@ -16,11 +16,11 @@ import (
 func resolveBasic(t *testing.T) *envmerge.Result {
 	t.Helper()
 	path := fixtures.Manifest("basic")
-	ec, err := config.Resolve(&config.Input{ConfigPath: &path}, "api-core")
+	r, err := config.Resolve(&config.Input{ConfigPath: &path}, "api-core")
 	if err != nil {
 		t.Fatalf("resolve fixture: %v", err)
 	}
-	env, err := envmerge.Build(*ec)
+	env, err := envmerge.Build(r.Envmerge)
 	if err != nil {
 		t.Fatalf("build fixture: %v", err)
 	}

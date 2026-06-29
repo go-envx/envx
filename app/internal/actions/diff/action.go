@@ -21,13 +21,18 @@ type actionParams struct {
 
 // -------------------------------------------------------------------------------------
 
-// actionConfig is the diff action's composed config.
+// actionConfig is the diff action's configurable surface: the envmerge settings
+// it resolves (env is positional, so it binds no --env). Display knobs (--reveal,
+// --output) bind to command-local vars since they shape rendering, not resolution.
 type actionConfig struct {
-	config.Input
-	// Reveal shows plaintext values instead of masking them.
-	Reveal bool
-	// Output selects the output format ("json" or the default table).
-	Output string
+	// Strict requires every overlay file in the namespace chain to exist.
+	Strict bool
+	// Prefix is prepended to every resolved key.
+	Prefix string
+	// Suffix is appended to every resolved key.
+	Suffix string
+	// NamespacePrefix prefixes each key with its namespace name.
+	NamespacePrefix bool
 }
 
 // -------------------------------------------------------------------------------------
@@ -59,19 +64,19 @@ type actionResultChange struct {
 // execute is the imperative shell: resolve the input into a single envmerge.Params,
 // build the merged environment for each specified environment, and hand both results
 // to the pure core.
-func execute(p actionParams, c *actionConfig) (actionResult, error) {
+func execute(p actionParams, in *config.Input) (actionResult, error) {
 	// resolve the shared config
-	ec, err := config.Resolve(&c.Input, p.Project)
+	resolved, err := config.Resolve(in, p.Project)
 	if err != nil {
 		return actionResult{}, err
 	}
 
 	// build each side's environment
-	a, err := buildEnv(*ec, p.EnvA)
+	a, err := buildEnv(resolved.Envmerge, p.EnvA)
 	if err != nil {
 		return actionResult{}, err
 	}
-	b, err := buildEnv(*ec, p.EnvB)
+	b, err := buildEnv(resolved.Envmerge, p.EnvB)
 	if err != nil {
 		return actionResult{}, err
 	}

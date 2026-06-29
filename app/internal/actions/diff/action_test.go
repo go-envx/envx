@@ -98,15 +98,15 @@ func TestRunActionIdenticalEnvs(t *testing.T) {
 func diffSides(t *testing.T, envA, envB string) (a, b *envmerge.Result) {
 	t.Helper()
 	path := fixtures.Manifest("basic")
-	ec, err := config.Resolve(&config.Input{ConfigPath: &path}, "api-core")
+	r, err := config.Resolve(&config.Input{ConfigPath: &path}, "api-core")
 	if err != nil {
 		t.Fatalf("resolve fixture: %v", err)
 	}
-	a, err = buildEnv(*ec, envA)
+	a, err = buildEnv(r.Envmerge, envA)
 	if err != nil {
 		t.Fatalf("buildEnv %s: %v", envA, err)
 	}
-	b, err = buildEnv(*ec, envB)
+	b, err = buildEnv(r.Envmerge, envB)
 	if err != nil {
 		t.Fatalf("buildEnv %s: %v", envB, err)
 	}

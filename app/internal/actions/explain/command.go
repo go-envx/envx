@@ -1,6 +1,7 @@
 package explain
 
 import (
+	"github.com/go-envx/envx/app/internal/config"
 	"github.com/go-envx/envx/app/internal/flags"
 	"github.com/go-envx/envx/app/internal/schema"
 	"github.com/go-envx/envx/app/pkg/arg"
@@ -33,7 +34,11 @@ const (
 // It accepts a project and an optional key. If the key is present it explains just
 // that key. If the key is absent it explains all keys.
 func NewCommand(configPath *string) *cobra.Command {
-	var cfg actionConfig
+	var (
+		cfg    actionConfig
+		reveal bool
+		output string
+	)
 
 	cmd := &cobra.Command{
 		Use:     usage,
@@ -42,9 +47,6 @@ func NewCommand(configPath *string) *cobra.Command {
 		Example: str.Dedent(example, 2),
 		Args:    cobra.RangeArgs(1, 2),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			cfg.ConfigPath = configPath
-			cfg.Changed = cmd.Flags()
-
 			// map args to action params
 			p := actionParams{
 				Project: args[0],
@@ -52,7 +54,8 @@ func NewCommand(configPath *string) *cobra.Command {
 			}
 
 			// execute the action
-			res, err := execute(p, &cfg)
+			in := cfg.input(cmd, configPath)
+			res, err := execute(p, in)
 			if err != nil {
 				return err
 			}
@@ -61,18 +64,33 @@ func NewCommand(configPath *string) *cobra.Command {
 			return render(&renderParams{
 				Writer: cmd.OutOrStdout(),
 				Result: res,
-				Format: cfg.Output,
-				Reveal: cfg.Reveal,
+				Format: output,
+				Reveal: reveal,
 			})
 		},
 	}
 
-	flags.BindBool(cmd, &cfg.Settings.Strict, &schema.Strict)
-	flags.BindString(cmd, &cfg.Settings.Prefix, &schema.Prefix)
-	flags.BindString(cmd, &cfg.Settings.Suffix, &schema.Suffix)
-	flags.BindBool(cmd, &cfg.Settings.NamespacePrefix, &schema.NamespacePrefix)
-	flags.BindString(cmd, &cfg.Settings.Env, &schema.Env)
-	flags.BindBool(cmd, &cfg.Reveal, &schema.Reveal)
-	flags.BindString(cmd, &cfg.Output, &schema.Output)
+	flags.BindBool(cmd, &cfg.Strict, &schema.Strict)
+	flags.BindString(cmd, &cfg.Prefix, &schema.Prefix)
+	flags.BindString(cmd, &cfg.Suffix, &schema.Suffix)
+	flags.BindBool(cmd, &cfg.NamespacePrefix, &schema.NamespacePrefix)
+	flags.BindString(cmd, &cfg.Env, &schema.Env)
+	flags.BindBool(cmd, &reveal, &schema.Reveal)
+	flags.BindString(cmd, &output, &schema.Output)
 	return cmd
+}
+
+// -------------------------------------------------------------------------------------
+
+// input gathers the explicitly-set flags into a *config.Input for resolution,
+// marking each setting present only when the user changed it on the command line.
+func (c *actionConfig) input(cmd *cobra.Command, configPath *string) *config.Input {
+	return &config.Input{
+		ConfigPath:      configPath,
+		Env:             flags.OptionalString(cmd, &schema.Env, c.Env),
+		Strict:          flags.OptionalBool(cmd, &schema.Strict, c.Strict),
+		Prefix:          flags.OptionalString(cmd, &schema.Prefix, c.Prefix),
+		Suffix:          flags.OptionalString(cmd, &schema.Suffix, c.Suffix),
+		NamespacePrefix: flags.OptionalBool(cmd, &schema.NamespacePrefix, c.NamespacePrefix),
+	}
 }

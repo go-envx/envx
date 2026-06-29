@@ -32,3 +32,26 @@ func BindBool(cmd *cobra.Command, dst *bool, spec *schema.FlagSpec) {
 func BindPersistentString(cmd *cobra.Command, dst *string, spec *schema.FlagSpec) {
 	cmd.PersistentFlags().StringVarP(dst, spec.Name, spec.Short, "", spec.HelpText())
 }
+
+// -------------------------------------------------------------------------------------
+
+// OptionalString returns a pointer to val when the user explicitly set spec's
+// flag on cmd, and nil otherwise. It translates cobra's changed state into the
+// optional form config.Input expects, keeping cobra knowledge at the CLI edge.
+func OptionalString(cmd *cobra.Command, spec *schema.FlagSpec, val string) *string {
+	if !cmd.Flags().Changed(spec.Name) {
+		return nil
+	}
+	return &val
+}
+
+// -------------------------------------------------------------------------------------
+
+// OptionalBool returns a pointer to val when the user explicitly set spec's flag
+// on cmd, and nil otherwise. It is the boolean counterpart to OptionalString.
+func OptionalBool(cmd *cobra.Command, spec *schema.FlagSpec, val bool) *bool {
+	if !cmd.Flags().Changed(spec.Name) {
+		return nil
+	}
+	return &val
+}

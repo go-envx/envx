@@ -25,13 +25,13 @@ type actionParams struct {
 
 // -------------------------------------------------------------------------------------
 
-// actionConfig holds the set action's config: the shared resolution input. set
-// only registers and uses --env (plus the persistent --config) since it mutates a
-// single overlay file rather than merging an environment; config.ResolveOverlayPath
-// turns the input into the target overlay path.
-// actionConfig is the set action's composed config.
+// actionConfig is the set action's configurable surface. set only resolves --env
+// (plus the persistent --config) since it mutates a single overlay file rather
+// than merging an environment; Resolved.OverlayPath turns the resolution into the
+// target overlay path.
 type actionConfig struct {
-	config.Input
+	// Env is the target environment whose overlay file is written.
+	Env string
 }
 
 // -------------------------------------------------------------------------------------
@@ -40,9 +40,13 @@ type actionConfig struct {
 // include path) via config, reads the current document, applies the pure
 // transform, and writes the result back atomically. set never invokes envmerge
 // since no project means there is nothing to merge.
-func execute(p actionParams, c *actionConfig) error {
-	// resolve the target overlay file
-	target, err := config.ResolveOverlayPath(&c.Input, p.IncludePath)
+func execute(p actionParams, in *config.Input) error {
+	// resolve the global context (no project) and derive the target overlay file
+	resolved, err := config.Resolve(in, "")
+	if err != nil {
+		return err
+	}
+	target, err := resolved.OverlayPath(p.IncludePath)
 	if err != nil {
 		return err
 	}

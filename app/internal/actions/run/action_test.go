@@ -12,16 +12,6 @@ import (
 
 // -------------------------------------------------------------------------------------
 
-// noChange is a config.FlagSet stub reporting that no flag was set.
-type noChange struct{}
-
-// -------------------------------------------------------------------------------------
-
-// Changed always reports false.
-func (noChange) Changed(string) bool { return false }
-
-// -------------------------------------------------------------------------------------
-
 // TestExecuteInjectsEnv verifies the resolved environment reaches the child
 // process under the default (no-overload) settings.
 func TestExecuteInjectsEnv(t *testing.T) {
@@ -29,11 +19,11 @@ func TestExecuteInjectsEnv(t *testing.T) {
 
 	path := fixtures.Manifest("basic")
 	var stdout bytes.Buffer
-	c := &actionConfig{Input: config.Input{ConfigPath: &path, Changed: noChange{}}}
+	in := &config.Input{ConfigPath: &path}
 	err := execute(context.Background(), actionParams{
 		Project:  "api-core",
 		ExecArgs: []string{"printenv", "APP_NAME"},
-	}, c, streams{Stdout: &stdout, Stderr: io.Discard})
+	}, in, streams{Stdout: &stdout, Stderr: io.Discard})
 	if err != nil {
 		t.Fatalf("execute: %v", err)
 	}
@@ -52,11 +42,11 @@ func TestExecuteOverloadFromEnv(t *testing.T) {
 
 	path := fixtures.Manifest("basic")
 	var stdout bytes.Buffer
-	c := &actionConfig{Input: config.Input{ConfigPath: &path, Changed: noChange{}}}
+	in := &config.Input{ConfigPath: &path}
 	err := execute(context.Background(), actionParams{
 		Project:  "api-core",
 		ExecArgs: []string{"printenv", "APP_NAME"},
-	}, c, streams{Stdout: &stdout, Stderr: io.Discard})
+	}, in, streams{Stdout: &stdout, Stderr: io.Discard})
 	if err != nil {
 		t.Fatalf("execute: %v", err)
 	}

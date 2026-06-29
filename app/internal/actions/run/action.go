@@ -21,9 +21,19 @@ type actionParams struct {
 
 // -------------------------------------------------------------------------------------
 
-// actionConfig is the run action's composed config.
+// actionConfig is the run action's configurable surface: the envmerge settings it
+// resolves before merging, plus the overload knob the runner consumes.
 type actionConfig struct {
-	config.Input
+	// Env is the target environment to resolve.
+	Env string
+	// Strict requires every overlay file in the namespace chain to exist.
+	Strict bool
+	// Prefix is prepended to every resolved key.
+	Prefix string
+	// Suffix is appended to every resolved key.
+	Suffix string
+	// NamespacePrefix prefixes each key with its namespace name.
+	NamespacePrefix bool
 	// Overload lets file values win over existing OS environment variables.
 	Overload bool
 }
@@ -41,29 +51,26 @@ type streams struct {
 // -------------------------------------------------------------------------------------
 
 // execute is the imperative shell: resolve the input into an envmerge.Params, build
-// the merged environment, resolve the overload setting (flag > ENVX_OVERLOAD),
-// then run the child process with the merged environment.
-func execute(ctx context.Context, p actionParams, c *actionConfig, s streams) error {
+// the merged environment, then run the child process with the merged environment
+// using the resolved overload setting.
+func execute(ctx context.Context, p actionParams, in *config.Input, s streams) error {
 	// resolve the input config
-	ec, err := config.Resolve(&c.Input, p.Project)
+	resolved, err := config.Resolve(in, p.Project)
 	if err != nil {
 		return err
 	}
 
 	// build the merged environment
-	env, err := envmerge.Build(*ec)
+	env, err := envmerge.Build(resolved.Envmerge)
 	if err != nil {
 		return err
 	}
-
-	// resolve the overload setting (flag > ENVX_OVERLOAD)
-	overload := config.ResolveOverload(c.Overload, c.Changed)
 
 	// run the child process with the merged environment; a non-zero child exit
 	// code surfaces as an *exitcode.Error so main.go can propagate it.
 	return runner.Run(ctx, p.ExecArgs, runner.Params{
 		Env:      env.All(),
-		Overload: overload,
+		Overload: resolved.Overload,
 		Stdout:   s.Stdout,
 		Stderr:   s.Stderr,
 	})

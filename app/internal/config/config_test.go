@@ -4,20 +4,17 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/go-envx/envx/app/internal/envmerge"
 	"github.com/go-envx/envx/app/internal/fixtures"
 	"github.com/go-envx/envx/app/internal/schema"
 )
 
 // -------------------------------------------------------------------------------------
-// fakeFlagSet is a test double for FlagSet driven by a fixed changed-set.
-type fakeFlagSet struct {
-	changed map[string]bool
-}
+// strPtr returns a pointer to s, for building optional Input values in tests.
+func strPtr(s string) *string { return &s }
 
 // -------------------------------------------------------------------------------------
-// Changed reports whether name was marked changed in the test fixture.
-func (f fakeFlagSet) Changed(name string) bool { return f.changed[name] }
+// boolPtr returns a pointer to b, for building optional Input values in tests.
+func boolPtr(b bool) *bool { return &b }
 
 // -------------------------------------------------------------------------------------
 // testManifest builds an in-memory manifest with global and project-level env
@@ -37,42 +34,39 @@ func testManifest() *schema.Manifest {
 }
 
 // -------------------------------------------------------------------------------------
-// TestResolveManifest verifies project lookup, the env precedence (flag > project
-// > global), option layering, and pass-through of includes/environments into the
-// envmerge.Params against an in-memory manifest. Terminal defaults are left to the
-// envmerge, so an unset env stays empty here.
+// TestResolveManifest verifies project lookup, the env precedence (explicit >
+// project > global), setting layering, and pass-through of includes/environments
+// into the envmerge.Params against an in-memory manifest. An empty project
+// resolves the global context only. Terminal defaults are left to envmerge, so an
+// unset env stays empty here.
 func TestResolveManifest(t *testing.T) {
 	m := testManifest()
-	none := fakeFlagSet{changed: map[string]bool{}}
 
-	t.Run("flag wins", func(t *testing.T) {
-		ec, err := resolveManifest(m, "", &Input{
-			Settings: envmerge.Settings{Env: "from-flag"},
-			Changed:  fakeFlagSet{changed: map[string]bool{schema.Env.Name: true}},
-		}, "api")
+	t.Run("explicit wins", func(t *testing.T) {
+		r, err := resolveManifest(m, "", &Input{Env: strPtr("from-flag")}, "api")
 		if err != nil {
 			t.Fatal(err)
 		}
-		if ec.Settings.Env != "from-flag" {
-			t.Errorf("Env = %q, want from-flag", ec.Settings.Env)
+		if r.Envmerge.Settings.Env != "from-flag" {
+			t.Errorf("Env = %q, want from-flag", r.Envmerge.Settings.Env)
 		}
 	})
 	t.Run("project default", func(t *testing.T) {
-		ec, err := resolveManifest(m, "", &Input{Changed: none}, "api")
+		r, err := resolveManifest(m, "", &Input{}, "api")
 		if err != nil {
 			t.Fatal(err)
 		}
-		if ec.Settings.Env != "production" {
-			t.Errorf("Env = %q, want production", ec.Settings.Env)
+		if r.Envmerge.Settings.Env != "production" {
+			t.Errorf("Env = %q, want production", r.Envmerge.Settings.Env)
 		}
 	})
 	t.Run("global default", func(t *testing.T) {
-		ec, err := resolveManifest(m, "", &Input{Changed: none}, "web")
+		r, err := resolveManifest(m, "", &Input{}, "web")
 		if err != nil {
 			t.Fatal(err)
 		}
-		if ec.Settings.Env != "staging" {
-			t.Errorf("Env = %q, want staging", ec.Settings.Env)
+		if r.Envmerge.Settings.Env != "staging" {
+			t.Errorf("Env = %q, want staging", r.Envmerge.Settings.Env)
 		}
 	})
 	t.Run("env left empty for envmerge default", func(t *testing.T) {
@@ -82,37 +76,101 @@ func TestResolveManifest(t *testing.T) {
 				"api": {Includes: []string{"env/x"}},
 			},
 		}
-		ec, err := resolveManifest(bare, "", &Input{Changed: none}, "api")
+		r, err := resolveManifest(bare, "", &Input{}, "api")
 		if err != nil {
 			t.Fatal(err)
 		}
-		if ec.Settings.Env != "" {
-			t.Errorf("Env = %q, want empty (envmerge applies the default)", ec.Settings.Env)
+		if r.Envmerge.Settings.Env != "" {
+			t.Errorf(
+				"Env = %q, want empty (envmerge applies the default)",
+				r.Envmerge.Settings.Env,
+			)
 		}
 	})
-	t.Run("options and includes pass through", func(t *testing.T) {
-		ec, err := resolveManifest(m, "", &Input{
-			Settings: envmerge.Settings{Prefix: "APP", Strict: true},
-			Changed: fakeFlagSet{changed: map[string]bool{
-				schema.Prefix.Name: true, schema.Strict.Name: true,
-			}},
+	t.Run("settings and includes pass through", func(t *testing.T) {
+		r, err := resolveManifest(m, "", &Input{
+			Prefix: strPtr("APP"), Strict: boolPtr(true),
 		}, "api")
 		if err != nil {
 			t.Fatal(err)
 		}
-		if ec.Settings.Prefix != "APP" || !ec.Settings.Strict {
-			t.Errorf("options not applied: %+v", ec.Settings)
+		if r.Envmerge.Settings.Prefix != "APP" || !r.Envmerge.Settings.Strict {
+			t.Errorf("settings not applied: %+v", r.Envmerge.Settings)
 		}
-		if len(ec.Includes) != 1 || ec.Includes[0] != "env/x" {
-			t.Errorf("Includes = %v, want [env/x]", ec.Includes)
+		if len(r.Envmerge.Includes) != 1 || r.Envmerge.Includes[0] != "env/x" {
+			t.Errorf("Includes = %v, want [env/x]", r.Envmerge.Includes)
 		}
-		if len(ec.Environments) != 3 {
-			t.Errorf("Environments = %v", ec.Environments)
+		if len(r.Envmerge.Environments) != 3 {
+			t.Errorf("Environments = %v", r.Envmerge.Environments)
 		}
 	})
 	t.Run("unknown project errors", func(t *testing.T) {
-		if _, err := resolveManifest(m, "", &Input{Changed: none}, "ghost"); err == nil {
+		if _, err := resolveManifest(m, "", &Input{}, "ghost"); err == nil {
 			t.Error("expected error for unknown project")
+		}
+	})
+	t.Run("empty project resolves global only", func(t *testing.T) {
+		r, err := resolveManifest(m, "", &Input{}, "")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if r.Envmerge.Settings.Env != "staging" {
+			t.Errorf("Env = %q, want staging (global)", r.Envmerge.Settings.Env)
+		}
+		if len(r.Envmerge.Includes) != 0 {
+			t.Errorf("Includes = %v, want empty for no project", r.Envmerge.Includes)
+		}
+	})
+}
+
+// -------------------------------------------------------------------------------------
+// TestOverloadResolution verifies overload now layers through the manifest
+// (explicit > project > global), the precedence that was previously dropped.
+func TestOverloadResolution(t *testing.T) {
+	t.Parallel()
+
+	manifestWith := func(global, project *bool) *schema.Manifest {
+		return &schema.Manifest{
+			Environments: []string{"development"},
+			Settings:     schema.Settings{Overload: global},
+			Projects: map[string]schema.Project{
+				"api": {
+					Includes: []string{"env/x"},
+					Settings: schema.Settings{Overload: project},
+				},
+			},
+		}
+	}
+
+	t.Run("explicit wins over manifest", func(t *testing.T) {
+		r, err := resolveManifest(
+			manifestWith(boolPtr(false), nil), "", &Input{Overload: boolPtr(true)}, "api",
+		)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !r.Overload {
+			t.Error("explicit overload true should win")
+		}
+	})
+	t.Run("manifest global layer honored", func(t *testing.T) {
+		r, err := resolveManifest(manifestWith(boolPtr(true), nil), "", &Input{}, "api")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !r.Overload {
+			t.Error("manifest global overload=true should be honored")
+		}
+	})
+	t.Run("project layer over global", func(t *testing.T) {
+		r, err := resolveManifest(
+			manifestWith(boolPtr(false), boolPtr(true)), "", &Input{}, "api",
+		)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !r.Overload {
+			t.Error("project overload=true should win over global false")
 		}
 	})
 }
@@ -124,11 +182,11 @@ func TestResolve(t *testing.T) {
 	t.Parallel()
 
 	path := fixtures.Manifest("basic")
-	ec, err := Resolve(&Input{ConfigPath: &path}, "api-core")
+	r, err := Resolve(&Input{ConfigPath: &path}, "api-core")
 	if err != nil {
 		t.Fatalf("Resolve: %v", err)
 	}
-	if len(ec.Includes) == 0 {
+	if len(r.Envmerge.Includes) == 0 {
 		t.Error("expected includes from the fixture project")
 	}
 }
@@ -160,32 +218,22 @@ func TestManifestPath(t *testing.T) {
 }
 
 // -------------------------------------------------------------------------------------
-// TestResolveOverload verifies the overload toggle precedence (flag > default).
-func TestResolveOverload(t *testing.T) {
-	t.Parallel()
-
-	changed := fakeFlagSet{changed: map[string]bool{schema.Overload.Name: true}}
-	if !ResolveOverload(true, changed) {
-		t.Error("expected flag value true to win")
-	}
-	if ResolveOverload(false, fakeFlagSet{changed: map[string]bool{}}) {
-		t.Error("expected default false")
-	}
-}
-
-// -------------------------------------------------------------------------------------
-// TestResolveOverlayPath verifies the set action's overlay resolution: the
-// default environment feeds the overlay filename, and the error paths for an
-// unknown include or an undeclared environment.
-func TestResolveOverlayPath(t *testing.T) {
+// TestOverlayPath verifies the set action's overlay resolution from a project-less
+// Resolve: the default environment feeds the overlay filename, and the error paths
+// for an unknown include or an undeclared environment.
+func TestOverlayPath(t *testing.T) {
 	t.Parallel()
 
 	path := fixtures.Manifest("basic")
 
 	t.Run("default env and include", func(t *testing.T) {
-		target, err := ResolveOverlayPath(&Input{ConfigPath: &path}, "env/postgres")
+		r, err := Resolve(&Input{ConfigPath: &path}, "")
 		if err != nil {
-			t.Fatalf("ResolveOverlayPath: %v", err)
+			t.Fatalf("Resolve: %v", err)
+		}
+		target, err := r.OverlayPath("env/postgres")
+		if err != nil {
+			t.Fatalf("OverlayPath: %v", err)
 		}
 		// The basic fixture declares [development, staging, production], so the
 		// default resolves to the first declared environment.
@@ -197,49 +245,21 @@ func TestResolveOverlayPath(t *testing.T) {
 		}
 	})
 	t.Run("unknown include errors", func(t *testing.T) {
-		_, err := ResolveOverlayPath(&Input{ConfigPath: &path}, "env/ghost")
-		if err == nil {
+		r, err := Resolve(&Input{ConfigPath: &path}, "")
+		if err != nil {
+			t.Fatalf("Resolve: %v", err)
+		}
+		if _, err := r.OverlayPath("env/ghost"); err == nil {
 			t.Error("expected error for unknown include")
 		}
 	})
 	t.Run("undeclared env errors", func(t *testing.T) {
-		in := &Input{
-			ConfigPath: &path,
-			Settings:   envmerge.Settings{Env: "nope"},
-			Changed:    fakeFlagSet{changed: map[string]bool{schema.Env.Name: true}},
+		r, err := Resolve(&Input{ConfigPath: &path, Env: strPtr("nope")}, "")
+		if err != nil {
+			t.Fatalf("Resolve: %v", err)
 		}
-		_, err := ResolveOverlayPath(in, "env/postgres")
-		if err == nil {
+		if _, err := r.OverlayPath("env/postgres"); err == nil {
 			t.Error("expected error for undeclared environment")
-		}
-	})
-}
-
-// -------------------------------------------------------------------------------------
-// TestResolveEnv verifies the project-less env precedence (flag > manifest
-// global env), leaving the terminal default to the caller.
-func TestResolveEnv(t *testing.T) {
-	m := testManifest()
-	none := fakeFlagSet{changed: map[string]bool{}}
-
-	t.Run("flag wins", func(t *testing.T) {
-		got := ResolveEnv(
-			m, "from-flag",
-			fakeFlagSet{changed: map[string]bool{schema.Env.Name: true}},
-		)
-		if got != "from-flag" {
-			t.Errorf("got %q, want from-flag", got)
-		}
-	})
-	t.Run("manifest global when unset", func(t *testing.T) {
-		if got := ResolveEnv(m, "", none); got != "staging" {
-			t.Errorf("got %q, want staging", got)
-		}
-	})
-	t.Run("empty when nothing set", func(t *testing.T) {
-		bare := &schema.Manifest{Environments: []string{"development"}}
-		if got := ResolveEnv(bare, "", none); got != "" {
-			t.Errorf("got %q, want empty", got)
 		}
 	})
 }
@@ -250,24 +270,21 @@ func TestResolverString(t *testing.T) {
 	t.Parallel()
 
 	spec := schema.Prefix
-	t.Run("flag wins", func(t *testing.T) {
-		r := &Resolver{LookupEnv: func(string) (string, bool) { return "from-env", true }}
-		changed := fakeFlagSet{changed: map[string]bool{spec.Name: true}}
-		if got := r.String(&spec, changed, "from-flag", "layer"); got != "from-flag" {
+	t.Run("explicit wins", func(t *testing.T) {
+		r := &resolver{LookupEnv: func(string) (string, bool) { return "from-env", true }}
+		if got := r.String(&spec, strPtr("from-flag"), "layer"); got != "from-flag" {
 			t.Errorf("got %q, want from-flag", got)
 		}
 	})
 	t.Run("env wins over layers", func(t *testing.T) {
-		r := &Resolver{LookupEnv: func(string) (string, bool) { return "from-env", true }}
-		changed := fakeFlagSet{changed: map[string]bool{}}
-		if got := r.String(&spec, changed, "from-flag", "layer"); got != "from-env" {
+		r := &resolver{LookupEnv: func(string) (string, bool) { return "from-env", true }}
+		if got := r.String(&spec, nil, "layer"); got != "from-env" {
 			t.Errorf("got %q, want from-env", got)
 		}
 	})
 	t.Run("first non-empty layer", func(t *testing.T) {
-		r := &Resolver{LookupEnv: func(string) (string, bool) { return "", false }}
-		changed := fakeFlagSet{changed: map[string]bool{}}
-		if got := r.String(&spec, changed, "from-flag", "", "layer2"); got != "layer2" {
+		r := &resolver{LookupEnv: func(string) (string, bool) { return "", false }}
+		if got := r.String(&spec, nil, "", "layer2"); got != "layer2" {
 			t.Errorf("got %q, want layer2", got)
 		}
 	})
@@ -280,32 +297,27 @@ func TestResolverBool(t *testing.T) {
 	t.Parallel()
 
 	spec := schema.Strict
-	tru := true
-	t.Run("flag wins", func(t *testing.T) {
-		r := &Resolver{LookupEnv: func(string) (string, bool) { return "false", true }}
-		changed := fakeFlagSet{changed: map[string]bool{spec.Name: true}}
-		if !r.Bool(&spec, changed, true, &tru) {
-			t.Error("expected flag value true to win")
+	t.Run("explicit wins", func(t *testing.T) {
+		r := &resolver{LookupEnv: func(string) (string, bool) { return "false", true }}
+		if !r.Bool(&spec, boolPtr(true), boolPtr(true)) {
+			t.Error("expected explicit value true to win")
 		}
 	})
 	t.Run("env parsed", func(t *testing.T) {
-		r := &Resolver{LookupEnv: func(string) (string, bool) { return "true", true }}
-		changed := fakeFlagSet{changed: map[string]bool{}}
-		if !r.Bool(&spec, changed, false) {
+		r := &resolver{LookupEnv: func(string) (string, bool) { return "true", true }}
+		if !r.Bool(&spec, nil) {
 			t.Error("expected env value true")
 		}
 	})
 	t.Run("layer pointer", func(t *testing.T) {
-		r := &Resolver{LookupEnv: func(string) (string, bool) { return "", false }}
-		changed := fakeFlagSet{changed: map[string]bool{}}
-		if !r.Bool(&spec, changed, false, nil, &tru) {
+		r := &resolver{LookupEnv: func(string) (string, bool) { return "", false }}
+		if !r.Bool(&spec, nil, nil, boolPtr(true)) {
 			t.Error("expected first non-nil layer true")
 		}
 	})
 	t.Run("default false", func(t *testing.T) {
-		r := &Resolver{LookupEnv: func(string) (string, bool) { return "", false }}
-		changed := fakeFlagSet{changed: map[string]bool{}}
-		if r.Bool(&spec, changed, false, nil) {
+		r := &resolver{LookupEnv: func(string) (string, bool) { return "", false }}
+		if r.Bool(&spec, nil, nil) {
 			t.Error("expected default false")
 		}
 	})

@@ -116,3 +116,69 @@ func TestBindPersistentString(t *testing.T) {
 		t.Fatalf("flag %q was not registered as persistent", schema.Config.Name)
 	}
 }
+
+// -------------------------------------------------------------------------------------
+
+// TestOptionalString verifies OptionalString returns nil until the flag is
+// explicitly set, then a pointer to the parsed value.
+func TestOptionalString(t *testing.T) {
+	t.Parallel()
+
+	t.Run("unset is nil", func(t *testing.T) {
+		var prefix string
+		cmd := newTestCmd()
+		BindString(cmd, &prefix, &schema.Prefix)
+		if err := cmd.Execute(); err != nil {
+			t.Fatalf("execute: %v", err)
+		}
+		if got := OptionalString(cmd, &schema.Prefix, prefix); got != nil {
+			t.Errorf("got %v, want nil", got)
+		}
+	})
+	t.Run("set returns pointer", func(t *testing.T) {
+		var prefix string
+		cmd := newTestCmd()
+		BindString(cmd, &prefix, &schema.Prefix)
+		cmd.SetArgs([]string{"--prefix", "APP"})
+		if err := cmd.Execute(); err != nil {
+			t.Fatalf("execute: %v", err)
+		}
+		got := OptionalString(cmd, &schema.Prefix, prefix)
+		if got == nil || *got != "APP" {
+			t.Errorf("got %v, want pointer to APP", got)
+		}
+	})
+}
+
+// -------------------------------------------------------------------------------------
+
+// TestOptionalBool verifies OptionalBool returns nil until the flag is explicitly
+// set, then a pointer to the parsed value.
+func TestOptionalBool(t *testing.T) {
+	t.Parallel()
+
+	t.Run("unset is nil", func(t *testing.T) {
+		var strict bool
+		cmd := newTestCmd()
+		BindBool(cmd, &strict, &schema.Strict)
+		if err := cmd.Execute(); err != nil {
+			t.Fatalf("execute: %v", err)
+		}
+		if got := OptionalBool(cmd, &schema.Strict, strict); got != nil {
+			t.Errorf("got %v, want nil", got)
+		}
+	})
+	t.Run("set returns pointer", func(t *testing.T) {
+		var strict bool
+		cmd := newTestCmd()
+		BindBool(cmd, &strict, &schema.Strict)
+		cmd.SetArgs([]string{"--strict"})
+		if err := cmd.Execute(); err != nil {
+			t.Fatalf("execute: %v", err)
+		}
+		got := OptionalBool(cmd, &schema.Strict, strict)
+		if got == nil || !*got {
+			t.Errorf("got %v, want pointer to true", got)
+		}
+	})
+}
