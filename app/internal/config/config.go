@@ -168,7 +168,9 @@ func resolveProjectLayer(mc manifestContext) (projectLayer, error) {
 // explicit (input) > ENVX_* > project > global. Terminal defaults (such as the
 // first-declared environment) are left to envmerge downstream.
 func resolveEnvmergeParams(
-	mc manifestContext, in *Input, layer projectLayer,
+	mc manifestContext,
+	in *Input,
+	layer projectLayer,
 ) envmerge.Params {
 	proj, global := layer.settings, mc.manifest.Settings
 	return envmerge.Params{
@@ -209,7 +211,9 @@ func resolveEnvmergeParams(
 // resolveRunnerParams builds the runner input: the overload knob layered through
 // the precedence chain explicit (input) > ENVX_OVERLOAD > project > global.
 func resolveRunnerParams(
-	mc manifestContext, in *Input, layer projectLayer,
+	mc manifestContext,
+	in *Input,
+	layer projectLayer,
 ) runner.Params {
 	return runner.Params{
 		Overload: precedenceBool(&schema.Overload,
