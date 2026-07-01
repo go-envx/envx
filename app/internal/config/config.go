@@ -38,9 +38,9 @@ type Input struct {
 // -------------------------------------------------------------------------------------
 
 // manifestContext bundles the loaded manifest, the directory it was loaded from,
-// and the project being resolved: the shared input resolveManifest and projectLayer
-// both read, and which Result retains so OverlayPath can validate and join a target
-// without re-loading.
+// and the project being resolved: the shared input resolveManifest and
+// resolveProjectLayer both read, and which Result retains so OverlayPath can
+// validate and join a target without re-loading.
 type manifestContext struct {
 	// manifest is the parsed, validated manifest.
 	manifest *schema.Manifest
@@ -99,78 +99,101 @@ func resolveManifestPath(in *Input) string {
 
 // -------------------------------------------------------------------------------------
 
-// resolveManifest assembles a *Result from an already-loaded manifest: it
-// computes the project layer (settings + includes), then layers every setting
-// through the precedence chain. It is split from Resolve so the precedence stays
-// unit-testable with an in-memory manifest.
+// resolveManifest assembles a *Result from an already-loaded manifest: it computes
+// the project layer, then delegates to the envmerge and runner param builders that
+// layer each setting through the precedence chain. It is split from Resolve so the
+// precedence stays unit-testable with an in-memory manifest.
 func resolveManifest(mc manifestContext, in *Input) (*Result, error) {
 	// Compute the project layer (settings + includes) from the manifest context.
-	proj, includes, err := projectLayer(mc)
+	layer, err := resolveProjectLayer(mc)
 	if err != nil {
 		return nil, err
 	}
 
-	p := newPrecedence()
 	return &Result{
-		Envmerge: envmerge.Params{
-			Includes:     includes,
-			Environments: mc.manifest.Environments,
-			Settings:     resolveSettings(p, in, proj, mc.manifest.Settings),
-		},
-		Runner: runner.Params{
-			Overload: p.Bool(
-				&schema.Overload, in.Overload, proj.Overload, mc.manifest.Settings.Overload,
-			),
-		},
+		Envmerge:        resolveEnvmergeParams(mc, in, layer),
+		Runner:          resolveRunnerParams(mc, in, layer),
 		manifestContext: mc,
 	}, nil
 }
 
 // -------------------------------------------------------------------------------------
 
-// projectLayer returns the project's settings and its includes resolved to
-// absolute paths. An empty project contributes the zero settings and no includes
-// (the global-only context); a named project absent from the manifest is an error.
-func projectLayer(mc manifestContext) (schema.Settings, []string, error) {
-	// Empty project returns zero settings and no includes (the global-only context).
+// projectLayer is the project's contribution to resolution: its setting overrides
+// and its includes resolved to absolute paths. The zero value is the global-only
+// context — no overrides and no includes.
+type projectLayer struct {
+	// settings are the project-level setting overrides layered over the global ones.
+	settings schema.Settings
+	// includes are the project's namespaces resolved to absolute paths.
+	includes []string
+}
+
+// -------------------------------------------------------------------------------------
+
+// resolveProjectLayer computes the project layer from the manifest context. An
+// empty project yields the zero layer (the global-only context); a named project
+// absent from the manifest is an error.
+func resolveProjectLayer(mc manifestContext) (projectLayer, error) {
+	// Empty project yields the zero layer (the global-only context).
 	if mc.project == "" {
-		return schema.Settings{}, nil, nil
+		return projectLayer{}, nil
 	}
 
 	// Look up the project in the manifest.
-	p, ok := mc.manifest.LookupProject(mc.project)
+	proj, ok := mc.manifest.LookupProject(mc.project)
 	if !ok {
-		return schema.Settings{}, nil, fmt.Errorf(
+		return projectLayer{}, fmt.Errorf(
 			"project %q not found in manifest", mc.project,
 		)
 	}
 
 	// Resolve the project's includes to absolute paths.
-	includes := make([]string, len(p.Includes))
-	for i, inc := range p.Includes {
+	includes := make([]string, len(proj.Includes))
+	for i, inc := range proj.Includes {
 		includes[i] = filepath.Join(mc.dir, inc)
 	}
 
-	// Return the project's settings and resolved includes.
-	return p.Settings, includes, nil
+	return projectLayer{settings: proj.Settings, includes: includes}, nil
 }
 
 // -------------------------------------------------------------------------------------
 
-// resolveSettings layers each envmerge setting through the precedence chain
-// explicit (input) > ENVX_* > project > global, leaving terminal defaults (such as
-// the first-declared environment) to envmerge downstream.
-func resolveSettings(
-	p *precedence, in *Input, proj, global schema.Settings,
-) envmerge.Settings {
-	return envmerge.Settings{
-		Env:    p.String(&schema.Env, in.Env, proj.Env, global.Env),
-		Strict: p.Bool(&schema.Strict, in.Strict, proj.Strict, global.Strict),
-		Prefix: p.String(&schema.Prefix, in.Prefix, proj.Prefix, global.Prefix),
-		Suffix: p.String(&schema.Suffix, in.Suffix, proj.Suffix, global.Suffix),
-		NamespacePrefix: p.Bool(
-			&schema.NamespacePrefix, in.NamespacePrefix,
-			proj.NamespacePrefix, global.NamespacePrefix,
+// resolveEnvmergeParams builds the envmerge input: the project's includes, the
+// declared environments, and every setting layered through the precedence chain
+// explicit (input) > ENVX_* > project > global. Terminal defaults (such as the
+// first-declared environment) are left to envmerge downstream.
+func resolveEnvmergeParams(
+	mc manifestContext, in *Input, layer projectLayer,
+) envmerge.Params {
+	proj, global := layer.settings, mc.manifest.Settings
+	return envmerge.Params{
+		Includes:     layer.includes,
+		Environments: mc.manifest.Environments,
+		Settings: envmerge.Settings{
+			Env:    precedenceString(&schema.Env, in.Env, proj.Env, global.Env),
+			Strict: precedenceBool(&schema.Strict, in.Strict, proj.Strict, global.Strict),
+			Prefix: precedenceString(&schema.Prefix, in.Prefix, proj.Prefix, global.Prefix),
+			Suffix: precedenceString(&schema.Suffix, in.Suffix, proj.Suffix, global.Suffix),
+			NamespacePrefix: precedenceBool(
+				&schema.NamespacePrefix, in.NamespacePrefix,
+				proj.NamespacePrefix, global.NamespacePrefix,
+			),
+		},
+	}
+}
+
+// -------------------------------------------------------------------------------------
+
+// resolveRunnerParams builds the runner input: the overload knob layered through
+// the precedence chain explicit (input) > ENVX_OVERLOAD > project > global.
+func resolveRunnerParams(
+	mc manifestContext, in *Input, layer projectLayer,
+) runner.Params {
+	return runner.Params{
+		Overload: precedenceBool(
+			&schema.Overload, in.Overload,
+			layer.settings.Overload, mc.manifest.Settings.Overload,
 		),
 	}
 }

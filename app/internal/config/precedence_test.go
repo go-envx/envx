@@ -29,22 +29,20 @@ func TestPrecedenceString(t *testing.T) {
 
 	t.Run("explicit wins", func(t *testing.T) {
 		t.Setenv(spec.Env, "from-env")
-		p := newPrecedence()
-		if got := p.String(&spec, strPtr("from-flag"), "layer"); got != "from-flag" {
+		got := precedenceString(&spec, strPtr("from-flag"), "layer")
+		if got != "from-flag" {
 			t.Errorf("got %q, want from-flag", got)
 		}
 	})
 	t.Run("env wins over layers", func(t *testing.T) {
 		t.Setenv(spec.Env, "from-env")
-		p := newPrecedence()
-		if got := p.String(&spec, nil, "layer"); got != "from-env" {
+		if got := precedenceString(&spec, nil, "layer"); got != "from-env" {
 			t.Errorf("got %q, want from-env", got)
 		}
 	})
 	t.Run("first non-empty layer", func(t *testing.T) {
 		unsetEnv(t, spec.Env)
-		p := newPrecedence()
-		if got := p.String(&spec, nil, "", "layer2"); got != "layer2" {
+		if got := precedenceString(&spec, nil, "", "layer2"); got != "layer2" {
 			t.Errorf("got %q, want layer2", got)
 		}
 	})
@@ -59,29 +57,25 @@ func TestPrecedenceBool(t *testing.T) {
 
 	t.Run("explicit wins", func(t *testing.T) {
 		t.Setenv(spec.Env, "false")
-		p := newPrecedence()
-		if !p.Bool(&spec, boolPtr(true), boolPtr(true)) {
+		if !precedenceBool(&spec, boolPtr(true), boolPtr(true)) {
 			t.Error("expected explicit value true to win")
 		}
 	})
 	t.Run("env parsed", func(t *testing.T) {
 		t.Setenv(spec.Env, "true")
-		p := newPrecedence()
-		if !p.Bool(&spec, nil) {
+		if !precedenceBool(&spec, nil) {
 			t.Error("expected env value true")
 		}
 	})
 	t.Run("layer pointer", func(t *testing.T) {
 		unsetEnv(t, spec.Env)
-		p := newPrecedence()
-		if !p.Bool(&spec, nil, nil, boolPtr(true)) {
+		if !precedenceBool(&spec, nil, nil, boolPtr(true)) {
 			t.Error("expected first non-nil layer true")
 		}
 	})
 	t.Run("default false", func(t *testing.T) {
 		unsetEnv(t, spec.Env)
-		p := newPrecedence()
-		if p.Bool(&spec, nil, nil) {
+		if precedenceBool(&spec, nil, nil) {
 			t.Error("expected default false")
 		}
 	})

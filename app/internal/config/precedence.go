@@ -9,25 +9,11 @@ import (
 
 // -------------------------------------------------------------------------------------
 
-// precedence applies the chain "explicit value > ENVX_* env var > layered
-// defaults". It reads each setting's ENVX_* fallback straight from its
-// schema.FlagSpec, so registration and resolution can never disagree about a
-// name.
-type precedence struct{}
-
-// -------------------------------------------------------------------------------------
-
-// newPrecedence creates a precedence.
-func newPrecedence() *precedence {
-	return &precedence{}
-}
-
-// -------------------------------------------------------------------------------------
-
-// String resolves a string setting: the explicit value wins when present, then
-// the ENVX_* var, then the first non-empty layer (e.g. project then global
-// default), and finally "".
-func (p *precedence) String(
+// precedenceString resolves a string setting: the explicit value wins when present,
+// then the ENVX_* var, then the first non-empty layer (e.g. project then global
+// default), and finally "". It reads the setting's ENVX_* fallback straight from its
+// schema.FlagSpec, so registration and resolution can never disagree about a name.
+func precedenceString(
 	s *schema.FlagSpec, explicit *string, layers ...string,
 ) string {
 	if explicit != nil {
@@ -48,10 +34,10 @@ func (p *precedence) String(
 
 // -------------------------------------------------------------------------------------
 
-// Bool resolves a boolean setting: the explicit value wins when present, then the
-// ENVX_* var (parsed), then the first non-nil layer (e.g. project then global
-// setting), and finally false.
-func (p *precedence) Bool(
+// precedenceBool resolves a boolean setting: the explicit value wins when present,
+// then the ENVX_* var (parsed), then the first non-nil layer (e.g. project then
+// global setting), and finally false.
+func precedenceBool(
 	s *schema.FlagSpec, explicit *bool, layers ...*bool,
 ) bool {
 	if explicit != nil {
