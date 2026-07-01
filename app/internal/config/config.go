@@ -52,6 +52,18 @@ type manifestContext struct {
 
 // -------------------------------------------------------------------------------------
 
+// projectLayer is the project's contribution to resolution: its setting overrides
+// and its includes resolved to absolute paths. The zero value is the global-only
+// context — no overrides and no includes.
+type projectLayer struct {
+	// settings are the project-level setting overrides layered over the global ones.
+	settings schema.Settings
+	// includes are the project's namespaces resolved to absolute paths.
+	includes []string
+}
+
+// -------------------------------------------------------------------------------------
+
 // Resolve loads the manifest (honoring --config, then ENVX_CONFIG, then a walk-up
 // search) and meshes it with the input's values and ENVX_* vars into a single
 // *Result, applying the precedence explicit > ENVX_* > project > global. An
@@ -119,18 +131,6 @@ func resolveManifest(mc manifestContext, in *Input) (*Result, error) {
 
 // -------------------------------------------------------------------------------------
 
-// projectLayer is the project's contribution to resolution: its setting overrides
-// and its includes resolved to absolute paths. The zero value is the global-only
-// context — no overrides and no includes.
-type projectLayer struct {
-	// settings are the project-level setting overrides layered over the global ones.
-	settings schema.Settings
-	// includes are the project's namespaces resolved to absolute paths.
-	includes []string
-}
-
-// -------------------------------------------------------------------------------------
-
 // resolveProjectLayer computes the project layer from the manifest context. An
 // empty project yields the zero layer (the global-only context); a named project
 // absent from the manifest is an error.
@@ -154,7 +154,11 @@ func resolveProjectLayer(mc manifestContext) (projectLayer, error) {
 		includes[i] = filepath.Join(mc.dir, inc)
 	}
 
-	return projectLayer{settings: proj.Settings, includes: includes}, nil
+	// Return the project layer: its settings and its includes.
+	return projectLayer{
+		settings: proj.Settings,
+		includes: includes,
+	}, nil
 }
 
 // -------------------------------------------------------------------------------------
@@ -171,13 +175,30 @@ func resolveEnvmergeParams(
 		Includes:     layer.includes,
 		Environments: mc.manifest.Environments,
 		Settings: envmerge.Settings{
-			Env:    precedenceString(&schema.Env, in.Env, proj.Env, global.Env),
-			Strict: precedenceBool(&schema.Strict, in.Strict, proj.Strict, global.Strict),
-			Prefix: precedenceString(&schema.Prefix, in.Prefix, proj.Prefix, global.Prefix),
-			Suffix: precedenceString(&schema.Suffix, in.Suffix, proj.Suffix, global.Suffix),
-			NamespacePrefix: precedenceBool(
-				&schema.NamespacePrefix, in.NamespacePrefix,
-				proj.NamespacePrefix, global.NamespacePrefix,
+			Env:    precedenceString(&schema.Env,
+				in.Env,
+				proj.Env,
+				global.Env,
+			),
+			Strict: precedenceBool(&schema.Strict,
+				in.Strict,
+				proj.Strict,
+				global.Strict,
+			),
+			Prefix: precedenceString(&schema.Prefix,
+				in.Prefix,
+				proj.Prefix,
+				global.Prefix,
+			),
+			Suffix: precedenceString(&schema.Suffix,
+				in.Suffix,
+				proj.Suffix,
+				global.Suffix,
+			),
+			NamespacePrefix: precedenceBool(&schema.NamespacePrefix,
+				in.NamespacePrefix,
+				proj.NamespacePrefix,
+				global.NamespacePrefix,
 			),
 		},
 	}
@@ -191,9 +212,10 @@ func resolveRunnerParams(
 	mc manifestContext, in *Input, layer projectLayer,
 ) runner.Params {
 	return runner.Params{
-		Overload: precedenceBool(
-			&schema.Overload, in.Overload,
-			layer.settings.Overload, mc.manifest.Settings.Overload,
+		Overload: precedenceBool(&schema.Overload,
+			in.Overload,
+			layer.settings.Overload,
+			mc.manifest.Settings.Overload,
 		),
 	}
 }
