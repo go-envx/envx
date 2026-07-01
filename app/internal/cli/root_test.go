@@ -270,33 +270,49 @@ func TestExplain(t *testing.T) {
 
 // -------------------------------------------------------------------------------------
 
-// TestDiff verifies diff reports changed keys across two environments.
+// TestDiff verifies diff reports changed keys across two environments and honors
+// --reveal (values shown) versus the default (values masked) — locking that diff
+// both registers and reads the display flags.
 func TestDiff(t *testing.T) {
 	t.Parallel()
 
 	cfg := fixtures.Manifest("basic")
-	stdout, _, err := execCmd(
-		"diff", "--config", cfg, "--reveal", "--output", "json",
-		"api-core", "development", "production",
-	)
-	if err != nil {
-		t.Fatalf("diff: %v", err)
+
+	// changedHost runs diff for api-core development->production and returns the
+	// env_a value of the HOST change, which differs between the two environments.
+	changedHost := func(t *testing.T, args ...string) string {
+		t.Helper()
+		full := append([]string{"diff", "--config", cfg, "--output", "json"}, args...)
+		full = append(full, "api-core", "development", "production")
+		stdout, _, err := execCmd(full...)
+		if err != nil {
+			t.Fatalf("diff: %v", err)
+		}
+		var result struct {
+			Changed []map[string]string `json:"changed"`
+		}
+		if err := json.Unmarshal(stdout.Bytes(), &result); err != nil {
+			t.Fatalf("invalid json: %v\n%s", err, stdout.String())
+		}
+		for _, c := range result.Changed {
+			if c["key"] == "HOST" {
+				return c["env_a"]
+			}
+		}
+		t.Fatalf("expected HOST among changed keys, got %v", result.Changed)
+		return ""
 	}
 
-	var result struct {
-		Added   []map[string]string `json:"added"`
-		Removed []map[string]string `json:"removed"`
-		Changed []map[string]string `json:"changed"`
-	}
-	if err := json.Unmarshal(stdout.Bytes(), &result); err != nil {
-		t.Fatalf("invalid json: %v\n%s", err, stdout.String())
-	}
-
-	changedKeys := make(map[string]struct{})
-	for _, c := range result.Changed {
-		changedKeys[c["key"]] = struct{}{}
-	}
-	if _, ok := changedKeys["HOST"]; !ok {
-		t.Errorf("expected HOST among changed keys, got %v", result.Changed)
-	}
+	t.Run("reveal shows values", func(t *testing.T) {
+		t.Parallel()
+		if got := changedHost(t, "--reveal"); got != "dev-db.local" {
+			t.Errorf("env_a = %q, want dev-db.local (revealed)", got)
+		}
+	})
+	t.Run("masks by default", func(t *testing.T) {
+		t.Parallel()
+		if got := changedHost(t); got != "********" {
+			t.Errorf("env_a = %q, want masked", got)
+		}
+	})
 }

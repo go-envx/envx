@@ -1,7 +1,6 @@
 package explain
 
 import (
-	"github.com/go-envx/envx/app/internal/config"
 	"github.com/go-envx/envx/app/internal/flags"
 	"github.com/go-envx/envx/app/internal/schema"
 	"github.com/go-envx/envx/app/pkg/arg"
@@ -33,9 +32,8 @@ const (
 // params/config, executes the action, and renders the result in the specified format.
 // It accepts a project and an optional key. If the key is present it explains just
 // that key. If the key is absent it explains all keys.
-func NewCommand(configPath *string) *cobra.Command {
+func NewCommand() *cobra.Command {
 	var (
-		cfg    actionConfig
 		reveal bool
 		output string
 	)
@@ -54,7 +52,7 @@ func NewCommand(configPath *string) *cobra.Command {
 			}
 
 			// execute the action
-			in := cfg.input(cmd, configPath)
+			in := flags.GetInput(cmd.Flags())
 			res, err := execute(p, in)
 			if err != nil {
 				return err
@@ -70,27 +68,14 @@ func NewCommand(configPath *string) *cobra.Command {
 		},
 	}
 
-	flags.BindBool(cmd, &cfg.Strict, &schema.Strict)
-	flags.BindString(cmd, &cfg.Prefix, &schema.Prefix)
-	flags.BindString(cmd, &cfg.Suffix, &schema.Suffix)
-	flags.BindBool(cmd, &cfg.NamespacePrefix, &schema.NamespacePrefix)
-	flags.BindString(cmd, &cfg.Env, &schema.Env)
-	flags.BindBool(cmd, &reveal, &schema.Reveal)
-	flags.BindString(cmd, &output, &schema.Output)
+	flags.Register(cmd.Flags(),
+		flags.WithEnv,
+		flags.WithStrict,
+		flags.WithPrefix,
+		flags.WithSuffix,
+		flags.WithNamespacePrefix,
+	)
+	flags.BindBool(cmd.Flags(), &reveal, &schema.Reveal)
+	flags.BindString(cmd.Flags(), &output, &schema.Output)
 	return cmd
-}
-
-// -------------------------------------------------------------------------------------
-
-// input gathers the explicitly-set flags into a *config.Input for resolution,
-// marking each setting present only when the user changed it on the command line.
-func (c *actionConfig) input(cmd *cobra.Command, configPath *string) *config.Input {
-	return &config.Input{
-		ConfigPath:      configPath,
-		Env:             flags.OptionalString(cmd, &schema.Env, c.Env),
-		Strict:          flags.OptionalBool(cmd, &schema.Strict, c.Strict),
-		Prefix:          flags.OptionalString(cmd, &schema.Prefix, c.Prefix),
-		Suffix:          flags.OptionalString(cmd, &schema.Suffix, c.Suffix),
-		NamespacePrefix: flags.OptionalBool(cmd, &schema.NamespacePrefix, c.NamespacePrefix),
-	}
 }

@@ -21,24 +21,6 @@ type actionParams struct {
 
 // -------------------------------------------------------------------------------------
 
-// actionConfig is the explain action's configurable surface: the envmerge
-// settings it resolves. Display knobs (--reveal, --output) bind to command-local
-// vars since they shape rendering, not resolution.
-type actionConfig struct {
-	// Env is the target environment to resolve.
-	Env string
-	// Strict requires every overlay file in the namespace chain to exist.
-	Strict bool
-	// Prefix is prepended to every resolved key.
-	Prefix string
-	// Suffix is appended to every resolved key.
-	Suffix string
-	// NamespacePrefix prefixes each key with its namespace name.
-	NamespacePrefix bool
-}
-
-// -------------------------------------------------------------------------------------
-
 // actionResult is the data the explain action returns.
 type actionResult struct {
 	// Entries is the per-key explanation rows.

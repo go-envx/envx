@@ -1,6 +1,6 @@
 // Package config is the resolution pipeline: it meshes the user's optional input
 // values, ENVX_* environment variables, and the loaded manifest into a single
-// resolved *Resolved, applying the precedence explicit > ENVX_* > project >
+// resolved *Result, applying the precedence explicit > ENVX_* > project >
 // global. One Resolve call loads the manifest once and returns the aggregate
 // (the envmerge.Params plus the resolved overload knob); actions read the fields
 // they need. It is framework-agnostic — no cobra — taking presence as an optional

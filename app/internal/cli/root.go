@@ -7,7 +7,6 @@ import (
 	"github.com/go-envx/envx/app/internal/actions/run"
 	"github.com/go-envx/envx/app/internal/actions/set"
 	"github.com/go-envx/envx/app/internal/flags"
-	"github.com/go-envx/envx/app/internal/schema"
 	"github.com/spf13/cobra"
 )
 
@@ -18,12 +17,10 @@ const (
 
 // -------------------------------------------------------------------------------------
 
-// NewRootCmd builds the command tree. It registers the persistent --config flag
-// and forwards its address to every action, which loads and resolves the
-// manifest on demand. version is injected from main at build time.
+// NewRootCmd builds the command tree. It registers the persistent --config flag,
+// which every action reads back through flags.GetInput to locate the manifest.
+// version is injected from main at build time.
 func NewRootCmd(version string) *cobra.Command {
-	var configPath string
-
 	root := &cobra.Command{
 		Use:           rootUsage,
 		Short:         rootShort,
@@ -35,14 +32,16 @@ func NewRootCmd(version string) *cobra.Command {
 		},
 	}
 
-	flags.BindPersistentString(root, &configPath, &schema.Config)
+	flags.Register(root.PersistentFlags(),
+		flags.WithConfig,
+	)
 
 	root.AddCommand(
-		get.NewCommand(&configPath),
-		run.NewCommand(&configPath),
-		set.NewCommand(&configPath),
-		explain.NewCommand(&configPath),
-		diff.NewCommand(&configPath),
+		get.NewCommand(),
+		run.NewCommand(),
+		set.NewCommand(),
+		explain.NewCommand(),
+		diff.NewCommand(),
 	)
 	return root
 }

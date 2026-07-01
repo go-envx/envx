@@ -1,9 +1,7 @@
 package set
 
 import (
-	"github.com/go-envx/envx/app/internal/config"
 	"github.com/go-envx/envx/app/internal/flags"
-	"github.com/go-envx/envx/app/internal/schema"
 	"github.com/go-envx/envx/app/pkg/str"
 	"github.com/spf13/cobra"
 )
@@ -33,9 +31,7 @@ const (
 
 // NewCommand builds the "set" command, which parses args into the action's
 // params/config and executes the action.
-func NewCommand(configPath *string) *cobra.Command {
-	var cfg actionConfig
-
+func NewCommand() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     usage,
 		Short:   short,
@@ -51,22 +47,11 @@ func NewCommand(configPath *string) *cobra.Command {
 			}
 
 			// execute the action
-			in := cfg.input(cmd, configPath)
+			in := flags.GetInput(cmd.Flags())
 			return execute(p, in)
 		},
 	}
 
-	flags.BindString(cmd, &cfg.Env, &schema.Env)
+	flags.Register(cmd.Flags(), flags.WithEnv)
 	return cmd
-}
-
-// -------------------------------------------------------------------------------------
-
-// input gathers the explicitly-set flags into a *config.Input for resolution,
-// marking --env present only when the user changed it on the command line.
-func (c *actionConfig) input(cmd *cobra.Command, configPath *string) *config.Input {
-	return &config.Input{
-		ConfigPath: configPath,
-		Env:        flags.OptionalString(cmd, &schema.Env, c.Env),
-	}
 }

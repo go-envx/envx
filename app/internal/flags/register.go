@@ -2,56 +2,92 @@ package flags
 
 import (
 	"github.com/go-envx/envx/app/internal/schema"
-	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
 )
 
 // -------------------------------------------------------------------------------------
 
-// BindString registers spec as a string flag on cmd's local flag set, sourcing
-// the name, shorthand, and usage from the spec so registration can never
-// disagree with resolution, and writes the parsed value into dst.
-func BindString(cmd *cobra.Command, dst *string, spec *schema.FlagSpec) {
-	cmd.Flags().StringVarP(dst, spec.Name, spec.Short, "", spec.HelpText())
-}
+// Option registers one setting's flag on a flag set. Each action lists the options
+// it wants explicitly, so a command's flag surface is visible at its registration
+// site rather than hidden behind a bundle.
+type Option func(*pflag.FlagSet)
 
 // -------------------------------------------------------------------------------------
 
-// BindBool registers spec as a bool flag on cmd's local flag set, sourcing the
-// name, shorthand, and usage from the spec so registration can never
-// disagree with resolution, and writes the parsed value into dst.
-func BindBool(cmd *cobra.Command, dst *bool, spec *schema.FlagSpec) {
-	cmd.Flags().BoolVarP(dst, spec.Name, spec.Short, false, spec.HelpText())
-}
-
-// -------------------------------------------------------------------------------------
-
-// BindPersistentString registers spec as a persistent string flag on cmd (so it
-// applies to every subcommand), sourcing the name, shorthand, and usage
-// from the spec, and writes the parsed value into dst. It is the persistent
-// counterpart to BindString, used for root-level flags like --config.
-func BindPersistentString(cmd *cobra.Command, dst *string, spec *schema.FlagSpec) {
-	cmd.PersistentFlags().StringVarP(dst, spec.Name, spec.Short, "", spec.HelpText())
-}
-
-// -------------------------------------------------------------------------------------
-
-// OptionalString returns a pointer to val when the user explicitly set spec's
-// flag on cmd, and nil otherwise. It translates cobra's changed state into the
-// optional form config.Input expects, keeping cobra knowledge at the CLI edge.
-func OptionalString(cmd *cobra.Command, spec *schema.FlagSpec, val string) *string {
-	if !cmd.Flags().Changed(spec.Name) {
-		return nil
+// Register applies each option to fs. A command chooses the scope by which flag set
+// it passes: cmd.Flags() for local flags, cmd.PersistentFlags() for the inherited
+// --config bootstrap flag.
+func Register(fs *pflag.FlagSet, opts ...Option) {
+	for _, opt := range opts {
+		opt(fs)
 	}
-	return &val
 }
 
 // -------------------------------------------------------------------------------------
 
-// OptionalBool returns a pointer to val when the user explicitly set spec's flag
-// on cmd, and nil otherwise. It is the boolean counterpart to OptionalString.
-func OptionalBool(cmd *cobra.Command, spec *schema.FlagSpec, val bool) *bool {
-	if !cmd.Flags().Changed(spec.Name) {
-		return nil
-	}
-	return &val
+// WithConfig registers the --config flag selecting the manifest. Root registers it
+// on its persistent flag set so every subcommand inherits it.
+func WithConfig(fs *pflag.FlagSet) {
+	registerString(fs, &schema.Config)
+}
+
+// -------------------------------------------------------------------------------------
+
+// WithEnv registers the --env flag, the target environment to resolve.
+func WithEnv(fs *pflag.FlagSet) {
+	registerString(fs, &schema.Env)
+}
+
+// -------------------------------------------------------------------------------------
+
+// WithStrict registers the --strict flag, requiring every overlay file to exist.
+func WithStrict(fs *pflag.FlagSet) {
+	registerBool(fs, &schema.Strict)
+}
+
+// -------------------------------------------------------------------------------------
+
+// WithPrefix registers the --prefix flag, prepended to every resolved key.
+func WithPrefix(fs *pflag.FlagSet) {
+	registerString(fs, &schema.Prefix)
+}
+
+// -------------------------------------------------------------------------------------
+
+// WithSuffix registers the --suffix flag, appended to every resolved key.
+func WithSuffix(fs *pflag.FlagSet) {
+	registerString(fs, &schema.Suffix)
+}
+
+// -------------------------------------------------------------------------------------
+
+// WithNamespacePrefix registers the --namespace-prefix flag, prefixing each key
+// with its namespace name.
+func WithNamespacePrefix(fs *pflag.FlagSet) {
+	registerBool(fs, &schema.NamespacePrefix)
+}
+
+// -------------------------------------------------------------------------------------
+
+// WithOverload registers the --overload flag, letting file values win over OS env
+// vars; only run hands the merged environment to the runner.
+func WithOverload(fs *pflag.FlagSet) {
+	registerBool(fs, &schema.Overload)
+}
+
+// -------------------------------------------------------------------------------------
+
+// registerString registers spec as a dest-less string flag on fs, delegating to
+// BindString and discarding the destination since GetInput reads the value back
+// from the flag set.
+func registerString(fs *pflag.FlagSet, spec *schema.FlagSpec) {
+	BindString(fs, new(string), spec)
+}
+
+// -------------------------------------------------------------------------------------
+
+// registerBool registers spec as a dest-less bool flag on fs, the boolean
+// counterpart to registerString.
+func registerBool(fs *pflag.FlagSet, spec *schema.FlagSpec) {
+	BindBool(fs, new(bool), spec)
 }

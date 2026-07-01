@@ -25,17 +25,6 @@ type actionParams struct {
 
 // -------------------------------------------------------------------------------------
 
-// actionConfig is the set action's configurable surface. set only resolves --env
-// (plus the persistent --config) since it mutates a single overlay file rather
-// than merging an environment; Resolved.OverlayPath turns the resolution into the
-// target overlay path.
-type actionConfig struct {
-	// Env is the target environment whose overlay file is written.
-	Env string
-}
-
-// -------------------------------------------------------------------------------------
-
 // execute is the imperative shell: it resolves the target overlay (environment +
 // include path) via config, reads the current document, applies the pure
 // transform, and writes the result back atomically. set never invokes envmerge

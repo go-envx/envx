@@ -3,182 +3,44 @@ package flags
 import (
 	"testing"
 
-	"github.com/go-envx/envx/app/internal/schema"
-	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
 )
 
 // -------------------------------------------------------------------------------------
 
-// newTestCmd returns a no-op command suitable for binding flags onto in tests.
-func newTestCmd() *cobra.Command {
-	return &cobra.Command{Use: "x", RunE: func(*cobra.Command, []string) error {
-		return nil
-	}}
+// newFlags returns an empty flag set suitable for registering onto in tests.
+func newFlags() *pflag.FlagSet {
+	return pflag.NewFlagSet("test", pflag.ContinueOnError)
 }
 
 // -------------------------------------------------------------------------------------
 
-// TestBindEnvmergeSettingFlags verifies the generic binders register the envmerge-
-// setting specs onto a command and that parsing writes through to their
-// destinations.
-func TestBindEnvmergeSettingFlags(t *testing.T) {
+// TestRegisterAndGetInput verifies Register + GetInput round-trip the explicitly-set
+// option flags into a *config.Input, leaving unset and unregistered flags nil.
+func TestRegisterAndGetInput(t *testing.T) {
 	t.Parallel()
 
-	var (
-		strict, nsPrefix bool
-		prefix, suffix   string
-	)
-	cmd := newTestCmd()
-	BindBool(cmd, &strict, &schema.Strict)
-	BindString(cmd, &prefix, &schema.Prefix)
-	BindString(cmd, &suffix, &schema.Suffix)
-	BindBool(cmd, &nsPrefix, &schema.NamespacePrefix)
-
-	for _, name := range []string{
-		schema.Strict.Name, schema.Prefix.Name, schema.Suffix.Name,
-		schema.NamespacePrefix.Name,
-	} {
-		if cmd.Flags().Lookup(name) == nil {
-			t.Errorf("flag %q was not registered", name)
-		}
+	fs := newFlags()
+	Register(fs, WithEnv, WithStrict, WithPrefix, WithSuffix, WithNamespacePrefix)
+	args := []string{"--env", "production", "--prefix", "APP", "--strict"}
+	if err := fs.Parse(args); err != nil {
+		t.Fatalf("parse: %v", err)
 	}
 
-	cmd.SetArgs([]string{
-		"--strict", "--prefix", "APP", "--suffix", "V2", "--namespace-prefix",
-	})
-	if err := cmd.Execute(); err != nil {
-		t.Fatalf("execute: %v", err)
+	in := GetInput(fs)
+	if in.Env == nil || *in.Env != "production" {
+		t.Errorf("Env = %v, want production", in.Env)
 	}
-
-	if !strict || !nsPrefix {
-		t.Errorf("bool flags not applied: strict=%v nsPrefix=%v", strict, nsPrefix)
+	if in.Prefix == nil || *in.Prefix != "APP" {
+		t.Errorf("Prefix = %v, want APP", in.Prefix)
 	}
-	if prefix != "APP" || suffix != "V2" {
-		t.Errorf("string flags not applied: prefix=%q suffix=%q", prefix, suffix)
+	if in.Strict == nil || !*in.Strict {
+		t.Errorf("Strict = %v, want true", in.Strict)
 	}
-}
-
-// -------------------------------------------------------------------------------------
-
-// TestBindString verifies BindString binds a string flag onto a command and that
-// parsing writes through to the destination.
-func TestBindString(t *testing.T) {
-	t.Parallel()
-
-	var env string
-	cmd := newTestCmd()
-	BindString(cmd, &env, &schema.Env)
-
-	if cmd.Flags().Lookup(schema.Env.Name) == nil {
-		t.Fatalf("flag %q was not registered", schema.Env.Name)
+	if in.Suffix != nil {
+		t.Errorf("Suffix = %v, want nil (unset)", in.Suffix)
 	}
-	cmd.SetArgs([]string{"--env", "production"})
-	if err := cmd.Execute(); err != nil {
-		t.Fatalf("execute: %v", err)
+	if in.Overload != nil {
+		t.Errorf("Overload = %v, want nil (unregistered)", in.Overload)
 	}
-	if env != "production" {
-		t.Errorf("env = %q, want production", env)
-	}
-}
-
-// -------------------------------------------------------------------------------------
-
-// TestBindEnvDefault verifies --env advertises no static default: with nothing set
-// the bound value stays empty, leaving the terminal fallback (the first declared
-// environment) to resolution.
-func TestBindEnvDefault(t *testing.T) {
-	t.Parallel()
-
-	var env string
-	cmd := newTestCmd()
-	BindString(cmd, &env, &schema.Env)
-
-	if err := cmd.Execute(); err != nil {
-		t.Fatalf("execute: %v", err)
-	}
-	if env != "" {
-		t.Errorf("env default = %q, want empty", env)
-	}
-}
-
-// -------------------------------------------------------------------------------------
-
-// TestBindPersistentString verifies BindPersistentString binds a persistent flag
-// so it applies to subcommands.
-func TestBindPersistentString(t *testing.T) {
-	t.Parallel()
-
-	var path string
-	cmd := newTestCmd()
-	BindPersistentString(cmd, &path, &schema.Config)
-
-	if cmd.PersistentFlags().Lookup(schema.Config.Name) == nil {
-		t.Fatalf("flag %q was not registered as persistent", schema.Config.Name)
-	}
-}
-
-// -------------------------------------------------------------------------------------
-
-// TestOptionalString verifies OptionalString returns nil until the flag is
-// explicitly set, then a pointer to the parsed value.
-func TestOptionalString(t *testing.T) {
-	t.Parallel()
-
-	t.Run("unset is nil", func(t *testing.T) {
-		var prefix string
-		cmd := newTestCmd()
-		BindString(cmd, &prefix, &schema.Prefix)
-		if err := cmd.Execute(); err != nil {
-			t.Fatalf("execute: %v", err)
-		}
-		if got := OptionalString(cmd, &schema.Prefix, prefix); got != nil {
-			t.Errorf("got %v, want nil", got)
-		}
-	})
-	t.Run("set returns pointer", func(t *testing.T) {
-		var prefix string
-		cmd := newTestCmd()
-		BindString(cmd, &prefix, &schema.Prefix)
-		cmd.SetArgs([]string{"--prefix", "APP"})
-		if err := cmd.Execute(); err != nil {
-			t.Fatalf("execute: %v", err)
-		}
-		got := OptionalString(cmd, &schema.Prefix, prefix)
-		if got == nil || *got != "APP" {
-			t.Errorf("got %v, want pointer to APP", got)
-		}
-	})
-}
-
-// -------------------------------------------------------------------------------------
-
-// TestOptionalBool verifies OptionalBool returns nil until the flag is explicitly
-// set, then a pointer to the parsed value.
-func TestOptionalBool(t *testing.T) {
-	t.Parallel()
-
-	t.Run("unset is nil", func(t *testing.T) {
-		var strict bool
-		cmd := newTestCmd()
-		BindBool(cmd, &strict, &schema.Strict)
-		if err := cmd.Execute(); err != nil {
-			t.Fatalf("execute: %v", err)
-		}
-		if got := OptionalBool(cmd, &schema.Strict, strict); got != nil {
-			t.Errorf("got %v, want nil", got)
-		}
-	})
-	t.Run("set returns pointer", func(t *testing.T) {
-		var strict bool
-		cmd := newTestCmd()
-		BindBool(cmd, &strict, &schema.Strict)
-		cmd.SetArgs([]string{"--strict"})
-		if err := cmd.Execute(); err != nil {
-			t.Fatalf("execute: %v", err)
-		}
-		got := OptionalBool(cmd, &schema.Strict, strict)
-		if got == nil || !*got {
-			t.Errorf("got %v, want pointer to true", got)
-		}
-	})
 }

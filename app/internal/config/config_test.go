@@ -1,7 +1,6 @@
 package config
 
 import (
-	"path/filepath"
 	"testing"
 
 	"github.com/go-envx/envx/app/internal/fixtures"
@@ -9,14 +8,17 @@ import (
 )
 
 // -------------------------------------------------------------------------------------
+
 // strPtr returns a pointer to s, for building optional Input values in tests.
 func strPtr(s string) *string { return &s }
 
 // -------------------------------------------------------------------------------------
+
 // boolPtr returns a pointer to b, for building optional Input values in tests.
 func boolPtr(b bool) *bool { return &b }
 
 // -------------------------------------------------------------------------------------
+
 // testManifest builds an in-memory manifest with global and project-level env
 // settings for exercising the precedence chain.
 func testManifest() *schema.Manifest {
@@ -34,6 +36,7 @@ func testManifest() *schema.Manifest {
 }
 
 // -------------------------------------------------------------------------------------
+
 // TestResolveManifest verifies project lookup, the env precedence (explicit >
 // project > global), setting layering, and pass-through of includes/environments
 // into the envmerge.Params against an in-memory manifest. An empty project
@@ -43,7 +46,10 @@ func TestResolveManifest(t *testing.T) {
 	m := testManifest()
 
 	t.Run("explicit wins", func(t *testing.T) {
-		r, err := resolveManifest(m, "", &Input{Env: strPtr("from-flag")}, "api")
+		r, err := resolveManifest(
+			manifestContext{manifest: m, project: "api"},
+			&Input{Env: strPtr("from-flag")},
+		)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -52,7 +58,7 @@ func TestResolveManifest(t *testing.T) {
 		}
 	})
 	t.Run("project default", func(t *testing.T) {
-		r, err := resolveManifest(m, "", &Input{}, "api")
+		r, err := resolveManifest(manifestContext{manifest: m, project: "api"}, &Input{})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -61,7 +67,7 @@ func TestResolveManifest(t *testing.T) {
 		}
 	})
 	t.Run("global default", func(t *testing.T) {
-		r, err := resolveManifest(m, "", &Input{}, "web")
+		r, err := resolveManifest(manifestContext{manifest: m, project: "web"}, &Input{})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -76,7 +82,7 @@ func TestResolveManifest(t *testing.T) {
 				"api": {Includes: []string{"env/x"}},
 			},
 		}
-		r, err := resolveManifest(bare, "", &Input{}, "api")
+		r, err := resolveManifest(manifestContext{manifest: bare, project: "api"}, &Input{})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -88,9 +94,9 @@ func TestResolveManifest(t *testing.T) {
 		}
 	})
 	t.Run("settings and includes pass through", func(t *testing.T) {
-		r, err := resolveManifest(m, "", &Input{
+		r, err := resolveManifest(manifestContext{manifest: m, project: "api"}, &Input{
 			Prefix: strPtr("APP"), Strict: boolPtr(true),
-		}, "api")
+		})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -105,12 +111,13 @@ func TestResolveManifest(t *testing.T) {
 		}
 	})
 	t.Run("unknown project errors", func(t *testing.T) {
-		if _, err := resolveManifest(m, "", &Input{}, "ghost"); err == nil {
+		_, err := resolveManifest(manifestContext{manifest: m, project: "ghost"}, &Input{})
+		if err == nil {
 			t.Error("expected error for unknown project")
 		}
 	})
 	t.Run("empty project resolves global only", func(t *testing.T) {
-		r, err := resolveManifest(m, "", &Input{}, "")
+		r, err := resolveManifest(manifestContext{manifest: m, project: ""}, &Input{})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -124,6 +131,7 @@ func TestResolveManifest(t *testing.T) {
 }
 
 // -------------------------------------------------------------------------------------
+
 // TestOverloadResolution verifies overload now layers through the manifest
 // (explicit > project > global), the precedence that was previously dropped.
 func TestOverloadResolution(t *testing.T) {
@@ -144,38 +152,47 @@ func TestOverloadResolution(t *testing.T) {
 
 	t.Run("explicit wins over manifest", func(t *testing.T) {
 		r, err := resolveManifest(
-			manifestWith(boolPtr(false), nil), "", &Input{Overload: boolPtr(true)}, "api",
+			manifestContext{manifest: manifestWith(boolPtr(false), nil), project: "api"},
+			&Input{Overload: boolPtr(true)},
 		)
 		if err != nil {
 			t.Fatal(err)
 		}
-		if !r.Overload {
+		if !r.Runner.Overload {
 			t.Error("explicit overload true should win")
 		}
 	})
 	t.Run("manifest global layer honored", func(t *testing.T) {
-		r, err := resolveManifest(manifestWith(boolPtr(true), nil), "", &Input{}, "api")
+		r, err := resolveManifest(
+			manifestContext{manifest: manifestWith(boolPtr(true), nil), project: "api"},
+			&Input{},
+		)
 		if err != nil {
 			t.Fatal(err)
 		}
-		if !r.Overload {
+		if !r.Runner.Overload {
 			t.Error("manifest global overload=true should be honored")
 		}
 	})
 	t.Run("project layer over global", func(t *testing.T) {
 		r, err := resolveManifest(
-			manifestWith(boolPtr(false), boolPtr(true)), "", &Input{}, "api",
+			manifestContext{
+				manifest: manifestWith(boolPtr(false), boolPtr(true)),
+				project:  "api",
+			},
+			&Input{},
 		)
 		if err != nil {
 			t.Fatal(err)
 		}
-		if !r.Overload {
+		if !r.Runner.Overload {
 			t.Error("project overload=true should win over global false")
 		}
 	})
 }
 
 // -------------------------------------------------------------------------------------
+
 // TestResolve verifies the facade loads the manifest from the input's config path
 // and resolves a known fixture project end to end.
 func TestResolve(t *testing.T) {
@@ -192,133 +209,28 @@ func TestResolve(t *testing.T) {
 }
 
 // -------------------------------------------------------------------------------------
+
 // TestManifestPath verifies the manifest-location precedence: --config flag wins,
 // then ENVX_CONFIG, then empty (which defers to the manifest walk-up).
 func TestManifestPath(t *testing.T) {
 	t.Run("flag wins over env", func(t *testing.T) {
 		t.Setenv(schema.Config.Env, "from-env")
 		flag := "from-flag"
-		if got := manifestPath(&Input{ConfigPath: &flag}); got != "from-flag" {
+		if got := resolveManifestPath(&Input{ConfigPath: &flag}); got != "from-flag" {
 			t.Errorf("got %q, want from-flag", got)
 		}
 	})
 	t.Run("env when flag empty", func(t *testing.T) {
 		t.Setenv(schema.Config.Env, "from-env")
 		empty := ""
-		if got := manifestPath(&Input{ConfigPath: &empty}); got != "from-env" {
+		if got := resolveManifestPath(&Input{ConfigPath: &empty}); got != "from-env" {
 			t.Errorf("got %q, want from-env", got)
 		}
 	})
 	t.Run("empty when neither set", func(t *testing.T) {
 		t.Setenv(schema.Config.Env, "")
-		if got := manifestPath(&Input{}); got != "" {
+		if got := resolveManifestPath(&Input{}); got != "" {
 			t.Errorf("got %q, want empty", got)
-		}
-	})
-}
-
-// -------------------------------------------------------------------------------------
-// TestOverlayPath verifies the set action's overlay resolution from a project-less
-// Resolve: the default environment feeds the overlay filename, and the error paths
-// for an unknown include or an undeclared environment.
-func TestOverlayPath(t *testing.T) {
-	t.Parallel()
-
-	path := fixtures.Manifest("basic")
-
-	t.Run("default env and include", func(t *testing.T) {
-		r, err := Resolve(&Input{ConfigPath: &path}, "")
-		if err != nil {
-			t.Fatalf("Resolve: %v", err)
-		}
-		target, err := r.OverlayPath("env/postgres")
-		if err != nil {
-			t.Fatalf("OverlayPath: %v", err)
-		}
-		// The basic fixture declares [development, staging, production], so the
-		// default resolves to the first declared environment.
-		if filepath.Base(target) != "postgres.development.yaml" {
-			t.Errorf("target = %q, want .../postgres.development.yaml", target)
-		}
-		if filepath.Base(filepath.Dir(target)) != "env" {
-			t.Errorf("target dir = %q, want .../env", filepath.Dir(target))
-		}
-	})
-	t.Run("unknown include errors", func(t *testing.T) {
-		r, err := Resolve(&Input{ConfigPath: &path}, "")
-		if err != nil {
-			t.Fatalf("Resolve: %v", err)
-		}
-		if _, err := r.OverlayPath("env/ghost"); err == nil {
-			t.Error("expected error for unknown include")
-		}
-	})
-	t.Run("undeclared env errors", func(t *testing.T) {
-		r, err := Resolve(&Input{ConfigPath: &path, Env: strPtr("nope")}, "")
-		if err != nil {
-			t.Fatalf("Resolve: %v", err)
-		}
-		if _, err := r.OverlayPath("env/postgres"); err == nil {
-			t.Error("expected error for undeclared environment")
-		}
-	})
-}
-
-// -------------------------------------------------------------------------------------
-// TestResolverString verifies the string precedence chain.
-func TestResolverString(t *testing.T) {
-	t.Parallel()
-
-	spec := schema.Prefix
-	t.Run("explicit wins", func(t *testing.T) {
-		r := &resolver{LookupEnv: func(string) (string, bool) { return "from-env", true }}
-		if got := r.String(&spec, strPtr("from-flag"), "layer"); got != "from-flag" {
-			t.Errorf("got %q, want from-flag", got)
-		}
-	})
-	t.Run("env wins over layers", func(t *testing.T) {
-		r := &resolver{LookupEnv: func(string) (string, bool) { return "from-env", true }}
-		if got := r.String(&spec, nil, "layer"); got != "from-env" {
-			t.Errorf("got %q, want from-env", got)
-		}
-	})
-	t.Run("first non-empty layer", func(t *testing.T) {
-		r := &resolver{LookupEnv: func(string) (string, bool) { return "", false }}
-		if got := r.String(&spec, nil, "", "layer2"); got != "layer2" {
-			t.Errorf("got %q, want layer2", got)
-		}
-	})
-}
-
-// -------------------------------------------------------------------------------------
-// TestResolverBool verifies the boolean precedence chain including pointer
-// layers.
-func TestResolverBool(t *testing.T) {
-	t.Parallel()
-
-	spec := schema.Strict
-	t.Run("explicit wins", func(t *testing.T) {
-		r := &resolver{LookupEnv: func(string) (string, bool) { return "false", true }}
-		if !r.Bool(&spec, boolPtr(true), boolPtr(true)) {
-			t.Error("expected explicit value true to win")
-		}
-	})
-	t.Run("env parsed", func(t *testing.T) {
-		r := &resolver{LookupEnv: func(string) (string, bool) { return "true", true }}
-		if !r.Bool(&spec, nil) {
-			t.Error("expected env value true")
-		}
-	})
-	t.Run("layer pointer", func(t *testing.T) {
-		r := &resolver{LookupEnv: func(string) (string, bool) { return "", false }}
-		if !r.Bool(&spec, nil, nil, boolPtr(true)) {
-			t.Error("expected first non-nil layer true")
-		}
-	})
-	t.Run("default false", func(t *testing.T) {
-		r := &resolver{LookupEnv: func(string) (string, bool) { return "", false }}
-		if r.Bool(&spec, nil, nil) {
-			t.Error("expected default false")
 		}
 	})
 }

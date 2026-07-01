@@ -1,7 +1,11 @@
-// Package flags is the cobra binding boundary: it registers schema flag specs as
-// flags on cobra commands. BindString/BindBool/BindPersistentString each read a
-// schema.FlagSpec (name, shorthand, usage) and bind the matching cobra
-// flag, writing parsed values into a caller-owned destination. Housing these
-// binders here isolates the cobra dependency, keeping the resolution and
-// spec-catalog layers framework-free.
+// Package flags translates schema flag specs into pflag flags and reads them back.
+//
+// Resolution flags flow through config: an action registers them onto a flag set
+// with Register(fs, WithEnv, WithStrict, ...) and GetInput(fs) reads them back into
+// a config.Input, sourcing values straight from the flag set so registration and
+// extraction cannot drift. A command chooses the scope by which flag set it passes
+// — cmd.Flags() for local flags, root.PersistentFlags() for the inherited --config
+// bootstrap flag. Presentation flags a command consumes directly (--reveal,
+// --output) register into a local variable via BindBool/BindString. Taking a
+// pflag.FlagSet keeps this package independent of cobra and its command tree.
 package flags

@@ -21,25 +21,6 @@ type actionParams struct {
 
 // -------------------------------------------------------------------------------------
 
-// actionConfig is the run action's configurable surface: the envmerge settings it
-// resolves before merging, plus the overload knob the runner consumes.
-type actionConfig struct {
-	// Env is the target environment to resolve.
-	Env string
-	// Strict requires every overlay file in the namespace chain to exist.
-	Strict bool
-	// Prefix is prepended to every resolved key.
-	Prefix string
-	// Suffix is appended to every resolved key.
-	Suffix string
-	// NamespacePrefix prefixes each key with its namespace name.
-	NamespacePrefix bool
-	// Overload lets file values win over existing OS environment variables.
-	Overload bool
-}
-
-// -------------------------------------------------------------------------------------
-
 // streams bundles the output sinks the run action wires the child process to.
 type streams struct {
 	// Stdout is the sink for the child process's standard output.
@@ -66,12 +47,14 @@ func execute(ctx context.Context, p actionParams, in *config.Input, s streams) e
 		return err
 	}
 
+	// start from the resolved runner params, then supply the merged environment
+	// and output streams the config layer can't know about.
+	params := resolved.Runner
+	params.Env = env.All()
+	params.Stdout = s.Stdout
+	params.Stderr = s.Stderr
+
 	// run the child process with the merged environment; a non-zero child exit
 	// code surfaces as an *exitcode.Error so main.go can propagate it.
-	return runner.Run(ctx, p.ExecArgs, runner.Params{
-		Env:      env.All(),
-		Overload: resolved.Overload,
-		Stdout:   s.Stdout,
-		Stderr:   s.Stderr,
-	})
+	return runner.Run(ctx, p.ExecArgs, params)
 }
