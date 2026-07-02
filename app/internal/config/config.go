@@ -117,14 +117,15 @@ func resolveManifestPath(in *Input) string {
 // precedence stays unit-testable with an in-memory manifest.
 func resolveManifest(mc manifestContext, in *Input) (*Result, error) {
 	// Compute the project layer (settings + includes) from the manifest context.
-	layer, err := resolveProjectLayer(mc)
+	pl, err := resolveProjectLayer(mc)
 	if err != nil {
 		return nil, err
 	}
 
+	// Build the config Result from the manifest context, Input, and project layer.
 	return &Result{
-		Envmerge:        resolveEnvmergeParams(mc, in, layer),
-		Runner:          resolveRunnerParams(mc, in, layer),
+		Envmerge:        resolveEnvmergeParams(mc, in, pl),
+		Runner:          resolveRunnerParams(mc, in, pl),
 		manifestContext: mc,
 	}, nil
 }
@@ -141,7 +142,7 @@ func resolveProjectLayer(mc manifestContext) (projectLayer, error) {
 	}
 
 	// Look up the project in the manifest.
-	proj, ok := mc.manifest.LookupProject(mc.project)
+	project, ok := mc.manifest.LookupProject(mc.project)
 	if !ok {
 		return projectLayer{}, fmt.Errorf(
 			"project %q not found in manifest", mc.project,
@@ -149,14 +150,14 @@ func resolveProjectLayer(mc manifestContext) (projectLayer, error) {
 	}
 
 	// Resolve the project's includes to absolute paths.
-	includes := make([]string, len(proj.Includes))
-	for i, inc := range proj.Includes {
+	includes := make([]string, len(project.Includes))
+	for i, inc := range project.Includes {
 		includes[i] = filepath.Join(mc.dir, inc)
 	}
 
 	// Return the project layer: its settings and its includes.
 	return projectLayer{
-		settings: proj.Settings,
+		settings: project.Settings,
 		includes: includes,
 	}, nil
 }
@@ -170,11 +171,11 @@ func resolveProjectLayer(mc manifestContext) (projectLayer, error) {
 func resolveEnvmergeParams(
 	mc manifestContext,
 	in *Input,
-	layer projectLayer,
+	pl projectLayer,
 ) envmerge.Params {
-	proj, global := layer.settings, mc.manifest.Settings
+	proj, global := pl.settings, mc.manifest.Settings
 	return envmerge.Params{
-		Includes:     layer.includes,
+		Includes:     pl.includes,
 		Environments: mc.manifest.Environments,
 		Settings: envmerge.Settings{
 			Env:    precedenceString(&schema.Env,
@@ -213,12 +214,12 @@ func resolveEnvmergeParams(
 func resolveRunnerParams(
 	mc manifestContext,
 	in *Input,
-	layer projectLayer,
+	pl projectLayer,
 ) runner.Params {
 	return runner.Params{
 		Overload: precedenceBool(&schema.Overload,
 			in.Overload,
-			layer.settings.Overload,
+			pl.settings.Overload,
 			mc.manifest.Settings.Overload,
 		),
 	}
