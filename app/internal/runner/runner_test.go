@@ -2,7 +2,6 @@ package runner
 
 import (
 	"bytes"
-	"context"
 	"errors"
 	"testing"
 
@@ -17,7 +16,7 @@ func TestRunInjectsEnv(t *testing.T) {
 	t.Parallel()
 
 	var stdout bytes.Buffer
-	err := Run(context.Background(), []string{"printenv", "FROM_FILE"}, Params{
+	err := Run([]string{"printenv", "FROM_FILE"}, Params{
 		Env:    map[string]string{"FROM_FILE": "yes"},
 		Stdout: &stdout,
 		Stderr: &bytes.Buffer{},
@@ -37,7 +36,7 @@ func TestRunInjectsEnv(t *testing.T) {
 func TestRunPropagatesExitCode(t *testing.T) {
 	t.Parallel()
 
-	err := Run(context.Background(), []string{"sh", "-c", "exit 3"}, Params{
+	err := Run([]string{"sh", "-c", "exit 3"}, Params{
 		Stdout: &bytes.Buffer{},
 		Stderr: &bytes.Buffer{},
 	})
@@ -58,7 +57,7 @@ func TestRunOverloadPrecedence(t *testing.T) {
 	t.Setenv("SHARED_KEY", "from-os")
 
 	var stdout bytes.Buffer
-	err := Run(context.Background(), []string{"printenv", "SHARED_KEY"}, Params{
+	err := Run([]string{"printenv", "SHARED_KEY"}, Params{
 		Env:      map[string]string{"SHARED_KEY": "from-file"},
 		Overload: true,
 		Stdout:   &stdout,
@@ -79,7 +78,7 @@ func TestRunDefaultPrecedence(t *testing.T) {
 	t.Setenv("SHARED_KEY", "from-os")
 
 	var stdout bytes.Buffer
-	err := Run(context.Background(), []string{"printenv", "SHARED_KEY"}, Params{
+	err := Run([]string{"printenv", "SHARED_KEY"}, Params{
 		Env:    map[string]string{"SHARED_KEY": "from-file"},
 		Stdout: &stdout,
 		Stderr: &bytes.Buffer{},
@@ -98,7 +97,29 @@ func TestRunDefaultPrecedence(t *testing.T) {
 func TestRunNoCommand(t *testing.T) {
 	t.Parallel()
 
-	if err := Run(context.Background(), nil, Params{}); err == nil {
+	if err := Run(nil, Params{}); err == nil {
 		t.Fatal("expected error for empty args")
+	}
+}
+
+// -------------------------------------------------------------------------------------
+
+// TestRunSignaledExitCode verifies a child terminated by a signal surfaces as an
+// *exitcode.Error carrying the shell convention 128+signum (130 for SIGINT)
+// rather than the -1 that os/exec reports for signaled processes.
+func TestRunSignaledExitCode(t *testing.T) {
+	t.Parallel()
+
+	// The child signals only its own PID ($$), so the test process is unaffected.
+	err := Run([]string{"sh", "-c", "kill -INT $$"}, Params{
+		Stdout: &bytes.Buffer{},
+		Stderr: &bytes.Buffer{},
+	})
+	var ec *exitcode.Error
+	if !errors.As(err, &ec) {
+		t.Fatalf("expected *exitcode.Error, got %v", err)
+	}
+	if ec.Code != 130 {
+		t.Errorf("Code = %d, want 130 (128+SIGINT)", ec.Code)
 	}
 }

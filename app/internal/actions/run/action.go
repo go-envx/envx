@@ -1,7 +1,6 @@
 package run
 
 import (
-	"context"
 	"io"
 
 	"github.com/go-envx/envx/app/internal/config"
@@ -34,7 +33,7 @@ type streams struct {
 // execute is the imperative shell: resolve the input into an envmerge.Params, build
 // the merged environment, then run the child process with the merged environment
 // using the resolved overload setting.
-func execute(ctx context.Context, p actionParams, in *config.Input, s streams) error {
+func execute(p actionParams, in *config.Input, s streams) error {
 	// resolve the input config
 	resolved, err := config.Resolve(in, p.Project)
 	if err != nil {
@@ -54,7 +53,8 @@ func execute(ctx context.Context, p actionParams, in *config.Input, s streams) e
 	params.Stdout = s.Stdout
 	params.Stderr = s.Stderr
 
-	// run the child process with the merged environment; a non-zero child exit
-	// code surfaces as an *exitcode.Error so main.go can propagate it.
-	return runner.Run(ctx, p.ExecArgs, params)
+	// run the child process with the merged environment; the runner forwards
+	// signals to the child and surfaces a non-zero or signal-terminated exit as
+	// an *exitcode.Error so main.go can propagate it.
+	return runner.Run(p.ExecArgs, params)
 }

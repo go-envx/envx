@@ -1,13 +1,11 @@
-// Command envx is the entry point for the envx CLI. It wires signal handling,
-// executes the root command, and maps errors to exit codes.
+// Command envx is the entry point for the envx CLI. It executes the root
+// command and maps errors to exit codes.
 package main
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"os"
-	"os/signal"
 
 	"github.com/go-envx/envx/app/internal/cli"
 	"github.com/go-envx/envx/app/internal/exitcode"
@@ -23,14 +21,13 @@ func main() {
 }
 
 // -------------------------------------------------------------------------------------
-// run executes the root command under a signal-aware context and translates any
-// error into a process exit code: an exitcode.Error carries its own code, every
-// other error maps to 1.
+// run executes the root command and translates any error into a process exit
+// code: an exitcode.Error carries its own code, every other error maps to 1.
+// The run command's child-process signal handling lives in the runner, which
+// forwards signals to the child and mirrors its exit status, so no root-level
+// signal trapping is required here.
 func run() int {
-	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
-	defer stop()
-
-	if err := cli.NewRootCmd(version).ExecuteContext(ctx); err != nil {
+	if err := cli.NewRootCmd(version).Execute(); err != nil {
 		if exitErr, ok := errors.AsType[*exitcode.Error](err); ok {
 			return exitErr.Code
 		}

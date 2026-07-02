@@ -2,7 +2,6 @@ package run
 
 import (
 	"bytes"
-	"context"
 	"io"
 	"testing"
 
@@ -20,7 +19,7 @@ func TestExecuteInjectsEnv(t *testing.T) {
 	path := fixtures.Manifest("basic")
 	var stdout bytes.Buffer
 	in := &config.Input{ConfigPath: &path}
-	err := execute(context.Background(), actionParams{
+	err := execute(actionParams{
 		Project:  "api-core",
 		ExecArgs: []string{"printenv", "APP_NAME"},
 	}, in, streams{Stdout: &stdout, Stderr: io.Discard})
@@ -43,7 +42,7 @@ func TestExecuteOverloadFromEnv(t *testing.T) {
 	path := fixtures.Manifest("basic")
 	var stdout bytes.Buffer
 	in := &config.Input{ConfigPath: &path}
-	err := execute(context.Background(), actionParams{
+	err := execute(actionParams{
 		Project:  "api-core",
 		ExecArgs: []string{"printenv", "APP_NAME"},
 	}, in, streams{Stdout: &stdout, Stderr: io.Discard})

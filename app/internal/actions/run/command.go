@@ -60,7 +60,7 @@ func NewCommand() *cobra.Command {
 
 			// execute the action
 			in := flags.GetInput(cmd.Flags())
-			return execute(cmd.Context(), p, in, streams{
+			return execute(p, in, streams{
 				Stdout: cmd.OutOrStdout(),
 				Stderr: cmd.ErrOrStderr(),
 			})
