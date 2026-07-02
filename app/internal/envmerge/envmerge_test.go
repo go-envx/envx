@@ -155,6 +155,52 @@ func TestMergeNamespacesOverlay(t *testing.T) {
 
 // -------------------------------------------------------------------------------------
 
+// TestMergeNamespacesShadowTracksBase verifies that when an environment overlay
+// overrides a base value, origin tracking records the base file as shadowed by
+// the winning overlay within the same namespace, while a key defined only in the
+// base has no shadowed sources.
+func TestMergeNamespacesShadowTracksBase(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+	writeYAML(t, dir, "postgres.yaml", "host: localhost\nport: 5432\n")
+	writeYAML(t, dir, "postgres.production.yaml", "host: prod-db\n")
+
+	res, err := mergeNamespaces(
+		[]namespace{{dir: dir, name: "postgres"}}, Settings{Env: "production"},
+	)
+	if err != nil {
+		t.Fatalf("mergeNamespaces: %v", err)
+	}
+
+	origin, ok := res.Origin("HOST")
+	if !ok {
+		t.Fatal("expected origin for HOST")
+	}
+	if filepath.Base(origin.Winner.File) != "postgres.production.yaml" {
+		t.Errorf("HOST winner = %q, want overlay", origin.Winner.File)
+	}
+	if len(origin.Shadowed) != 1 {
+		t.Fatalf("HOST shadowed = %v, want exactly the base file", origin.Shadowed)
+	}
+	if filepath.Base(origin.Shadowed[0].File) != "postgres.yaml" {
+		t.Errorf(
+			"HOST shadowed = %q, want base postgres.yaml", origin.Shadowed[0].File,
+		)
+	}
+
+	// PORT lives only in the base file, so it has no shadowed sources.
+	port, ok := res.Origin("PORT")
+	if !ok {
+		t.Fatal("expected origin for PORT")
+	}
+	if len(port.Shadowed) != 0 {
+		t.Errorf("PORT shadowed = %v, want none", port.Shadowed)
+	}
+}
+
+// -------------------------------------------------------------------------------------
+
 // TestMergeNamespacesStrictMissingOverlay verifies strict mode errors when an
 // overlay file is absent, while lax mode tolerates it.
 func TestMergeNamespacesStrictMissingOverlay(t *testing.T) {

@@ -106,6 +106,31 @@ func TestRunNoCommand(t *testing.T) {
 
 // -------------------------------------------------------------------------------------
 
+// TestRunCommandNotFound verifies a command missing from PATH surfaces as an
+// *exitcode.Error carrying the shell convention 127 (rather than the generic
+// runtime code) and writes a diagnostic to stderr.
+func TestRunCommandNotFound(t *testing.T) {
+	t.Parallel()
+
+	var stderr bytes.Buffer
+	err := Run([]string{"envx-nonexistent-command-xyz"}, Params{
+		Stdout: &bytes.Buffer{},
+		Stderr: &stderr,
+	})
+	var ec *exitcode.Error
+	if !errors.As(err, &ec) {
+		t.Fatalf("expected *exitcode.Error, got %v", err)
+	}
+	if ec.Code != 127 {
+		t.Errorf("Code = %d, want 127 (command not found)", ec.Code)
+	}
+	if stderr.Len() == 0 {
+		t.Error("expected a diagnostic on stderr")
+	}
+}
+
+// -------------------------------------------------------------------------------------
+
 // TestRunSignaledExitCode verifies a child terminated by a signal surfaces as an
 // *exitcode.Error carrying the shell convention 128+signum (130 for SIGINT)
 // rather than the -1 that os/exec reports for signaled processes.

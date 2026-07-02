@@ -110,9 +110,10 @@ func loadNamespace(ns namespace, settings Settings, acc *resolved) error {
 		return fmt.Errorf("namespace %s/%s: %w", ns.dir, ns.name, err)
 	}
 
-	// Compute both key->path lookups once up front rather than re-flattening the
-	// env overlay for every key inside the loop.
-	flatKeys := flattenKeys(merged)
+	// Map each flat key back to its dotted path in the base file and the env
+	// overlay separately, computed once so the per-key loop can attribute a
+	// value to the exact file(s) that defined it.
+	baseKeys := flattenKeys(baseMap)
 	envKeys := flattenKeys(envMap)
 	for key, value := range flat {
 		finalKey := key
@@ -120,23 +121,55 @@ func loadNamespace(ns namespace, settings Settings, acc *resolved) error {
 			finalKey = toEnvKey(ns.name) + "_" + key
 		}
 
-		sourceFile := baseFile
-		if _, inEnv := envKeys[key]; inEnv {
-			sourceFile = envFile
-		}
-
-		src := Source{File: sourceFile, Key: flatKeys[key]}
-		if existing, ok := acc.origins[finalKey]; ok {
-			existing.Shadowed = append(existing.Shadowed, existing.Winner)
-			existing.Winner = src
-			acc.origins[finalKey] = existing
-		} else {
-			acc.origins[finalKey] = Origin{Winner: src}
-		}
+		sources := namespaceSources(key, baseFile, envFile, baseKeys, envKeys)
+		integrateSources(acc, finalKey, sources)
 		acc.values[finalKey] = value
 	}
 
 	return nil
+}
+
+// -------------------------------------------------------------------------------------
+
+// namespaceSources returns the sources one namespace contributes for a single
+// flattened key, in merge order: the base file first, then the environment
+// overlay. A key defined in both files yields two sources so the overlay, coming
+// last, shadows the base. The slice always holds at least one source, since the
+// key was produced by flattening the merge of exactly these two files.
+func namespaceSources(
+	key, baseFile, envFile string,
+	baseKeys, envKeys map[string]string,
+) []Source {
+	var sources []Source
+	if path, ok := baseKeys[key]; ok {
+		sources = append(sources, Source{File: baseFile, Key: path})
+	}
+	if path, ok := envKeys[key]; ok {
+		sources = append(sources, Source{File: envFile, Key: path})
+	}
+	return sources
+}
+
+// -------------------------------------------------------------------------------------
+
+// integrateSources folds one namespace's ordered sources for a key into the
+// running origins, preserving the full merge history. An origin already recorded
+// by an earlier namespace is demoted into the shadowed chain — its prior shadows
+// first, then its former winner — ahead of this namespace's own lower-priority
+// sources. The last source, the highest priority, becomes the new winner, so
+// Shadowed always reads oldest-to-newest and Winner is the surviving source.
+func integrateSources(acc *resolved, key string, sources []Source) {
+	var shadowed []Source
+	if existing, ok := acc.origins[key]; ok {
+		shadowed = append(shadowed, existing.Shadowed...)
+		shadowed = append(shadowed, existing.Winner)
+	}
+	shadowed = append(shadowed, sources[:len(sources)-1]...)
+
+	acc.origins[key] = Origin{
+		Winner:   sources[len(sources)-1],
+		Shadowed: shadowed,
+	}
 }
 
 // -------------------------------------------------------------------------------------

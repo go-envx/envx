@@ -173,3 +173,60 @@ func TestApplyRejectsNonMappingRoot(t *testing.T) {
 		t.Fatal("expected error for non-mapping root, got nil")
 	}
 }
+
+// -------------------------------------------------------------------------------------
+
+// TestApplyRefusesToOverwriteList verifies setting a key that currently holds a
+// list is refused, so a user's hand-authored list is never collapsed into a
+// scalar, and the document is left unchanged.
+func TestApplyRefusesToOverwriteList(t *testing.T) {
+	t.Parallel()
+
+	src := "hosts:\n  - a\n  - b\n"
+	doc := new(yaml.Node)
+	if err := yaml.Unmarshal([]byte(src), doc); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if err := apply(doc, actionParams{Key: "hosts", Value: "x"}); err == nil {
+		t.Fatal("expected error overwriting a list, got nil")
+	}
+	out, err := marshalDoc(doc, detectIndent(doc))
+	if err != nil {
+		t.Fatalf("marshalDoc: %v", err)
+	}
+	if string(out) != src {
+		t.Errorf("list was modified on a refused set:\n%s", out)
+	}
+}
+
+// -------------------------------------------------------------------------------------
+
+// TestApplyRefusesToDescendThroughList verifies a nested set that would traverse
+// through a list is refused rather than silently discarding the list.
+func TestApplyRefusesToDescendThroughList(t *testing.T) {
+	t.Parallel()
+
+	doc := new(yaml.Node)
+	if err := yaml.Unmarshal([]byte("db:\n  - a\n  - b\n"), doc); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if err := apply(doc, actionParams{Key: "db.password", Value: "x"}); err == nil {
+		t.Fatal("expected error descending through a list, got nil")
+	}
+}
+
+// -------------------------------------------------------------------------------------
+
+// TestApplyRefusesToOverwriteMapping verifies setting a key that currently holds
+// a nested mapping is refused, so a populated subtree is never dropped.
+func TestApplyRefusesToOverwriteMapping(t *testing.T) {
+	t.Parallel()
+
+	doc := new(yaml.Node)
+	if err := yaml.Unmarshal([]byte("creds:\n  user: admin\n"), doc); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if err := apply(doc, actionParams{Key: "creds", Value: "x"}); err == nil {
+		t.Fatal("expected error overwriting a mapping, got nil")
+	}
+}

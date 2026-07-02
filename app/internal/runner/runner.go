@@ -70,7 +70,11 @@ func Run(args []string, p Params) error {
 	cmd.Env = buildEnv(p)
 
 	if err := cmd.Start(); err != nil {
-		return fmt.Errorf("starting command: %w", err)
+		// Mirror a shell: report the failure and exit with its conventional code
+		// (127 not-found, 126 found-but-not-executable) rather than the generic
+		// runtime code, so scripts wrapping `envx run` can branch on it.
+		_, _ = fmt.Fprintf(p.Stderr, "envx: %v\n", err)
+		return &exitcode.Error{Code: startFailureCode(err)}
 	}
 
 	// Relay signals to the child until it exits. Installing these handlers also
@@ -122,6 +126,18 @@ func exitCode(exitErr *exec.ExitError) int {
 		return 128 + int(ws.Signal())
 	}
 	return 1
+}
+
+// -------------------------------------------------------------------------------------
+
+// startFailureCode maps a failure to start the child to the shell's conventional
+// exit code: 127 when the command was not found on PATH, and 126 when it was
+// found but could not be executed (for example, a permission error).
+func startFailureCode(err error) int {
+	if errors.Is(err, exec.ErrNotFound) {
+		return 127
+	}
+	return 126
 }
 
 // -------------------------------------------------------------------------------------

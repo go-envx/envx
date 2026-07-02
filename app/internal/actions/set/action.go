@@ -95,8 +95,7 @@ func apply(doc *yaml.Node, p actionParams) error {
 	if err != nil {
 		return err
 	}
-	setNestedKey(root, strings.Split(p.Key, "."), p.Value)
-	return nil
+	return setNestedKey(root, strings.Split(p.Key, "."), p.Value)
 }
 
 // -------------------------------------------------------------------------------------
@@ -130,18 +129,30 @@ func documentRoot(doc *yaml.Node) (*yaml.Node, error) {
 // -------------------------------------------------------------------------------------
 
 // setNestedKey walks parts through node's nested mappings, creating intermediate
-// mappings as needed, and writes value at the final part. A non-mapping node
-// blocking an intermediate step is replaced with a fresh mapping, mirroring a
-// first-time write. An existing value node is updated in place so its comments
-// and position survive; a missing key is appended after the existing entries.
-func setNestedKey(node *yaml.Node, parts []string, value string) {
-	for _, part := range parts[:len(parts)-1] {
+// mappings as needed, and writes value at the final part. A scalar blocking an
+// intermediate step is reinterpreted as a mapping (a first-time write refining a
+// bare leaf into a branch). Structured data is never silently discarded: a list
+// or mapping the target would overwrite, or a list an intermediate step would
+// descend through, is refused with an error so a user's hand-authored YAML
+// survives. An existing scalar leaf is updated in place so its comments and
+// position survive; a missing key is appended after the existing entries.
+func setNestedKey(node *yaml.Node, parts []string, value string) error {
+	for i, part := range parts[:len(parts)-1] {
 		child := mappingValue(node, part)
 		switch {
 		case child == nil:
 			child = &yaml.Node{Kind: yaml.MappingNode}
 			appendPair(node, part, child)
-		case child.Kind != yaml.MappingNode:
+		case child.Kind == yaml.MappingNode:
+			// Existing branch: descend into it, leaving its entries untouched.
+		case child.Kind == yaml.SequenceNode:
+			return fmt.Errorf(
+				"%q is a list; refusing to overwrite it",
+				strings.Join(parts[:i+1], "."),
+			)
+		default:
+			// A scalar (or null) leaf is refined into a mapping so the path can
+			// continue; only a single value is superseded, not a collection.
 			*child = yaml.Node{Kind: yaml.MappingNode}
 		}
 		node = child
@@ -149,12 +160,22 @@ func setNestedKey(node *yaml.Node, parts []string, value string) {
 
 	last := parts[len(parts)-1]
 	if v := mappingValue(node, last); v != nil {
+		if v.Kind == yaml.SequenceNode || v.Kind == yaml.MappingNode {
+			kind := "a mapping"
+			if v.Kind == yaml.SequenceNode {
+				kind = "a list"
+			}
+			return fmt.Errorf(
+				"%q is %s; refusing to overwrite it", strings.Join(parts, "."), kind,
+			)
+		}
 		setScalar(v, value)
-		return
+		return nil
 	}
 	leaf := new(yaml.Node)
 	setScalar(leaf, value)
 	appendPair(node, last, leaf)
+	return nil
 }
 
 // -------------------------------------------------------------------------------------
