@@ -61,6 +61,14 @@ func WithSuffix(fs *pflag.FlagSet) {
 
 // -------------------------------------------------------------------------------------
 
+// WithDelimiter registers the --delimiter flag, the string used to join a
+// list-valued setting into a single env var.
+func WithDelimiter(fs *pflag.FlagSet) {
+	registerString(fs, &schema.Delimiter)
+}
+
+// -------------------------------------------------------------------------------------
+
 // WithNamespacePrefix registers the --namespace-prefix flag, prefixing each key
 // with its namespace name.
 func WithNamespacePrefix(fs *pflag.FlagSet) {

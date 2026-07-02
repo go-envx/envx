@@ -39,6 +39,33 @@ func TestNormalizeParamsKeepsExplicitEnv(t *testing.T) {
 
 // -------------------------------------------------------------------------------------
 
+// TestNormalizeParamsDefaultsDelimiter verifies an empty delimiter falls back to
+// the default comma while an explicit delimiter is left untouched.
+func TestNormalizeParamsDefaultsDelimiter(t *testing.T) {
+	t.Parallel()
+
+	def := &Params{Environments: []string{"development"}}
+	if err := normalizeParams(def); err != nil {
+		t.Fatalf("normalizeParams: %v", err)
+	}
+	if def.Settings.Delimiter != "," {
+		t.Errorf("Delimiter = %q, want , (default)", def.Settings.Delimiter)
+	}
+
+	custom := &Params{
+		Environments: []string{"development"},
+		Settings:     Settings{Delimiter: ":"},
+	}
+	if err := normalizeParams(custom); err != nil {
+		t.Fatalf("normalizeParams: %v", err)
+	}
+	if custom.Settings.Delimiter != ":" {
+		t.Errorf("Delimiter = %q, want : (explicit)", custom.Settings.Delimiter)
+	}
+}
+
+// -------------------------------------------------------------------------------------
+
 // TestNormalizeParamsUndeclaredEnv verifies an environment outside the declared
 // set is rejected.
 func TestNormalizeParamsUndeclaredEnv(t *testing.T) {

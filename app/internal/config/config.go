@@ -29,6 +29,8 @@ type Input struct {
 	Prefix *string
 	// Suffix is the explicitly requested key suffix.
 	Suffix *string
+	// Delimiter is the explicitly requested list-join delimiter.
+	Delimiter *string
 	// NamespacePrefix, when set, prefixes each key with its namespace.
 	NamespacePrefix *bool
 	// Overload, when set, lets file values win over existing OS env vars.
@@ -197,6 +199,11 @@ func resolveEnvmergeParams(
 				in.Suffix,
 				proj.Suffix,
 				global.Suffix,
+			),
+			Delimiter: precedenceString(&schema.Delimiter,
+				in.Delimiter,
+				proj.Delimiter,
+				global.Delimiter,
 			),
 			NamespacePrefix: precedenceBool(&schema.NamespacePrefix,
 				in.NamespacePrefix,

@@ -44,7 +44,7 @@ func TestCatalogEnvVarsUnique(t *testing.T) {
 	t.Parallel()
 
 	specs := []FlagSpec{
-		Config, Env, Strict, Prefix, Suffix, NamespacePrefix, Overload,
+		Config, Env, Strict, Prefix, Suffix, Delimiter, NamespacePrefix, Overload,
 		Reveal, Output,
 	}
 	seen := make(map[string]string)

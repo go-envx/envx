@@ -65,6 +65,13 @@ var (
 		Usage: "suffix appended to every key",
 	}
 
+	// Delimiter joins a list-valued leaf into a single env var.
+	Delimiter = FlagSpec{
+		Name:  "delimiter",
+		Env:   "ENVX_DELIMITER",
+		Usage: `string used to join list values (default ",")`,
+	}
+
 	// NamespacePrefix prefixes each key with its namespace name.
 	NamespacePrefix = FlagSpec{
 		Name:  "namespace-prefix",

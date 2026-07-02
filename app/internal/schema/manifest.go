@@ -45,6 +45,8 @@ type Project struct {
 // "unset", which the resolution precedence chain relies on when layering project over
 // global over CLI input.
 type Settings struct {
+	// Delimiter joins a list-valued leaf into a single env var.
+	Delimiter string `yaml:"delimiter"`
 	// Env is the target environment to load.
 	Env string `yaml:"env"`
 	// NamespacePrefix prefixes each key with its namespace name, if true.

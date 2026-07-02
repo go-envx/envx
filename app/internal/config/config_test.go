@@ -110,6 +110,17 @@ func TestResolveManifest(t *testing.T) {
 			t.Errorf("Environments = %v", r.Envmerge.Environments)
 		}
 	})
+	t.Run("delimiter explicit flows through", func(t *testing.T) {
+		r, err := resolveManifest(manifestContext{manifest: m, project: "api"}, &Input{
+			Delimiter: strPtr("|"),
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if r.Envmerge.Settings.Delimiter != "|" {
+			t.Errorf("Delimiter = %q, want |", r.Envmerge.Settings.Delimiter)
+		}
+	})
 	t.Run("unknown project errors", func(t *testing.T) {
 		_, err := resolveManifest(manifestContext{manifest: m, project: "ghost"}, &Input{})
 		if err == nil {

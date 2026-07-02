@@ -36,12 +36,12 @@ func TestGetInputCapturesEveryOption(t *testing.T) {
 
 	fs := newFlags()
 	Register(fs,
-		WithConfig, WithEnv, WithStrict, WithPrefix, WithSuffix,
+		WithConfig, WithEnv, WithStrict, WithPrefix, WithSuffix, WithDelimiter,
 		WithNamespacePrefix, WithOverload,
 	)
 	args := []string{
 		"--config", "envx.yaml", "--env", "prod", "--strict", "--prefix", "P",
-		"--suffix", "S", "--namespace-prefix", "--overload",
+		"--suffix", "S", "--delimiter", ",", "--namespace-prefix", "--overload",
 	}
 	if err := fs.Parse(args); err != nil {
 		t.Fatalf("parse: %v", err)
@@ -49,7 +49,8 @@ func TestGetInputCapturesEveryOption(t *testing.T) {
 
 	in := GetInput(fs)
 	if in.ConfigPath == nil || in.Env == nil || in.Strict == nil || in.Prefix == nil ||
-		in.Suffix == nil || in.NamespacePrefix == nil || in.Overload == nil {
+		in.Suffix == nil || in.Delimiter == nil || in.NamespacePrefix == nil ||
+		in.Overload == nil {
 		t.Fatalf("a flag was not captured by GetInput: %+v", in)
 	}
 }

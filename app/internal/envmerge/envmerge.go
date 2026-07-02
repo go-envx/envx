@@ -105,7 +105,7 @@ func loadNamespace(ns namespace, settings Settings, acc *resolved) error {
 
 	merged := deepMerge(baseMap, envMap)
 
-	flat, err := flatten(merged)
+	flat, err := flatten(merged, settings.Delimiter)
 	if err != nil {
 		return fmt.Errorf("namespace %s/%s: %w", ns.dir, ns.name, err)
 	}

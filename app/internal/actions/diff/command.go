@@ -70,6 +70,7 @@ func NewCommand() *cobra.Command {
 		flags.WithStrict,
 		flags.WithPrefix,
 		flags.WithSuffix,
+		flags.WithDelimiter,
 		flags.WithNamespacePrefix,
 	)
 	flags.BindBool(cmd.Flags(), &reveal, &schema.Reveal)

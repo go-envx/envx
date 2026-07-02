@@ -240,3 +240,47 @@ func TestMergeNamespacesPrefixSuffix(t *testing.T) {
 		t.Errorf("expected APP_POSTGRES_HOST_V2, got keys %v", res.Keys())
 	}
 }
+
+// -------------------------------------------------------------------------------------
+
+// TestMergeNamespacesJoinsList verifies a list-valued leaf is joined into a
+// single env var using the configured delimiter.
+func TestMergeNamespacesJoinsList(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+	writeYAML(t, dir, "app.yaml", "hosts:\n  - a\n  - b\n  - c\n")
+
+	res, err := mergeNamespaces(
+		[]namespace{{dir: dir, name: "app"}},
+		Settings{Env: "development", Delimiter: "|"},
+	)
+	if err != nil {
+		t.Fatalf("mergeNamespaces: %v", err)
+	}
+	if v, _ := res.Get("HOSTS"); v != "a|b|c" {
+		t.Errorf("HOSTS = %q, want a|b|c", v)
+	}
+}
+
+// -------------------------------------------------------------------------------------
+
+// TestBuildJoinsListWithDefaultDelimiter verifies Build applies the default comma
+// delimiter to a list leaf when none is configured.
+func TestBuildJoinsListWithDefaultDelimiter(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+	writeYAML(t, dir, "app.yaml", "hosts:\n  - a\n  - b\n")
+
+	res, err := Build(Params{
+		Includes:     []string{filepath.Join(dir, "app")},
+		Environments: []string{"development"},
+	})
+	if err != nil {
+		t.Fatalf("Build: %v", err)
+	}
+	if v, _ := res.Get("HOSTS"); v != "a,b" {
+		t.Errorf("HOSTS = %q, want a,b (default comma)", v)
+	}
+}

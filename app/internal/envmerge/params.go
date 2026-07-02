@@ -7,6 +7,11 @@ import (
 
 // -------------------------------------------------------------------------------------
 
+// defaultDelimiter joins list-valued leaves when no delimiter is configured.
+const defaultDelimiter = ","
+
+// -------------------------------------------------------------------------------------
+
 // Params is envmerge's input contract: a plain data bag the caller fully
 // populates. envmerge knows nothing about where its inputs came from or how they
 // were produced. Every field is optional and envmerge fills in terminal defaults
@@ -37,6 +42,9 @@ type Settings struct {
 	Prefix string
 	// Suffix is appended to every resolved key.
 	Suffix string
+	// Delimiter joins a list-valued leaf into one string; an empty value means
+	// the default (",") that normalizeParams applies.
+	Delimiter string
 	// NamespacePrefix prefixes each resolved key with its namespace name.
 	NamespacePrefix bool
 }
@@ -49,6 +57,11 @@ func normalizeParams(p *Params) error {
 	// Apply the first declared environment as the default if the target is empty.
 	if p.Settings.Env == "" && len(p.Environments) > 0 {
 		p.Settings.Env = p.Environments[0]
+	}
+
+	// Apply the default list delimiter when none was configured.
+	if p.Settings.Delimiter == "" {
+		p.Settings.Delimiter = defaultDelimiter
 	}
 
 	// Validate the resolved environment against the declared set.
