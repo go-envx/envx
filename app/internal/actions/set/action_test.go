@@ -1,59 +1,175 @@
 package set
 
 import (
-	"reflect"
+	"strings"
 	"testing"
+
+	"gopkg.in/yaml.v3"
 )
 
 // -------------------------------------------------------------------------------------
 
-// TestApplyFlatKey verifies a flat key is set on a fresh document.
-func TestApplyFlatKey(t *testing.T) {
+// applyToYAML parses src (an empty string models a missing/fresh file), applies
+// p to the document node, and returns the re-encoded YAML so tests can assert on
+// the preserved comments, order, and formatting.
+func applyToYAML(t *testing.T, src string, p actionParams) string {
+	t.Helper()
+	doc := new(yaml.Node)
+	if src != "" {
+		if err := yaml.Unmarshal([]byte(src), doc); err != nil {
+			t.Fatalf("unmarshal: %v", err)
+		}
+	}
+	if err := apply(doc, p); err != nil {
+		t.Fatalf("apply: %v", err)
+	}
+	out, err := marshalDoc(doc, detectIndent(doc))
+	if err != nil {
+		t.Fatalf("marshalDoc: %v", err)
+	}
+	return string(out)
+}
+
+// -------------------------------------------------------------------------------------
+
+// TestApplyFlatKeyEmptyDoc verifies a flat key is written to a fresh document.
+func TestApplyFlatKeyEmptyDoc(t *testing.T) {
 	t.Parallel()
 
-	got := apply(nil, actionParams{Key: "host", Value: "localhost"})
-	want := map[string]any{"host": "localhost"}
-	if !reflect.DeepEqual(got, want) {
-		t.Errorf("apply() = %v, want %v", got, want)
+	got := applyToYAML(t, "", actionParams{Key: "host", Value: "localhost"})
+	want := "host: localhost\n"
+	if got != want {
+		t.Errorf("apply() =\n%q\nwant\n%q", got, want)
 	}
 }
 
 // -------------------------------------------------------------------------------------
 
-// TestApplyNestedKey verifies dotted keys create intermediate maps.
-func TestApplyNestedKey(t *testing.T) {
+// TestApplyPreservesCommentsAndOrder verifies that adding a nested key leaves the
+// document's comments and existing key order untouched.
+func TestApplyPreservesCommentsAndOrder(t *testing.T) {
 	t.Parallel()
 
-	got := apply(
-		map[string]any{"host": "localhost"},
-		actionParams{Key: "credentials.password", Value: "secret"},
-	)
-	creds, ok := got["credentials"].(map[string]any)
-	if !ok {
-		t.Fatalf("credentials is not a map: %T", got["credentials"])
+	src := "# managed by envx\n" +
+		"host: localhost # primary\n" +
+		"port: 5432\n"
+
+	got := applyToYAML(t, src, actionParams{Key: "credentials.password", Value: "secret"})
+
+	for _, want := range []string{
+		"# managed by envx",
+		"host: localhost # primary",
+		"port: 5432",
+		"credentials:",
+		"  password: secret",
+	} {
+		if !strings.Contains(got, want) {
+			t.Errorf("output missing %q:\n%s", want, got)
+		}
 	}
-	if creds["password"] != "secret" {
-		t.Errorf("password = %v, want secret", creds["password"])
-	}
-	if got["host"] != "localhost" {
-		t.Errorf("host = %v, want localhost", got["host"])
+	if strings.Index(got, "host:") > strings.Index(got, "credentials:") {
+		t.Errorf("existing keys were reordered:\n%s", got)
 	}
 }
 
 // -------------------------------------------------------------------------------------
 
-// TestSetNestedKeyOverwritesScalar verifies a scalar blocking a nested path is
-// replaced with a map.
-func TestSetNestedKeyOverwritesScalar(t *testing.T) {
+// TestApplyUpdatesExistingValueInPlace verifies overwriting a key keeps the
+// surrounding comments and replaces only the value.
+func TestApplyUpdatesExistingValueInPlace(t *testing.T) {
 	t.Parallel()
 
-	data := map[string]any{"a": "scalar"}
-	setNestedKey(data, "a.b", "value")
-	sub, ok := data["a"].(map[string]any)
-	if !ok {
-		t.Fatalf("a is not a map: %T", data["a"])
+	src := "# doc\n" +
+		"password: old # inline note\n"
+
+	got := applyToYAML(t, src, actionParams{Key: "password", Value: "new"})
+
+	if !strings.Contains(got, "password: new") {
+		t.Errorf("value not updated:\n%s", got)
 	}
-	if sub["b"] != "value" {
-		t.Errorf("a.b = %v, want value", sub["b"])
+	if strings.Contains(got, "old") {
+		t.Errorf("old value was not replaced:\n%s", got)
+	}
+	for _, want := range []string{"# doc", "# inline note"} {
+		if !strings.Contains(got, want) {
+			t.Errorf("output missing comment %q:\n%s", want, got)
+		}
+	}
+}
+
+// -------------------------------------------------------------------------------------
+
+// TestApplyOverwritesScalarBlockingPath verifies a scalar blocking a nested path
+// is replaced with a mapping.
+func TestApplyOverwritesScalarBlockingPath(t *testing.T) {
+	t.Parallel()
+
+	got := applyToYAML(t, "a: scalar\n", actionParams{Key: "a.b", Value: "value"})
+	want := "a:\n  b: value\n"
+	if got != want {
+		t.Errorf("apply() =\n%q\nwant\n%q", got, want)
+	}
+}
+
+// -------------------------------------------------------------------------------------
+
+// TestApplyQuotesAmbiguousValues verifies values that look like non-strings are
+// quoted, so env values round-trip as strings.
+func TestApplyQuotesAmbiguousValues(t *testing.T) {
+	t.Parallel()
+
+	got := applyToYAML(t, "", actionParams{Key: "timeout", Value: "10"})
+	want := "timeout: \"10\"\n"
+	if got != want {
+		t.Errorf("apply() =\n%q\nwant\n%q", got, want)
+	}
+}
+
+// -------------------------------------------------------------------------------------
+
+// TestApplyMatchesExistingIndent verifies a new key adopts the file's existing
+// indentation width rather than a fixed default.
+func TestApplyMatchesExistingIndent(t *testing.T) {
+	t.Parallel()
+
+	src := "credentials:\n    username: admin\n"
+	got := applyToYAML(t, src, actionParams{Key: "credentials.password", Value: "secret"})
+	want := "credentials:\n    username: admin\n    password: secret\n"
+	if got != want {
+		t.Errorf("apply() =\n%q\nwant\n%q", got, want)
+	}
+}
+
+// -------------------------------------------------------------------------------------
+
+// TestDetectIndentIgnoresFlowMapping verifies an inline flow mapping's column gap
+// is not mistaken for a block indentation step, so detection falls back to the
+// default rather than a bogus width.
+func TestDetectIndentIgnoresFlowMapping(t *testing.T) {
+	t.Parallel()
+
+	doc := new(yaml.Node)
+	if err := yaml.Unmarshal([]byte("cfg: {a: 1}\n"), doc); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if got := detectIndent(doc); got != defaultIndent {
+		t.Errorf("detectIndent = %d, want %d (flow mapping must not set indent)",
+			got, defaultIndent)
+	}
+}
+
+// -------------------------------------------------------------------------------------
+
+// TestApplyRejectsNonMappingRoot verifies a document whose root is not a mapping
+// is rejected rather than clobbered.
+func TestApplyRejectsNonMappingRoot(t *testing.T) {
+	t.Parallel()
+
+	doc := new(yaml.Node)
+	if err := yaml.Unmarshal([]byte("- a\n- b\n"), doc); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if err := apply(doc, actionParams{Key: "x", Value: "y"}); err == nil {
+		t.Fatal("expected error for non-mapping root, got nil")
 	}
 }

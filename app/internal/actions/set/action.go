@@ -1,6 +1,7 @@
 package set
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"os"
@@ -26,9 +27,10 @@ type actionParams struct {
 // -------------------------------------------------------------------------------------
 
 // execute is the imperative shell: it resolves the target overlay (environment +
-// include path) via config, reads the current document, applies the pure
-// transform, and writes the result back atomically. set never invokes envmerge
-// since no project means there is nothing to merge.
+// include path) via config, reads the current document into a YAML node tree,
+// applies the pure edit, and writes the result back atomically. Editing the node
+// tree in place preserves the file's comments, key order, and formatting; set
+// never invokes envmerge since no project means there is nothing to merge.
 func execute(p actionParams, in *config.Input) error {
 	// resolve the global context (no project) and derive the target overlay file
 	resolved, err := config.Resolve(in, "")
@@ -40,36 +42,43 @@ func execute(p actionParams, in *config.Input) error {
 		return err
 	}
 
-	// read the current document
+	// read the current document, preserving comments, key order, and formatting
 	doc, err := readDoc(target)
 	if err != nil {
 		return err
 	}
 
-	// apply the change
-	out, err := yaml.Marshal(apply(doc, p))
-	if err != nil {
-		return fmt.Errorf("marshaling yaml: %w", err)
+	// match the file's existing indentation so the edit blends in
+	indent := detectIndent(doc)
+
+	// apply the change surgically to the node tree
+	if err := apply(doc, p); err != nil {
+		return fmt.Errorf("setting %q in %s: %w", p.Key, target, err)
 	}
 
-	// write the result back atomically
+	// re-encode and write the result back atomically
+	out, err := marshalDoc(doc, indent)
+	if err != nil {
+		return fmt.Errorf("marshaling %s: %w", target, err)
+	}
 	return file.WriteAtomic(target, out)
 }
 
 // -------------------------------------------------------------------------------------
 
-// readDoc loads an existing overlay into a generic map, returning an empty map
-// when the file does not yet exist.
-func readDoc(path string) (map[string]any, error) {
+// readDoc parses the overlay at path into a YAML document node, preserving its
+// comments, key order, and structure for a surgical edit. A missing file yields
+// an empty document so the first set creates it.
+func readDoc(path string) (*yaml.Node, error) {
+	doc := new(yaml.Node)
 	data, err := file.Read(path)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
-			return make(map[string]any), nil
+			return doc, nil
 		}
 		return nil, fmt.Errorf("reading %s: %w", path, err)
 	}
-	doc := make(map[string]any)
-	if err := yaml.Unmarshal(data, &doc); err != nil {
+	if err := yaml.Unmarshal(data, doc); err != nil {
 		return nil, fmt.Errorf("parsing %s: %w", path, err)
 	}
 	return doc, nil
@@ -77,31 +86,180 @@ func readDoc(path string) (map[string]any, error) {
 
 // -------------------------------------------------------------------------------------
 
-// apply is the pure kernel: it returns doc with the key set, creating doc when
-// nil. Plain data in, plain data out; no file I/O.
-func apply(doc map[string]any, p actionParams) map[string]any {
-	if doc == nil {
-		doc = make(map[string]any)
+// apply is the pure kernel: it sets the key path on the document's root mapping,
+// creating the root and any intermediate mappings as needed. It edits value
+// nodes in place so surrounding keys, comments, and formatting are left
+// untouched. Node tree in, mutated node tree out; no file I/O.
+func apply(doc *yaml.Node, p actionParams) error {
+	root, err := documentRoot(doc)
+	if err != nil {
+		return err
 	}
-	setNestedKey(doc, p.Key, p.Value)
-	return doc
+	setNestedKey(root, strings.Split(p.Key, "."), p.Value)
+	return nil
 }
 
 // -------------------------------------------------------------------------------------
 
-// setNestedKey sets value at a dot-separated key path within data, creating
-// intermediate maps as needed and overwriting any non-map node that blocks the
-// path.
-func setNestedKey(data map[string]any, key, value string) {
-	parts := strings.Split(key, ".")
-	current := data
-	for _, part := range parts[:len(parts)-1] {
-		next, ok := current[part].(map[string]any)
-		if !ok {
-			next = make(map[string]any)
-			current[part] = next
-		}
-		current = next
+// documentRoot returns the mapping node the keys live under, seeding an empty
+// mapping for a fresh or empty document. A document whose root is an explicit
+// null (an all-comments file) is promoted to a mapping in place so its comments
+// survive; any other non-mapping root is rejected as malformed.
+func documentRoot(doc *yaml.Node) (*yaml.Node, error) {
+	if len(doc.Content) == 0 {
+		doc.Kind = yaml.DocumentNode
+		root := &yaml.Node{Kind: yaml.MappingNode}
+		doc.Content = []*yaml.Node{root}
+		return root, nil
 	}
-	current[parts[len(parts)-1]] = value
+
+	root := doc.Content[0]
+	switch {
+	case root.Kind == yaml.MappingNode:
+		return root, nil
+	case root.Kind == yaml.ScalarNode && root.Tag == "!!null":
+		root.Kind = yaml.MappingNode
+		root.Tag = ""
+		root.Value = ""
+		return root, nil
+	default:
+		return nil, errors.New("document root is not a mapping")
+	}
+}
+
+// -------------------------------------------------------------------------------------
+
+// setNestedKey walks parts through node's nested mappings, creating intermediate
+// mappings as needed, and writes value at the final part. A non-mapping node
+// blocking an intermediate step is replaced with a fresh mapping, mirroring a
+// first-time write. An existing value node is updated in place so its comments
+// and position survive; a missing key is appended after the existing entries.
+func setNestedKey(node *yaml.Node, parts []string, value string) {
+	for _, part := range parts[:len(parts)-1] {
+		child := mappingValue(node, part)
+		switch {
+		case child == nil:
+			child = &yaml.Node{Kind: yaml.MappingNode}
+			appendPair(node, part, child)
+		case child.Kind != yaml.MappingNode:
+			*child = yaml.Node{Kind: yaml.MappingNode}
+		}
+		node = child
+	}
+
+	last := parts[len(parts)-1]
+	if v := mappingValue(node, last); v != nil {
+		setScalar(v, value)
+		return
+	}
+	leaf := new(yaml.Node)
+	setScalar(leaf, value)
+	appendPair(node, last, leaf)
+}
+
+// -------------------------------------------------------------------------------------
+
+// mappingValue returns the value node paired with key in a mapping node, or nil
+// when the key is absent. A mapping stores its entries as alternating key/value
+// nodes in Content.
+func mappingValue(node *yaml.Node, key string) *yaml.Node {
+	for i := 0; i+1 < len(node.Content); i += 2 {
+		if node.Content[i].Value == key {
+			return node.Content[i+1]
+		}
+	}
+	return nil
+}
+
+// -------------------------------------------------------------------------------------
+
+// appendPair adds a new key/value entry to the end of a mapping node, leaving the
+// order and comments of the existing entries untouched.
+func appendPair(node *yaml.Node, key string, value *yaml.Node) {
+	keyNode := &yaml.Node{Kind: yaml.ScalarNode, Tag: "!!str", Value: key}
+	node.Content = append(node.Content, keyNode, value)
+}
+
+// -------------------------------------------------------------------------------------
+
+// setScalar writes value into node as a string scalar, clearing any prior style
+// and children so the encoder can re-quote as needed. It mutates only the value
+// fields, so an existing node keeps its comments and position; env values are
+// always strings, matching envx's flattened output.
+func setScalar(node *yaml.Node, value string) {
+	node.Kind = yaml.ScalarNode
+	node.Tag = "!!str"
+	node.Style = 0
+	node.Value = value
+	node.Content = nil
+}
+
+// -------------------------------------------------------------------------------------
+
+// marshalDoc encodes the document node using indent spaces per level, matching
+// the file's existing indentation so an edit never reflows the untouched parts.
+func marshalDoc(doc *yaml.Node, indent int) ([]byte, error) {
+	var buf bytes.Buffer
+	enc := yaml.NewEncoder(&buf)
+	enc.SetIndent(indent)
+	if err := enc.Encode(doc); err != nil {
+		return nil, err
+	}
+	if err := enc.Close(); err != nil {
+		return nil, err
+	}
+	return buf.Bytes(), nil
+}
+
+// -------------------------------------------------------------------------------------
+
+// defaultIndent is the indentation width used when a document has no nested
+// mapping to infer one from (a flat, empty, or brand-new file).
+const defaultIndent = 2
+
+// -------------------------------------------------------------------------------------
+
+// detectIndent infers the per-level indentation width from the document's first
+// nested mapping, measuring the column gap between a key and its child. It reads
+// the parsed node positions rather than scanning text, so comments and blank
+// lines never skew it. It falls back to defaultIndent for a flat/empty document
+// or a width outside YAML's supported 2..9 range, so the encoder always receives
+// a valid, non-reflowing setting.
+func detectIndent(doc *yaml.Node) int {
+	if len(doc.Content) == 0 {
+		return defaultIndent
+	}
+	if n, ok := firstNestedIndent(doc.Content[0]); ok && n >= 2 && n <= 9 {
+		return n
+	}
+	return defaultIndent
+}
+
+// -------------------------------------------------------------------------------------
+
+// firstNestedIndent walks node depth-first and returns the column gap between the
+// first block-mapping key that has a nested block-mapping child and that child,
+// i.e. the document's indentation step. Flow-style mappings ("{a: 1}") are
+// skipped: they carry no block indentation and their column gap is an artifact of
+// the inline layout, not a step to imitate. It reports false when node holds no
+// block mapping to measure.
+func firstNestedIndent(node *yaml.Node) (int, bool) {
+	if node.Kind != yaml.MappingNode || node.Style&yaml.FlowStyle != 0 {
+		return 0, false
+	}
+	for i := 0; i+1 < len(node.Content); i += 2 {
+		key, val := node.Content[i], node.Content[i+1]
+		if val.Kind != yaml.MappingNode || val.Style&yaml.FlowStyle != 0 {
+			continue
+		}
+		if len(val.Content) > 0 {
+			if gap := val.Content[0].Column - key.Column; gap > 0 {
+				return gap, true
+			}
+		}
+		if gap, ok := firstNestedIndent(val); ok {
+			return gap, true
+		}
+	}
+	return 0, false
 }
