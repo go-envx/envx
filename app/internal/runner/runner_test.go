@@ -3,6 +3,8 @@ package runner
 import (
 	"bytes"
 	"errors"
+	"os"
+	"syscall"
 	"testing"
 
 	"github.com/go-envx/envx/app/internal/exitcode"
@@ -121,5 +123,40 @@ func TestRunSignaledExitCode(t *testing.T) {
 	}
 	if ec.Code != 130 {
 		t.Errorf("Code = %d, want 130 (128+SIGINT)", ec.Code)
+	}
+}
+
+// -------------------------------------------------------------------------------------
+
+// TestShouldForward verifies the interactive guard: terminal-delivered signals
+// (SIGINT, SIGQUIT) are not re-forwarded when attached to a tty (the tty already
+// delivered them to the child), while supervisor signals and every signal in
+// non-interactive mode are forwarded.
+func TestShouldForward(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name        string
+		sig         os.Signal
+		interactive bool
+		want        bool
+	}{
+		{"interactive SIGINT not forwarded", os.Interrupt, true, false},
+		{"interactive SIGQUIT not forwarded", syscall.SIGQUIT, true, false},
+		{"interactive SIGTERM forwarded", syscall.SIGTERM, true, true},
+		{"interactive SIGHUP forwarded", syscall.SIGHUP, true, true},
+		{"non-interactive SIGINT forwarded", os.Interrupt, false, true},
+		{"non-interactive SIGQUIT forwarded", syscall.SIGQUIT, false, true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			if got := shouldForward(tt.sig, tt.interactive); got != tt.want {
+				t.Errorf(
+					"shouldForward(%v, interactive=%v) = %v, want %v",
+					tt.sig, tt.interactive, got, tt.want,
+				)
+			}
+		})
 	}
 }
