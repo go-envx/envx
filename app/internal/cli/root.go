@@ -19,14 +19,21 @@ const (
 
 // NewRootCmd builds the command tree. It registers the persistent --config flag,
 // which every action reads back through flags.GetInput to locate the manifest.
-// version is injected from main at build time.
-func NewRootCmd(version string) *cobra.Command {
+// The build metadata in info is rendered by the --version flag.
+func NewRootCmd(info BuildInfo) *cobra.Command {
 	root := &cobra.Command{
 		Use:           rootUsage,
 		Short:         rootShort,
-		Version:       version,
+		Version:       formatVersion(info),
 		SilenceErrors: true,
-		SilenceUsage:  true,
+		PersistentPreRunE: func(cmd *cobra.Command, _ []string) error {
+			// Parsing and validation have already succeeded by the time this
+			// runs, so silence Cobra's usage dump on any later (runtime) error;
+			// usage and validation errors happen earlier and still show help.
+			// main.go reads this same flag to map the process exit code.
+			cmd.SilenceUsage = true
+			return nil
+		},
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			return cmd.Help()
 		},

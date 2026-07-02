@@ -41,21 +41,13 @@ func NewCommand() *cobra.Command {
 		Short:   short,
 		Long:    str.Dedent(long),
 		Example: str.Dedent(example, 2),
+		Args:    validateArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			// validate args
-			dashIdx := cmd.ArgsLenAtDash()
-			if dashIdx < 1 {
-				return fmt.Errorf("usage: %s", usage)
-			}
-			childArgs := args[dashIdx:]
-			if len(childArgs) == 0 {
-				return errors.New("no command specified after --")
-			}
-
-			// map args to action params
+			// validateArgs guarantees exactly one project before "--", so args[0]
+			// is the project and args[1:] is the command to run.
 			p := actionParams{
 				Project:  args[0],
-				ExecArgs: childArgs,
+				ExecArgs: args[1:],
 			}
 
 			// execute the action
@@ -76,4 +68,23 @@ func NewCommand() *cobra.Command {
 		flags.WithOverload,
 	)
 	return cmd
+}
+
+// -------------------------------------------------------------------------------------
+
+// validateArgs enforces run's positional layout: exactly one project name, a
+// "--" separator, then at least one command word. Validating here (rather than in
+// RunE) makes a malformed invocation a usage error, so Cobra prints the help text
+// and envx exits with the usage code.
+func validateArgs(cmd *cobra.Command, args []string) error {
+	dash := cmd.ArgsLenAtDash()
+	switch {
+	case dash < 0:
+		return errors.New("missing '--' separator before the command to run")
+	case dash != 1:
+		return fmt.Errorf("run accepts exactly one project before '--', got %d", dash)
+	case len(args) == dash:
+		return errors.New("no command specified after '--'")
+	}
+	return nil
 }

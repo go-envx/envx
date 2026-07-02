@@ -110,7 +110,10 @@ func loadNamespace(ns namespace, settings Settings, acc *resolved) error {
 		return fmt.Errorf("namespace %s/%s: %w", ns.dir, ns.name, err)
 	}
 
+	// Compute both key->path lookups once up front rather than re-flattening the
+	// env overlay for every key inside the loop.
 	flatKeys := flattenKeys(merged)
+	envKeys := flattenKeys(envMap)
 	for key, value := range flat {
 		finalKey := key
 		if settings.NamespacePrefix {
@@ -118,10 +121,8 @@ func loadNamespace(ns namespace, settings Settings, acc *resolved) error {
 		}
 
 		sourceFile := baseFile
-		if envMap != nil {
-			if _, inEnv := flattenSingle(envMap, key); inEnv {
-				sourceFile = envFile
-			}
+		if _, inEnv := envKeys[key]; inEnv {
+			sourceFile = envFile
 		}
 
 		src := Source{File: sourceFile, Key: flatKeys[key]}

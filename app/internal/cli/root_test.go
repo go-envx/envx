@@ -19,7 +19,7 @@ import (
 func execCmd(args ...string) (stdout, stderr *bytes.Buffer, err error) {
 	stdout = new(bytes.Buffer)
 	stderr = new(bytes.Buffer)
-	cmd := NewRootCmd("test")
+	cmd := NewRootCmd(BuildInfo{Version: "test"})
 	cmd.SetOut(stdout)
 	cmd.SetErr(stderr)
 	cmd.SetArgs(args)
@@ -82,8 +82,12 @@ func TestVersionFlag(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if got, want := stdout.String(), "envx version test\n"; got != want {
-		t.Errorf("got %q, want %q", got, want)
+	out := stdout.String()
+	if !strings.HasPrefix(out, "envx version test\n") {
+		t.Errorf("version output = %q, want it to start with %q", out, "envx version test\n")
+	}
+	if !strings.Contains(out, "commit:") {
+		t.Errorf("version output %q missing commit metadata", out)
 	}
 }
 

@@ -27,7 +27,7 @@ tasks:
   test:
     desc: Run tests for the CLI
     cmds:
-      - go test -race -coverprofile=coverage.out ./...
+      - go test -race -coverpkg=./... -coverprofile=coverage.out ./...
 
   check:
     desc: Run formatting, static analysis, and vulnerability scanning

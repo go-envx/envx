@@ -158,16 +158,6 @@ func flattenKeys(m map[string]any) map[string]string {
 
 // -------------------------------------------------------------------------------------
 
-// flattenSingle reports whether targetKey would be produced by flattening m,
-// returning the original dotted path when it would. Used to attribute a key to
-// an overlay file.
-func flattenSingle(m map[string]any, targetKey string) (string, bool) {
-	path, ok := flattenKeys(m)[targetKey]
-	return path, ok
-}
-
-// -------------------------------------------------------------------------------------
-
 // transformKey applies the prefix and suffix to a single key.
 func transformKey(key, prefix, suffix string) string {
 	if prefix != "" {
