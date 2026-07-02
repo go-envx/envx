@@ -1,6 +1,9 @@
 package envmerge
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
 
 // -------------------------------------------------------------------------------------
 
@@ -42,7 +45,8 @@ func TestFlatten(t *testing.T) {
 	t.Parallel()
 
 	in := map[string]any{
-		"host": "localhost",
+		"host":     "localhost",
+		"password": nil,
 		"credentials": map[string]any{
 			"user-name": "postgres",
 		},
@@ -56,6 +60,10 @@ func TestFlatten(t *testing.T) {
 	}
 	if got["CREDENTIALS_USER_NAME"] != "postgres" {
 		t.Errorf("CREDENTIALS_USER_NAME = %q, want postgres", got["CREDENTIALS_USER_NAME"])
+	}
+	if _, ok := got["PASSWORD"]; !ok || got["PASSWORD"] != "" {
+		t.Errorf("PASSWORD = %q (present=%t), want empty string for a nil leaf",
+			got["PASSWORD"], ok)
 	}
 }
 
@@ -71,8 +79,14 @@ func TestFlattenCollision(t *testing.T) {
 			"key": "b",
 		},
 	}
-	if _, err := flatten(in); err == nil {
+	_, err := flatten(in)
+	if err == nil {
 		t.Fatal("expected flatten collision error")
+	}
+	// The colliding paths are reported in a stable, sorted order so the message
+	// does not vary with map iteration order.
+	if !strings.Contains(err.Error(), `"api.key" and "api_key"`) {
+		t.Errorf("collision message not in stable order: %v", err)
 	}
 }
 

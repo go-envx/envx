@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"strings"
 	"text/tabwriter"
 )
 
@@ -46,13 +45,18 @@ type renderParams struct {
 // -------------------------------------------------------------------------------------
 
 // render writes the result to p.Writer in the requested format ("json" or the
-// default aligned table), masking values unless reveal is set.
+// default aligned table), masking values unless reveal is set. An unrecognized
+// format is rejected so a typo like --output=jsonn fails loudly.
 func render(p *renderParams) error {
 	masked := maskResult(p.Result, p.Reveal)
-	if strings.EqualFold(p.Format, "json") {
+	switch p.Format {
+	case "", "table":
+		return renderTable(p.Writer, masked)
+	case "json":
 		return renderJSON(p.Writer, masked)
+	default:
+		return fmt.Errorf("invalid output format %q (want table or json)", p.Format)
 	}
-	return renderTable(p.Writer, masked)
 }
 
 // -------------------------------------------------------------------------------------

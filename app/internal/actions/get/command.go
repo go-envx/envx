@@ -14,7 +14,8 @@ const (
 		of the specified key. The key is matched case-insensitively (uppercased).
 
 		The target environment is determined by the --env flag, the ENVX_ENV env
-		var, a manifest env setting, or defaults to "development".
+		var, a manifest env setting, or defaults to the first environment declared
+		in envx.yaml.
 	`
 	example = `
 		envx get api-core POSTGRES_HOST

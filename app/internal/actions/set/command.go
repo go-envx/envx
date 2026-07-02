@@ -18,7 +18,8 @@ const (
 		exactly (e.g. "env/postgres", "apps/api-core/env/api-core").
 
 		The target environment is determined by the --env flag, the ENVX_ENV env
-		var, a manifest env setting, or defaults to "development".
+		var, a manifest env setting, or defaults to the first environment declared
+		in envx.yaml.
 	`
 	example = `
 		envx set env/postgres password insecure-password

@@ -150,3 +150,21 @@ func TestRenderMasksByDefault(t *testing.T) {
 		}
 	}
 }
+
+// -------------------------------------------------------------------------------------
+
+// TestRenderInvalidFormat verifies an unrecognized output format is rejected
+// rather than silently falling back to the table.
+func TestRenderInvalidFormat(t *testing.T) {
+	t.Parallel()
+
+	var buf bytes.Buffer
+	err := render(&renderParams{
+		Writer: &buf,
+		Result: sampleResult(),
+		Format: "jsonn",
+	})
+	if err == nil {
+		t.Fatal("expected error for invalid output format")
+	}
+}

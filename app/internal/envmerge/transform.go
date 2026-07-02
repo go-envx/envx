@@ -102,13 +102,25 @@ func flatten(m map[string]any) (map[string]string, error) {
 				continue
 			}
 			if existing, collision := origins[flatKey]; collision {
+				// Order the two paths so the message is stable regardless of the
+				// map iteration order that surfaced the collision.
+				first, second := existing, path
+				if first > second {
+					first, second = second, first
+				}
 				return fmt.Errorf(
 					"flatten collision: %q and %q both produce key %q",
-					existing, path, flatKey,
+					first, second, flatKey,
 				)
 			}
 			origins[flatKey] = path
-			result[flatKey] = fmt.Sprintf("%v", v)
+			// A nil leaf (an empty YAML key such as "password:") resolves to an
+			// empty value rather than the "<nil>" fmt would otherwise produce.
+			if v == nil {
+				result[flatKey] = ""
+			} else {
+				result[flatKey] = fmt.Sprintf("%v", v)
+			}
 		}
 		return nil
 	}

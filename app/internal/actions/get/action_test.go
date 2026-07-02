@@ -12,7 +12,7 @@ import (
 // -------------------------------------------------------------------------------------
 
 // resolveBasic loads the shared "basic" fixture and resolves the api-core
-// project for the default (development) environment.
+// project for the default environment (the first declared).
 func resolveBasic(t *testing.T) *envmerge.Result {
 	t.Helper()
 	path := fixtures.Manifest("basic")
