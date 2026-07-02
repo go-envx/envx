@@ -178,7 +178,7 @@ func resolveEnvmergeParams(
 		Includes:     pl.includes,
 		Environments: mc.manifest.Environments,
 		Settings: envmerge.Settings{
-			Env:    precedenceString(&schema.Env,
+			Env: precedenceString(&schema.Env,
 				in.Env,
 				proj.Env,
 				global.Env,
