@@ -31,11 +31,22 @@ linters:
       settings:
         hugeParam:
           sizeThreshold: 256
+        rangeValCopy:
+          sizeThreshold: 256
     lll:
       line-length: 88
     gosec:
       excludes:
         - G104 # Covered by errcheck
+
+  exclusions:
+    rules:
+      # Test fixtures routinely embed fake secret-looking strings (envx's own
+      # domain is env/secret config), which G101 flags as hardcoded credentials.
+      - path: _test\.go
+        text: "G101"
+        linters:
+          - gosec
 
 formatters:
   enable:

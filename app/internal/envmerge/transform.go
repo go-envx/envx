@@ -81,10 +81,13 @@ func toMap(v any) (map[string]any, bool) {
 // flatten converts a nested map to flat KEY=VALUE pairs suitable for env vars.
 // Key paths are joined with "_" and uppercased (postgres.username ->
 // POSTGRES_USERNAME) and a list leaf is joined into a single delimiter-separated
-// string. It returns an error when two distinct paths collapse to the same flat
-// key (preventing silent data loss) or when a list cannot be rendered (see
-// leafValue).
-func flatten(m map[string]any, delimiter string) (map[string]string, error) {
+// string. Each leaf value is passed through resolve, which dereferences any
+// reference it contains. It returns an error when two distinct paths collapse to
+// the same flat key (preventing silent data loss) or when a leaf cannot be
+// rendered (see leafValue).
+func flatten(
+	m map[string]any, delimiter string, resolve valueResolver,
+) (map[string]string, error) {
 	result := make(map[string]string)
 	origins := make(map[string]string)
 
@@ -116,7 +119,7 @@ func flatten(m map[string]any, delimiter string) (map[string]string, error) {
 				)
 			}
 			origins[flatKey] = path
-			value, err := leafValue(v, path, delimiter)
+			value, err := leafValue(v, path, delimiter, resolve)
 			if err != nil {
 				return err
 			}
@@ -133,19 +136,19 @@ func flatten(m map[string]any, delimiter string) (map[string]string, error) {
 
 // -------------------------------------------------------------------------------------
 
-// leafValue renders a flattened leaf to its env-var string form. A scalar yields
-// itself and a nil leaf (a bare "key:") yields "", rather than the "<nil>" fmt
-// would otherwise produce. A list is joined into a single delimiter-separated
-// string so a value can be authored as a YAML sequence; it errors when an item
-// is itself a list or mapping (which has no flat env-var form) or contains the
-// delimiter (which would make the joined value impossible to split back).
-func leafValue(v any, path, delimiter string) (string, error) {
+// leafValue renders a flattened leaf to its env-var string form, resolving any
+// reference it contains via resolve. A scalar (or nil) yields its resolved
+// string. A list is resolved item-by-item and joined into a single
+// delimiter-separated string, so a reference works inside a list as well as a
+// standalone scalar; it errors when an item is itself a list or mapping (which
+// has no flat env-var form) or when a resolved value contains the delimiter
+// (which would make the joined value impossible to split back).
+func leafValue(
+	v any, path, delimiter string, resolve valueResolver,
+) (string, error) {
 	list, ok := v.([]any)
 	if !ok {
-		if v == nil {
-			return "", nil
-		}
-		return fmt.Sprintf("%v", v), nil
+		return resolve(scalarString(v))
 	}
 
 	items := make([]string, len(list))
@@ -156,9 +159,9 @@ func leafValue(v any, path, delimiter string) (string, error) {
 				path,
 			)
 		}
-		s := ""
-		if item != nil {
-			s = fmt.Sprintf("%v", item)
+		s, err := resolve(scalarString(item))
+		if err != nil {
+			return "", err
 		}
 		if delimiter != "" && strings.Contains(s, delimiter) {
 			return "", fmt.Errorf(
@@ -168,6 +171,17 @@ func leafValue(v any, path, delimiter string) (string, error) {
 		items[i] = s
 	}
 	return strings.Join(items, delimiter), nil
+}
+
+// -------------------------------------------------------------------------------------
+
+// scalarString renders a scalar leaf value to its string form, mapping a nil
+// leaf (a bare "key:") to "" rather than the "<nil>" fmt would produce.
+func scalarString(v any) string {
+	if v == nil {
+		return ""
+	}
+	return fmt.Sprintf("%v", v)
 }
 
 // -------------------------------------------------------------------------------------

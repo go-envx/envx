@@ -24,6 +24,22 @@ type Params struct {
 	Environments []string
 	// Settings holds the fully-resolved env-resolution knobs the merge reads.
 	Settings Settings
+	// Resolver dereferences reference-valued leaves (e.g. secrets) after the merge.
+	// A nil Resolver leaves every value untouched, so callers with no references
+	// need not supply one.
+	Resolver Resolver
+}
+
+// -------------------------------------------------------------------------------------
+
+// Resolver dereferences a single merged value, substituting any reference it
+// recognizes and returning plain values unchanged. env is the active
+// environment, used to resolve environment-implicit references. envmerge defines
+// this interface (the consumer); an implementation lives in the secrets package.
+type Resolver interface {
+	// Resolve returns value with any recognized reference dereferenced, or value
+	// unchanged when it is not a reference.
+	Resolve(value, env string) (string, error)
 }
 
 // -------------------------------------------------------------------------------------

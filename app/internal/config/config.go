@@ -9,6 +9,7 @@ import (
 	"github.com/go-envx/envx/app/internal/manifest"
 	"github.com/go-envx/envx/app/internal/runner"
 	"github.com/go-envx/envx/app/internal/schema"
+	"github.com/go-envx/envx/app/internal/secrets"
 )
 
 // -------------------------------------------------------------------------------------
@@ -93,7 +94,43 @@ func Resolve(in *Input, project string) (*Result, error) {
 	}
 
 	// Resolve the manifest context and input into a single Result.
-	return resolveManifest(mc, in)
+	res, err := resolveManifest(mc, in)
+	if err != nil {
+		return nil, err
+	}
+
+	// Wire the secret resolver so envmerge can dereference secret:// references.
+	resolver, err := buildSecretResolver(m, dir)
+	if err != nil {
+		return nil, err
+	}
+	res.Envmerge.Resolver = resolver
+
+	return res, nil
+}
+
+// -------------------------------------------------------------------------------------
+
+// buildSecretResolver loads the workspace secrets store and returns a resolver
+// bound to it. The store path is the manifest's secrets.path (joined against the
+// manifest directory when relative), defaulting to secrets.yaml beside the
+// manifest. A missing store yields an empty one, so a reference against it fails
+// loudly as a dangling reference rather than leaking the raw reference string.
+func buildSecretResolver(
+	m *schema.Manifest, dir string,
+) (*secrets.Resolver, error) {
+	path := m.Secrets.Path
+	if path == "" {
+		path = filepath.Join(dir, "secrets.yaml")
+	} else if !filepath.IsAbs(path) {
+		path = filepath.Join(dir, path)
+	}
+
+	store, err := secrets.Load(path)
+	if err != nil {
+		return nil, err
+	}
+	return secrets.NewResolver(store, m.Secrets.RequireGroup), nil
 }
 
 // -------------------------------------------------------------------------------------

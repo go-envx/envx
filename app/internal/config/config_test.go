@@ -1,8 +1,11 @@
 package config
 
 import (
+	"os"
+	"path/filepath"
 	"testing"
 
+	"github.com/go-envx/envx/app/internal/envmerge"
 	"github.com/go-envx/envx/app/internal/fixtures"
 	"github.com/go-envx/envx/app/internal/schema"
 )
@@ -216,6 +219,82 @@ func TestResolve(t *testing.T) {
 	}
 	if len(r.Envmerge.Includes) == 0 {
 		t.Error("expected includes from the fixture project")
+	}
+}
+
+// -------------------------------------------------------------------------------------
+
+// writeWorkspace lays out a temp workspace with the given files (path -> body,
+// relative to the workspace root) and returns the manifest path.
+func writeWorkspace(t *testing.T, files map[string]string) string {
+	t.Helper()
+	dir := t.TempDir()
+	for rel, body := range files {
+		full := filepath.Join(dir, rel)
+		if err := os.MkdirAll(filepath.Dir(full), 0o750); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(full, []byte(body), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	return filepath.Join(dir, "envx.yaml")
+}
+
+// -------------------------------------------------------------------------------------
+
+// TestResolveSecretReference verifies the wired resolver dereferences secret
+// references end to end: an implicit-group reference resolves against the active
+// environment's group, and an explicit shared reference resolves against it.
+func TestResolveSecretReference(t *testing.T) {
+	t.Parallel()
+
+	path := writeWorkspace(t, map[string]string{
+		"envx.yaml": "environments: [development, production]\n" +
+			"projects:\n  api:\n    includes: [env/app]\n",
+		"env/app.yaml": "password: secret://api_key\ntoken: secret://shared/token\n",
+		"secrets.yaml": "secrets:\n" +
+			"  development:\n    api_key: dev-secret\n" +
+			"  shared:\n    token: t0k\n",
+	})
+
+	res, err := Resolve(&Input{ConfigPath: &path}, "api")
+	if err != nil {
+		t.Fatalf("Resolve: %v", err)
+	}
+	env, err := envmerge.Build(res.Envmerge)
+	if err != nil {
+		t.Fatalf("Build: %v", err)
+	}
+
+	if v, _ := env.Get("PASSWORD"); v != "dev-secret" {
+		t.Errorf("PASSWORD = %q, want dev-secret (implicit group=development)", v)
+	}
+	if v, _ := env.Get("TOKEN"); v != "t0k" {
+		t.Errorf("TOKEN = %q, want t0k (shared group)", v)
+	}
+}
+
+// -------------------------------------------------------------------------------------
+
+// TestResolveDanglingSecretReference verifies a reference with no matching store
+// entry fails loudly at Build rather than leaking the raw reference string.
+func TestResolveDanglingSecretReference(t *testing.T) {
+	t.Parallel()
+
+	path := writeWorkspace(t, map[string]string{
+		"envx.yaml": "environments: [development]\n" +
+			"projects:\n  api:\n    includes: [env/app]\n",
+		"env/app.yaml": "password: secret://development/missing\n",
+		"secrets.yaml": "secrets:\n  development:\n    other: x\n",
+	})
+
+	res, err := Resolve(&Input{ConfigPath: &path}, "api")
+	if err != nil {
+		t.Fatalf("Resolve: %v", err)
+	}
+	if _, err := envmerge.Build(res.Envmerge); err == nil {
+		t.Fatal("expected dangling reference error")
 	}
 }
 

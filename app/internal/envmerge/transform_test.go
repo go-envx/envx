@@ -7,6 +7,11 @@ import (
 
 // -------------------------------------------------------------------------------------
 
+// passthrough is an identity value resolver for flatten tests (no references).
+func passthrough(s string) (string, error) { return s, nil }
+
+// -------------------------------------------------------------------------------------
+
 // TestDeepMerge verifies recursive map merging with scalar/list replacement.
 func TestDeepMerge(t *testing.T) {
 	t.Parallel()
@@ -51,7 +56,7 @@ func TestFlatten(t *testing.T) {
 			"user-name": "postgres",
 		},
 	}
-	got, err := flatten(in, ",")
+	got, err := flatten(in, ",", passthrough)
 	if err != nil {
 		t.Fatalf("flatten: %v", err)
 	}
@@ -79,7 +84,7 @@ func TestFlattenCollision(t *testing.T) {
 			"key": "b",
 		},
 	}
-	_, err := flatten(in, ",")
+	_, err := flatten(in, ",", passthrough)
 	if err == nil {
 		t.Fatal("expected flatten collision error")
 	}
@@ -105,7 +110,7 @@ func TestFlattenList(t *testing.T) {
 		"gappy": []any{"x", nil, "z"},
 	}
 
-	got, err := flatten(in, ",")
+	got, err := flatten(in, ",", passthrough)
 	if err != nil {
 		t.Fatalf("flatten: %v", err)
 	}
@@ -129,7 +134,8 @@ func TestFlattenList(t *testing.T) {
 func TestFlattenListCustomDelimiter(t *testing.T) {
 	t.Parallel()
 
-	got, err := flatten(map[string]any{"path": []any{"/bin", "/usr/bin"}}, ":")
+	in := map[string]any{"path": []any{"/bin", "/usr/bin"}}
+	got, err := flatten(in, ":", passthrough)
 	if err != nil {
 		t.Fatalf("flatten: %v", err)
 	}
@@ -147,14 +153,15 @@ func TestFlattenListErrors(t *testing.T) {
 
 	t.Run("item contains delimiter", func(t *testing.T) {
 		t.Parallel()
-		if _, err := flatten(map[string]any{"hosts": []any{"a,b", "c"}}, ","); err == nil {
+		in := map[string]any{"hosts": []any{"a,b", "c"}}
+		if _, err := flatten(in, ",", passthrough); err == nil {
 			t.Fatal("expected error for item containing the delimiter")
 		}
 	})
 	t.Run("non-scalar item", func(t *testing.T) {
 		t.Parallel()
 		in := map[string]any{"servers": []any{map[string]any{"host": "a"}}}
-		if _, err := flatten(in, ","); err == nil {
+		if _, err := flatten(in, ",", passthrough); err == nil {
 			t.Fatal("expected error for non-scalar list item")
 		}
 	})

@@ -35,8 +35,30 @@ func Build(p Params) (*Result, error) {
 	// Build the namespace chain from the Includes list.
 	namespaces := buildNamespaces(p.Includes)
 
-	// Merge the namespaces into a single Result.
-	return mergeNamespaces(namespaces, p.Settings)
+	// Merge the namespaces into a single Result, dereferencing reference-valued
+	// leaves through the configured resolver as they are flattened.
+	resolve := newValueResolver(p.Resolver, p.Settings.Env)
+	return mergeNamespaces(namespaces, p.Settings, resolve)
+}
+
+// -------------------------------------------------------------------------------------
+
+// valueResolver dereferences a single flattened leaf value (a scalar, or one
+// item of a list) exactly once, returning plain values unchanged. It is applied
+// at every leaf during flattening, so a reference works anywhere a value does,
+// including inside a list.
+type valueResolver func(string) (string, error)
+
+// -------------------------------------------------------------------------------------
+
+// newValueResolver adapts the optional Resolver into a valueResolver bound to the
+// active environment. A nil Resolver yields an identity func, so callers with no
+// references (and tests) pass values through untouched.
+func newValueResolver(r Resolver, env string) valueResolver {
+	if r == nil {
+		return func(s string) (string, error) { return s, nil }
+	}
+	return func(s string) (string, error) { return r.Resolve(s, env) }
 }
 
 // -------------------------------------------------------------------------------------
@@ -60,16 +82,24 @@ func buildNamespaces(includes []string) []namespace {
 
 // mergeNamespaces loads and merges a sequence of namespaces using the resolved
 // settings. Namespaces are processed in declaration order (deterministic
-// last-wins) and the merged, flattened values plus per-key origins are wrapped
-// in an immutable Result.
-func mergeNamespaces(namespaces []namespace, settings Settings) (*Result, error) {
+// last-wins), reference-valued leaves are dereferenced via resolve as they
+// flatten, and the merged, flattened values plus per-key origins are wrapped in
+// an immutable Result.
+func mergeNamespaces(
+	namespaces []namespace, settings Settings, resolve valueResolver,
+) (*Result, error) {
+	// A nil resolver passes values through unchanged (no references to resolve).
+	if resolve == nil {
+		resolve = newValueResolver(nil, "")
+	}
+
 	acc := &resolved{
 		values:  make(map[string]string),
 		origins: make(map[string]Origin),
 	}
 
 	for _, ns := range namespaces {
-		if err := loadNamespace(ns, settings, acc); err != nil {
+		if err := loadNamespace(ns, settings, acc, resolve); err != nil {
 			return nil, err
 		}
 	}
@@ -86,7 +116,9 @@ func mergeNamespaces(namespaces []namespace, settings Settings) (*Result, error)
 // loadNamespace loads one namespace's base and optional overlay file,
 // deep-merges them, flattens the result to env-var keys, and integrates it into
 // the running values/origins maps.
-func loadNamespace(ns namespace, settings Settings, acc *resolved) error {
+func loadNamespace(
+	ns namespace, settings Settings, acc *resolved, resolve valueResolver,
+) error {
 	baseFile := filepath.Join(ns.dir, ns.name+".yaml")
 	envFile := filepath.Join(ns.dir, ns.name+"."+settings.Env+".yaml")
 
@@ -105,7 +137,7 @@ func loadNamespace(ns namespace, settings Settings, acc *resolved) error {
 
 	merged := deepMerge(baseMap, envMap)
 
-	flat, err := flatten(merged, settings.Delimiter)
+	flat, err := flatten(merged, settings.Delimiter, resolve)
 	if err != nil {
 		return fmt.Errorf("namespace %s/%s: %w", ns.dir, ns.name, err)
 	}

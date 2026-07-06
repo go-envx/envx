@@ -22,6 +22,23 @@ type Manifest struct {
 	// ordered list of includes (namespaces) to load and merge for that project, plus
 	// optional project-specific settings that override the global settings.
 	Projects map[string]Project `yaml:"projects"`
+	// Secrets configures the workspace secrets store used to resolve secret://
+	// references. It is workspace-level (not per-project); its zero value discovers
+	// secrets.yaml beside the manifest and keeps the implicit-group shorthand on.
+	Secrets SecretsConfig `yaml:"secrets"`
+}
+
+// -------------------------------------------------------------------------------------
+
+// SecretsConfig configures how secret references resolve against the workspace
+// secrets store. Both fields are optional.
+type SecretsConfig struct {
+	// Path overrides the secrets file location. Empty discovers secrets.yaml beside
+	// the manifest; a relative path is joined against the manifest directory.
+	Path string `yaml:"path"`
+	// RequireGroup, when true, rejects the "secret://<key>" shorthand and requires
+	// every reference to name its group explicitly (secret://<group>/<key>).
+	RequireGroup bool `yaml:"require_group"`
 }
 
 // -------------------------------------------------------------------------------------
