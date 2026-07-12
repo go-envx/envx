@@ -1,0 +1,33 @@
+version: '3'
+
+# When a task is added, modified, or removed, update the Task table in `docs/README.md`.
+# Minor tasks do not need to be added to the table.
+
+tasks:
+  dev:
+    desc: Start the docs dev server
+    cmds:
+      - pnpm exec smili free-port 4321
+      - pnpm exec astro dev
+
+  build:
+    desc: Build the static docs site
+    cmds:
+      - pnpm exec astro build
+
+  preview:
+    desc: Preview the built docs site
+    deps: [build]
+    cmds:
+      - pnpm exec astro preview
+
+  check:
+    desc: Lint, format, and type-check the docs
+    cmds:
+      - pnpm exec biome check . --write
+      - pnpm exec astro check
+
+  clean:
+    desc: Clean build artifacts and dependencies
+    cmds:
+      - rm -rf dist .astro node_modules

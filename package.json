@@ -1,7 +1,8 @@
 {
-	"name": "root",
-	"packageManager": "pnpm@11.6.0",
-	"devDependencies": {
-		"@biomejs/biome": "2.5.0"
-	}
+  "name": "root",
+  "packageManager": "pnpm@11.9.0",
+  "devDependencies": {
+    "@biomejs/biome": "2.5.0",
+    "@dev-smili/cli": "1.0.1"
+  }
 }

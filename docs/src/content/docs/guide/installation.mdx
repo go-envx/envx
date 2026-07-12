@@ -1,0 +1,38 @@
+---
+title: Installation
+description: Install the envx CLI.
+---
+
+import { Tabs, TabItem } from '@astrojs/starlight/components'
+
+<Tabs>
+  <TabItem label="Go">
+
+```sh
+go install github.com/go-envx/envx/app/cmd/envx@latest
+```
+
+  </TabItem>
+  <TabItem label="Release">
+
+Download a prebuilt binary for your platform from the
+[releases page](https://github.com/go-envx/envx/releases), extract it, and place
+`envx` on your `PATH`.
+
+  </TabItem>
+  <TabItem label="From source">
+
+```sh
+git clone https://github.com/go-envx/envx.git
+cd envx
+task envx:install
+```
+
+  </TabItem>
+</Tabs>
+
+Verify the install:
+
+```sh
+envx --version
+```

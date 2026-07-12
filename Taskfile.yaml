@@ -4,6 +4,9 @@ includes:
   envx:
     taskfile: ./app/Taskfile.yaml
     dir: ./app
+  docs:
+    taskfile: ./docs/Taskfile.yaml
+    dir: ./docs
 
 tasks:
   install:
@@ -12,3 +15,8 @@ tasks:
       - mise install
       - pnpm install
       - task envx:install
+
+  clean:git:
+    desc: Remove local branches whose remote was deleted (interactive)
+    cmds:
+      - pnpm exec smili clean-git

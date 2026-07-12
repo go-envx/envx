@@ -1,0 +1,55 @@
+---
+title: envx
+description: Layered, composable environment management for multi-project workspaces.
+template: splash
+hero:
+  tagline: Declare your environments once, compose them from small reusable files, and resolve them per project and per environment, with full visibility into where every value comes from.
+  actions:
+    - text: Installation
+      link: /guide/installation/
+      icon: right-arrow
+      variant: primary
+    - text: Getting Started
+      link: /guide/getting-started/
+      icon: right-arrow
+    - text: GitHub
+      link: https://github.com/go-envx/envx
+      icon: external
+      variant: minimal
+---
+
+import { Card, CardGrid } from '@astrojs/starlight/components'
+
+## Why envx?
+
+Real projects rarely have one `.env` file. They have a database config shared by
+several services, a gateway config, per-app settings, and different values for
+development, staging, and production. Managing that with copy-pasted `.env` files
+quickly becomes error-prone: values drift, overrides are invisible, and nobody
+knows which file actually won.
+
+envx replaces that sprawl with a single, declarative model: one manifest declares
+your environments and projects, and each project composes its environment from
+small, reusable files layered per environment.
+
+<CardGrid>
+  <Card title="Workspace manifest" icon="document">
+    Declare environments, projects, and settings in one `envx.yaml`.
+  </Card>
+  <Card title="Composable namespaces" icon="puzzle">
+    Build a project's environment from an ordered list of reusable files, merged
+    with last-one-wins semantics.
+  </Card>
+  <Card title="Base + overlay files" icon="seti:config">
+    A base file plus optional per-environment overlays keep environment
+    differences small and explicit.
+  </Card>
+  <Card title="Explain & diff" icon="magnifier">
+    See where every value resolves from, and compare a project across two
+    environments.
+  </Card>
+  <Card title="Run anything" icon="rocket">
+    Launch any command with the fully merged environment injected, with
+    transparent signal forwarding and exit-code propagation.
+  </Card>
+</CardGrid>
