@@ -7,39 +7,6 @@ import (
 
 // -------------------------------------------------------------------------------------
 
-// TestDeepMerge verifies recursive map merging with scalar/list replacement.
-func TestDeepMerge(t *testing.T) {
-	t.Parallel()
-
-	dst := map[string]any{
-		"a": "1",
-		"nested": map[string]any{
-			"x": "base",
-			"y": "keep",
-		},
-	}
-	src := map[string]any{
-		"b": "2",
-		"nested": map[string]any{
-			"x": "override",
-		},
-	}
-
-	got := deepMerge(dst, src)
-	if got["a"] != "1" || got["b"] != "2" {
-		t.Errorf("top-level keys wrong: %v", got)
-	}
-	nested, _ := toMap(got["nested"])
-	if nested["x"] != "override" {
-		t.Errorf("nested.x = %v, want override", nested["x"])
-	}
-	if nested["y"] != "keep" {
-		t.Errorf("nested.y = %v, want keep", nested["y"])
-	}
-}
-
-// -------------------------------------------------------------------------------------
-
 // TestFlatten verifies nested-to-env flattening and key normalization.
 func TestFlatten(t *testing.T) {
 	t.Parallel()

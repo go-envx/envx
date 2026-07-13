@@ -31,35 +31,6 @@ func loadYAML(path string) (map[string]any, error) {
 
 // -------------------------------------------------------------------------------------
 
-// deepMerge recursively merges src into dst: maps are merged key-by-key, while
-// scalars and lists from src replace those in dst. dst is modified in place and
-// returned.
-func deepMerge(dst, src map[string]any) map[string]any {
-	if dst == nil {
-		dst = make(map[string]any)
-	}
-	if src == nil {
-		return dst
-	}
-	for k, srcVal := range src {
-		dstVal, exists := dst[k]
-		if !exists {
-			dst[k] = srcVal
-			continue
-		}
-		srcMap, srcIsMap := toMap(srcVal)
-		dstMap, dstIsMap := toMap(dstVal)
-		if srcIsMap && dstIsMap {
-			dst[k] = deepMerge(dstMap, srcMap)
-		} else {
-			dst[k] = srcVal
-		}
-	}
-	return dst
-}
-
-// -------------------------------------------------------------------------------------
-
 // toMap coerces a value into map[string]any, handling both the standard form
 // and the map[any]any variant that yaml.v3 can produce.
 func toMap(v any) (map[string]any, bool) {

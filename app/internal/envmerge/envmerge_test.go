@@ -221,6 +221,91 @@ func TestMergeNamespacesStrictMissingOverlay(t *testing.T) {
 
 // -------------------------------------------------------------------------------------
 
+// TestMergeNamespacesNestedFlatEquivalence verifies an overlay may override a
+// base value written in the other spelling: a nested log.level in the base is
+// overridden by a flat log_level in the overlay, since both collapse to
+// LOG_LEVEL. Origin tracking attributes the winner to the overlay and records
+// the base as shadowed.
+func TestMergeNamespacesNestedFlatEquivalence(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+	writeYAML(t, dir, "app.yaml", "log:\n  level: info\n")
+	writeYAML(t, dir, "app.production.yaml", "log_level: warn\n")
+
+	res, err := mergeNamespaces(
+		[]namespace{{dir: dir, name: "app"}}, Settings{Env: "production"},
+	)
+	if err != nil {
+		t.Fatalf("mergeNamespaces: %v", err)
+	}
+
+	if v, _ := res.Get("LOG_LEVEL"); v != "warn" {
+		t.Errorf("LOG_LEVEL = %q, want warn (flat overlay overrides nested base)", v)
+	}
+	origin, ok := res.Origin("LOG_LEVEL")
+	if !ok {
+		t.Fatal("expected origin for LOG_LEVEL")
+	}
+	if filepath.Base(origin.Winner.File) != "app.production.yaml" {
+		t.Errorf("LOG_LEVEL winner = %q, want overlay", origin.Winner.File)
+	}
+	if origin.Winner.Key != "log_level" {
+		t.Errorf("LOG_LEVEL winner key = %q, want log_level", origin.Winner.Key)
+	}
+	if len(origin.Shadowed) != 1 || origin.Shadowed[0].Key != "log.level" {
+		t.Errorf("LOG_LEVEL shadowed = %v, want base log.level", origin.Shadowed)
+	}
+}
+
+// -------------------------------------------------------------------------------------
+
+// TestMergeNamespacesNestedPartialOverride verifies layered flattening preserves
+// deep-merge semantics for nested maps: an overlay that sets one leaf under a
+// mapping overrides only that leaf, leaving the base's sibling leaves intact.
+func TestMergeNamespacesNestedPartialOverride(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+	writeYAML(t, dir, "app.yaml", "log:\n  level: info\n  format: json\n")
+	writeYAML(t, dir, "app.production.yaml", "log:\n  level: warn\n")
+
+	res, err := mergeNamespaces(
+		[]namespace{{dir: dir, name: "app"}}, Settings{Env: "production"},
+	)
+	if err != nil {
+		t.Fatalf("mergeNamespaces: %v", err)
+	}
+
+	if v, _ := res.Get("LOG_LEVEL"); v != "warn" {
+		t.Errorf("LOG_LEVEL = %q, want warn", v)
+	}
+	if v, _ := res.Get("LOG_FORMAT"); v != "json" {
+		t.Errorf("LOG_FORMAT = %q, want json (base leaf preserved)", v)
+	}
+}
+
+// -------------------------------------------------------------------------------------
+
+// TestMergeNamespacesSingleFileCollision verifies two spellings that collapse to
+// the same env key within a single file still error, since the value would
+// otherwise be ambiguous.
+func TestMergeNamespacesSingleFileCollision(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+	writeYAML(t, dir, "app.yaml", "log:\n  level: info\nlog_level: warn\n")
+
+	_, err := mergeNamespaces(
+		[]namespace{{dir: dir, name: "app"}}, Settings{Env: "development"},
+	)
+	if err == nil {
+		t.Fatal("expected collision error for two spellings in one file")
+	}
+}
+
+// -------------------------------------------------------------------------------------
+
 // TestMergeNamespacesPrefixSuffix verifies global prefix/suffix and namespace
 // prefixing apply to every key.
 func TestMergeNamespacesPrefixSuffix(t *testing.T) {

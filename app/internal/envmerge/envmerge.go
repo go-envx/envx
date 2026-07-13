@@ -3,6 +3,7 @@ package envmerge
 import (
 	"errors"
 	"fmt"
+	"maps"
 	"os"
 	"path/filepath"
 	"strings"
@@ -83,9 +84,9 @@ func mergeNamespaces(namespaces []namespace, settings Settings) (*Result, error)
 
 // -------------------------------------------------------------------------------------
 
-// loadNamespace loads one namespace's base and optional overlay file,
-// deep-merges them, flattens the result to env-var keys, and integrates it into
-// the running values/origins maps.
+// loadNamespace loads one namespace's base and optional overlay file, flattens
+// each to env-var keys, layers the overlay over the base, and integrates the
+// result into the running values/origins maps.
 func loadNamespace(ns namespace, settings Settings, acc *resolved) error {
 	baseFile := filepath.Join(ns.dir, ns.name+".yaml")
 	envFile := filepath.Join(ns.dir, ns.name+"."+settings.Env+".yaml")
@@ -103,12 +104,23 @@ func loadNamespace(ns namespace, settings Settings, acc *resolved) error {
 		envMap = nil
 	}
 
-	merged := deepMerge(baseMap, envMap)
-
-	flat, err := flatten(merged, settings.Delimiter)
+	// Flatten each file to env-var keys independently, then layer the overlay
+	// over the base. Equivalent nested and flat spellings (log.level and
+	// log_level) collapse to the same env key, so an overlay can override a base
+	// value written in the other style, while flatten still rejects two spellings
+	// colliding within a single file.
+	baseFlat, err := flatten(baseMap, settings.Delimiter)
 	if err != nil {
 		return fmt.Errorf("namespace %s/%s: %w", ns.dir, ns.name, err)
 	}
+	envFlat, err := flatten(envMap, settings.Delimiter)
+	if err != nil {
+		return fmt.Errorf("namespace %s/%s: %w", ns.dir, ns.name, err)
+	}
+
+	flat := make(map[string]string, len(baseFlat)+len(envFlat))
+	maps.Copy(flat, baseFlat)
+	maps.Copy(flat, envFlat)
 
 	// Map each flat key back to its dotted path in the base file and the env
 	// overlay separately, computed once so the per-key loop can attribute a
