@@ -21,6 +21,27 @@
 		"https://biomejs.dev/": true,
 		"https://docs.renovatebot.com/": true
 	},
+	// Go Settings
+	// gopls is installed/pinned via mise (see mise.toml), so stop the Go
+	// extension from checking the module proxy for updates on every activation —
+	// that check is what triggers the recurring "update Go tools" notification.
+	"go.toolsManagement.checkForUpdates": "off",
+  // Text Overrides
+  "[plaintext]": {
+      "editor.wordWrap": "bounded",
+      "editor.wordWrapColumn": 88,
+      "editor.rulers": [88]
+  },
+  "[markdown]": {
+      "editor.wordWrap": "bounded",
+      "editor.wordWrapColumn": 88,
+      "editor.rulers": [88]
+  },
+  "[mdx]": {
+      "editor.wordWrap": "bounded",
+      "editor.wordWrapColumn": 88,
+      "editor.rulers": [88]
+  },
 	// Extensions Recommendations
 	"biome.suggestInstallingGlobally": false,
 	"extensions.ignoreRecommendations": true

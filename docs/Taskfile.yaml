@@ -6,9 +6,12 @@ version: '3'
 tasks:
   dev:
     desc: Start the docs dev server
+    vars:
+      PORT: 4321
     cmds:
-      - pnpm exec smili free-port 4321
-      - pnpm exec astro dev
+      - pnpm exec astro dev stop
+      - pnpm exec smili free-port {{.PORT}}
+      - pnpm exec astro dev --port {{.PORT}}
 
   build:
     desc: Build the static docs site

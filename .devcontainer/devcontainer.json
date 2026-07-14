@@ -27,7 +27,8 @@
 				"logerfo.open-all-files",
 				"mhutchie.git-graph",
 				"tamasfe.even-better-toml",
-				"task.vscode-task"
+				"task.vscode-task",
+        "unifiedjs.vscode-mdx"
 			]
 		}
 	}

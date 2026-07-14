@@ -1,6 +1,6 @@
 <div align="center">
 
-<a href="docs/src/content/docs/guide/introduction.md">
+<a href="docs/src/content/docs/guide/getting-started.md">
   <img src="docs/src/assets/logo.png" alt="envx logo" width="200" height="200" />
 </a>
 
@@ -14,7 +14,7 @@
 
 [Installation](docs/src/content/docs/guide/installation.mdx) &bull;
 [Getting Started](docs/src/content/docs/guide/getting-started.md) &bull;
-[Docs](docs/src/content/docs/guide/introduction.md) &bull;
+[Docs](docs/src/content/docs/configuration/overview.md) &bull;
 [Contributing](docs/src/content/docs/contributing.md)
 
 </div>

@@ -37,15 +37,17 @@ export default defineConfig({
         {
           label: 'Guide',
           items: [
-            { label: 'Introduction', slug: 'guide/introduction' },
             { label: 'Installation', slug: 'guide/installation' },
             { label: 'Getting Started', slug: 'guide/getting-started' },
-            { label: 'Concepts', slug: 'guide/concepts' },
           ],
         },
         {
-          label: 'Reference',
-          items: [{ autogenerate: { directory: 'reference' } }],
+          label: 'Configuration',
+          items: [{ autogenerate: { directory: 'configuration' } }],
+        },
+        {
+          label: 'Commands',
+          items: [{ autogenerate: { directory: 'commands' } }],
         },
         { label: 'Contribute', slug: 'contribute' },
       ],
