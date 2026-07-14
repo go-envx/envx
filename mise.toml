@@ -26,11 +26,6 @@ go = "1.26.4"                     # https://go.dev/ref/spec
 golangci-lint = "2.12.2"          # https://golangci-lint.run/
 goreleaser = "2.16.0"             # https://goreleaser.com/
 
-# gopls — VS Code Go language server. Pinned here so `mise install` installs it
-# automatically; the Go extension then finds it on PATH and stops prompting to
-# update Go tools (see go.toolsManagement.checkForUpdates in .vscode/settings.json).
-"go:golang.org/x/tools/gopls" = "0.23.0"  # https://pkg.go.dev/golang.org/x/tools/gopls
-
 # Node
 node = "24.16.0"                  # https://nodejs.org/docs/latest/api/
 pnpm = "11.6.0"                   # https://pnpm.io/motivation
