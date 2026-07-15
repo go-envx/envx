@@ -44,10 +44,10 @@ var (
 		Usage: "target environment (defaults to first declared environment in envx.yaml)",
 	}
 
-	// Strict requires every environment overlay file in the namespace chain to exist.
-	Strict = FlagSpec{
-		Name:  "strict",
-		Env:   "ENVX_STRICT",
+	// RequireOverlays requires every environment overlay file in the namespace to exist.
+	RequireOverlays = FlagSpec{
+		Name:  "require-overlays",
+		Env:   "ENVX_REQUIRE_OVERLAYS",
 		Usage: "require all environment overlay files to exist",
 	}
 

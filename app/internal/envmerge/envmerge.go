@@ -13,7 +13,7 @@ import (
 
 // namespace identifies one namespace to load. It resolves to up to two files:
 //   - base:    <dir>/<name>.yaml       (required — defines the namespace)
-//   - overlay: <dir>/<name>.<env>.yaml (optional unless strict mode)
+//   - overlay: <dir>/<name>.<env>.yaml (optional unless require_overlays)
 type namespace struct {
 	// dir is the absolute directory holding the namespace's YAML files.
 	dir string
@@ -98,7 +98,7 @@ func loadNamespace(ns namespace, settings Settings, acc *resolved) error {
 
 	envMap, err := loadYAML(envFile)
 	if err != nil {
-		if settings.Strict || !errors.Is(err, os.ErrNotExist) {
+		if settings.RequireOverlays || !errors.Is(err, os.ErrNotExist) {
 			return fmt.Errorf("loading environment file %s: %w", envFile, err)
 		}
 		envMap = nil

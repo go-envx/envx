@@ -18,9 +18,9 @@ const (
 		Use --output=json for machine-readable output.
 	`
 	example = `
-		envx diff api-core development production
-		envx diff api-core development production --reveal
-		envx diff api-core development production --output=json
+		envx diff api-service development production
+		envx diff api-service development production --reveal
+		envx diff api-service development production --output=json
 	`
 )
 
@@ -67,7 +67,7 @@ func NewCommand() *cobra.Command {
 	}
 
 	flags.Register(cmd.Flags(),
-		flags.WithStrict,
+		flags.WithRequireOverlays,
 		flags.WithPrefix,
 		flags.WithSuffix,
 		flags.WithDelimiter,

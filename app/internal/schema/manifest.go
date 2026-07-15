@@ -55,8 +55,8 @@ type Settings struct {
 	Overload *bool `yaml:"overload"`
 	// Prefix is prepended to every resolved env-var key.
 	Prefix string `yaml:"prefix"`
-	// Strict requires every environment overlay file in the namespace chain to exist.
-	Strict *bool `yaml:"strict"`
+	// RequireOverlays requires every environment overlay file in the namespace to exist.
+	RequireOverlays *bool `yaml:"require_overlays"`
 	// Suffix is appended to every resolved env-var key.
 	Suffix string `yaml:"suffix"`
 }

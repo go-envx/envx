@@ -18,8 +18,8 @@ const (
 		in envx.yaml.
 	`
 	example = `
-		envx get api-core POSTGRES_HOST
-		envx get api-core postgres_host --env=production
+		envx get api-service DATABASE_HOST
+		envx get api-service database_host --env=production
 	`
 )
 
@@ -58,7 +58,7 @@ func NewCommand() *cobra.Command {
 
 	flags.Register(cmd.Flags(),
 		flags.WithEnv,
-		flags.WithStrict,
+		flags.WithRequireOverlays,
 		flags.WithPrefix,
 		flags.WithSuffix,
 		flags.WithDelimiter,

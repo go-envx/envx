@@ -20,9 +20,9 @@ const (
 		Use --output=json for machine-readable output.
 	`
 	example = `
-		envx explain api-core
-		envx explain api-core POSTGRES_HOST --reveal
-		envx explain api-core --output=json
+		envx explain api-service
+		envx explain api-service DATABASE_HOST --reveal
+		envx explain api-service --output=json
 	`
 )
 
@@ -70,7 +70,7 @@ func NewCommand() *cobra.Command {
 
 	flags.Register(cmd.Flags(),
 		flags.WithEnv,
-		flags.WithStrict,
+		flags.WithRequireOverlays,
 		flags.WithPrefix,
 		flags.WithSuffix,
 		flags.WithDelimiter,

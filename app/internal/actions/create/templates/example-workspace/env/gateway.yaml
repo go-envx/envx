@@ -1,0 +1,3 @@
+gateway:
+  url: http://gateway.local
+  timeout: 30

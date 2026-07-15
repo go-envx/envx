@@ -152,7 +152,7 @@ so any layer can depend on them without risking an import cycle.
 ## Settings resolution
 
 A "setting" is any knob that controls how envx loads and merges environment files
-(`env`, `strict`, `prefix`, `suffix`, `delimiter`, `namespace_prefix`,
+(`env`, `require_overlays`, `prefix`, `suffix`, `delimiter`, `namespace_prefix`,
 `overload`, plus the `config` bootstrap flag). Every setting can be supplied from
 several places; `config` resolves them with a fixed **precedence**, highest to
 lowest:
@@ -241,7 +241,7 @@ Which flags each verb registers (from each `command.go`):
 | --- | :-: | :-: | :-: | :-: | :-: |
 | `--config` (persistent, all commands) | ✓ | ✓ | ✓ | ✓ | ✓ |
 | `--env` / `-E` | ✓ | ✓ | ✓ | ✓ | |
-| `--strict` | ✓ | ✓ | | ✓ | ✓ |
+| `--require-overlays` | ✓ | ✓ | | ✓ | ✓ |
 | `--prefix` | ✓ | ✓ | | ✓ | ✓ |
 | `--suffix` | ✓ | ✓ | | ✓ | ✓ |
 | `--delimiter` | ✓ | ✓ | | ✓ | ✓ |
@@ -252,6 +252,11 @@ Which flags each verb registers (from each `command.go`):
 
 `diff` takes the two environments as positional arguments, so it does not register
 `--env`.
+
+`create` stands apart from the resolution verbs: it scaffolds an example workspace
+(`create quick-start`, `create example-workspace`) from templates embedded under
+[internal/actions/create/templates](internal/actions/create/templates) and
+registers only `--target-dir` and `--force`.
 
 ## Testing
 

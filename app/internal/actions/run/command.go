@@ -25,9 +25,9 @@ const (
 		in envx.yaml.
 	`
 	example = `
-		envx run api-core -- npm start
-		envx run api-core --env=production -- node server.js
-		envx run api-core --strict -- ./run.sh
+		envx run api-service -- npm start
+		envx run api-service --env=production -- node server.js
+		envx run api-service --require-overlays -- ./run.sh
 	`
 )
 
@@ -62,7 +62,7 @@ func NewCommand() *cobra.Command {
 
 	flags.Register(cmd.Flags(),
 		flags.WithEnv,
-		flags.WithStrict,
+		flags.WithRequireOverlays,
 		flags.WithPrefix,
 		flags.WithSuffix,
 		flags.WithDelimiter,

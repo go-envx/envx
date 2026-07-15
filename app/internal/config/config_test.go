@@ -95,12 +95,12 @@ func TestResolveManifest(t *testing.T) {
 	})
 	t.Run("settings and includes pass through", func(t *testing.T) {
 		r, err := resolveManifest(manifestContext{manifest: m, project: "api"}, &Input{
-			Prefix: strPtr("APP"), Strict: boolPtr(true),
+			Prefix: strPtr("APP"), RequireOverlays: boolPtr(true),
 		})
 		if err != nil {
 			t.Fatal(err)
 		}
-		if r.Envmerge.Settings.Prefix != "APP" || !r.Envmerge.Settings.Strict {
+		if r.Envmerge.Settings.Prefix != "APP" || !r.Envmerge.Settings.RequireOverlays {
 			t.Errorf("settings not applied: %+v", r.Envmerge.Settings)
 		}
 		if len(r.Envmerge.Includes) != 1 || r.Envmerge.Includes[0] != "env/x" {

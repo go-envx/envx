@@ -14,7 +14,7 @@ func TestGetInputUnregisteredStaysNil(t *testing.T) {
 	t.Parallel()
 
 	fs := newFlags()
-	Register(fs, WithStrict, WithPrefix, WithSuffix, WithNamespacePrefix)
+	Register(fs, WithRequireOverlays, WithPrefix, WithSuffix, WithNamespacePrefix)
 	if fs.Lookup(schema.Env.Name) != nil {
 		t.Fatal("--env should not be registered without WithEnv")
 	}
@@ -36,11 +36,11 @@ func TestGetInputCapturesEveryOption(t *testing.T) {
 
 	fs := newFlags()
 	Register(fs,
-		WithConfig, WithEnv, WithStrict, WithPrefix, WithSuffix, WithDelimiter,
+		WithConfig, WithEnv, WithRequireOverlays, WithPrefix, WithSuffix, WithDelimiter,
 		WithNamespacePrefix, WithOverload,
 	)
 	args := []string{
-		"--config", "envx.yaml", "--env", "prod", "--strict", "--prefix", "P",
+		"--config", "envx.yaml", "--env", "prod", "--require-overlays", "--prefix", "P",
 		"--suffix", "S", "--delimiter", ",", "--namespace-prefix", "--overload",
 	}
 	if err := fs.Parse(args); err != nil {
@@ -48,9 +48,9 @@ func TestGetInputCapturesEveryOption(t *testing.T) {
 	}
 
 	in := GetInput(fs)
-	if in.ConfigPath == nil || in.Env == nil || in.Strict == nil || in.Prefix == nil ||
-		in.Suffix == nil || in.Delimiter == nil || in.NamespacePrefix == nil ||
-		in.Overload == nil {
+	if in.ConfigPath == nil || in.Env == nil || in.RequireOverlays == nil ||
+		in.Prefix == nil || in.Suffix == nil || in.Delimiter == nil ||
+		in.NamespacePrefix == nil || in.Overload == nil {
 		t.Fatalf("a flag was not captured by GetInput: %+v", in)
 	}
 }

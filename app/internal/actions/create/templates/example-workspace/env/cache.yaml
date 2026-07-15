@@ -1,0 +1,2 @@
+host: cache.local
+port: 6379

@@ -21,8 +21,8 @@ func TestRegisterAndGetInput(t *testing.T) {
 	t.Parallel()
 
 	fs := newFlags()
-	Register(fs, WithEnv, WithStrict, WithPrefix, WithSuffix, WithNamespacePrefix)
-	args := []string{"--env", "production", "--prefix", "APP", "--strict"}
+	Register(fs, WithEnv, WithRequireOverlays, WithPrefix, WithSuffix, WithNamespacePrefix)
+	args := []string{"--env", "production", "--prefix", "APP", "--require-overlays"}
 	if err := fs.Parse(args); err != nil {
 		t.Fatalf("parse: %v", err)
 	}
@@ -34,8 +34,8 @@ func TestRegisterAndGetInput(t *testing.T) {
 	if in.Prefix == nil || *in.Prefix != "APP" {
 		t.Errorf("Prefix = %v, want APP", in.Prefix)
 	}
-	if in.Strict == nil || !*in.Strict {
-		t.Errorf("Strict = %v, want true", in.Strict)
+	if in.RequireOverlays == nil || !*in.RequireOverlays {
+		t.Errorf("RequireOverlays = %v, want true", in.RequireOverlays)
 	}
 	if in.Suffix != nil {
 		t.Errorf("Suffix = %v, want nil (unset)", in.Suffix)

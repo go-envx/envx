@@ -15,16 +15,16 @@ const (
 		(e.g. "credentials.password").
 
 		The include path must match an entry from a project's includes list
-		exactly (e.g. "env/postgres", "apps/api-core/env/api-core").
+		exactly (e.g. "env/database", "api-service/env/values").
 
 		The target environment is determined by the --env flag, the ENVX_ENV env
 		var, a manifest env setting, or defaults to the first environment declared
 		in envx.yaml.
 	`
 	example = `
-		envx set env/postgres password insecure-password
-		envx set env/postgres credentials.password s3cret --env=staging
-		envx set env/gateway timeout 10 --env=production
+		envx set api-service/env/values log_level warn --env=production
+		envx set env/database database.password rotated --env=production
+		envx set env/gateway gateway.timeout 10
 	`
 )
 

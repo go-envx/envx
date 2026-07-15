@@ -53,7 +53,7 @@ func TestPrecedenceString(t *testing.T) {
 // TestPrecedenceBool verifies the boolean precedence chain including pointer
 // layers.
 func TestPrecedenceBool(t *testing.T) {
-	spec := schema.Strict
+	spec := schema.RequireOverlays
 
 	t.Run("explicit wins", func(t *testing.T) {
 		t.Setenv(spec.Env, "false")

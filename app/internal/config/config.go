@@ -23,8 +23,8 @@ type Input struct {
 	ConfigPath *string
 	// Env is the explicitly requested target environment.
 	Env *string
-	// Strict, when set, requires every overlay file in the chain to exist.
-	Strict *bool
+	// RequireOverlays, when set, requires every overlay file in the chain to exist.
+	RequireOverlays *bool
 	// Prefix is the explicitly requested key prefix.
 	Prefix *string
 	// Suffix is the explicitly requested key suffix.
@@ -185,10 +185,10 @@ func resolveEnvmergeParams(
 				proj.Env,
 				global.Env,
 			),
-			Strict: precedenceBool(&schema.Strict,
-				in.Strict,
-				proj.Strict,
-				global.Strict,
+			RequireOverlays: precedenceBool(&schema.RequireOverlays,
+				in.RequireOverlays,
+				proj.RequireOverlays,
+				global.RequireOverlays,
 			),
 			Prefix: precedenceString(&schema.Prefix,
 				in.Prefix,

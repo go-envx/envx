@@ -2,7 +2,7 @@ environments: [development, staging, production]
 
 settings:
   overload: false
-  strict: false
+  require_overlays: false
 
 projects:
   api-core:

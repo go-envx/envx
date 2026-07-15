@@ -16,7 +16,7 @@ func GetInput(fs *pflag.FlagSet) *config.Input {
 	return &config.Input{
 		ConfigPath:      optString(fs, &schema.Config),
 		Env:             optString(fs, &schema.Env),
-		Strict:          optBool(fs, &schema.Strict),
+		RequireOverlays: optBool(fs, &schema.RequireOverlays),
 		Prefix:          optString(fs, &schema.Prefix),
 		Suffix:          optString(fs, &schema.Suffix),
 		Delimiter:       optString(fs, &schema.Delimiter),

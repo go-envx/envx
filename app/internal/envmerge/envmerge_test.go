@@ -201,18 +201,18 @@ func TestMergeNamespacesShadowTracksBase(t *testing.T) {
 
 // -------------------------------------------------------------------------------------
 
-// TestMergeNamespacesStrictMissingOverlay verifies strict mode errors when an
-// overlay file is absent, while lax mode tolerates it.
-func TestMergeNamespacesStrictMissingOverlay(t *testing.T) {
+// TestMergeNamespacesRequireOverlaysMissingOverlay verifies require_overlays mode
+// errors when an overlay file is absent, while lax mode tolerates it.
+func TestMergeNamespacesRequireOverlaysMissingOverlay(t *testing.T) {
 	t.Parallel()
 
 	dir := t.TempDir()
 	writeYAML(t, dir, "postgres.yaml", "host: localhost\n")
 
 	ns := []namespace{{dir: dir, name: "postgres"}}
-	_, err := mergeNamespaces(ns, Settings{Env: "production", Strict: true})
+	_, err := mergeNamespaces(ns, Settings{Env: "production", RequireOverlays: true})
 	if err == nil {
-		t.Error("expected strict error for missing overlay")
+		t.Error("expected require_overlays error for missing overlay")
 	}
 	if _, err := mergeNamespaces(ns, Settings{Env: "production"}); err != nil {
 		t.Errorf("lax mode should tolerate missing overlay, got %v", err)

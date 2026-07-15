@@ -36,8 +36,8 @@ type Settings struct {
 	// Env is the target environment to resolve; an empty value falls back to the
 	// first declared environment.
 	Env string
-	// Strict requires each namespace's environment overlay file to exist.
-	Strict bool
+	// RequireOverlays requires each namespace's environment overlay file to exist.
+	RequireOverlays bool
 	// Prefix is prepended to every resolved key.
 	Prefix string
 	// Suffix is appended to every resolved key.

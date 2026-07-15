@@ -40,9 +40,10 @@ func WithEnv(fs *pflag.FlagSet) {
 
 // -------------------------------------------------------------------------------------
 
-// WithStrict registers the --strict flag, requiring every overlay file to exist.
-func WithStrict(fs *pflag.FlagSet) {
-	registerBool(fs, &schema.Strict)
+// WithRequireOverlays registers the --require-overlays flag, requiring every
+// overlay file to exist.
+func WithRequireOverlays(fs *pflag.FlagSet) {
+	registerBool(fs, &schema.RequireOverlays)
 }
 
 // -------------------------------------------------------------------------------------
