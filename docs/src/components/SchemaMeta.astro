@@ -13,7 +13,7 @@ interface Props {
 const { type, required = false } = Astro.props
 ---
 
-<div class="badge-row">
+<div class="flex flex-wrap items-center gap-3 my-5">
   <Badge text={type} variant="note" />
   {
     required ? (
@@ -23,13 +23,3 @@ const { type, required = false } = Astro.props
     )
   }
 </div>
-
-<style>
-  .badge-row {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 0.75rem;
-    margin-block: 1.25rem;
-  }
-</style>

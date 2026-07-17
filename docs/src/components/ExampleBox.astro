@@ -1,5 +1,6 @@
 ---
-import IconFolder from '#components/IconFolder.astro'
+import { Icon } from 'astro-icon/components'
+
 // ExampleBox wraps a schema item's example in a native <details> disclosure so the
 // reference page stays scannable: readers expand an example only when they want
 // it. Pass `open` to render it expanded by default. The native disclosure
@@ -18,8 +19,6 @@ import IconFolder from '#components/IconFolder.astro'
 // The eyebrow labels ("Workspace" / "Commands") are inlined here rather than
 // factored into a component: they're two trivial call sites, so a shared
 // component earned its keep less than the indirection cost.
-import IconLightbulb from '#components/IconLightbulb.astro'
-import IconTerminal from '#components/IconTerminal.astro'
 
 interface Props {
   open?: boolean
@@ -33,7 +32,7 @@ const hasCommands = Astro.slots.has('commands')
 
 <details class="example" open={open}>
   <summary>
-    <IconLightbulb />
+    <Icon name="material-symbols:lightbulb-outline" class="h-5 w-5" aria-hidden="true" />
     <span class="label-expand">Expand example</span>
     <span class="label-collapse">Collapse example</span>
   </summary>
@@ -42,7 +41,7 @@ const hasCommands = Astro.slots.has('commands')
       hasWorkspace && (
         <Fragment>
           <div class="example-label">
-            <IconFolder />
+            <Icon name="material-symbols:folder-outline" class="h-6 w-6" aria-hidden="true" />
             Workspace
           </div>
           <div class:list={['example-files', { 'example-files--single': !hasFiles }]}>
@@ -62,7 +61,7 @@ const hasCommands = Astro.slots.has('commands')
       hasCommands && (
         <Fragment>
           <div class="example-label">
-            <IconTerminal />
+            <Icon name="material-symbols:terminal" class="h-6 w-6" aria-hidden="true" />
             Commands
           </div>
           <slot name="commands" />

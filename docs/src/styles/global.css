@@ -1,0 +1,12 @@
+/* Tailwind + Starlight integration preamble.
+ *
+ * Ordering the cascade layers so Starlight's own styles win over Tailwind's
+ * base while Tailwind utilities still override component styles. This follows
+ * the official Starlight Tailwind guide: import the bridge, then Tailwind's
+ * theme and utilities into their respective layers (preflight is intentionally
+ * left out so it doesn't reset Starlight's base styles). */
+@layer base, starlight, theme, components, utilities;
+
+@import "@astrojs/starlight-tailwind";
+@import "tailwindcss/theme.css" layer(theme);
+@import "tailwindcss/utilities.css" layer(utilities);

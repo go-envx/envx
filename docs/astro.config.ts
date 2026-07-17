@@ -1,5 +1,7 @@
 import starlight from '@astrojs/starlight'
+import tailwindcss from '@tailwindcss/vite'
 import { defineConfig } from 'astro/config'
+import icon from 'astro-icon'
 
 /**
  * Docs site configuration:
@@ -13,9 +15,13 @@ export default defineConfig({
   server: {
     host: true,
   },
+  vite: {
+    plugins: [tailwindcss()],
+  },
   integrations: [
     starlight({
       title: 'envx',
+      customCss: ['./src/styles/global.css'],
       description:
         'Layered, composable environment management for multi-project workspaces.',
       logo: {
@@ -53,5 +59,6 @@ export default defineConfig({
         { label: 'Contribute', slug: 'contribute' },
       ],
     }),
+    icon(),
   ],
 })
