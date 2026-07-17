@@ -2,7 +2,7 @@
 title: run
 description: Run a command with a project's merged environment injected.
 sidebar:
-  order: 3
+  order: 4
 ---
 
 ```sh
@@ -27,18 +27,17 @@ verbatim.
 
 ## Examples
 
+These examples use the [Example Workspace](/guide/example-workspace/) (`envx create example-workspace`).
+
 ```sh
 # Run a command with the default environment.
-envx run api-core -- npm start
+envx run api-service -- npm start
 
 # Resolve against a specific environment.
-envx run api-core --env production -- node server.js
+envx run api-service --env production -- node server.js
 
 # Let file values override existing OS env vars.
-envx run api-core --overload -- npm start
-
-# Require every overlay file in the chain to exist.
-envx run api-core --strict -- ./deploy.sh
+envx run api-service --overload -- npm start
 ```
 
 ## Flags
@@ -47,14 +46,14 @@ envx run api-core --strict -- ./deploy.sh
 | --- | --- | --- |
 | `--env`, `-E` | `ENVX_ENV` | Target environment to resolve. |
 | `--overload` | `ENVX_OVERLOAD` | File values override existing OS env vars. |
-| `--strict` | `ENVX_STRICT` | Require every overlay file to exist. |
+| `--require-overlays` | `ENVX_REQUIRE_OVERLAYS` | Require every overlay file to exist. |
 | `--prefix` | `ENVX_PREFIX` | Prefix prepended to every key. |
 | `--suffix` | `ENVX_SUFFIX` | Suffix appended to every key. |
 | `--delimiter` | `ENVX_DELIMITER` | String used to join list values. |
 | `--namespace-prefix` | `ENVX_NAMESPACE_PREFIX` | Prefix each key with its namespace. |
 
 Plus the [global flags](/commands/overview/#global-flags). These flags map to
-[settings](/configuration/settings-reference/) and override the values in `envx.yaml`.
+[settings](/configuration/schema/#settings-2) and override the values in `envx.yaml`.
 
 ## Exit codes
 

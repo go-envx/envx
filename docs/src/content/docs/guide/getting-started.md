@@ -3,7 +3,8 @@ title: Getting Started
 description: Learn the key concepts, then build your first envx workspace.
 ---
 
-This guide introduces the core ideas envx is built on and then walks through setting up a project from scratch.
+This guide introduces the core ideas envx is built on and then walks through
+setting up a project from scratch.
 
 ## Key concepts
 
@@ -11,7 +12,7 @@ envx works with three kinds of files:
 
 | File | Role |
 | --- | --- |
-| `envx.yaml` | The workspace configuration file: defines the environments, projects, and any global settings for envx to use. By default, this file lives at your workspace root. |
+| `envx.yaml` | The workspace manifest: defines the environments, projects, and any global settings for envx to use. By default, this file lives at your workspace root. |
 | `<namespace>.yaml` | The base layer for a namespace: a reusable slice of environment values shared by every environment. |
 | `<namespace>.<environment>.yaml` | The environment overlay for a namespace: values that override or extend the base for one specific environment. |
 
@@ -25,6 +26,10 @@ A few terms are worth naming up front:
 That is the whole model. Everything else is detail you can pick up as you go.
 
 ## Set up a project
+
+:::tip[Skip the typing]
+Run `envx create quick-start` to scaffold this exact workspace, then jump to step 4 to try it out. Otherwise, build it up by hand below.
+:::
 
 ### 1. Workspace configuration file
 
@@ -49,15 +54,15 @@ projects:
       - web-server/env/values
 ```
 
-Each entry under `includes` is a namespace. They merge in declaration order,
-so if two namespaces define the same key, the one listed last wins. Here
-`api-service/env/values` would override any key it shares with `env/database`.
+Here two projects share the `env/gateway` namespace, while `env/database` belongs
+to `api-service` alone. Entries under `includes` merge in declaration order, so if
+two namespaces define the same key, the one listed last wins.
 
 ### 2. Base namespace files
 
-For each namespace, create a base `<namespace>.yaml`. It declares every key the
-namespace provides, with defaults for shared values and blanks for anything an
-environment must supply:
+For each namespace, create a base `<namespace>.yaml` with the values shared across
+every environment. Shared namespaces nest their keys under the namespace name; each
+app keeps its own config flat:
 
 ```yaml
 # env/database.yaml
@@ -69,29 +74,27 @@ database:
 ```yaml
 # env/gateway.yaml
 gateway:
-  url:
+  url: http://gateway.local
   timeout: 30
 ```
 
 ```yaml
 # api-service/env/values.yaml
 name: api-service
-port: 4000
-log:
-  level: info
-  format: json
+log_level: info
 ```
 
 ```yaml
 # web-server/env/values.yaml
 name: web-server
-port: 3000
 ```
 
 **Things to note:**
 
-- Nested keys flatten into `SCREAMING_SNAKE_CASE` env vars, so `log.level`
-  becomes `LOG_LEVEL`.
+- Keys flatten into `SCREAMING_SNAKE_CASE`, so the nested `database.host` becomes
+  `DATABASE_HOST` and the flat `log_level` becomes `LOG_LEVEL`.
+- Nesting shared namespaces keeps their keys distinct — `DATABASE_HOST` rather
+  than a bare `HOST` that could collide with another namespace.
 - Lookups are case-insensitive.
 
 ### 3. Environment overlay files
@@ -102,36 +105,26 @@ environment. Each overlay is merged over its base, so you only write what change
 ```yaml
 # env/database.production.yaml
 database:
-  host: db.production.host
+  host: prod-db.internal
 ```
 
 ```yaml
 # env/gateway.development.yaml
 gateway:
-  url: http://localhost
+  url: http://localhost:8080
 ```
 
 ```yaml
-# env/gateway.production.yaml
-gateway:
-  url: https://gateway.example.com
-```
-
-```yaml
-# api-service/env/values.production.yaml
-log_level: warn
+# api-service/env/values.development.yaml
+log_level: debug
 ```
 
 **Things to note:**
 
-- Overlays supply only the keys that change, so in `production` just
-  `DATABASE_HOST`, `GATEWAY_URL`, and `LOG_LEVEL` come from these files. Every
-  other key still resolves from its base.
-- Flat and nested spellings resolve to the same variable, so the api-service
-  overlay's flat `log_level` overrides its nested `log.level` base: both become
-  `LOG_LEVEL`.
-- A namespace needs an overlay only when its values change, so the web server has
-  no `web-server/env/values.production.yaml`.
+- An overlay supplies only the keys that change, so in `development` just
+  `GATEWAY_URL` and `LOG_LEVEL` come from these files; every other key resolves
+  from its base.
+- A namespace needs an overlay only when its values change, so `web-server` has none.
 
 ### 4. Resolve and run
 
@@ -143,32 +136,31 @@ envx get api-service DATABASE_HOST
 # localhost
 
 envx get api-service DATABASE_HOST --env production
-# db.production.host
+# prod-db.internal
 
 envx get web-server GATEWAY_URL
-# http://localhost
+# http://localhost:8080
 
 envx get web-server DATABASE_HOST
 # error: key "DATABASE_HOST" not found
 
-envx explain web-server
+envx explain api-service
 # show where each value came from
 
 envx run api-service -- node server.js
 # run with the merged environment
-
-envx run web-server -- node server.js
-# gateway + web-server values only
 ```
 
 Each project resolves only the namespaces in its `includes` block, so values stay
-scoped to the project that asks for them.
+scoped to the project that asks for them — `web-server` never sees `DATABASE_HOST`.
 
 ---
 
 :::tip[Next steps]
+- Explore a complete workspace that exercises every setting in the
+  [Example Workspace](/guide/example-workspace/).
 - Learn how to shape `envx.yaml` and every available setting in
-  [Configuration](/configuration/overview/).
+  [Configuration](/configuration/schema/).
 - See the full command surface, with examples and flags, in
   [Commands](/commands/overview/).
 :::

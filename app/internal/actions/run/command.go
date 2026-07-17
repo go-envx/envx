@@ -27,7 +27,7 @@ const (
 	example = `
 		envx run api-service -- npm start
 		envx run api-service --env=production -- node server.js
-		envx run api-service --require-overlays -- ./run.sh
+		envx run api-service --overload -- ./run.sh
 	`
 )
 

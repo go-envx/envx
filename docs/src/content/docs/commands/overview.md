@@ -11,6 +11,7 @@ full flag list.
 
 | Command | Purpose |
 | --- | --- |
+| [`create`](/commands/create/) | Scaffold a ready-to-run example workspace. |
 | [`get`](/commands/get/) | Resolve a project's environment and print one value. |
 | [`run`](/commands/run/) | Run a command with the merged environment injected. |
 | [`set`](/commands/set/) | Write a key/value into a namespace's overlay file. |
@@ -29,7 +30,7 @@ These flags are available on every command:
 
 ## Settings flags
 
-Most commands also accept flags that map to [settings](/configuration/settings-reference/),
-such as `--env`, `--strict`, `--prefix`, `--suffix`, `--delimiter`, and
+Most commands also accept flags that map to [settings](/configuration/schema/#settings-2),
+such as `--env`, `--require-overlays`, `--prefix`, `--suffix`, `--delimiter`, and
 `--namespace-prefix`. These override the matching value in `envx.yaml`. Each
 command page lists exactly which ones it accepts.

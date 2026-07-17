@@ -2,7 +2,7 @@
 title: set
 description: Write a key/value into a namespace's environment overlay file.
 sidebar:
-  order: 4
+  order: 5
 ---
 
 ```sh
@@ -14,7 +14,7 @@ The key supports dot notation for nested YAML paths, such as
 `credentials.password`.
 
 The include path must match an entry from a project's `includes` list exactly,
-for example `env/postgres` or `apps/api-core/env/api-core`. The value is written
+for example `env/database` or `api-service/env/values`. The value is written
 to the overlay for the target environment (`<include-path>.<env>.yaml`).
 
 ## Arguments
@@ -27,15 +27,17 @@ to the overlay for the target environment (`<include-path>.<env>.yaml`).
 
 ## Examples
 
+These examples use the [Example Workspace](/guide/example-workspace/) (`envx create example-workspace`).
+
 ```sh
-# Write a top-level key to the default environment's overlay.
-envx set env/postgres password insecure-password
+# Write a flat key to an app's overlay.
+envx set api-service/env/values log_level warn --env production
 
-# Write a nested key to the staging overlay.
-envx set env/postgres credentials.password s3cret --env staging
+# Write a nested key with dot notation.
+envx set env/database database.password rotated --env production
 
-# Write to the production overlay.
-envx set env/gateway timeout 10 --env production
+# Write to the default environment's overlay.
+envx set env/gateway gateway.timeout 10
 ```
 
 ## Flags

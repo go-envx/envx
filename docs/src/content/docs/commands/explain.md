@@ -2,7 +2,7 @@
 title: explain
 description: Show each resolved value and the file it came from.
 sidebar:
-  order: 5
+  order: 6
 ---
 
 ```sh
@@ -25,15 +25,17 @@ Values are masked by default. Pass `--reveal` to print them in plaintext, or
 
 ## Examples
 
+These examples use the [Example Workspace](/guide/example-workspace/) (`envx create example-workspace`).
+
 ```sh
 # Explain every key for the default environment.
-envx explain api-core
+envx explain api-service
 
 # Explain a single key and reveal its value.
-envx explain api-core POSTGRES_HOST --reveal
+envx explain api-service DATABASE_HOST --reveal
 
 # Emit machine-readable output.
-envx explain api-core --output json
+envx explain api-service --output json
 ```
 
 ## Flags
@@ -43,13 +45,13 @@ envx explain api-core --output json
 | `--reveal` | | Print values in plaintext instead of masking them. |
 | `--output`, `-o` | | Output format: `table` (default) or `json`. |
 | `--env`, `-E` | `ENVX_ENV` | Target environment to resolve. |
-| `--strict` | `ENVX_STRICT` | Require every overlay file to exist. |
+| `--require-overlays` | `ENVX_REQUIRE_OVERLAYS` | Require every overlay file to exist. |
 | `--prefix` | `ENVX_PREFIX` | Prefix prepended to every key. |
 | `--suffix` | `ENVX_SUFFIX` | Suffix appended to every key. |
 | `--delimiter` | `ENVX_DELIMITER` | String used to join list values. |
 | `--namespace-prefix` | `ENVX_NAMESPACE_PREFIX` | Prefix each key with its namespace. |
 
 Plus the [global flags](/commands/overview/#global-flags). The `--env`,
-`--strict`, `--prefix`, `--suffix`, `--delimiter`, and `--namespace-prefix` flags
-map to [settings](/configuration/settings-reference/) and override the values in
+`--require-overlays`, `--prefix`, `--suffix`, `--delimiter`, and `--namespace-prefix` flags
+map to [settings](/configuration/schema/#settings-2) and override the values in
 `envx.yaml`.

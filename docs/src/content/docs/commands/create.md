@@ -1,0 +1,48 @@
+---
+title: create
+description: Scaffold a ready-to-run example workspace.
+sidebar:
+  order: 2
+---
+
+```sh
+envx create <template> [flags]
+```
+
+`create` scaffolds a self-contained envx workspace — an `envx.yaml` plus its
+namespace and overlay files — so you can explore envx without authoring anything
+by hand. Pick a template:
+
+| Template | Description |
+| --- | --- |
+| `quick-start` | A minimal, single-project workspace: the smallest setup that shows how envx resolves and merges files. Mirrors the [Getting Started](/guide/getting-started/) guide. |
+| `example-workspace` | A complete workspace with multiple projects, shared and per-project namespaces, and value shapes that exercise every setting. Mirrors the [Example Workspace](/guide/example-workspace/) guide. |
+
+## Examples
+
+```sh
+# Scaffold the minimal workspace into ./quick-start
+envx create quick-start
+
+# Scaffold the full example into a directory of your choice
+envx create example-workspace --target-dir ./playground
+
+# Overwrite files in an existing directory
+envx create example-workspace --force
+```
+
+## Flags
+
+| Flag | Description |
+| --- | --- |
+| `--target-dir` | Directory to scaffold into (default: the template name). |
+| `--force` | Overwrite existing files instead of stopping on conflicts. |
+
+Plus the [global flags](/commands/overview/#global-flags).
+
+After scaffolding, `cd` into the directory and try a command:
+
+```sh
+cd example-workspace
+envx get api-service DATABASE_HOST
+```

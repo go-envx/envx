@@ -22,6 +22,7 @@
 			"extensions": [
 				"amodio.toggle-excluded-files",
 				"Anthropic.claude-code",
+        "astro-build.astro-vscode",
 				"biomejs.biome",
 				"golang.Go",
 				"logerfo.open-all-files",

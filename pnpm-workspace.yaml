@@ -5,6 +5,3 @@ packages:
 # esbuild compiles its platform binary via an install script that Astro/Vite need.
 allowBuilds:
   esbuild: true
-
-minimumReleaseAgeExclude:
-  - '@dev-smili/cli@1.0.1'

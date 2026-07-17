@@ -1,0 +1,35 @@
+---
+import { Badge } from '@astrojs/starlight/components'
+
+// SchemaMeta renders the type + status badge row shown under each schema key
+// heading. Pass the type as `type`; `required` selects the amber "required"
+// badge, otherwise a green "optional" badge is shown. Centralizing the
+// type/status -> Badge variant mapping keeps every call site declarative.
+interface Props {
+  type: string
+  required?: boolean
+}
+
+const { type, required = false } = Astro.props
+---
+
+<div class="badge-row">
+  <Badge text={type} variant="note" />
+  {
+    required ? (
+      <Badge text="required" variant="caution" />
+    ) : (
+      <Badge text="optional" variant="success" />
+    )
+  }
+</div>
+
+<style>
+  .badge-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.75rem;
+    margin-block: 1.25rem;
+  }
+</style>

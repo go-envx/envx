@@ -2,7 +2,7 @@
 title: get
 description: Resolve a project's environment and print a single value.
 sidebar:
-  order: 2
+  order: 3
 ---
 
 ```sh
@@ -22,15 +22,14 @@ to the same value.
 
 ## Examples
 
+These examples use the [Example Workspace](/guide/example-workspace/) (`envx create example-workspace`).
+
 ```sh
 # Print a value for the default environment.
-envx get api-core POSTGRES_HOST
+envx get api-service DATABASE_HOST
 
 # Resolve against a specific environment.
-envx get api-core postgres_host --env production
-
-# Prefix keys before looking one up.
-envx get api-core APP_POSTGRES_HOST --prefix APP
+envx get api-service database_host --env production
 ```
 
 ## Flags
@@ -38,11 +37,11 @@ envx get api-core APP_POSTGRES_HOST --prefix APP
 | Flag | Environment variable | Description |
 | --- | --- | --- |
 | `--env`, `-E` | `ENVX_ENV` | Target environment to resolve. |
-| `--strict` | `ENVX_STRICT` | Require every overlay file to exist. |
+| `--require-overlays` | `ENVX_REQUIRE_OVERLAYS` | Require every overlay file to exist. |
 | `--prefix` | `ENVX_PREFIX` | Prefix prepended to every key. |
 | `--suffix` | `ENVX_SUFFIX` | Suffix appended to every key. |
 | `--delimiter` | `ENVX_DELIMITER` | String used to join list values. |
 | `--namespace-prefix` | `ENVX_NAMESPACE_PREFIX` | Prefix each key with its namespace. |
 
 Plus the [global flags](/commands/overview/#global-flags). These flags map to
-[settings](/configuration/settings-reference/) and override the values in `envx.yaml`.
+[settings](/configuration/schema/#settings-2) and override the values in `envx.yaml`.

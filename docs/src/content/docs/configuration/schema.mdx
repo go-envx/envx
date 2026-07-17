@@ -1,0 +1,474 @@
+---
+title: Schema
+description: The structural reference for envx.yaml — every key, its type, and its default.
+sidebar:
+  order: 1
+---
+
+import ExampleBox from '#components/ExampleBox.astro';
+import ExampleControls from '#components/ExampleControls.astro';
+import SchemaMeta from '#components/SchemaMeta.astro';
+
+`envx.yaml` is the workspace manifest: it declares your environments, your projects, and the settings that shape how envx resolves them. This page is the structural reference for every key. To see a manifest built from scratch, follow [Getting Started](/guide/getting-started/). To learn how envx locates the manifest, see [Discovery](/configuration/discovery/).
+
+:::note
+Examples on this page are collapsed by default to keep it scannable.
+- Expand one example by clicking it
+- Expand and collapse all examples with the button below — or press <kbd>e</kbd>
+:::
+
+<ExampleControls />
+
+## Manifest
+
+  The top-level object of `envx.yaml`.
+
+### `environments`
+
+  <SchemaMeta type="string[]" required />
+
+  The ordered list of environments you can resolve against. The first entry is the default when [`env`](#env) is not specified.
+
+  <ExampleBox>
+    <Fragment slot="manifest">
+      ```yaml
+      # envx.yaml
+      environments:
+        - development
+        - staging
+        - production
+      ```
+    </Fragment>
+  </ExampleBox>
+
+### `settings`
+
+  <SchemaMeta type="Settings" />
+
+  Global [Settings](#settings-2) applied to every project.
+
+  <ExampleBox>
+    <Fragment slot="manifest">
+      ```yaml
+      # envx.yaml
+      settings:
+        prefix: APP
+        delimiter: ","
+      ```
+    </Fragment>
+  </ExampleBox>
+
+### `projects`
+
+  <SchemaMeta type="map[string]Project" required />
+
+  A map of project name to its [`Project`](#project) definition. Declare at least one.
+
+  <ExampleBox>
+    <Fragment slot="manifest">
+      ```yaml
+      # envx.yaml
+      projects:
+        api-service:
+          includes:
+            - env/database
+      ```
+    </Fragment>
+  </ExampleBox>
+
+## Project
+
+  One entry under [`projects`](#projects).
+
+### `includes`
+
+  <SchemaMeta type="string[]" required />
+
+  The ordered list of namespaces to merge. Each entry `<dir>/<name>` resolves to a base `<dir>/<name>.yaml` and an overlay `<dir>/<name>.<environment>.yaml`. Namespaces merge in declaration order, so when two define the same key, the one listed last wins.
+
+  <ExampleBox>
+    <Fragment slot="manifest">
+      ```yaml
+      # envx.yaml
+      environments:
+        - development
+
+      projects:
+        web:
+          includes:
+            - database
+            - overrides
+      ```
+    </Fragment>
+    <Fragment slot="files">
+      ```yaml
+      # database.yaml
+      host: db.local
+      port: 5432
+      ```
+
+      ```yaml
+      # overrides.yaml
+      host: override.local
+      ```
+    </Fragment>
+    <Fragment slot="commands">
+      ```sh
+      # overrides is listed last, so its host wins; port is untouched.
+      envx get web HOST
+      # override.local
+      envx get web PORT
+      # 5432
+      ```
+    </Fragment>
+  </ExampleBox>
+
+### `settings`
+
+  <SchemaMeta type="Settings" />
+
+  Project-level [Settings](#settings-2) that override the global ones.
+
+  <ExampleBox>
+    <Fragment slot="manifest">
+      ```yaml
+      # envx.yaml
+      environments:
+        - development
+
+      settings:
+        prefix: APP
+
+      projects:
+        web:
+          settings:
+            prefix: WEB
+          includes:
+            - values
+      ```
+    </Fragment>
+    <Fragment slot="files">
+      ```yaml
+      # values.yaml
+      host: localhost
+      ```
+    </Fragment>
+    <Fragment slot="commands">
+      ```sh
+      # The project prefix overrides the global one, so HOST resolves as WEB_HOST.
+      envx get web WEB_HOST
+      # localhost
+      ```
+    </Fragment>
+  </ExampleBox>
+
+## Settings
+
+  Every setting can be declared globally (the top-level [`settings`](#settings) block) or per project (a project's [`settings`](#settings-1) block), and each can also be supplied as a CLI flag or an `ENVX_*` environment variable. When the same setting is set in more than one place, [Settings Resolution](/configuration/settings-resolution/) decides which one wins. Each example below pairs a minimal workspace with a command that resolves the setting.
+
+### `delimiter`
+
+  <SchemaMeta type="string" />
+
+  The string used to join a list-valued leaf into a single variable, so `[db-a.local, db-b.local]` becomes `db-a.local,db-b.local`.
+
+  - **CLI Flag:** `--delimiter`
+  - **Environment Variable:** `ENVX_DELIMITER`
+  - **Default Value:** `","`
+
+  <ExampleBox>
+    <Fragment slot="manifest">
+      ```yaml
+      # envx.yaml
+      environments:
+        - development
+
+      settings:
+        delimiter: ";"
+
+      projects:
+        web:
+          includes:
+            - values
+      ```
+    </Fragment>
+    <Fragment slot="files">
+      ```yaml
+      # values.yaml
+      hosts:
+        - db-a.local
+        - db-b.local
+      ```
+    </Fragment>
+    <Fragment slot="commands">
+      ```sh
+      # A list leaf is joined into one value with the delimiter.
+      envx get web HOSTS
+      # db-a.local;db-b.local
+      ```
+    </Fragment>
+  </ExampleBox>
+
+### `env`
+
+  <SchemaMeta type="string" />
+
+  The environment to resolve. It selects which `<namespace>.<environment>.yaml` overlays are layered on top of each base file. It must be one of the environments declared in [`environments`](#environments).
+
+  - **CLI Flag:** `--env`, `-E`
+  - **Environment Variable:** `ENVX_ENV`
+  - **Default Value:** first declared environment in `environments`
+
+  <ExampleBox>
+    <Fragment slot="manifest">
+      ```yaml
+      # envx.yaml
+      environments:
+        - development
+        - production
+
+      settings:
+        env: production
+
+      projects:
+        web:
+          includes:
+            - values
+      ```
+    </Fragment>
+    <Fragment slot="files">
+      ```yaml
+      # values.yaml
+      host: dev.local
+      ```
+
+      ```yaml
+      # values.production.yaml
+      host: prod.internal
+      ```
+    </Fragment>
+    <Fragment slot="commands">
+      ```sh
+      # env selects the production overlay, so HOST resolves to its value.
+      envx get web HOST
+      # prod.internal
+      ```
+    </Fragment>
+  </ExampleBox>
+
+### `namespace_prefix`
+
+  <SchemaMeta type="bool" />
+
+  Prefix each key with the name of the namespace it came from. Most workspaces avoid this by nesting shared namespaces (see the Example Workspace), but it is useful when flat namespaces collide — the `worker` project includes `cache` and `queue`, which both define `host` and `port`.
+
+  - **CLI Flag:** `--namespace-prefix`
+  - **Environment Variable:** `ENVX_NAMESPACE_PREFIX`
+  - **Default Value:** `false`
+
+  <ExampleBox>
+    <Fragment slot="manifest">
+      ```yaml
+      # envx.yaml
+      environments:
+        - development
+
+      projects:
+        worker:
+          settings:
+            namespace_prefix: true
+          includes:
+            - cache
+            - queue
+      ```
+    </Fragment>
+    <Fragment slot="files">
+      ```yaml
+      # cache.yaml
+      host: cache.local
+      port: 6379
+      ```
+
+      ```yaml
+      # queue.yaml
+      host: queue.local
+      port: 5672
+      ```
+    </Fragment>
+    <Fragment slot="commands">
+      ```sh
+      # cache and queue both define host; the namespace name keeps them apart.
+      envx get worker CACHE_HOST
+      # cache.local
+      envx get worker QUEUE_HOST
+      # queue.local
+      ```
+    </Fragment>
+  </ExampleBox>
+
+### `overload`
+
+  <SchemaMeta type="bool" />
+
+  Let values from your files override existing OS environment variables. Applies to [`run`](/commands/run/); by default an existing OS variable wins.
+
+  - **CLI Flag:** `--overload`
+  - **Environment Variable:** `ENVX_OVERLOAD`
+  - **Default Value:** `false`
+
+  <ExampleBox>
+    <Fragment slot="manifest">
+      ```yaml
+      # envx.yaml
+      environments:
+        - development
+
+      settings:
+        overload: true
+
+      projects:
+        web:
+          includes:
+            - values
+      ```
+    </Fragment>
+    <Fragment slot="files">
+      ```yaml
+      # values.yaml
+      name: from-file
+      ```
+    </Fragment>
+    <Fragment slot="commands">
+      ```sh
+      # With overload, the file value wins over the existing OS variable.
+      NAME=from-os envx run web -- printenv NAME
+      # from-file
+      ```
+    </Fragment>
+  </ExampleBox>
+
+### `prefix`
+
+  <SchemaMeta type="string" />
+
+  Prepended to every resolved key, uppercased and joined with an underscore, so `app` turns `HOST` into `APP_HOST`.
+
+  - **CLI Flag:** `--prefix`
+  - **Environment Variable:** `ENVX_PREFIX`
+  - **Default Value:** `""`
+
+  <ExampleBox>
+    <Fragment slot="manifest">
+      ```yaml
+      # envx.yaml
+      environments:
+        - development
+
+      settings:
+        prefix: app
+
+      projects:
+        web:
+          includes:
+            - values
+      ```
+    </Fragment>
+    <Fragment slot="files">
+      ```yaml
+      # values.yaml
+      host: localhost
+      port: 8080
+      ```
+    </Fragment>
+    <Fragment slot="commands">
+      ```sh
+      # Every key is prefixed, so HOST resolves as APP_HOST.
+      envx get web APP_HOST
+      # localhost
+      ```
+    </Fragment>
+  </ExampleBox>
+
+### `require_overlays`
+
+  <SchemaMeta type="bool" />
+
+  Require every overlay file in a project's namespace chain to exist. A missing overlay becomes an error instead of being silently skipped.
+
+  - **CLI Flag:** `--require-overlays`
+  - **Environment Variable:** `ENVX_REQUIRE_OVERLAYS`
+  - **Default Value:** `false`
+
+  <ExampleBox>
+    <Fragment slot="manifest">
+      ```yaml
+      # envx.yaml
+      environments:
+        - development
+        - staging
+
+      settings:
+        require_overlays: true
+
+      projects:
+        web:
+          includes:
+            - values
+      ```
+    </Fragment>
+    <Fragment slot="files">
+      ```yaml
+      # values.yaml
+      host: localhost
+      ```
+    </Fragment>
+    <Fragment slot="commands">
+      ```sh
+      # There is no values.staging.yaml, so resolving staging errors instead
+      # of silently falling back to the base.
+      envx get web HOST --env staging
+      # Error: loading environment file values.staging.yaml: open values.staging.yaml: no such file or directory
+      ```
+    </Fragment>
+  </ExampleBox>
+
+### `suffix`
+
+  <SchemaMeta type="string" />
+
+  Appended to every resolved key, uppercased and joined with an underscore, so `v2` turns `DATABASE_HOST` into `DATABASE_HOST_V2`.
+
+  - **CLI Flag:** `--suffix`
+  - **Environment Variable:** `ENVX_SUFFIX`
+  - **Default Value:** `""`
+
+  <ExampleBox>
+    <Fragment slot="manifest">
+      ```yaml
+      # envx.yaml
+      environments:
+        - development
+
+      settings:
+        suffix: v2
+
+      projects:
+        web:
+          includes:
+            - values
+      ```
+    </Fragment>
+    <Fragment slot="files">
+      ```yaml
+      # values.yaml
+      host: localhost
+      ```
+    </Fragment>
+    <Fragment slot="commands">
+      ```sh
+      # Every key gets the suffix, so HOST resolves as HOST_V2.
+      envx get web HOST_V2
+      # localhost
+      ```
+    </Fragment>
+  </ExampleBox>
