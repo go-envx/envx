@@ -27,7 +27,7 @@ That is the whole model. Everything else is detail you can pick up as you go.
 
 ## Set up a project
 
-:::tip[Skip the typing]
+:::note[Skip the typing]
 Run `envx create quick-start` to scaffold this exact workspace, then jump to step 4 to try it out. Otherwise, build it up by hand below.
 :::
 

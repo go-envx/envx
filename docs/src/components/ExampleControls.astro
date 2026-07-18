@@ -59,11 +59,11 @@ import KeyboardShortcut from '#components/KeyboardShortcut.astro'
   /**
    * Collect every collapsible example on the page.
    *
-   * @returns The page's `<details[data-example-box]>` disclosures, in document order.
+   * @returns The page's `<details[data-example-accordion]>` disclosures, in document order.
    */
   function getExamples() {
     return Array.from(
-      document.querySelectorAll<HTMLDetailsElement>('details[data-example-box]'),
+      document.querySelectorAll<HTMLDetailsElement>('details[data-example-accordion]'),
     )
   }
 

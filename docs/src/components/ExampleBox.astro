@@ -1,19 +1,11 @@
 ---
 import { Icon } from 'astro-icon/components'
 
-// ExampleBox wraps a schema item's example in a native <details> disclosure so the
-// reference page stays scannable: readers expand an example only when they want
-// it. Pass `open` to render it expanded by default. The native disclosure
-// marker provides the leading caret (it rotates on open for free); the summary
-// label flips between "Expand example" and "Collapse example" via the [open]
-// attribute (CSS only). The summary's lightbulb glyph matches the eyebrow icons.
+// ExampleBox lays out an example's content inside a bordered card body. It is
+// presentational only — wrap it in an <ExampleAccordion> to make the card
+// collapsible (that's how every example on the schema page is rendered).
 //
-// The `data-example-box` attribute is the behavior hook ExampleControls queries
-// (`details[data-example-box]`) to expand/collapse every example at once; it's kept
-// separate from the `example-box` styling class so the styling can change
-// without breaking the toggle-all script.
-//
-// ExampleBox also composes an example's parts from slots so call sites stay
+// ExampleBox composes an example's parts from slots so call sites stay
 // declarative — it renders the eyebrows and the file layout itself:
 //   - `manifest` slot -> the envx.yaml, shown in the left column of a
 //     "Workspace" group.
@@ -25,105 +17,65 @@ import { Icon } from 'astro-icon/components'
 // factored into a component: they're two trivial call sites, so a shared
 // component earned its keep less than the indirection cost.
 
-interface Props {
-  open?: boolean
-}
-
-const { open = false } = Astro.props
 const hasFiles = Astro.slots.has('files')
 const hasWorkspace = Astro.slots.has('manifest') || hasFiles
 const hasCommands = Astro.slots.has('commands')
 ---
 
-<details class="example-box my-6 rounded-lg" data-example-box open={open}>
-  <summary
-    class="example-toggle flex cursor-pointer items-center gap-1.5 px-3.5 py-2.5 font-semibold tracking-[0.08em] uppercase select-none"
-  >
-    <Icon name="material-symbols:lightbulb-outline" class="h-5 w-5" aria-hidden="true" />
-    <span class="label-expand">Expand example</span>
-    <span class="label-collapse">Collapse example</span>
-  </summary>
-  <div class="example-body p-3.5">
-    {
-      hasWorkspace && (
-        <Fragment>
-          <div class="example-label mt-6 mb-2 flex items-center gap-1.5 font-semibold tracking-widest uppercase">
-            <Icon name="material-symbols:folder-outline" class="h-6 w-6" aria-hidden="true" />
-            Workspace
+<div class="example-box @container p-3.5">
+  {
+    hasWorkspace && (
+      <Fragment>
+        <div class="example-label mt-6 mb-2 flex items-center gap-1.5 font-semibold tracking-widest uppercase">
+          <Icon name="material-symbols:folder-outline" class="h-6 w-6" aria-hidden="true" />
+          Workspace
+        </div>
+        {/*
+          The side-by-side split is driven by THIS component's width, not the
+          viewport: `.example-box` above is a `@container`, so the `@min-[...]`
+          variant flips the files grid to two columns once the box itself is
+          wide enough — regardless of sidebars or viewport width. Default is the
+          single-column stack; it upgrades to two columns at the container
+          breakpoint, measured against the container's content box (inside the
+          box's p-3.5 padding) — the space the grid actually has for columns.
+          28rem keeps each column comfortably wide. The ~800px "tablet" case,
+          where Starlight's left sidebar first appears and squeezes the content
+          column, is handled by narrowing --sl-sidebar-width in global.css, NOT
+          by lowering this breakpoint. Tune it if the split feels early or late.
+        */}
+        <div
+          class:list={[
+            'example-files mb-2 grid items-start gap-4',
+            hasFiles ? 'grid-cols-1 @min-[28rem]:grid-cols-2' : 'grid-cols-1',
+          ]}
+        >
+          <div class="example-files__manifest">
+            <slot name="manifest" />
           </div>
-          <div
-            class:list={[
-              'example-files mb-2 grid items-start gap-4',
-              hasFiles ? 'grid-cols-2 max-[50rem]:grid-cols-1' : 'grid-cols-1',
-            ]}
-          >
-            <div class="example-files__manifest">
-              <slot name="manifest" />
+          {hasFiles && (
+            <div class="example-files__namespaces flex flex-col gap-4">
+              <slot name="files" />
             </div>
-            {hasFiles && (
-              <div class="example-files__namespaces flex flex-col gap-4">
-                <slot name="files" />
-              </div>
-            )}
-          </div>
-        </Fragment>
-      )
-    }
-    {
-      hasCommands && (
-        <Fragment>
-          <div class="example-label mt-6 mb-2 flex items-center gap-1.5 font-semibold tracking-widest uppercase">
-            <Icon name="material-symbols:terminal" class="h-6 w-6" aria-hidden="true" />
-            Commands
-          </div>
-          <slot name="commands" />
-        </Fragment>
-      )
-    }
-    <slot />
-  </div>
-</details>
+          )}
+        </div>
+      </Fragment>
+    )
+  }
+  {
+    hasCommands && (
+      <Fragment>
+        <div class="example-label mt-6 mb-2 flex items-center gap-1.5 font-semibold tracking-widest uppercase">
+          <Icon name="material-symbols:terminal" class="h-6 w-6" aria-hidden="true" />
+          Commands
+        </div>
+        <slot name="commands" />
+      </Fragment>
+    )
+  }
+  <slot />
+</div>
 
 <style>
-  /* Card container: the border color is a Starlight token, so the whole border
-     stays in CSS; the card's spacing and rounded corners are utility classes on
-     the <details>. */
-  .example-box {
-    border: 1px solid var(--sl-color-gray-5);
-
-    /* Swap the toggle label to match the current state. */
-    &[open] .label-expand {
-      display: none;
-    }
-    &:not([open]) .label-collapse {
-      display: none;
-    }
-
-    /* Divider under the toggle once the card is open, matching the border. */
-    &[open] .example-toggle {
-      border-bottom: 1px solid var(--sl-color-gray-5);
-    }
-  }
-
-  /* The <summary> acts as the card's toggle: its uppercase label size and color
-     track Starlight theme variables, while the row's flex layout, padding, and
-     typography are utility classes. */
-  .example-toggle {
-    font-size: var(--sl-text-xs);
-    color: var(--sl-color-gray-2);
-
-    /* Tint the toggle's lightbulb with the muted Starlight gray. */
-    & :global(svg) {
-      color: var(--sl-color-gray-3);
-    }
-
-    /* Keyboard focus ring, using the accent-with-white-fallback token. */
-    &:focus-visible {
-      outline: 2px solid var(--sl-color-accent-high, var(--sl-color-white));
-      outline-offset: -2px;
-    }
-  }
-
   /* Eyebrow tokens: the label's size and color come from Starlight; its flex
      layout, spacing, and typography are utility classes. */
   .example-label {
@@ -133,7 +85,7 @@ const hasCommands = Astro.slots.has('commands')
 
   /* Trim the slotted content's leading and trailing margins so the body hugs its
      contents; targets generated markdown children, so it can't be a utility class. */
-  .example-body {
+  .example-box {
     & > :global(:first-child) {
       margin-block-start: 0;
     }
