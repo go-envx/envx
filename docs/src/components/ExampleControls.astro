@@ -1,4 +1,6 @@
 ---
+import KeyboardShortcut from '#components/KeyboardShortcut.astro'
+
 // ExampleControls renders the single Expand/Collapse-all toggle for the schema
 // page's collapsible examples. It lives in a component (rather than page
 // markup) because it needs client interactivity; the explanatory Note lives in
@@ -10,110 +12,95 @@
 
 <button
   type="button"
-  class="example-toggle-all"
-  data-examples-toggle
+  class="toggle mt-4 mb-6 inline-flex cursor-pointer items-center gap-2 rounded-full px-4 py-2 font-semibold tracking-[0.08em] uppercase shadow-[0_2px_10px_rgba(0,0,0,0.25)]"
+  data-toggle
   data-state="closed"
 >
   <span class="label-expand">Expand all examples</span>
   <span class="label-collapse">Collapse all examples</span>
-  <kbd>e</kbd>
+  <KeyboardShortcut size="lg">e</KeyboardShortcut>
 </button>
 
 <p class="sr-only" data-examples-status aria-live="polite"></p>
 
 <style>
-  .example-toggle-all {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.5rem;
-    margin-block: 1rem 1.5rem;
-    padding: 0.55rem 0.95rem;
+  /* Pill tokens: the border, fill, text color, and label size all track
+     Starlight theme variables, so they read clearest as CSS. The pill's shape,
+     spacing, and typographic layout live in utility classes on the element. */
+  .toggle {
     border: 1px solid var(--sl-color-gray-5);
-    border-radius: 2rem;
     background: var(--sl-color-gray-6);
     color: var(--sl-color-white);
     font-size: var(--sl-text-xs);
-    font-weight: 600;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.25);
-    cursor: pointer;
-  }
 
-  .example-toggle-all:hover {
-    border-color: var(--sl-color-gray-4);
-    background: var(--sl-color-gray-5);
-  }
+    /* Lift the border and fill one Starlight gray step on hover. */
+    &:hover {
+      border-color: var(--sl-color-gray-4);
+      background: var(--sl-color-gray-5);
+    }
 
-  /* Swap the button label with the toggle state, no JS needed for the text. */
-  .example-toggle-all[data-state='open'] .label-expand {
-    display: none;
-  }
+    /* Keyboard focus ring, using the accent-with-white-fallback token. */
+    &:focus-visible {
+      outline: 2px solid var(--sl-color-accent-high, var(--sl-color-white));
+      outline-offset: 2px;
+    }
 
-  .example-toggle-all:not([data-state='open']) .label-collapse {
-    display: none;
-  }
-
-  /* Visually hidden live-region text, kept in the accessibility tree. */
-  .sr-only {
-    position: absolute;
-    width: 1px;
-    height: 1px;
-    padding: 0;
-    margin: -1px;
-    overflow: hidden;
-    clip: rect(0, 0, 0, 0);
-    white-space: nowrap;
-    border: 0;
-  }
-
-  /* Keyboard focus ring, using the accent-with-white-fallback token. */
-  [data-examples-toggle]:focus-visible {
-    outline: 2px solid var(--sl-color-accent-high, var(--sl-color-white));
-    outline-offset: 2px;
-  }
-</style>
-
-<style is:global>
-  /* Keycap for the `e` shortcut hint, shared by the toggle button and the Note
-     aside. Scoped to page content so it doesn't restyle Starlight chrome (e.g.
-     the header search's Ctrl K hint). */
-  .sl-markdown-content kbd {
-    display: inline-block;
-    min-width: 1.5em;
-    padding: 0.15em 0.4em;
-    border: 1px solid var(--sl-color-gray-4);
-    border-radius: 0.3rem;
-    background: var(--sl-color-gray-5);
-    color: var(--sl-color-white);
-    font-family: var(--sl-font-mono, ui-monospace, monospace);
-    font-size: 0.8em;
-    line-height: 1;
-    text-align: center;
-    text-transform: none;
-    letter-spacing: 0;
+    /* Swap the button label to match the toggle state. */
+    &[data-state='open'] .label-expand {
+      display: none;
+    }
+    &:not([data-state='open']) .label-collapse {
+      display: none;
+    }
   }
 </style>
 
 <script>
+  /**
+   * Collect every collapsible example on the page.
+   *
+   * @returns The page's `<details[data-example-box]>` disclosures, in document order.
+   */
   function getExamples() {
     return Array.from(
-      document.querySelectorAll<HTMLDetailsElement>('details.example'),
+      document.querySelectorAll<HTMLDetailsElement>('details[data-example-box]'),
     )
   }
 
+  /**
+   * Find the single Expand/Collapse-all toggle button by its behavior hook.
+   *
+   * @returns The toggle button, or `null` before it renders.
+   */
+  function getToggleButton() {
+    return document.querySelector<HTMLButtonElement>('[data-toggle]')
+  }
+
+  /**
+   * Report whether every example is currently expanded.
+   *
+   * @returns `true` when at least one example exists and all are open.
+   */
   function allOpen() {
     const items = getExamples()
     return items.length > 0 && items.every((d) => d.open)
   }
 
+  /**
+   * Mirror the current expand/collapse state onto the toggle button so its
+   * CSS-driven label matches the examples.
+   */
   function syncButton() {
-    const btn = document.querySelector<HTMLButtonElement>(
-      '[data-examples-toggle]',
-    )
+    const btn = getToggleButton()
     if (btn) btn.dataset.state = allOpen() ? 'open' : 'closed'
   }
 
+  /**
+   * Expand or collapse every example, then sync the button and announce the
+   * change through the polite live region.
+   *
+   * @param open - `true` to expand all examples, `false` to collapse them.
+   */
   function setAll(open: boolean) {
     const items = getExamples()
     if (items.length === 0) return
@@ -127,10 +114,16 @@
     }
   }
 
-  // Toggling every example at once changes the page height a lot, which would
-  // otherwise leave the reader scrolled to a different section. Anchor on the
-  // heading the reader is currently under and restore its viewport position
-  // after the toggle so the view stays put.
+  /**
+   * Run a DOM mutation while keeping the reader's viewport anchored.
+   *
+   * Toggling every example at once changes the page height a lot, which would
+   * otherwise leave the reader scrolled to a different section. Anchor on the
+   * heading the reader is currently under and restore its viewport position
+   * after the mutation so the view stays put.
+   *
+   * @param mutate - The DOM mutation to run between measuring and restoring.
+   */
   function preserveScroll(mutate: () => void) {
     const headings = Array.from(
       document.querySelectorAll<HTMLElement>(
@@ -149,10 +142,21 @@
     if (anchor) window.scrollBy(0, anchor.getBoundingClientRect().top - before)
   }
 
+  /**
+   * Flip every example between fully expanded and collapsed, preserving the
+   * reader's scroll position.
+   */
   function toggleAll() {
     preserveScroll(() => setAll(!allOpen()))
   }
 
+  /**
+   * Detect whether an element is a text-entry surface, so the shortcut can bow
+   * out while the reader is typing (WCAG 2.1.4).
+   *
+   * @param el - The element to test, typically an event target.
+   * @returns `true` for editable hosts, inputs, textareas, and selects.
+   */
   function isTyping(el: EventTarget | null): boolean {
     if (!(el instanceof HTMLElement)) return false
     if (el.isContentEditable) return true
@@ -160,6 +164,13 @@
     return tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT'
   }
 
+  /**
+   * Handle the global `e` shortcut that toggles all examples. Ignores the key
+   * while a modifier is held, during IME composition, or while the reader is
+   * typing into a field.
+   *
+   * @param event - The keydown event from the document listener.
+   */
   function onKeydown(event: KeyboardEvent) {
     if (event.ctrlKey || event.metaKey || event.altKey || event.isComposing) {
       return
@@ -168,10 +179,13 @@
     if (event.key.toLowerCase() === 'e') toggleAll()
   }
 
+  /**
+   * Wire the toggle button's click handler and each example's `toggle`
+   * listener, then sync the button. Guarded with data flags so repeated calls
+   * (e.g. on Starlight's `astro:page-load`) don't attach duplicate listeners.
+   */
   function wireExampleControls() {
-    const btn = document.querySelector<HTMLButtonElement>(
-      '[data-examples-toggle]',
-    )
+    const btn = getToggleButton()
     if (btn && !btn.dataset.wired) {
       btn.dataset.wired = 'true'
       btn.addEventListener('click', toggleAll)
@@ -184,6 +198,8 @@
     syncButton()
   }
 
+  // Register the keyboard shortcut once per document, then wire the controls now
+  // and again after each Starlight client-side navigation.
   if (!document.documentElement.dataset.exampleKeys) {
     document.documentElement.dataset.exampleKeys = 'true'
     document.addEventListener('keydown', onKeydown)
