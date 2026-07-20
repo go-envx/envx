@@ -157,8 +157,6 @@ scoped to the project that asks for them — `web-server` never sees `DATABASE_H
 ---
 
 :::tip[Next steps]
-- Explore a complete workspace that exercises every setting in the
-  [Example Workspace](/guide/example-workspace/).
 - Learn how to shape `envx.yaml` and every available setting in
   [Configuration](/configuration/schema/).
 - See the full command surface, with examples and flags, in

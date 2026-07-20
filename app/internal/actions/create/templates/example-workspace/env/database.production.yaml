@@ -1,4 +1,0 @@
-database:
-  host: prod-db.internal
-  user: prod_app
-  password: prod-secret-rotated

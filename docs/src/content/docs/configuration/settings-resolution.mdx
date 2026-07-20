@@ -1,0 +1,82 @@
+---
+title: Settings Resolution
+description: How envx resolves each setting when the same one is supplied in more than one place.
+sidebar:
+  order: 3
+---
+
+import ExampleBox from '#components/ExampleBox.astro';
+
+The same setting can be declared in several places — a global default in
+`envx.yaml`, a per-project override, a CLI flag, or an environment variable. This
+page explains how envx decides which one wins. For what each setting does, see
+[Schema](/configuration/schema/#settings-2).
+
+## Per-project overrides
+
+Settings can be declared globally and overridden for a single project. A project
+setting always wins over the matching global setting — for example, a project that
+sets `prefix: web` overrides a global `prefix: app`. The example below shows this.
+
+## Precedence
+
+The same settings can also be supplied at the command line or through the
+environment. envx resolves each setting using this precedence, highest to lowest:
+
+1. **CLI flag** (e.g. `--prefix`)
+2. **`ENVX_*` environment variable** (e.g. `ENVX_PREFIX`)
+3. **Project settings** (`projects.<name>.settings`)
+4. **Global settings** (top-level `settings`)
+5. **Built-in default**
+
+## Examples
+
+The workspace below sets `prefix: app` globally and overrides it to `prefix: web`
+on the `web` project. Watch each layer take over in turn — the project setting,
+then an `ENVX_PREFIX` variable, then a `--prefix` flag — by the prefix applied to
+every resolved key:
+
+  <ExampleBox>
+    <Fragment slot="manifest">
+      ```yaml
+      # envx.yaml
+      environments:
+        - development
+
+      settings:
+        prefix: app
+
+      projects:
+        web:
+          settings:
+            prefix: web
+          includes:
+            - values
+      ```
+    </Fragment>
+    <Fragment slot="files">
+      ```yaml
+      # values.yaml
+      host: localhost
+      ```
+    </Fragment>
+    <Fragment slot="commands">
+      ```sh
+      # Project setting wins over global:
+      # keys are WEB_-prefixed.
+      envx get web WEB_HOST
+      # localhost
+
+      # ENVX_PREFIX overrides the project
+      # setting: keys become ENV_-prefixed.
+      ENVX_PREFIX=env envx get web ENV_HOST
+      # localhost
+
+      # A --prefix flag overrides the
+      # variable: keys become CLI_-prefixed.
+      ENVX_PREFIX=env envx get web CLI_HOST \
+        --prefix cli
+      # localhost
+      ```
+    </Fragment>
+  </ExampleBox>

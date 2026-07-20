@@ -254,7 +254,7 @@ Which flags each verb registers (from each `command.go`):
 `--env`.
 
 `create` stands apart from the resolution verbs: it scaffolds an example workspace
-(`create quick-start`, `create example-workspace`) from templates embedded under
+(`create quick-start`) from a template embedded under
 [internal/actions/create/templates](internal/actions/create/templates) and
 registers only `--target-dir` and `--force`.
 

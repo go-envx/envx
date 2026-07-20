@@ -15,8 +15,7 @@ import (
 // -------------------------------------------------------------------------------------
 
 // templatesFS embeds the create templates. Each subdirectory of templates/ is one
-// named workspace ("quick-start", "example-workspace") laid out exactly as it
-// should appear on disk.
+// named workspace ("quick-start") laid out exactly as it should appear on disk.
 //
 //go:embed all:templates
 var templatesFS embed.FS
@@ -24,8 +23,7 @@ var templatesFS embed.FS
 // Template names, matching the subdirectories under templates/ and the "create"
 // subcommand names.
 const (
-	quickStart       = "quick-start"
-	exampleWorkspace = "example-workspace"
+	quickStart = "quick-start"
 )
 
 // -------------------------------------------------------------------------------------

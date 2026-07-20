@@ -1,9 +1,0 @@
-database:
-  host: localhost
-  port: 5432
-  name: app
-  user: app
-  password: secret
-  pool_hosts:
-    - db-a.local
-    - db-b.local

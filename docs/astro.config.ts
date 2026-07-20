@@ -45,7 +45,6 @@ export default defineConfig({
           items: [
             { label: 'Installation', slug: 'guide/installation' },
             { label: 'Getting Started', slug: 'guide/getting-started' },
-            { label: 'Example Workspace', slug: 'guide/example-workspace' },
           ],
         },
         {

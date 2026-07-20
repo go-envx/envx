@@ -5,6 +5,8 @@ sidebar:
   order: 3
 ---
 
+import ExampleBox from '#components/ExampleBox.astro';
+
 ```sh
 envx get <project> <key>
 ```
@@ -22,15 +24,56 @@ to the same value.
 
 ## Examples
 
-These examples use the [Example Workspace](/guide/example-workspace/) (`envx create example-workspace`).
+The examples below resolve a small workspace — an `api` project with one nested
+`db` namespace and a production overlay:
 
-```sh
-# Print a value for the default environment.
-envx get api-service DATABASE_HOST
+  <ExampleBox>
+    <Fragment slot="manifest">
+      ```yaml
+      # envx.yaml
+      environments:
+        - development
+        - production
 
-# Resolve against a specific environment.
-envx get api-service database_host --env production
-```
+      projects:
+        api:
+          includes:
+            - db
+      ```
+    </Fragment>
+    <Fragment slot="files">
+      ```yaml
+      # db.yaml
+      db:
+        host: localhost
+        port: 5432
+        password: dev-secret
+      ```
+
+      ```yaml
+      # db.production.yaml
+      db:
+        host: prod.internal
+        password: prod-secret
+      ```
+    </Fragment>
+    <Fragment slot="commands">
+      ```sh
+      # development is the default env.
+      envx get api DB_HOST
+      # localhost
+
+      # Keys match case-insensitively.
+      envx get api db_host
+      # localhost
+
+      # Resolve a specific environment.
+      envx get api DB_HOST \
+        --env production
+      # prod.internal
+      ```
+    </Fragment>
+  </ExampleBox>
 
 ## Flags
 

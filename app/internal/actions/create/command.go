@@ -23,13 +23,6 @@ const (
 		environments — the smallest setup that shows how envx resolves and merges
 		environment files.
 	`
-
-	exampleShort = "Scaffold a full workspace that exercises every feature"
-	exampleLong  = `
-		Scaffold a complete workspace: multiple projects, shared and per-project
-		namespaces, environment overlays, and value shapes that exercise every
-		setting (prefixing, list delimiters, namespace prefixes, and more).
-	`
 )
 
 // -------------------------------------------------------------------------------------
@@ -47,7 +40,6 @@ func NewCommand() *cobra.Command {
 	}
 	cmd.AddCommand(
 		newTemplateCmd(quickStart, quickStartShort, quickStartLong),
-		newTemplateCmd(exampleWorkspace, exampleShort, exampleLong),
 	)
 	return cmd
 }

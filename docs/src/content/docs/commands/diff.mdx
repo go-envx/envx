@@ -5,6 +5,8 @@ sidebar:
   order: 7
 ---
 
+import ExampleBox from '#components/ExampleBox.astro';
+
 ```sh
 envx diff <project> <env-a> <env-b>
 ```
@@ -28,18 +30,69 @@ flag.
 
 ## Examples
 
-These examples use the [Example Workspace](/guide/example-workspace/) (`envx create example-workspace`).
+The examples below use the same `api` workspace, comparing its two environments.
+Only `DB_HOST` and `DB_PASSWORD` change between them; `DB_PORT` is the same in
+both, so it does not appear:
 
-```sh
-# Compare development against production.
-envx diff api-service development production
+  <ExampleBox>
+    <Fragment slot="manifest">
+      ```yaml
+      # envx.yaml
+      environments:
+        - development
+        - production
 
-# Reveal the differing values.
-envx diff api-service development production --reveal
+      projects:
+        api:
+          includes:
+            - db
+      ```
+    </Fragment>
+    <Fragment slot="files">
+      ```yaml
+      # db.yaml
+      db:
+        host: localhost
+        port: 5432
+        password: dev-secret
+      ```
 
-# Emit machine-readable output.
-envx diff api-service development production --output json
-```
+      ```yaml
+      # db.production.yaml
+      db:
+        host: prod.internal
+        password: prod-secret
+      ```
+    </Fragment>
+    <Fragment slot="commands">
+      ```sh
+      # Compare two environments (masked).
+      envx diff api development production
+      # ~  DB_HOST      ******** -> ********
+      # ~  DB_PASSWORD  ******** -> ********
+
+      # Reveal the differing values.
+      envx diff api development production \
+        --reveal
+      # ~  DB_HOST      localhost -> prod.internal
+      # ~  DB_PASSWORD  dev-secret -> prod-secret
+
+      # Machine-readable output.
+      envx diff api development production \
+        --output json
+      # {
+      #   "changed": [
+      #     {
+      #       "key": "DB_HOST",
+      #       "env_a": "********",
+      #       "env_b": "********"
+      #     },
+      #     ...
+      #   ]
+      # }
+      ```
+    </Fragment>
+  </ExampleBox>
 
 ## Flags
 

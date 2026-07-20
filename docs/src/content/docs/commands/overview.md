@@ -28,9 +28,27 @@ These flags are available on every command:
 | `--help`, `-h` | | Show help for the command. |
 | `--version` | | Print the envx version (root command). |
 
-## Settings flags
+## Command flags
 
-Most commands also accept flags that map to [settings](/configuration/schema/#settings-2),
-such as `--env`, `--require-overlays`, `--prefix`, `--suffix`, `--delimiter`, and
-`--namespace-prefix`. These override the matching value in `envx.yaml`. Each
-command page lists exactly which ones it accepts.
+Beyond the global flags, most commands share a common set. The flags in the top
+group map to [settings](/configuration/schema/#settings-2) and override the
+matching value in `envx.yaml`; the bottom group is available only at the command
+line. A ✓ marks where each flag applies:
+
+| Flag | [`get`](/commands/get/) | [`run`](/commands/run/) | [`set`](/commands/set/) | [`explain`](/commands/explain/) | [`diff`](/commands/diff/) |
+| --- | :-: | :-: | :-: | :-: | :-: |
+| **Configurable in `envx.yaml`** | | | | | |
+| [`--env`](/configuration/schema/#env), `-E` | ✓ | ✓ | ✓ | ✓ | |
+| [`--require-overlays`](/configuration/schema/#require_overlays) | ✓ | ✓ | | ✓ | ✓ |
+| [`--prefix`](/configuration/schema/#prefix) | ✓ | ✓ | | ✓ | ✓ |
+| [`--suffix`](/configuration/schema/#suffix) | ✓ | ✓ | | ✓ | ✓ |
+| [`--delimiter`](/configuration/schema/#delimiter) | ✓ | ✓ | | ✓ | ✓ |
+| [`--namespace-prefix`](/configuration/schema/#namespace_prefix) | ✓ | ✓ | | ✓ | ✓ |
+| [`--overload`](/configuration/schema/#overload) | | ✓ | | | |
+| **Command-line only** | | | | | |
+| `--reveal` | | | | ✓ | ✓ |
+| `--output`, `-o` | | | | ✓ | ✓ |
+
+`diff` compares two environments given as positional arguments, so it does not
+accept `--env`. `create` is not shown: it scaffolds a workspace and takes only
+`--target-dir` and `--force`.

@@ -5,6 +5,8 @@ sidebar:
   order: 6
 ---
 
+import ExampleBox from '#components/ExampleBox.astro';
+
 ```sh
 envx explain <project> [key]
 ```
@@ -25,18 +27,68 @@ Values are masked by default. Pass `--reveal` to print them in plaintext, or
 
 ## Examples
 
-These examples use the [Example Workspace](/guide/example-workspace/) (`envx create example-workspace`).
+The examples below use the same `api` workspace. Values are masked unless you pass
+`--reveal`:
 
-```sh
-# Explain every key for the default environment.
-envx explain api-service
+  <ExampleBox>
+    <Fragment slot="manifest">
+      ```yaml
+      # envx.yaml
+      environments:
+        - development
+        - production
 
-# Explain a single key and reveal its value.
-envx explain api-service DATABASE_HOST --reveal
+      projects:
+        api:
+          includes:
+            - db
+      ```
+    </Fragment>
+    <Fragment slot="files">
+      ```yaml
+      # db.yaml
+      db:
+        host: localhost
+        port: 5432
+        password: dev-secret
+      ```
 
-# Emit machine-readable output.
-envx explain api-service --output json
-```
+      ```yaml
+      # db.production.yaml
+      db:
+        host: prod.internal
+        password: prod-secret
+      ```
+    </Fragment>
+    <Fragment slot="commands">
+      ```sh
+      # Explain every key (values masked).
+      envx explain api
+      # KEY          VALUE     SOURCE
+      # DB_HOST      ********  db.yaml
+      # DB_PASSWORD  ********  db.yaml
+      # DB_PORT      ********  db.yaml
+
+      # Explain one key and reveal it.
+      envx explain api DB_PASSWORD \
+        --reveal
+      # KEY          VALUE       SOURCE
+      # DB_PASSWORD  dev-secret  db.yaml
+
+      # Machine-readable output.
+      envx explain api --output json
+      # [
+      #   {
+      #     "key": "DB_HOST",
+      #     "value": "********",
+      #     "source": "db.yaml",
+      #     "sourceKey": "db.host"
+      #   },
+      #   ...
+      # ]
+      ```
+    </Fragment>
+  </ExampleBox>
 
 ## Flags
 

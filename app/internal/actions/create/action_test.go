@@ -16,7 +16,7 @@ import (
 func TestExecuteScaffoldsFiles(t *testing.T) {
 	t.Parallel()
 
-	for _, name := range []string{quickStart, exampleWorkspace} {
+	for _, name := range []string{quickStart} {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 
@@ -60,15 +60,14 @@ func TestExecuteRefusesOverwrite(t *testing.T) {
 
 // -------------------------------------------------------------------------------------
 
-// TestExampleWorkspaceResolves scaffolds the example workspace and resolves it,
-// guarding the outputs the docs rely on: the development overlay wins the database
-// host, the last-included project namespace wins the PORT collision, and a list
-// leaf joins with the default delimiter.
-func TestExampleWorkspaceResolves(t *testing.T) {
+// TestQuickStartResolves scaffolds the quick-start workspace and resolves it,
+// guarding that the scaffolded files load and that api-service resolves the
+// database host the getting-started guide and the "try it" hint rely on.
+func TestQuickStartResolves(t *testing.T) {
 	t.Parallel()
 
 	dir := t.TempDir()
-	p := actionParams{Template: exampleWorkspace, TargetDir: dir}
+	p := actionParams{Template: quickStart, TargetDir: dir}
 	if _, err := execute(p); err != nil {
 		t.Fatalf("scaffold: %v", err)
 	}
@@ -84,14 +83,7 @@ func TestExampleWorkspaceResolves(t *testing.T) {
 		t.Fatalf("build: %v", err)
 	}
 
-	cases := map[string]string{
-		"DATABASE_HOST":       "dev-db.local",
-		"PORT":                "3001",
-		"DATABASE_POOL_HOSTS": "db-a.local,db-b.local",
-	}
-	for key, want := range cases {
-		if got, _ := env.Get(key); got != want {
-			t.Errorf("%s = %q, want %q", key, got, want)
-		}
+	if got, _ := env.Get("DATABASE_HOST"); got != "localhost" {
+		t.Errorf("DATABASE_HOST = %q, want %q", got, "localhost")
 	}
 }

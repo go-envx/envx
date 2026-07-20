@@ -16,7 +16,6 @@ by hand. Pick a template:
 | Template | Description |
 | --- | --- |
 | `quick-start` | A minimal, single-project workspace: the smallest setup that shows how envx resolves and merges files. Mirrors the [Getting Started](/guide/getting-started/) guide. |
-| `example-workspace` | A complete workspace with multiple projects, shared and per-project namespaces, and value shapes that exercise every setting. Mirrors the [Example Workspace](/guide/example-workspace/) guide. |
 
 ## Examples
 
@@ -24,11 +23,11 @@ by hand. Pick a template:
 # Scaffold the minimal workspace into ./quick-start
 envx create quick-start
 
-# Scaffold the full example into a directory of your choice
-envx create example-workspace --target-dir ./playground
+# Scaffold into a directory of your choice
+envx create quick-start --target-dir ./playground
 
 # Overwrite files in an existing directory
-envx create example-workspace --force
+envx create quick-start --force
 ```
 
 ## Flags
@@ -43,6 +42,6 @@ Plus the [global flags](/commands/overview/#global-flags).
 After scaffolding, `cd` into the directory and try a command:
 
 ```sh
-cd example-workspace
+cd quick-start
 envx get api-service DATABASE_HOST
 ```

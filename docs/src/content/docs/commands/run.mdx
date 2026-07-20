@@ -5,6 +5,8 @@ sidebar:
   order: 4
 ---
 
+import ExampleBox from '#components/ExampleBox.astro';
+
 ```sh
 envx run <project> -- <command> [args...]
 ```
@@ -27,18 +29,62 @@ verbatim.
 
 ## Examples
 
-These examples use the [Example Workspace](/guide/example-workspace/) (`envx create example-workspace`).
+The examples below use the same `api` workspace, running `printenv` so you can see
+the injected values:
 
-```sh
-# Run a command with the default environment.
-envx run api-service -- npm start
+  <ExampleBox>
+    <Fragment slot="manifest">
+      ```yaml
+      # envx.yaml
+      environments:
+        - development
+        - production
 
-# Resolve against a specific environment.
-envx run api-service --env production -- node server.js
+      projects:
+        api:
+          includes:
+            - db
+      ```
+    </Fragment>
+    <Fragment slot="files">
+      ```yaml
+      # db.yaml
+      db:
+        host: localhost
+        port: 5432
+        password: dev-secret
+      ```
 
-# Let file values override existing OS env vars.
-envx run api-service --overload -- npm start
-```
+      ```yaml
+      # db.production.yaml
+      db:
+        host: prod.internal
+        password: prod-secret
+      ```
+    </Fragment>
+    <Fragment slot="commands">
+      ```sh
+      # development is the default env.
+      envx run api -- printenv DB_HOST
+      # localhost
+
+      # Resolve a specific environment.
+      envx run api --env production \
+        -- printenv DB_HOST
+      # prod.internal
+
+      # An existing OS var wins by default.
+      DB_HOST=os.local envx run api \
+        -- printenv DB_HOST
+      # os.local
+
+      # --overload lets file values win.
+      DB_HOST=os.local envx run api \
+        --overload -- printenv DB_HOST
+      # localhost
+      ```
+    </Fragment>
+  </ExampleBox>
 
 ## Flags
 

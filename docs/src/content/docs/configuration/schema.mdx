@@ -123,9 +123,12 @@ Examples on this page are collapsed by default to keep it scannable.
     </Fragment>
     <Fragment slot="commands">
       ```sh
-      # overrides is listed last, so its host wins; port is untouched.
+      # overrides is listed last,
+      # so it wins over database.
+
       envx get web HOST
       # override.local
+
       envx get web PORT
       # 5432
       ```
@@ -151,6 +154,9 @@ Examples on this page are collapsed by default to keep it scannable.
         prefix: APP
 
       projects:
+        api:
+          includes:
+            - values
         web:
           settings:
             prefix: WEB
@@ -166,8 +172,10 @@ Examples on this page are collapsed by default to keep it scannable.
     </Fragment>
     <Fragment slot="commands">
       ```sh
-      # The project prefix overrides the global one, so HOST resolves as WEB_HOST.
       envx get web WEB_HOST
+      # localhost
+
+      envx get api APP_HOST
       # localhost
       ```
     </Fragment>
@@ -215,9 +223,14 @@ Examples on this page are collapsed by default to keep it scannable.
     </Fragment>
     <Fragment slot="commands">
       ```sh
-      # A list leaf is joined into one value with the delimiter.
       envx get web HOSTS
       # db-a.local;db-b.local
+
+      ENVX_DELIMITER=" " envx get web HOSTS
+      # db-a.local db-b.local
+
+      envx get web HOSTS --delimiter "|"
+      # db-a.local|db-b.local
       ```
     </Fragment>
   </ExampleBox>
@@ -264,9 +277,14 @@ Examples on this page are collapsed by default to keep it scannable.
     </Fragment>
     <Fragment slot="commands">
       ```sh
-      # env selects the production overlay, so HOST resolves to its value.
       envx get web HOST
       # prod.internal
+
+      ENVX_ENV=development envx get web HOST
+      # dev.local
+
+      envx get web HOST -E development
+      # dev.local
       ```
     </Fragment>
   </ExampleBox>
@@ -276,7 +294,7 @@ Examples on this page are collapsed by default to keep it scannable.
 
   <SchemaMeta type="bool" />
 
-  Prefix each key with the name of the namespace it came from. Most workspaces avoid this by nesting shared namespaces (see the Example Workspace), but it is useful when flat namespaces collide — the `worker` project includes `cache` and `queue`, which both define `host` and `port`.
+  Prefix each key with the name of the namespace it came from. Most workspaces avoid this by nesting shared namespaces, but it is useful when flat namespaces collide — the `worker` project below includes `cache` and `queue`, which both define `host` and `port`.
 
   - **CLI Flag:** `--namespace-prefix`
   - **Environment Variable:** `ENVX_NAMESPACE_PREFIX`
@@ -314,10 +332,16 @@ Examples on this page are collapsed by default to keep it scannable.
     </Fragment>
     <Fragment slot="commands">
       ```sh
-      # cache and queue both define host; the namespace name keeps them apart.
       envx get worker CACHE_HOST
       # cache.local
       envx get worker QUEUE_HOST
+      # queue.local
+
+      # Turn it off and the flat keys collide — the last include wins.
+      ENVX_NAMESPACE_PREFIX=false envx get worker HOST
+      # queue.local
+
+      envx get worker HOST --namespace-prefix=false
       # queue.local
       ```
     </Fragment>
@@ -359,9 +383,14 @@ Examples on this page are collapsed by default to keep it scannable.
     </Fragment>
     <Fragment slot="commands">
       ```sh
-      # With overload, the file value wins over the existing OS variable.
       NAME=from-os envx run web -- printenv NAME
       # from-file
+
+      ENVX_OVERLOAD=false NAME=from-os envx run web -- printenv NAME
+      # from-os
+
+      NAME=from-os envx run web --overload=false -- printenv NAME
+      # from-os
       ```
     </Fragment>
   </ExampleBox>
@@ -403,8 +432,13 @@ Examples on this page are collapsed by default to keep it scannable.
     </Fragment>
     <Fragment slot="commands">
       ```sh
-      # Every key is prefixed, so HOST resolves as APP_HOST.
       envx get web APP_HOST
+      # localhost
+
+      ENVX_PREFIX=svc envx get web SVC_HOST
+      # localhost
+
+      envx get web SVC_HOST --prefix svc
       # localhost
       ```
     </Fragment>
@@ -447,10 +481,14 @@ Examples on this page are collapsed by default to keep it scannable.
     </Fragment>
     <Fragment slot="commands">
       ```sh
-      # There is no values.staging.yaml, so resolving staging errors instead
-      # of silently falling back to the base.
       envx get web HOST --env staging
       # Error: loading environment file values.staging.yaml: open values.staging.yaml: no such file or directory
+
+      ENVX_REQUIRE_OVERLAYS=false envx get web HOST --env staging
+      # localhost
+
+      envx get web HOST --env staging --require-overlays=false
+      # localhost
       ```
     </Fragment>
   </ExampleBox>
@@ -491,8 +529,13 @@ Examples on this page are collapsed by default to keep it scannable.
     </Fragment>
     <Fragment slot="commands">
       ```sh
-      # Every key gets the suffix, so HOST resolves as HOST_V2.
       envx get web HOST_V2
+      # localhost
+
+      ENVX_SUFFIX=beta envx get web HOST_BETA
+      # localhost
+
+      envx get web HOST_BETA --suffix beta
       # localhost
       ```
     </Fragment>
