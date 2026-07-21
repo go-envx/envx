@@ -13,7 +13,7 @@ envx set <include-path> <key> <value>
 
 `set` writes a key/value pair into the environment overlay file for a namespace.
 The key supports dot notation for nested YAML paths, such as
-`credentials.password`.
+`pool.max_size`.
 
 The include path must match an entry from a project's `includes` list exactly,
 for example `env/database` or `api-service/env/values`. The value is written
@@ -54,14 +54,14 @@ within its YAML:
       db:
         host: localhost
         port: 5432
-        password: dev-secret
+        pool_size: 10
       ```
 
       ```yaml
       # db.production.yaml
       db:
         host: prod.internal
-        password: prod-secret
+        pool_size: 50
       ```
     </Fragment>
     <Fragment slot="commands">
@@ -73,14 +73,14 @@ within its YAML:
       #   db:
       #     host: db.local
 
-      # Update a nested key in an existing
-      # overlay; other keys are preserved.
-      envx set db db.password rotated \
+      # Update a key in an existing overlay;
+      # other keys are preserved.
+      envx set db db.host replica.internal \
         --env production
       # writes db.production.yaml:
       #   db:
-      #     host: prod.internal
-      #     password: rotated
+      #     host: replica.internal
+      #     pool_size: 50
       ```
     </Fragment>
   </ExampleBox>

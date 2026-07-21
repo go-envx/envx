@@ -52,14 +52,14 @@ the injected values:
       db:
         host: localhost
         port: 5432
-        password: dev-secret
+        pool_size: 10
       ```
 
       ```yaml
       # db.production.yaml
       db:
         host: prod.internal
-        password: prod-secret
+        pool_size: 50
       ```
     </Fragment>
     <Fragment slot="commands">

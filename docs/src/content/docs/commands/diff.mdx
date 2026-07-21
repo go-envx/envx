@@ -31,7 +31,7 @@ flag.
 ## Examples
 
 The examples below use the same `api` workspace, comparing its two environments.
-Only `DB_HOST` and `DB_PASSWORD` change between them; `DB_PORT` is the same in
+Only `DB_HOST` and `DB_POOL_SIZE` change between them; `DB_PORT` is the same in
 both, so it does not appear:
 
   <ExampleBox>
@@ -54,28 +54,28 @@ both, so it does not appear:
       db:
         host: localhost
         port: 5432
-        password: dev-secret
+        pool_size: 10
       ```
 
       ```yaml
       # db.production.yaml
       db:
         host: prod.internal
-        password: prod-secret
+        pool_size: 50
       ```
     </Fragment>
     <Fragment slot="commands">
       ```sh
       # Compare two environments (masked).
       envx diff api development production
-      # ~  DB_HOST      ******** -> ********
-      # ~  DB_PASSWORD  ******** -> ********
+      # ~  DB_HOST       ******** -> ********
+      # ~  DB_POOL_SIZE  ******** -> ********
 
       # Reveal the differing values.
       envx diff api development production \
         --reveal
-      # ~  DB_HOST      localhost -> prod.internal
-      # ~  DB_PASSWORD  dev-secret -> prod-secret
+      # ~  DB_HOST       localhost -> prod.internal
+      # ~  DB_POOL_SIZE  10 -> 50
 
       # Machine-readable output.
       envx diff api development production \

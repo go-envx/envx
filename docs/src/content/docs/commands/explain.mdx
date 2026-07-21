@@ -50,30 +50,29 @@ The examples below use the same `api` workspace. Values are masked unless you pa
       db:
         host: localhost
         port: 5432
-        password: dev-secret
+        pool_size: 10
       ```
 
       ```yaml
       # db.production.yaml
       db:
         host: prod.internal
-        password: prod-secret
+        pool_size: 50
       ```
     </Fragment>
     <Fragment slot="commands">
       ```sh
       # Explain every key (values masked).
       envx explain api
-      # KEY          VALUE     SOURCE
-      # DB_HOST      ********  db.yaml
-      # DB_PASSWORD  ********  db.yaml
-      # DB_PORT      ********  db.yaml
+      # KEY           VALUE     SOURCE
+      # DB_HOST       ********  db.yaml
+      # DB_POOL_SIZE  ********  db.yaml
+      # DB_PORT       ********  db.yaml
 
       # Explain one key and reveal it.
-      envx explain api DB_PASSWORD \
-        --reveal
-      # KEY          VALUE       SOURCE
-      # DB_PASSWORD  dev-secret  db.yaml
+      envx explain api DB_HOST --reveal
+      # KEY      VALUE      SOURCE
+      # DB_HOST  localhost  db.yaml
 
       # Machine-readable output.
       envx explain api --output json
