@@ -60,21 +60,23 @@ two namespaces define the same key, the one listed last wins.
 
 ### 2. Base namespace files
 
-For each namespace, create a base `<namespace>.yaml` with the values shared across
-every environment. Shared namespaces nest their keys under the namespace name; each
-app keeps its own config flat:
+For each namespace, create a base `<namespace>.yaml` that declares every key the
+namespace uses. Give shared keys their default value, and leave environment-specific
+values — like a database host — empty to fill in per environment (step 3). Shared
+namespaces nest their keys under the namespace name; each app keeps its own config
+flat:
 
 ```yaml
 # env/database.yaml
 database:
-  host: localhost
+  host: # set per environment
   port: 5432
 ```
 
 ```yaml
 # env/gateway.yaml
 gateway:
-  url: http://gateway.local
+  url: # set per environment
   timeout: 30
 ```
 
@@ -91,6 +93,9 @@ name: web-server
 
 **Things to note:**
 
+- A base declares every key the namespace uses, so its full shape lives in one
+  place. Keys with a sensible default (`port`, `timeout`) get one here;
+  environment-specific values (`host`, `url`) are left empty and set per environment.
 - Keys flatten into `SCREAMING_SNAKE_CASE`, so the nested `database.host` becomes
   `DATABASE_HOST` and the flat `log_level` becomes `LOG_LEVEL`.
 - Nesting shared namespaces keeps their keys distinct — `DATABASE_HOST` rather
@@ -101,6 +106,12 @@ name: web-server
 
 Add a `<namespace>.<environment>.yaml` overlay for any values that differ per
 environment. Each overlay is merged over its base, so you only write what changes:
+
+```yaml
+# env/database.development.yaml
+database:
+  host: localhost
+```
 
 ```yaml
 # env/database.production.yaml
@@ -115,15 +126,23 @@ gateway:
 ```
 
 ```yaml
+# env/gateway.production.yaml
+gateway:
+  url: https://gateway.internal
+```
+
+```yaml
 # api-service/env/values.development.yaml
 log_level: debug
 ```
 
 **Things to note:**
 
-- An overlay supplies only the keys that change, so in `development` just
-  `GATEWAY_URL` and `LOG_LEVEL` come from these files; every other key resolves
+- Each overlay supplies only what changes, so in `development` just `DATABASE_HOST`,
+  `GATEWAY_URL`, and `LOG_LEVEL` come from these files; every other key resolves
   from its base.
+- Because `host` and `url` have no base default, each environment sets them in its
+  own overlay.
 - A namespace needs an overlay only when its values change, so `web-server` has none.
 
 ### 4. Resolve and run
