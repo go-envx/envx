@@ -86,12 +86,6 @@ var (
 		Usage: "file values override OS env vars",
 	}
 
-	// Reveal prints values in plaintext instead of masking them.
-	Reveal = FlagSpec{
-		Name:  "reveal",
-		Usage: "print values instead of masking",
-	}
-
 	// Output selects the rendering format for tabular commands.
 	Output = FlagSpec{
 		Name:  "output",

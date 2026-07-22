@@ -21,8 +21,8 @@ func TestSpecHelpText(t *testing.T) {
 		},
 		{
 			name: "without env var",
-			spec: FlagSpec{Name: "reveal", Usage: "print values instead of masking"},
-			want: "print values instead of masking",
+			spec: FlagSpec{Name: "output", Usage: "output format: table|json"},
+			want: "output format: table|json",
 		},
 	}
 
@@ -52,7 +52,6 @@ func TestCatalogEnvVarsUnique(t *testing.T) {
 		Overload,
 		Prefix,
 		RequireOverlays,
-		Reveal,
 		Suffix,
 	}
 	seen := make(map[string]string)

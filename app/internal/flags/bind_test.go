@@ -31,13 +31,13 @@ func TestBindString(t *testing.T) {
 func TestBindBool(t *testing.T) {
 	t.Parallel()
 
-	var reveal bool
+	var requireOverlays bool
 	fs := newFlags()
-	BindBool(fs, &reveal, &schema.Reveal)
-	if err := fs.Parse([]string{"--reveal"}); err != nil {
+	BindBool(fs, &requireOverlays, &schema.RequireOverlays)
+	if err := fs.Parse([]string{"--require-overlays"}); err != nil {
 		t.Fatalf("parse: %v", err)
 	}
-	if !reveal {
-		t.Error("reveal = false, want true")
+	if !requireOverlays {
+		t.Error("require-overlays = false, want true")
 	}
 }

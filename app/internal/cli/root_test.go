@@ -216,13 +216,13 @@ func TestSetRoundTrip(t *testing.T) {
 
 // -------------------------------------------------------------------------------------
 
-// TestExplain verifies masking by default, --reveal, and JSON output.
+// TestExplain verifies explain prints values by default and supports JSON output.
 func TestExplain(t *testing.T) {
 	t.Parallel()
 
 	cfg := fixtures.Manifest("basic")
 
-	t.Run("masks by default", func(t *testing.T) {
+	t.Run("shows value", func(t *testing.T) {
 		t.Parallel()
 		stdout, _, err := execCmd(
 			"explain", "--config", cfg, "--env", "development", "api-core", "HOST",
@@ -234,22 +234,8 @@ func TestExplain(t *testing.T) {
 		if !strings.Contains(out, "HOST") {
 			t.Errorf("expected HOST in output, got %q", out)
 		}
-		if strings.Contains(out, "dev-db.local") {
-			t.Errorf("expected value to be masked, got %q", out)
-		}
-	})
-
-	t.Run("reveal shows value", func(t *testing.T) {
-		t.Parallel()
-		stdout, _, err := execCmd(
-			"explain", "--config", cfg, "--env", "development",
-			"--reveal", "api-core", "HOST",
-		)
-		if err != nil {
-			t.Fatalf("explain --reveal: %v", err)
-		}
-		if !strings.Contains(stdout.String(), "dev-db.local") {
-			t.Errorf("expected revealed value, got %q", stdout.String())
+		if !strings.Contains(out, "dev-db.local") {
+			t.Errorf("expected value in output, got %q", out)
 		}
 	})
 
@@ -257,7 +243,7 @@ func TestExplain(t *testing.T) {
 		t.Parallel()
 		stdout, _, err := execCmd(
 			"explain", "--config", cfg, "--env", "development",
-			"--reveal", "--output", "json", "api-core", "HOST",
+			"--output", "json", "api-core", "HOST",
 		)
 		if err != nil {
 			t.Fatalf("explain --output json: %v", err)
@@ -274,9 +260,9 @@ func TestExplain(t *testing.T) {
 
 // -------------------------------------------------------------------------------------
 
-// TestDiff verifies diff reports changed keys across two environments and honors
-// --reveal (values shown) versus the default (values masked) — locking that diff
-// both registers and reads the display flags.
+// TestDiff verifies diff reports changed keys across two environments and prints
+// their values by default — locking that diff both registers and reads the
+// display flags.
 func TestDiff(t *testing.T) {
 	t.Parallel()
 
@@ -307,16 +293,10 @@ func TestDiff(t *testing.T) {
 		return ""
 	}
 
-	t.Run("reveal shows values", func(t *testing.T) {
+	t.Run("shows values", func(t *testing.T) {
 		t.Parallel()
-		if got := changedHost(t, "--reveal"); got != "dev-db.local" {
-			t.Errorf("env_a = %q, want dev-db.local (revealed)", got)
-		}
-	})
-	t.Run("masks by default", func(t *testing.T) {
-		t.Parallel()
-		if got := changedHost(t); got != "********" {
-			t.Errorf("env_a = %q, want masked", got)
+		if got := changedHost(t); got != "dev-db.local" {
+			t.Errorf("env_a = %q, want dev-db.local", got)
 		}
 	})
 }

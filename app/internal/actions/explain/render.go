@@ -7,9 +7,6 @@ import (
 	"text/tabwriter"
 )
 
-// redacted is the placeholder shown for masked (non-revealed) values.
-const redacted = "********"
-
 // -------------------------------------------------------------------------------------
 
 // jsonEntry is the exported, tagged view of an entry used for JSON output
@@ -17,7 +14,7 @@ const redacted = "********"
 type jsonEntry struct {
 	// Key is the resolved env-var key.
 	Key string `json:"key"`
-	// Value is the resolved value, masked unless --reveal was set.
+	// Value is the resolved value.
 	Value string `json:"value"`
 	// Source is the file that provided the resolved value.
 	Source string `json:"source"`
@@ -30,7 +27,7 @@ type jsonEntry struct {
 // -------------------------------------------------------------------------------------
 
 // renderParams bundles everything render needs: the output sink, the structured
-// result, the chosen output format, and whether values are revealed.
+// result, and the chosen output format.
 type renderParams struct {
 	// Writer is the output sink to render to.
 	Writer io.Writer
@@ -38,43 +35,22 @@ type renderParams struct {
 	Result actionResult
 	// Format selects the output format ("json" or the default table).
 	Format string
-	// Reveal shows plaintext values instead of masking them.
-	Reveal bool
 }
 
 // -------------------------------------------------------------------------------------
 
 // render writes the result to p.Writer in the requested format ("json" or the
-// default aligned table), masking values unless reveal is set. An unrecognized
-// format is rejected so a typo like --output=jsonn fails loudly.
+// default aligned table). An unrecognized format is rejected so a typo like
+// --output=jsonn fails loudly.
 func render(p *renderParams) error {
-	masked := maskResult(p.Result, p.Reveal)
 	switch p.Format {
 	case "", "table":
-		return renderTable(p.Writer, masked)
+		return renderTable(p.Writer, p.Result)
 	case "json":
-		return renderJSON(p.Writer, masked)
+		return renderJSON(p.Writer, p.Result)
 	default:
 		return fmt.Errorf("invalid output format %q (want table or json)", p.Format)
 	}
-}
-
-// -------------------------------------------------------------------------------------
-
-// maskResult returns a copy of res with values redacted unless reveal is set.
-// Empty values stay empty.
-func maskResult(res actionResult, reveal bool) actionResult {
-	if reveal {
-		return res
-	}
-	entries := make([]actionResultEntry, len(res.Entries))
-	for i, e := range res.Entries {
-		if e.Value != "" {
-			e.Value = redacted
-		}
-		entries[i] = e
-	}
-	return actionResult{Entries: entries}
 }
 
 // -------------------------------------------------------------------------------------

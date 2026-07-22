@@ -25,7 +25,7 @@ to the same value.
 ## Examples
 
 The examples below resolve a small workspace — an `api` project with one nested
-`db` namespace and a production overlay:
+`db` namespace and development and production overlays:
 
   <ExampleBox>
     <Fragment slot="manifest">
@@ -45,9 +45,15 @@ The examples below resolve a small workspace — an `api` project with one neste
       ```yaml
       # db.yaml
       db:
-        host: localhost
+        host: # set per environment
         port: 5432
         pool_size: 10
+      ```
+
+      ```yaml
+      # db.development.yaml
+      db:
+        host: localhost
       ```
 
       ```yaml

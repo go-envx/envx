@@ -16,12 +16,11 @@ const (
 		value and the file it was resolved from. With no key it explains every
 		key; with a key it explains just that one.
 
-		Values are masked by default; pass --reveal to print them in plaintext.
 		Use --output=json for machine-readable output.
 	`
 	example = `
 		envx explain api-service
-		envx explain api-service DATABASE_HOST --reveal
+		envx explain api-service DATABASE_HOST
 		envx explain api-service --output=json
 	`
 )
@@ -33,10 +32,7 @@ const (
 // It accepts a project and an optional key. If the key is present it explains just
 // that key. If the key is absent it explains all keys.
 func NewCommand() *cobra.Command {
-	var (
-		reveal bool
-		output string
-	)
+	var output string
 
 	cmd := &cobra.Command{
 		Use:     usage,
@@ -63,7 +59,6 @@ func NewCommand() *cobra.Command {
 				Writer: cmd.OutOrStdout(),
 				Result: res,
 				Format: output,
-				Reveal: reveal,
 			})
 		},
 	}
@@ -76,7 +71,6 @@ func NewCommand() *cobra.Command {
 		flags.WithDelimiter,
 		flags.WithNamespacePrefix,
 	)
-	flags.BindBool(cmd.Flags(), &reveal, &schema.Reveal)
 	flags.BindString(cmd.Flags(), &output, &schema.Output)
 	return cmd
 }

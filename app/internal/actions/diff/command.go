@@ -14,12 +14,10 @@ const (
 		Diff resolves the same project under two environments and reports the
 		differences: keys added, removed, or changed between env-a and env-b.
 
-		Values are masked by default; pass --reveal to print them in plaintext.
 		Use --output=json for machine-readable output.
 	`
 	example = `
 		envx diff api-service development production
-		envx diff api-service development production --reveal
 		envx diff api-service development production --output=json
 	`
 )
@@ -30,10 +28,7 @@ const (
 // params/config, executes the action, and renders the structured diff in the
 // specified format.
 func NewCommand() *cobra.Command {
-	var (
-		reveal bool
-		output string
-	)
+	var output string
 
 	cmd := &cobra.Command{
 		Use:     usage,
@@ -61,7 +56,6 @@ func NewCommand() *cobra.Command {
 				Writer: cmd.OutOrStdout(),
 				Result: res,
 				Format: output,
-				Reveal: reveal,
 			})
 		},
 	}
@@ -73,7 +67,6 @@ func NewCommand() *cobra.Command {
 		flags.WithDelimiter,
 		flags.WithNamespacePrefix,
 	)
-	flags.BindBool(cmd.Flags(), &reveal, &schema.Reveal)
 	flags.BindString(cmd.Flags(), &output, &schema.Output)
 	return cmd
 }

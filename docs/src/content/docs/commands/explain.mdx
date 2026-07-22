@@ -15,8 +15,7 @@ envx explain <project> [key]
 and the file it was resolved from. With no key it explains every key; with a key
 it explains just that one.
 
-Values are masked by default. Pass `--reveal` to print them in plaintext, or
-`--output json` for machine-readable output.
+Use `--output json` for machine-readable output.
 
 ## Arguments
 
@@ -27,8 +26,7 @@ Values are masked by default. Pass `--reveal` to print them in plaintext, or
 
 ## Examples
 
-The examples below use the same `api` workspace. Values are masked unless you pass
-`--reveal`:
+The examples below use the same `api` workspace:
 
   <ExampleBox>
     <Fragment slot="manifest">
@@ -48,9 +46,15 @@ The examples below use the same `api` workspace. Values are masked unless you pa
       ```yaml
       # db.yaml
       db:
-        host: localhost
+        host: # set per environment
         port: 5432
         pool_size: 10
+      ```
+
+      ```yaml
+      # db.development.yaml
+      db:
+        host: localhost
       ```
 
       ```yaml
@@ -62,26 +66,29 @@ The examples below use the same `api` workspace. Values are masked unless you pa
     </Fragment>
     <Fragment slot="commands">
       ```sh
-      # Explain every key (values masked).
+      # Explain every key.
       envx explain api
-      # KEY           VALUE     SOURCE
-      # DB_HOST       ********  db.yaml
-      # DB_POOL_SIZE  ********  db.yaml
-      # DB_PORT       ********  db.yaml
+      # KEY           VALUE      SOURCE
+      # DB_HOST       localhost  db.development.yaml
+      # DB_POOL_SIZE  10         db.yaml
+      # DB_PORT       5432       db.yaml
 
-      # Explain one key and reveal it.
-      envx explain api DB_HOST --reveal
+      # Explain one key.
+      envx explain api DB_HOST
       # KEY      VALUE      SOURCE
-      # DB_HOST  localhost  db.yaml
+      # DB_HOST  localhost  db.development.yaml
 
       # Machine-readable output.
       envx explain api --output json
       # [
       #   {
       #     "key": "DB_HOST",
-      #     "value": "********",
-      #     "source": "db.yaml",
-      #     "sourceKey": "db.host"
+      #     "value": "localhost",
+      #     "source": "db.development.yaml",
+      #     "sourceKey": "db.host",
+      #     "shadowed": [
+      #       "db.yaml"
+      #     ]
       #   },
       #   ...
       # ]
@@ -93,7 +100,6 @@ The examples below use the same `api` workspace. Values are masked unless you pa
 
 | Flag | Environment variable | Description |
 | --- | --- | --- |
-| `--reveal` | | Print values in plaintext instead of masking them. |
 | `--output`, `-o` | | Output format: `table` (default) or `json`. |
 | `--env`, `-E` | `ENVX_ENV` | Target environment to resolve. |
 | `--require-overlays` | `ENVX_REQUIRE_OVERLAYS` | Require every overlay file to exist. |

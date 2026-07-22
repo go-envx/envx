@@ -8,36 +8,6 @@ import (
 
 // -------------------------------------------------------------------------------------
 
-// TestMaskResult verifies values are redacted unless reveal is set, and that
-// empty values stay empty.
-func TestMaskResult(t *testing.T) {
-	t.Parallel()
-
-	in := actionResult{
-		Added:   []actionResultChange{{Key: "A", EnvB: "secret"}},
-		Removed: []actionResultChange{{Key: "B", EnvA: "gone"}},
-		Changed: []actionResultChange{{Key: "C", EnvA: "old", EnvB: "new"}},
-	}
-
-	masked := maskResult(in, false)
-	if masked.Added[0].EnvB != redacted {
-		t.Errorf("added env-b = %q, want redacted", masked.Added[0].EnvB)
-	}
-	if masked.Removed[0].EnvA != redacted {
-		t.Errorf("removed env-a = %q, want redacted", masked.Removed[0].EnvA)
-	}
-	if masked.Changed[0].EnvA != redacted || masked.Changed[0].EnvB != redacted {
-		t.Errorf("changed not fully redacted: %+v", masked.Changed[0])
-	}
-
-	revealed := maskResult(in, true)
-	if revealed.Added[0].EnvB != "secret" {
-		t.Errorf("reveal should keep value, got %q", revealed.Added[0].EnvB)
-	}
-}
-
-// -------------------------------------------------------------------------------------
-
 // sampleResult is a small diff covering all three change kinds, used by the
 // render tests.
 func sampleResult() actionResult {
@@ -51,7 +21,7 @@ func sampleResult() actionResult {
 // -------------------------------------------------------------------------------------
 
 // TestRenderJSON verifies the JSON format emits added, removed, and changed
-// sections with revealed values when reveal is set.
+// sections with their values.
 func TestRenderJSON(t *testing.T) {
 	t.Parallel()
 
@@ -60,7 +30,6 @@ func TestRenderJSON(t *testing.T) {
 		Writer: &buf,
 		Result: sampleResult(),
 		Format: "json",
-		Reveal: true,
 	})
 	if err != nil {
 		t.Fatalf("render: %v", err)
@@ -105,7 +74,6 @@ func TestRenderTable(t *testing.T) {
 		Writer: &buf,
 		Result: sampleResult(),
 		Format: "table",
-		Reveal: true,
 	})
 	if err != nil {
 		t.Fatalf("render: %v", err)
@@ -119,34 +87,6 @@ func TestRenderTable(t *testing.T) {
 	} {
 		if !strings.Contains(out, want) {
 			t.Errorf("table output missing %q:\n%s", want, out)
-		}
-	}
-}
-
-// -------------------------------------------------------------------------------------
-
-// TestRenderMasksByDefault verifies render redacts values when reveal is not set.
-func TestRenderMasksByDefault(t *testing.T) {
-	t.Parallel()
-
-	var buf bytes.Buffer
-	err := render(&renderParams{
-		Writer: &buf,
-		Result: sampleResult(),
-		Format: "table",
-		Reveal: false,
-	})
-	if err != nil {
-		t.Fatalf("render: %v", err)
-	}
-
-	out := buf.String()
-	if !strings.Contains(out, redacted) {
-		t.Errorf("expected redacted placeholder, got:\n%s", out)
-	}
-	for _, secret := range []string{"added-value", "removed-value", "before", "after"} {
-		if strings.Contains(out, secret) {
-			t.Errorf("plaintext value %q leaked into masked output:\n%s", secret, out)
 		}
 	}
 }

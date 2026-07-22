@@ -7,9 +7,6 @@ import (
 	"text/tabwriter"
 )
 
-// redacted is the placeholder shown for masked (non-revealed) values.
-const redacted = "********"
-
 // -------------------------------------------------------------------------------------
 
 // jsonChange is the exported, tagged view of a change used for JSON output.
@@ -38,7 +35,7 @@ type jsonResult struct {
 // -------------------------------------------------------------------------------------
 
 // renderParams bundles everything render needs: the output sink, the structured
-// diff, the chosen output format, and whether values are revealed.
+// diff, and the chosen output format.
 type renderParams struct {
 	// Writer is the output sink to render to.
 	Writer io.Writer
@@ -46,51 +43,20 @@ type renderParams struct {
 	Result actionResult
 	// Format selects the output format ("json" or the default table).
 	Format string
-	// Reveal shows plaintext values instead of masking them.
-	Reveal bool
 }
 
 // -------------------------------------------------------------------------------------
 
-// render writes the diff to p.Writer in the requested format, masking values
-// unless reveal is set. An unrecognized format is rejected so a typo like
-// --output=jsonn fails loudly.
+// render writes the diff to p.Writer in the requested format. An unrecognized
+// format is rejected so a typo like --output=jsonn fails loudly.
 func render(p *renderParams) error {
-	masked := maskResult(p.Result, p.Reveal)
 	switch p.Format {
 	case "", "table":
-		return renderTable(p.Writer, masked)
+		return renderTable(p.Writer, p.Result)
 	case "json":
-		return renderJSON(p.Writer, masked)
+		return renderJSON(p.Writer, p.Result)
 	default:
 		return fmt.Errorf("invalid output format %q (want table or json)", p.Format)
-	}
-}
-
-// -------------------------------------------------------------------------------------
-
-// maskResult returns a copy of res with values redacted unless reveal is set.
-func maskResult(res actionResult, reveal bool) actionResult {
-	if reveal {
-		return res
-	}
-	mask := func(in []actionResultChange) []actionResultChange {
-		out := make([]actionResultChange, len(in))
-		for i, c := range in {
-			if c.EnvA != "" {
-				c.EnvA = redacted
-			}
-			if c.EnvB != "" {
-				c.EnvB = redacted
-			}
-			out[i] = c
-		}
-		return out
-	}
-	return actionResult{
-		Added:   mask(res.Added),
-		Removed: mask(res.Removed),
-		Changed: mask(res.Changed),
 	}
 }
 

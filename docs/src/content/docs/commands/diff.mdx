@@ -14,8 +14,7 @@ envx diff <project> <env-a> <env-b>
 `diff` resolves the same project under two environments and reports the
 differences: keys added, removed, or changed between `env-a` and `env-b`.
 
-Values are masked by default. Pass `--reveal` to print them in plaintext, or
-`--output json` for machine-readable output.
+Use `--output json` for machine-readable output.
 
 ## Arguments
 
@@ -52,9 +51,15 @@ both, so it does not appear:
       ```yaml
       # db.yaml
       db:
-        host: localhost
+        host: # set per environment
         port: 5432
         pool_size: 10
+      ```
+
+      ```yaml
+      # db.development.yaml
+      db:
+        host: localhost
       ```
 
       ```yaml
@@ -66,14 +71,8 @@ both, so it does not appear:
     </Fragment>
     <Fragment slot="commands">
       ```sh
-      # Compare two environments (masked).
+      # Compare two environments.
       envx diff api development production
-      # ~  DB_HOST       ******** -> ********
-      # ~  DB_POOL_SIZE  ******** -> ********
-
-      # Reveal the differing values.
-      envx diff api development production \
-        --reveal
       # ~  DB_HOST       localhost -> prod.internal
       # ~  DB_POOL_SIZE  10 -> 50
 
@@ -84,8 +83,8 @@ both, so it does not appear:
       #   "changed": [
       #     {
       #       "key": "DB_HOST",
-      #       "env_a": "********",
-      #       "env_b": "********"
+      #       "env_a": "localhost",
+      #       "env_b": "prod.internal"
       #     },
       #     ...
       #   ]
@@ -98,7 +97,6 @@ both, so it does not appear:
 
 | Flag | Environment variable | Description |
 | --- | --- | --- |
-| `--reveal` | | Print values in plaintext instead of masking them. |
 | `--output`, `-o` | | Output format: `table` (default) or `json`. |
 | `--require-overlays` | `ENVX_REQUIRE_OVERLAYS` | Require every overlay file to exist. |
 | `--prefix` | `ENVX_PREFIX` | Prefix prepended to every key. |

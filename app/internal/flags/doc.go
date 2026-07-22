@@ -5,6 +5,6 @@
 // a config.Input, sourcing values straight from the flag set so registration and
 // extraction cannot drift. A command chooses the scope by which flag set it passes
 // — cmd.Flags() for local flags, root.PersistentFlags() for the inherited --config
-// bootstrap flag. Presentation flags a command consumes directly (--reveal,
-// --output) register into a local variable via BindBool/BindString.
+// bootstrap flag. Presentation flags a command consumes directly (--output)
+// register into a local variable via BindString.
 package flags

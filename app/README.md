@@ -143,8 +143,8 @@ flowchart TD
 - `get`, `run`, `explain`, and `diff` import `envmerge`; `set` does not (it edits
   the YAML node tree directly and never flattens).
 - Only `run` imports `runner`.
-- Only `explain` and `diff` import `schema` directly, for the `--reveal` and
-  `--output` flag specs they register themselves.
+- Only `explain` and `diff` import `schema` directly, for the `--output` flag
+  spec they register themselves.
 
 `schema` and `exitcode` are pure leaves that import only the standard library,
 so any layer can depend on them without risking an import cycle.
@@ -247,7 +247,6 @@ Which flags each verb registers (from each `command.go`):
 | `--delimiter` | ✓ | ✓ | | ✓ | ✓ |
 | `--namespace-prefix` | ✓ | ✓ | | ✓ | ✓ |
 | `--overload` | | ✓ | | | |
-| `--reveal` | | | | ✓ | ✓ |
 | `--output` / `-o` | | | | ✓ | ✓ |
 
 `diff` takes the two environments as positional arguments, so it does not register
