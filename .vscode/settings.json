@@ -16,6 +16,9 @@
 	"files.insertFinalNewline": true,
 	"files.trimFinalNewlines": true,
 	"files.trimTrailingWhitespace": true,
+	"files.associations": {
+		"mise.lock": "toml"
+	},	
 	// JSON Schemas
 	"json.schemaDownload.trustedDomains": {
 		"https://biomejs.dev/": true,
@@ -23,22 +26,22 @@
 	},
 	// Go Settings
 	"go.toolsManagement.autoUpdate": true,
-  // Text Overrides
-  "[plaintext]": {
-      "editor.wordWrap": "bounded",
-      "editor.wordWrapColumn": 88,
-      "editor.rulers": [88]
-  },
-  "[markdown]": {
-      "editor.wordWrap": "bounded",
-      "editor.wordWrapColumn": 88,
-      "editor.rulers": [88]
-  },
-  "[mdx]": {
-      "editor.wordWrap": "bounded",
-      "editor.wordWrapColumn": 88,
-      "editor.rulers": [88]
-  },
+	// Text Overrides
+	"[plaintext]": {
+	  "editor.wordWrap": "bounded",
+	  "editor.wordWrapColumn": 88,
+	  "editor.rulers": [88]
+	},
+	"[markdown]": {
+	  "editor.wordWrap": "bounded",
+	  "editor.wordWrapColumn": 88,
+	  "editor.rulers": [88]
+	},
+	"[mdx]": {
+	  "editor.wordWrap": "bounded",
+	  "editor.wordWrapColumn": 88,
+	  "editor.rulers": [88]
+	},
 	// Extensions Recommendations
 	"biome.suggestInstallingGlobally": false,
 	"extensions.ignoreRecommendations": true
