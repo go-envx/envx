@@ -16,28 +16,28 @@
     {
       "description": "Group devcontainer updates; require dashboard approval",
       "matchFileNames": [".devcontainer/**"],
-      "groupName": "devcontainer",
+      "groupName": "devcontainer dependencies",
       "dependencyDashboardApproval": true
     },
     {
       "description": "Group root development tools",
       "matchFileNames": ["mise.toml", "package.json"],
-      "groupName": "root"
+      "groupName": "root dependencies"
     },
     {
       "description": "Group GitHub workflow/action updates",
       "matchFileNames": [".github/**"],
-      "groupName": "github"
+      "groupName": "github workflow dependencies"
     },
     {
       "description": "Group Go CLI app updates",
       "matchFileNames": ["app/**"],
-      "groupName": "app"
+      "groupName": "app dependencies"
     },
     {
       "description": "Group docs site updates",
       "matchFileNames": ["docs/**"],
-      "groupName": "docs"
+      "groupName": "docs dependencies"
     }
   ]
 }
