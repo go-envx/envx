@@ -11,9 +11,7 @@ import ExampleBox from '#components/ExampleBox.astro';
 envx get <project> <key>
 ```
 
-`get` resolves the merged environment for a project and prints the value of a
-single key. The key is matched case-insensitively, so `HOST` and `host` resolve
-to the same value.
+`get` resolves the merged environment for a project and prints the value of a single key. The key is matched case-insensitively, so `HOST` and `host` resolve to the same value.
 
 ## Arguments
 
@@ -24,8 +22,7 @@ to the same value.
 
 ## Examples
 
-The examples below resolve a small workspace — an `api` project with one nested
-`db` namespace and development and production overlays:
+The examples below resolve a small workspace — an `api` project with one nested `db` namespace and development and production overlays:
 
   <ExampleBox>
     <Fragment slot="manifest">
@@ -92,5 +89,4 @@ The examples below resolve a small workspace — an `api` project with one neste
 | `--delimiter` | `ENVX_DELIMITER` | String used to join list values. |
 | `--namespace-prefix` | `ENVX_NAMESPACE_PREFIX` | Prefix each key with its namespace. |
 
-Plus the [global flags](/commands/overview/#global-flags). These flags map to
-[settings](/configuration/schema/#settings-2) and override the values in `envx.yaml`.
+Plus the [global flags](/commands/overview/#global-flags). These flags map to [settings](/configuration/schema/#settings-2) and override the values in `envx.yaml`.

@@ -1,15 +1,12 @@
 # envx docs
 
-The documentation site for envx, built with [Astro](https://astro.build/) and
-[Starlight](https://starlight.astro.build/).
+The documentation site for envx, built with [Astro](https://astro.build/) and [Starlight](https://starlight.astro.build/).
 
-Content lives in [src/content/docs/](src/content/docs/) as Markdown (`.md`) and
-MDX (`.mdx`) files.
+Content lives in [src/content/docs/](src/content/docs/) as Markdown (`.md`) and MDX (`.mdx`) files.
 
 ## Tasks
 
-All tasks run through [Task](https://taskfile.dev/) and are namespaced under
-`docs:` from the repository root.
+All tasks run through [Task](https://taskfile.dev/) and are namespaced under `docs:` from the repository root.
 
 | Task | Purpose |
 | --- | --- |

@@ -5,9 +5,7 @@ sidebar:
   order: 1
 ---
 
-The envx CLI is a small set of commands for resolving, inspecting, and running
-your projects' environments. Each command has its own page with examples and its
-full flag list.
+The envx CLI is a small set of commands for resolving, inspecting, and running your projects' environments. Each command has its own page with examples and its full flag list.
 
 | Command | Purpose |
 | --- | --- |
@@ -30,10 +28,7 @@ These flags are available on every command:
 
 ## Command flags
 
-Beyond the global flags, most commands share a common set. The flags in the top
-group map to [settings](/configuration/schema/#settings-2) and override the
-matching value in `envx.yaml`; the bottom group is available only at the command
-line. A ✓ marks where each flag applies:
+Beyond the global flags, most commands share a common set. The flags in the top group map to [settings](/configuration/schema/#settings-2) and override the matching value in `envx.yaml`; the bottom group is available only at the command line. A ✓ marks where each flag applies:
 
 | Flag | [`get`](/commands/get/) | [`run`](/commands/run/) | [`set`](/commands/set/) | [`explain`](/commands/explain/) | [`diff`](/commands/diff/) |
 | --- | :-: | :-: | :-: | :-: | :-: |
@@ -48,6 +43,4 @@ line. A ✓ marks where each flag applies:
 | **Command-line only** | | | | | |
 | `--output`, `-o` | | | | ✓ | ✓ |
 
-`diff` compares two environments given as positional arguments, so it does not
-accept `--env`. `create` is not shown: it scaffolds a workspace and takes only
-`--target-dir` and `--force`.
+`diff` compares two environments given as positional arguments, so it does not accept `--env`. `create` is not shown: it scaffolds a workspace and takes only `--target-dir` and `--force`.

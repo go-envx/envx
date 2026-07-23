@@ -11,14 +11,9 @@ import ExampleBox from '#components/ExampleBox.astro';
 envx run <project> -- <command> [args...]
 ```
 
-`run` executes a command with the environment variables resolved from a project's
-namespace chain. Everything after the `--` separator is the command to run and
-its arguments.
+`run` executes a command with the environment variables resolved from a project's namespace chain. Everything after the `--` separator is the command to run and its arguments.
 
-By default, existing OS environment variables take precedence over values from
-your files. Pass `--overload` to let file values win instead. Signals are
-forwarded transparently to the child process, and its exit code is propagated
-verbatim.
+By default, existing OS environment variables take precedence over values from your files. Pass `--overload` to let file values win instead. Signals are forwarded transparently to the child process, and its exit code is propagated verbatim.
 
 ## Arguments
 
@@ -29,8 +24,7 @@ verbatim.
 
 ## Examples
 
-The examples below use the same `api` workspace, running `printenv` so you can see
-the injected values:
+The examples below use the same `api` workspace, running `printenv` so you can see the injected values:
 
   <ExampleBox>
     <Fragment slot="manifest">
@@ -104,13 +98,11 @@ the injected values:
 | `--delimiter` | `ENVX_DELIMITER` | String used to join list values. |
 | `--namespace-prefix` | `ENVX_NAMESPACE_PREFIX` | Prefix each key with its namespace. |
 
-Plus the [global flags](/commands/overview/#global-flags). These flags map to
-[settings](/configuration/schema/#settings-2) and override the values in `envx.yaml`.
+Plus the [global flags](/commands/overview/#global-flags). These flags map to [settings](/configuration/schema/#settings-2) and override the values in `envx.yaml`.
 
 ## Exit codes
 
-envx maps outcomes to conventional exit codes so `run` composes cleanly in
-scripts:
+envx maps outcomes to conventional exit codes so `run` composes cleanly in scripts:
 
 | Code | Meaning |
 | --- | --- |
@@ -121,5 +113,4 @@ scripts:
 | `127` | Command not found |
 | `128+N` | Child terminated by signal `N` (e.g. `130` for SIGINT) |
 
-The child process's own exit code is propagated verbatim, so a command that exits
-`7` makes envx exit `7`.
+The child process's own exit code is propagated verbatim, so a command that exits `7` makes envx exit `7`.

@@ -11,13 +11,9 @@ import ExampleBox from '#components/ExampleBox.astro';
 envx set <include-path> <key> <value>
 ```
 
-`set` writes a key/value pair into the environment overlay file for a namespace.
-The key supports dot notation for nested YAML paths, such as
-`pool.max_size`.
+`set` writes a key/value pair into the environment overlay file for a namespace. The key supports dot notation for nested YAML paths, such as `pool.max_size`.
 
-The include path must match an entry from a project's `includes` list exactly,
-for example `env/database` or `api-service/env/values`. The value is written
-to the overlay for the target environment (`<include-path>.<env>.yaml`).
+The include path must match an entry from a project's `includes` list exactly, for example `env/database` or `api-service/env/values`. The value is written to the overlay for the target environment (`<include-path>.<env>.yaml`).
 
 ## Arguments
 
@@ -29,10 +25,7 @@ to the overlay for the target environment (`<include-path>.<env>.yaml`).
 
 ## Examples
 
-The examples below use the same `api` workspace. `set` writes the key into the
-overlay for the target environment, creating the file if it does not exist. The
-include path (`db`) selects the namespace; the dotted key (`db.host`) is the path
-within its YAML:
+The examples below use the same `api` workspace. `set` writes the key into the overlay for the target environment, creating the file if it does not exist. The include path (`db`) selects the namespace; the dotted key (`db.host`) is the path within its YAML:
 
   <ExampleBox>
     <Fragment slot="manifest">

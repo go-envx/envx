@@ -11,9 +11,7 @@ import ExampleBox from '#components/ExampleBox.astro';
 envx explain <project> [key]
 ```
 
-`explain` resolves a project's environment and reports, for each key, the value
-and the file it was resolved from. With no key it explains every key; with a key
-it explains just that one.
+`explain` resolves a project's environment and reports, for each key, the value and the file it was resolved from. With no key it explains every key; with a key it explains just that one.
 
 Use `--output json` for machine-readable output.
 
@@ -108,7 +106,4 @@ The examples below use the same `api` workspace:
 | `--delimiter` | `ENVX_DELIMITER` | String used to join list values. |
 | `--namespace-prefix` | `ENVX_NAMESPACE_PREFIX` | Prefix each key with its namespace. |
 
-Plus the [global flags](/commands/overview/#global-flags). The `--env`,
-`--require-overlays`, `--prefix`, `--suffix`, `--delimiter`, and `--namespace-prefix` flags
-map to [settings](/configuration/schema/#settings-2) and override the values in
-`envx.yaml`.
+Plus the [global flags](/commands/overview/#global-flags). The `--env`, `--require-overlays`, `--prefix`, `--suffix`, `--delimiter`, and `--namespace-prefix` flags map to [settings](/configuration/schema/#settings-2) and override the values in `envx.yaml`.
