@@ -1,0 +1,87 @@
+---
+title: set
+description: Write a key/value into a namespace's environment overlay file.
+sidebar:
+  order: 5
+---
+
+import ExampleBox from '#components/ExampleBox.astro';
+
+```sh
+envx set <include-path> <key> <value>
+```
+
+`set` writes a key/value pair into the environment overlay file for a namespace. The key supports dot notation for nested YAML paths, such as `pool.max_size`.
+
+The include path must match an entry from a project's `includes` list exactly, for example `env/database` or `api-service/env/values`. The value is written to the overlay for the target environment (`<include-path>.<env>.yaml`).
+
+## Arguments
+
+| Argument | Description |
+| --- | --- |
+| `<include-path>` | A namespace path exactly as it appears in a project's `includes`. |
+| `<key>` | The key to write; dot notation sets a nested path. |
+| `<value>` | The value to write. |
+
+## Examples
+
+The examples below use the same `api` workspace. `set` writes the key into the overlay for the target environment, creating the file if it does not exist. The include path (`db`) selects the namespace; the dotted key (`db.host`) is the path within its YAML:
+
+  <ExampleBox>
+    <Fragment slot="manifest">
+      ```yaml
+      # envx.yaml
+      environments:
+        - development
+        - production
+
+      projects:
+        api:
+          includes:
+            - db
+      ```
+    </Fragment>
+    <Fragment slot="files">
+      ```yaml
+      # db.yaml
+      db:
+        host: # set per environment
+        port: 5432
+        pool_size: 10
+      ```
+
+      ```yaml
+      # db.production.yaml
+      db:
+        host: prod.internal
+        pool_size: 50
+      ```
+    </Fragment>
+    <Fragment slot="commands">
+      ```sh
+      # host is set per environment; development
+      # has no overlay yet, so this creates one.
+      envx set db db.host localhost
+      # writes db.development.yaml:
+      #   db:
+      #     host: localhost
+
+      # Update a key in an existing overlay;
+      # other keys are preserved.
+      envx set db db.host replica.internal \
+        --env production
+      # writes db.production.yaml:
+      #   db:
+      #     host: replica.internal
+      #     pool_size: 50
+      ```
+    </Fragment>
+  </ExampleBox>
+
+## Flags
+
+| Flag | Environment variable | Description |
+| --- | --- | --- |
+| `--env`, `-E` | `ENVX_ENV` | Environment overlay file to write to. |
+
+Plus the [global flags](../overview/#global-flags).

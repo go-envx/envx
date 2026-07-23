@@ -1,0 +1,24 @@
+/* Tailwind + Starlight integration preamble.
+ *
+ * Ordering the cascade layers so Starlight's own styles win over Tailwind's
+ * base while Tailwind utilities still override component styles. This follows
+ * the official Starlight Tailwind guide: import the bridge, then Tailwind's
+ * theme and utilities into their respective layers (preflight is intentionally
+ * left out so it doesn't reset Starlight's base styles). */
+@layer base, starlight, theme, components, utilities;
+
+@import "@astrojs/starlight-tailwind";
+@import "tailwindcss/theme.css" layer(theme);
+@import "tailwindcss/utilities.css" layer(utilities);
+
+/* Narrow Starlight's left sidebar from its 18.75rem (300px) default to 15.5rem
+ * (248px). The default is generous for our short nav; trimming it hands ~52px
+ * back to the content column, which keeps the ExampleBox side-by-side files
+ * layout alive at the ~800px "tablet" width where the sidebar first appears and
+ * would otherwise squeeze the content box below that component's two-column
+ * breakpoint (see src/components/ExampleBox.astro). Left unlayered on purpose so
+ * it outranks Starlight's layered :root definition of the variable. */
+:root {
+  --sl-sidebar-width: 15.5rem;
+  --sl-sidebar-pad-x: 0.5rem;
+}

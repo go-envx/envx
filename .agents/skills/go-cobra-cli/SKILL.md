@@ -1,0 +1,355 @@
+---
+name: go-cobra-cli
+description: "Best practices for developing Go Cobra-based CLI applications. Use when writing new commands, modifying existing CLI code, or reviewing Go CLI code for quality and correctness."
+---
+
+You are an expert Go developer specializing in CLI applications built with Cobra. Apply the following best practices when writing, modifying, or reviewing Go Cobra CLI code.
+
+# Best Practices for Go Cobra CLI Development
+
+## 1. Project Structure
+
+Organize by **feature (vertical slices)**, not by technical layer. Each feature owns its command wiring and its business logic in one self-contained package, so related code lives together and a feature can be understood — or removed — in isolation.
+
+```text
+cmd/<binary>/main.go      # Minimal entrypoint — dependency wiring + exit codes only
+internal/
+├── <feature>/            # One package per feature/domain (e.g. user, order)
+│   ├── command.go        # Cobra wiring: parse flags/args, format output (the "shell")
+│   ├── <feature>.go      # Pure business logic: no Cobra, no global I/O (the "core")
+│   └── config.go         # The feature's typed config (shared pieces + local flags)
+├── <feature2>/
+├── config/               # Shared: configuration loading and validation
+├── flags/                # Shared: single source of truth for flag definitions
+└── runner/               # Shared: external process execution, if needed
+```
+
+- **Slice vertically by feature, not horizontally by layer.** Prefer `internal/user/` holding that feature's command, logic, and types together over scattering them across `internal/cmd/`, `internal/service/`, and `internal/model/`. Vertical slices keep change localized and make feature-to-feature dependencies explicit.
+- **Keep `main.go` minimal.** Construct dependencies, execute the root command, and map errors to exit codes. Nothing else.
+- **Functional core, imperative shell.** Within a feature, separate pure logic (deterministic, no Cobra or I/O — trivially table-testable) from the thin shell that parses input, performs effects, and formats output. `command.go` is the shell; the core is plain functions over plain data.
+- **Separate business logic from CLI wiring.** Core logic has no knowledge of Cobra, so it can be reused by another frontend (API, TUI) and tested without constructing commands.
+- **Minimize each feature's exported surface.** Export the command constructor (e.g. `NewCommand`) plus the few types callers truly need; keep params, results, and helpers unexported so internals stay free to change.
+
+```go
+func main() {
+    ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+    defer stop()
+
+    root := cli.NewRootCommand(deps)
+    root.SetContext(ctx)
+
+    if err := root.Execute(); err != nil {
+        fmt.Fprintln(os.Stderr, err)
+        os.Exit(exitCode(err))
+    }
+}
+```
+
+## 2. Command Design
+
+- **Use command constructors**, not package-level variables. Return `*cobra.Command` from functions like `NewRunCommand(app *App)` so dependencies are injected and state is not shared.
+- **Keep a consistent hierarchy.** Choose `[app] [noun] [verb]` or `[app] [verb] [noun]` and stick with it.
+- **Prefer subcommands over overloaded flags.** `db migrate` is clearer than `db --action=migrate`.
+- **Limit nesting to 2–3 levels.** Deeper hierarchies are hard to discover and use.
+- **Treat command names as public API.** They become part of scripts and CI pipelines.
+
+## 3. Always Use `RunE`
+
+Use `RunE` instead of `Run` for every command that can fail. This enables:
+
+- Centralized error handling at the process boundary.
+- Clean testing without intercepting `os.Exit`.
+- Consistent error formatting and exit-code mapping.
+
+```go
+RunE: func(cmd *cobra.Command, args []string) error {
+    return app.Run(cmd.Context(), args[0], options)
+}
+```
+
+**Never call `os.Exit()` from inside a command handler.**
+
+## 4. Error Handling
+
+- **Wrap errors with context:** `fmt.Errorf("load config %s: %w", path, err)`.
+- **Make errors actionable.** Include the relevant input, path, or resource name.
+- **Don't double-report.** Either print the error in the handler or return it — not both.
+- **Follow Go conventions:** lowercase error strings, no trailing punctuation.
+- **Silence usage on runtime errors.** By default, Cobra prints the full help on any error. Suppress this after parsing succeeds:
+
+```go
+PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
+    cmd.SilenceUsage = true
+    return nil
+}
+```
+
+## 5. Exit Codes
+
+- `0` — success.
+- `1` — general runtime error.
+- `2` — usage/validation error.
+- Define additional codes for distinguishable failure modes (config error, not found, interrupted).
+- Apply exit codes **only at the process boundary** (`main.go`), never deep inside command logic.
+- Document exit codes for users who script the CLI.
+
+## 6. Flags and Arguments
+
+### Flags
+
+- **Persistent flags** for options that apply globally or across subcommands (`--config`, `--verbose`, `--output`).
+- **Local flags** for command-specific options (`--port` on `serve`).
+- Mark required flags with `MarkFlagRequired`.
+- Use `MarkFlagsRequiredTogether` and `MarkFlagsMutuallyExclusive` for flag relationships.
+- Keep flag names long, explicit, and stable. Use shorthand only for very common options.
+- Make defaults visible in help text.
+- **Define each shared flag once.** When a flag appears on multiple commands, declare its identity (name, shorthand, env-var fallback, usage) in a single place and reference it everywhere, so the flag and its env var can never drift apart. Reuse that one definition for both registration and precedence resolution.
+- **Bind flags at the Cobra edge into typed structs.** Register via `cmd.Flags()` / `cmd.PersistentFlags()` in command constructors; keep core logic free of the flag library. Prefer explicit, typed registration over reflection or struct-tag–driven "registries."
+
+### Arguments
+
+- Use Cobra validators: `cobra.ExactArgs`, `cobra.MinimumNArgs`, or custom functions.
+- Validate argument **meaning** separately from count (in `PreRunE` or early in `RunE`).
+- Document argument names in `Use`: `deploy [environment] [service]`.
+- Prefer subcommands over positional arguments with many modes.
+
+## 7. Configuration Layering
+
+Support a clear precedence chain: **Flags > Environment Variables > Config File > Defaults**.
+
+- Bind flags to Viper with `viper.BindPFlag` in `PersistentPreRunE`.
+- Keep Viper out of business logic — resolve config into typed structs before passing downstream.
+- Use `$XDG_CONFIG_HOME` or `~/.config/<app>/` for config file location.
+- Validate the **final resolved configuration**, not just individual sources.
+- Make precedence behavior explicit in documentation.
+- Don't let config loading fail for commands that don't need it (`help`, `version`, `completion`).
+
+## 8. Context and Cancellation
+
+- Use `cmd.Context()` inside `RunE` and pass it through to all application logic.
+- Set up signal handling at the top level with `signal.NotifyContext`.
+- Make long-running operations respect context cancellation.
+- Use `exec.CommandContext` for subprocesses.
+- Return a clear error when work is interrupted.
+
+```go
+ctx, cancel := signal.NotifyContext(cmd.Context(), os.Interrupt, syscall.SIGTERM)
+defer cancel()
+```
+
+## 9. Input and Output Design
+
+- **stdout** — primary command output (data that users may pipe).
+- **stderr** — diagnostics, progress, warnings, and human-facing status.
+- Use `cmd.OutOrStdout()` and `cmd.ErrOrStderr()` so tests can capture output without touching real streams.
+- Support `--output=json|yaml|table` for commands likely to be scripted.
+- Respect `NO_COLOR` and suppress decorative output when stdout is not a terminal.
+- Keep `--quiet`, `--verbose`, and `--debug` semantics distinct:
+  - `--quiet`: suppress nonessential human output.
+  - `--verbose`: additional operational detail.
+  - `--debug`: diagnostic detail useful for bug reports.
+
+## 10. Testing
+
+- **Test commands through constructed instances**, not by executing the compiled binary:
+
+```go
+func executeCommand(root *cobra.Command, args ...string) (string, string, error) {
+    stdout := new(bytes.Buffer)
+    stderr := new(bytes.Buffer)
+    root.SetOut(stdout)
+    root.SetErr(stderr)
+    root.SetArgs(args)
+    err := root.Execute()
+    return stdout.String(), stderr.String(), err
+}
+```
+
+- **Test business logic separately from Cobra.** Core logic should be testable without constructing commands.
+- Use **table-driven tests** for flag parsing, argument validation, and output formatting.
+- Test invalid flag combinations, missing required flags, and argument count violations.
+- Use temporary directories for filesystem operations.
+- Avoid tests that depend on global process state (real env vars, cwd, real stdout).
+- Mock external dependencies via small interfaces injected through command constructors.
+
+## 11. Dependency Injection
+
+- Inject filesystem access, environment readers, clocks, HTTP clients, and process runners.
+- Avoid direct calls to `os.Getenv`, `os.Getwd`, `time.Now`, and `exec.Command` scattered throughout command logic.
+- Keep interfaces small and owned by the consuming package.
+- Use concrete types unless an interface provides clear testability value.
+- Construct all dependencies in `main.go` or `PersistentPreRunE` and pass them into command constructors.
+
+## 12. Help and Documentation
+
+- **`Short`** — concise phrase (< 50 chars) shown in parent command listings.
+- **`Long`** — fuller description shown on `--help` for the specific command.
+- **`Example`** — realistic, copy-pasteable usage examples on every user-facing command.
+
+```go
+Example: `  myapp deploy staging
+  myapp deploy production --dry-run --force`
+```
+
+- Use Cobra's `doc.GenMarkdownTree` or `doc.GenManTree` to auto-generate reference documentation.
+- Review generated help output as part of development. Help text is UX.
+
+### Code Comments
+
+**Every `func` and `type` — exported or not, no matter how trivial — must be preceded by a block-header doc comment. This is mandatory and is never skipped.** The header is a full-width divider line, then a blank line, then a Go-style doc comment that begins with the symbol's name and clearly states its purpose:
+
+```go
+// -------------------------------------------------------------------------------------
+
+// newServeCmd creates the "serve" subcommand. It wires flag and argument
+// parsing to the feature's core logic and writes results to the command's
+// output stream.
+func newServeCmd(deps *Deps) *cobra.Command { ... }
+
+// -------------------------------------------------------------------------------------
+
+// Options holds the resolved settings a command hands to its core logic.
+type Options struct {
+	// Project is the project name to resolve.
+	Project string
+	// Reveal shows plaintext values instead of masking them.
+	Reveal bool
+}
+```
+
+- The divider makes symbol boundaries easy to scan in large files.
+- **Leave one blank line between the divider and the doc comment.** The gap separates the visual divider from the prose so both read cleanly in the IDE — the divider is never glued to the first line of the comment.
+- Begin the prose with the identifier name (standard Go doc-comment form), then describe what it does and why — not how.
+- **Give every struct field its own brief doc comment**, on the line directly above the field. Keep them short — one line stating what the field holds.
+- Apply it to one-line helpers and tiny structs too; uniformity is the point.
+
+## 13. Shell Completions
+
+- Ship a `completion` subcommand — Cobra provides built-in support for bash, zsh, fish, and PowerShell.
+- Add `ValidArgsFunction` for dynamic completions (e.g., completing resource names).
+- Avoid slow network calls in completion functions; respect context cancellation.
+- Test completion behavior for commands with complex arguments.
+
+## 14. Version and Build Metadata
+
+- Provide a `version` subcommand or `--version` flag.
+- Embed version, commit, and build date via `-ldflags`:
+
+```go
+var (
+    version = "dev"
+    commit  = "unknown"
+    date    = "unknown"
+)
+```
+
+- Include Go version and OS/arch in verbose version output.
+- Use `debug.ReadBuildInfo()` as a fallback for module version in development builds.
+
+## 15. Automation and Interactive UX
+
+- **Assume the CLI will be scripted.** Keep machine-readable output formats stable.
+- Provide `--yes` or `--force` for commands that would otherwise prompt interactively.
+- Detect non-interactive stdin (`!term.IsTerminal(os.Stdin.Fd())`) and fail clearly rather than blocking on input.
+- Confirm destructive actions unless force/yes is provided.
+- Provide `--dry-run` for risky or destructive operations.
+- Make failures deterministic — same input should produce same error behavior.
+
+## 16. Security
+
+- Treat all CLI input as untrusted.
+- Pass subprocess arguments as separate strings — never through shell interpolation.
+- Validate paths before destructive operations; be cautious with symlinks.
+- Redact secrets in logs, errors, and debug output.
+- Use least-privilege file permissions for sensitive data (e.g., `0600`).
+- Never write credentials to config files unless explicitly requested.
+
+## 17. Backward Compatibility
+
+- Treat command names, flags, config keys, output formats, and exit codes as compatibility surfaces.
+- Use Cobra's deprecation support when removing or renaming flags:
+
+```go
+cmd.Flags().Bool("old-flag", false, "")
+_ = cmd.Flags().MarkDeprecated("old-flag", "use --new-flag instead")
+```
+
+- Keep deprecated behavior working long enough for users to migrate.
+- Mention replacements clearly in deprecation messages.
+
+## 18. Performance
+
+- Keep startup fast. Avoid expensive work during package initialization or `init()` functions.
+- Use `cobra.OnInitialize()` for deferred setup.
+- Don't perform network calls before command validation succeeds.
+- Lazy-load heavy configuration only for commands that need it.
+- Stream large data instead of buffering everything in memory.
+
+## 19. Distribution
+
+- Build static binaries with `CGO_ENABLED=0` for portability.
+- Cross-compile with `GOOS`/`GOARCH` in CI.
+- Ship checksums for release artifacts.
+- Sign releases when supply-chain assurance matters.
+- Verify that packaged binaries contain correct version metadata.
+
+---
+
+## Quick Reference: Common Pitfalls
+
+| Pitfall | Fix |
+|---------|-----|
+| `os.Exit()` inside handlers | Return errors; exit only in `main.go` |
+| Global mutable command variables | Use constructor functions with DI |
+| Printing error AND returning it | Do one or the other |
+| Business logic inside `RunE` | Delegate to the feature's core (pure functions) |
+| Usage printed on runtime errors | `SilenceUsage = true` after parsing |
+| Persistent flags where local flags suffice | Scope flags to the command that needs them |
+| Writing to `fmt.Println` directly | Use `cmd.OutOrStdout()` / `cmd.ErrOrStderr()` |
+| Expensive init before knowing which command runs | Lazy-load in `PersistentPreRunE` |
+| Config loading fails `help`/`version` commands | Only load config for commands that need it |
+| Ignoring context cancellation | Thread `cmd.Context()` through all operations |
+
+---
+
+## Development Checklist
+
+Before shipping a command, verify:
+
+- [ ] Command name, aliases, and hierarchy are intentional
+- [ ] `Use`, `Short`, `Long`, and `Example` are clear and accurate
+- [ ] Argument count and meaning are validated
+- [ ] Flags have clear names, defaults, and validation
+- [ ] Incompatible flag combinations are rejected
+- [ ] Business logic lives outside Cobra wiring
+- [ ] Output goes through command-provided writers
+- [ ] Errors are actionable and not duplicated
+- [ ] Context cancellation is respected
+- [ ] Tests cover success, validation failure, runtime failure, and output
+- [ ] Help output has been reviewed
+- [ ] Every `func` and `type` has a block-header doc comment
+- [ ] Automation/scripting behavior is predictable
+- [ ] Secrets are never logged or printed
+- [ ] Exit codes are intentional and documented
+
+---
+
+## Appendix: General Go Practices (Applicable to CLI Development)
+
+These are not Cobra-specific but are consistently important when building CLI tools in Go:
+
+- **Error strings are lowercase** and don't end with punctuation (`"open file: permission denied"`, not `"Failed to open file."`).
+- **Wrap errors with `%w`** to preserve the chain for callers that need `errors.Is` / `errors.As`.
+- **Use sentinel or typed errors sparingly** — only when callers must branch on them.
+- **Keep interfaces small** (1–3 methods) and define them in the consuming package, not the provider.
+- **Prefer concrete types** unless an interface provides clear testability or decoupling value.
+- **Accept interfaces, return structs.** Take interfaces as parameters where they aid testing or decoupling, but return concrete types so callers keep full access. Expose behavior on returned structs through methods rather than pre-emptively wrapping them in interfaces.
+- **Avoid `init()` functions.** Explicit initialization in `main` or constructors is easier to reason about and test.
+- **Use `context.Context` as the first parameter** for any function that does I/O, calls external services, or may need cancellation.
+- **Table-driven tests** reduce duplication for parsing, validation, and formatting logic.
+- **Use `t.TempDir()`** for filesystem tests — it handles cleanup automatically.
+- **Stream data** rather than buffering entire payloads in memory when the size is unbounded.
+- **Atomic file writes** (write to temp, then rename) prevent corruption on crash for important files.
+- **Prefer `exec.CommandContext`** over `exec.Command` so subprocesses are killed on cancellation.
+- **Never interpolate user input into shell strings.** Pass arguments as discrete elements to `exec.Command`.
+- **Validate at boundaries** (CLI input, config files, network responses) — internal code can then trust its inputs.

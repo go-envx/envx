@@ -1,0 +1,42 @@
+version: '3'
+
+tasks:
+  all:
+    desc: 'Run the full pipeline in series: check, test, build, install'
+    cmds:
+      - task: check
+      - task: test
+      - task: build
+      - task: install
+
+  run:
+    desc: 'Run the CLI on the fly (usage: task run -- <args>)'
+    cmds:
+      - go run ./cmd/envx {{.CLI_ARGS}}
+
+  build:
+    desc: Build the CLI binary
+    cmds:
+      - go build -o bin/envx ./cmd/envx
+
+  install:
+    desc: Install the CLI to your Go bin/ directory
+    cmds:
+      - go install ./cmd/envx
+
+  test:
+    desc: Run tests for the CLI
+    cmds:
+      - go test -race -coverpkg=./... -coverprofile=coverage.out ./...
+
+  check:
+    desc: Run formatting, static analysis, and vulnerability scanning
+    cmds:
+      - golangci-lint fmt
+      - golangci-lint run
+      - go tool govulncheck ./...
+
+  clean:
+    desc: Clean build artifacts
+    cmds:
+      - rm -rf bin/

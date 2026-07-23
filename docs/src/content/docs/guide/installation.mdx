@@ -1,0 +1,44 @@
+---
+title: Installation
+description: Install the envx CLI.
+---
+
+envx is a single self-contained binary. Choose whichever method fits your setup.
+
+## Go
+
+Install the latest release with the Go toolchain:
+
+```sh
+go install github.com/go-envx/envx/app/cmd/envx@latest
+```
+
+## Binary
+
+Download a prebuilt binary for your platform from the [releases page](https://github.com/go-envx/envx/releases), extract it, and place `envx` on your `PATH`.
+
+## From source
+
+Clone the repository and build it with [Task](https://taskfile.dev/):
+
+```sh
+git clone https://github.com/go-envx/envx.git
+cd envx
+task envx:install
+```
+
+## Mise
+
+[mise](https://mise.jdx.dev/) installs the latest GitHub release and puts it on your `PATH`:
+
+```sh
+mise use -g github:go-envx/envx
+```
+
+## Verify
+
+Confirm the install:
+
+```sh
+envx --version
+```

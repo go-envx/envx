@@ -1,0 +1,57 @@
+---
+// KeyboardShortcut renders a keyboard-key hint as a styled <kbd> keycap, e.g.
+// `<KeyboardShortcut>e</KeyboardShortcut>`. It is presentational only — it draws
+// the key, it does not register the shortcut's behavior. Because the keycap
+// style is scoped to this component, it styles every keycap the component
+// renders (inside a button, inside markdown copy, anywhere) without a global
+// rule and without touching Starlight's own <kbd> chrome, such as the header
+// search's Ctrl K hint.
+
+// The size prop scales the keycap relative to its surrounding text: sm (0.8em)
+// tucks into body copy or a button label, md (1em) matches it, lg (1.2em) draws
+// emphasis. It maps to a data-size variant styled in the scoped block below.
+interface Props {
+  size?: 'md' | 'lg'
+}
+
+const { size = 'md' } = Astro.props
+---
+
+<kbd
+  class="keyboard-shortcut mx-1 inline-block align-middle text-center leading-none normal-case tracking-normal"
+  data-size={size}
+><slot /></kbd>
+
+<style>
+  /* Keycap surface. Sizing is em-relative so the key scales with its
+     surrounding text; the size prop picks the scale via the data-size variants
+     below. The fill, border, and mono font come from Starlight theme tokens, so
+     they read clearest as CSS. The layout resets that keep the key upright
+     regardless of context are utility classes on the element: inline-block,
+     centering, tight line-height, and the case/tracking resets that undo any
+     inherited uppercase styling. The align-middle utility and the negative
+     margin-block below together center the key on the text line and stop its
+     padding and border from stretching the line box when it sits in body copy —
+     the line-height strut then floors the line at its natural height. (In the
+     toggle button it lives in a flex row, so the vertical-align is inert and the
+     symmetric negative margin leaves it centered and the button height
+     unchanged.) */
+  .keyboard-shortcut {
+    min-width: 1.5em;
+    padding: 0.15em 0.4em;
+    margin-block: -0.4em;
+    border: 1px solid var(--sl-color-gray-4);
+    border-radius: 0.3rem;
+    background: var(--sl-color-gray-5);
+    color: var(--sl-color-white);
+    font-family: var(--sl-font-mono, ui-monospace, monospace);
+
+    &[data-size='md'] {
+      font-size: 0.8em;
+    }
+
+    &[data-size='lg'] {
+      font-size: 1.0em;
+    }
+  }
+</style>

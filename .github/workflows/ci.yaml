@@ -21,7 +21,8 @@ jobs:
     name: Detect Changes
     runs-on: ubuntu-latest
     outputs:
-      envx: ${{ steps.filter.outputs.envx }}
+      app: ${{ steps.filter.outputs.app }}
+      docs: ${{ steps.filter.outputs.docs }}
     steps:
       - name: Checkout code
         uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
@@ -31,9 +32,11 @@ jobs:
         with:
           predicate-quantifier: 'every'
           filters: |
-            envx:
-              - 'apps/envx/**'
-              - '!apps/envx/**/*.md'
+            app:
+              - 'app/**'
+              - '!app/**/*.md'
+            docs:
+              - 'docs/**'
 
   # ─────────────────────────────────────────────────────────────
   # Commitlint: Validate PR title follows conventional commits
@@ -67,11 +70,11 @@ jobs:
   check:
     name: Check
     needs: changes
-    if: needs.changes.outputs.envx == 'true'
+    if: needs.changes.outputs.app == 'true'
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: apps/envx
+        working-directory: app
     steps:
       - name: Checkout code
         uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
@@ -88,11 +91,11 @@ jobs:
   test:
     name: Test
     needs: changes
-    if: needs.changes.outputs.envx == 'true'
+    if: needs.changes.outputs.app == 'true'
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: apps/envx
+        working-directory: app
     steps:
       - name: Checkout code
         uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
@@ -106,7 +109,7 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: coverage
-          path: apps/envx/coverage.out
+          path: app/coverage.out
 
   # ─────────────────────────────────────────────────────────────
   # Build: Verify the binary compiles successfully
@@ -114,11 +117,11 @@ jobs:
   build:
     name: Build
     needs: changes
-    if: needs.changes.outputs.envx == 'true'
+    if: needs.changes.outputs.app == 'true'
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: apps/envx
+        working-directory: app
     steps:
       - name: Checkout code
         uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
@@ -130,12 +133,35 @@ jobs:
         run: task build
 
   # ─────────────────────────────────────────────────────────────
+  # Docs: Lint, type-check, and build the documentation site
+  # ─────────────────────────────────────────────────────────────
+  docs:
+    name: Docs
+    needs: changes
+    if: needs.changes.outputs.docs == 'true'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: docs
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+      - name: Setup tools
+        uses: jdx/mise-action@dba19683ed58901619b14f395a24841710cb4925 # v4.1.0
+        with:
+          install_args: node pnpm task
+      - name: Run checks
+        run: task check
+      - name: Build site
+        run: task build
+
+  # ─────────────────────────────────────────────────────────────
   # Gate: All checks passed
   # ─────────────────────────────────────────────────────────────
   ci-passed:
     name: 🚧 CI Passed
     if: always()
-    needs: [commitlint, changes, check, test, build]
+    needs: [commitlint, changes, check, test, build, docs]
     runs-on: ubuntu-latest
     steps:
       - name: Verify all checks passed
@@ -144,7 +170,8 @@ jobs:
              [[ "${{ needs.changes.result }}" == "failure" ]] || \
              [[ "${{ needs.check.result }}" == "failure" ]] || \
              [[ "${{ needs.test.result }}" == "failure" ]] || \
-             [[ "${{ needs.build.result }}" == "failure" ]]; then
+             [[ "${{ needs.build.result }}" == "failure" ]] || \
+             [[ "${{ needs.docs.result }}" == "failure" ]]; then
             echo "::error::One or more CI jobs failed"
             exit 1
           fi

@@ -1,0 +1,23 @@
+---
+title: Discovery
+description: How envx locates your envx.yaml manifest.
+sidebar:
+  order: 2
+---
+
+Before envx can resolve anything, it has to find your [`envx.yaml`](../schema/). It does that in one of two ways.
+
+## Automatic discovery
+
+By default, envx walks up from the current working directory, stopping at the git repository root, and uses the first file named `envx.yaml` it finds. You can run envx from anywhere inside your project and it resolves against the same manifest.
+
+## Explicit path
+
+To use a file in another location, or one that is not named `envx.yaml`, point at it directly with the `--config` flag or the `ENVX_CONFIG` environment variable:
+
+```sh
+envx get api-service DATABASE_HOST --config ./path/to/my-config.yaml
+ENVX_CONFIG=./path/to/my-config.yaml envx get api-service DATABASE_HOST
+```
+
+The `--config` flag takes precedence over `ENVX_CONFIG`, which in turn takes precedence over automatic discovery.

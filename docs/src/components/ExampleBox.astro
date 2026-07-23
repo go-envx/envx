@@ -1,0 +1,108 @@
+---
+import { Icon } from 'astro-icon/components'
+
+// ExampleBox lays out an example's content inside a bordered card body. It is
+// presentational only — wrap it in an <ExampleAccordion> to make the card
+// collapsible (that's how every example on the schema page is rendered).
+//
+// ExampleBox composes an example's parts from slots so call sites stay
+// declarative — it renders the eyebrows and the file layout itself:
+//   - `manifest` slot -> the envx.yaml, shown in the left column of a
+//     "Workspace" group.
+//   - `files` slot    -> the namespace file(s), stacked in the right column.
+//   - `commands` slot -> the shell commands, shown under a "Commands" group.
+//   - default slot    -> raw content for a simple shape snippet (no eyebrows).
+//
+// The eyebrow labels ("Workspace" / "Commands") are inlined here rather than
+// factored into a component: they're two trivial call sites, so a shared
+// component earned its keep less than the indirection cost.
+
+const hasFiles = Astro.slots.has('files')
+const hasWorkspace = Astro.slots.has('manifest') || hasFiles
+const hasCommands = Astro.slots.has('commands')
+---
+
+<div class="example-box @container p-3.5">
+  {
+    hasWorkspace && (
+      <Fragment>
+        <div class="example-label mt-6 mb-2 flex items-center gap-1.5 font-semibold tracking-widest uppercase">
+          <Icon name="material-symbols:folder-outline" class="h-6 w-6" aria-hidden="true" />
+          Workspace
+        </div>
+        {/*
+          The side-by-side split is driven by THIS component's width, not the
+          viewport: `.example-box` above is a `@container`, so the `@min-[...]`
+          variant flips the files grid to two columns once the box itself is
+          wide enough — regardless of sidebars or viewport width. Default is the
+          single-column stack; it upgrades to two columns at the container
+          breakpoint, measured against the container's content box (inside the
+          box's p-3.5 padding) — the space the grid actually has for columns.
+          28rem keeps each column comfortably wide. The ~800px "tablet" case,
+          where Starlight's left sidebar first appears and squeezes the content
+          column, is handled by narrowing --sl-sidebar-width in global.css, NOT
+          by lowering this breakpoint. Tune it if the split feels early or late.
+        */}
+        <div
+          class:list={[
+            'example-files mb-2 grid items-start gap-4',
+            hasFiles ? 'grid-cols-1 @min-[28rem]:grid-cols-2' : 'grid-cols-1',
+          ]}
+        >
+          <div class="example-files__manifest">
+            <slot name="manifest" />
+          </div>
+          {hasFiles && (
+            <div class="example-files__namespaces flex flex-col gap-4">
+              <slot name="files" />
+            </div>
+          )}
+        </div>
+      </Fragment>
+    )
+  }
+  {
+    hasCommands && (
+      <Fragment>
+        <div class="example-label mt-6 mb-2 flex items-center gap-1.5 font-semibold tracking-widest uppercase">
+          <Icon name="material-symbols:terminal" class="h-6 w-6" aria-hidden="true" />
+          Commands
+        </div>
+        <slot name="commands" />
+      </Fragment>
+    )
+  }
+  <slot />
+</div>
+
+<style>
+  /* Eyebrow tokens: the label's size and color come from Starlight; its flex
+     layout, spacing, and typography are utility classes. */
+  .example-label {
+    font-size: var(--sl-text-xs);
+    color: var(--sl-color-gray-3);
+  }
+
+  /* Trim the slotted content's leading and trailing margins so the body hugs its
+     contents; targets generated markdown children, so it can't be a utility class. */
+  .example-box {
+    & > :global(:first-child) {
+      margin-block-start: 0;
+    }
+    & > :global(:last-child) {
+      margin-block-end: 0;
+    }
+  }
+
+  /* Let the grid cells shrink so wide code blocks scroll rather than overflow,
+     and cancel Starlight's markdown flow spacing (a `* + *` margin-top that
+     would push the second column down) so both columns start at the top. */
+  .example-files__manifest,
+  .example-files__namespaces {
+    min-width: 0;
+    margin: 0;
+    & > :global(*) {
+      margin: 0;
+    }
+  }
+</style>

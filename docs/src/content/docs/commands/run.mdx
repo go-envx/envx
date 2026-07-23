@@ -1,0 +1,116 @@
+---
+title: run
+description: Run a command with a project's merged environment injected.
+sidebar:
+  order: 4
+---
+
+import ExampleBox from '#components/ExampleBox.astro';
+
+```sh
+envx run <project> -- <command> [args...]
+```
+
+`run` executes a command with the environment variables resolved from a project's namespace chain. Everything after the `--` separator is the command to run and its arguments.
+
+By default, existing OS environment variables take precedence over values from your files. Pass `--overload` to let file values win instead. Signals are forwarded transparently to the child process, and its exit code is propagated verbatim.
+
+## Arguments
+
+| Argument | Description |
+| --- | --- |
+| `<project>` | The project whose environment is injected. |
+| `<command> [args...]` | The command to run, after a `--` separator. |
+
+## Examples
+
+The examples below use the same `api` workspace, running `printenv` so you can see the injected values:
+
+  <ExampleBox>
+    <Fragment slot="manifest">
+      ```yaml
+      # envx.yaml
+      environments:
+        - development
+        - production
+
+      projects:
+        api:
+          includes:
+            - db
+      ```
+    </Fragment>
+    <Fragment slot="files">
+      ```yaml
+      # db.yaml
+      db:
+        host: # set per environment
+        port: 5432
+        pool_size: 10
+      ```
+
+      ```yaml
+      # db.development.yaml
+      db:
+        host: localhost
+      ```
+
+      ```yaml
+      # db.production.yaml
+      db:
+        host: prod.internal
+        pool_size: 50
+      ```
+    </Fragment>
+    <Fragment slot="commands">
+      ```sh
+      # development is the default env.
+      envx run api -- printenv DB_HOST
+      # localhost
+
+      # Resolve a specific environment.
+      envx run api --env production \
+        -- printenv DB_HOST
+      # prod.internal
+
+      # An existing OS var wins by default.
+      DB_HOST=os.local envx run api \
+        -- printenv DB_HOST
+      # os.local
+
+      # --overload lets file values win.
+      DB_HOST=os.local envx run api \
+        --overload -- printenv DB_HOST
+      # localhost
+      ```
+    </Fragment>
+  </ExampleBox>
+
+## Flags
+
+| Flag | Environment variable | Description |
+| --- | --- | --- |
+| `--env`, `-E` | `ENVX_ENV` | Target environment to resolve. |
+| `--overload` | `ENVX_OVERLOAD` | File values override existing OS env vars. |
+| `--require-overlays` | `ENVX_REQUIRE_OVERLAYS` | Require every overlay file to exist. |
+| `--prefix` | `ENVX_PREFIX` | Prefix prepended to every key. |
+| `--suffix` | `ENVX_SUFFIX` | Suffix appended to every key. |
+| `--delimiter` | `ENVX_DELIMITER` | String used to join list values. |
+| `--namespace-prefix` | `ENVX_NAMESPACE_PREFIX` | Prefix each key with its namespace. |
+
+Plus the [global flags](../overview/#global-flags). These flags map to [settings](../../configuration/schema/#settings-2) and override the values in `envx.yaml`.
+
+## Exit codes
+
+envx maps outcomes to conventional exit codes so `run` composes cleanly in scripts:
+
+| Code | Meaning |
+| --- | --- |
+| `0` | Success |
+| `1` | Runtime error |
+| `2` | Usage or validation error (invalid flags or arguments) |
+| `126` | Command found but not executable |
+| `127` | Command not found |
+| `128+N` | Child terminated by signal `N` (e.g. `130` for SIGINT) |
+
+The child process's own exit code is propagated verbatim, so a command that exits `7` makes envx exit `7`.

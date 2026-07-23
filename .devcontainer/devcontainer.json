@@ -22,12 +22,14 @@
 			"extensions": [
 				"amodio.toggle-excluded-files",
 				"Anthropic.claude-code",
+        "astro-build.astro-vscode",
 				"biomejs.biome",
 				"golang.Go",
 				"logerfo.open-all-files",
 				"mhutchie.git-graph",
 				"tamasfe.even-better-toml",
-				"task.vscode-task"
+				"task.vscode-task",
+        "unifiedjs.vscode-mdx"
 			]
 		}
 	}

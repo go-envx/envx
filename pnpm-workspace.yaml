@@ -1,0 +1,7 @@
+packages:
+  - docs
+
+# Build scripts allowed to run during install (pnpm blocks all by default).
+# esbuild compiles its platform binary via an install script that Astro/Vite need.
+allowBuilds:
+  esbuild: true

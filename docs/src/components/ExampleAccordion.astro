@@ -1,0 +1,77 @@
+---
+import { Icon } from 'astro-icon/components'
+
+// ExampleAccordion wraps an example in a native <details> disclosure so the
+// reference page stays scannable: readers expand an example only when they want
+// it. Pass `open` to render it expanded by default. The native disclosure
+// marker provides the leading caret (it rotates on open for free); the summary
+// label flips between "Expand example" and "Collapse example" via the [open]
+// attribute (CSS only). The summary's lightbulb glyph matches the eyebrow icons.
+//
+// The `data-example-accordion` attribute is the behavior hook ExampleControls
+// queries (`details[data-example-accordion]`) to expand/collapse every example
+// at once; it's kept separate from the `example-accordion` styling class so the
+// styling can change without breaking the toggle-all script. If you rename or
+// move this hook, update ExampleControls' getExamples() query to match.
+//
+// The example's content — typically an <ExampleBox> — is passed as the default
+// slot and rendered inside the disclosure body.
+
+interface Props {
+  open?: boolean
+}
+
+const { open = false } = Astro.props
+---
+
+<details class="example-accordion my-6 rounded-lg" data-example-accordion open={open}>
+  <summary
+    class="example-toggle flex cursor-pointer items-center gap-1.5 px-3.5 py-2.5 font-semibold tracking-[0.08em] uppercase select-none"
+  >
+    <Icon name="material-symbols:lightbulb-outline" class="h-5 w-5" aria-hidden="true" />
+    <span class="label-expand">Expand example</span>
+    <span class="label-collapse">Collapse example</span>
+  </summary>
+  <slot />
+</details>
+
+<style>
+  /* Card container: the border color is a Starlight token, so the whole border
+     stays in CSS; the card's spacing and rounded corners are utility classes on
+     the <details>. */
+  .example-accordion {
+    border: 1px solid var(--sl-color-gray-5);
+
+    /* Swap the toggle label to match the current state. */
+    &[open] .label-expand {
+      display: none;
+    }
+    &:not([open]) .label-collapse {
+      display: none;
+    }
+
+    /* Divider under the toggle once the card is open, matching the border. */
+    &[open] .example-toggle {
+      border-bottom: 1px solid var(--sl-color-gray-5);
+    }
+  }
+
+  /* The <summary> acts as the card's toggle: its uppercase label size and color
+     track Starlight theme variables, while the row's flex layout, padding, and
+     typography are utility classes. */
+  .example-toggle {
+    font-size: var(--sl-text-xs);
+    color: var(--sl-color-gray-2);
+
+    /* Tint the toggle's lightbulb with the muted Starlight gray. */
+    & :global(svg) {
+      color: var(--sl-color-gray-3);
+    }
+
+    /* Keyboard focus ring, using the accent-with-white-fallback token. */
+    &:focus-visible {
+      outline: 2px solid var(--sl-color-accent-high, var(--sl-color-white));
+      outline-offset: -2px;
+    }
+  }
+</style>

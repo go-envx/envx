@@ -1,0 +1,109 @@
+---
+title: explain
+description: Show each resolved value and the file it came from.
+sidebar:
+  order: 6
+---
+
+import ExampleBox from '#components/ExampleBox.astro';
+
+```sh
+envx explain <project> [key]
+```
+
+`explain` resolves a project's environment and reports, for each key, the value and the file it was resolved from. With no key it explains every key; with a key it explains just that one.
+
+Use `--output json` for machine-readable output.
+
+## Arguments
+
+| Argument | Description |
+| --- | --- |
+| `<project>` | The project to resolve. |
+| `[key]` | Optional. Explain only this key instead of all keys. |
+
+## Examples
+
+The examples below use the same `api` workspace:
+
+  <ExampleBox>
+    <Fragment slot="manifest">
+      ```yaml
+      # envx.yaml
+      environments:
+        - development
+        - production
+
+      projects:
+        api:
+          includes:
+            - db
+      ```
+    </Fragment>
+    <Fragment slot="files">
+      ```yaml
+      # db.yaml
+      db:
+        host: # set per environment
+        port: 5432
+        pool_size: 10
+      ```
+
+      ```yaml
+      # db.development.yaml
+      db:
+        host: localhost
+      ```
+
+      ```yaml
+      # db.production.yaml
+      db:
+        host: prod.internal
+        pool_size: 50
+      ```
+    </Fragment>
+    <Fragment slot="commands">
+      ```sh
+      # Explain every key.
+      envx explain api
+      # KEY           VALUE      SOURCE
+      # DB_HOST       localhost  db.development.yaml
+      # DB_POOL_SIZE  10         db.yaml
+      # DB_PORT       5432       db.yaml
+
+      # Explain one key.
+      envx explain api DB_HOST
+      # KEY      VALUE      SOURCE
+      # DB_HOST  localhost  db.development.yaml
+
+      # Machine-readable output.
+      envx explain api --output json
+      # [
+      #   {
+      #     "key": "DB_HOST",
+      #     "value": "localhost",
+      #     "source": "db.development.yaml",
+      #     "sourceKey": "db.host",
+      #     "shadowed": [
+      #       "db.yaml"
+      #     ]
+      #   },
+      #   ...
+      # ]
+      ```
+    </Fragment>
+  </ExampleBox>
+
+## Flags
+
+| Flag | Environment variable | Description |
+| --- | --- | --- |
+| `--output`, `-o` | | Output format: `table` (default) or `json`. |
+| `--env`, `-E` | `ENVX_ENV` | Target environment to resolve. |
+| `--require-overlays` | `ENVX_REQUIRE_OVERLAYS` | Require every overlay file to exist. |
+| `--prefix` | `ENVX_PREFIX` | Prefix prepended to every key. |
+| `--suffix` | `ENVX_SUFFIX` | Suffix appended to every key. |
+| `--delimiter` | `ENVX_DELIMITER` | String used to join list values. |
+| `--namespace-prefix` | `ENVX_NAMESPACE_PREFIX` | Prefix each key with its namespace. |
+
+Plus the [global flags](../overview/#global-flags). The `--env`, `--require-overlays`, `--prefix`, `--suffix`, `--delimiter`, and `--namespace-prefix` flags map to [settings](../../configuration/schema/#settings-2) and override the values in `envx.yaml`.

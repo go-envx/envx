@@ -1,0 +1,16 @@
+environments: [development, staging, production]
+
+settings:
+  overload: false
+  require_overlays: false
+
+projects:
+  api-core:
+    includes:
+      - env/postgres
+      - env/gateway
+      - apps/api-core/env/api-core
+  web:
+    includes:
+      - env/gateway
+      - apps/web/env/web

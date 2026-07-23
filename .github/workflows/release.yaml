@@ -2,9 +2,22 @@ name: Release 🚀
 
 on:
   push:
+    # Cut a release by pushing a semver tag, e.g. `v1.0.0`. GoReleaser builds the
+    # binaries and the GitHub release from this tag, and the docs site is
+    # published in lockstep (see the `docs` job). Because the Go module lives
+    # in the `app/` subdirectory, `go install` needs a tag prefixed with the
+    # module path (`app/v1.0.0`); the "Publish Go module tag" step below mirrors
+    # each release tag into that form. Pushing an `app/*` tag does not re-trigger
+    # this workflow, since it only fires on `v*`.
     tags:
       - "v*"
+  # Manually publish the documentation site without cutting a release (for a
+  # docs-only fix). Only the `docs` job runs on this event — GoReleaser does
+  # not. The site is built from the branch or tag selected when dispatched.
+  workflow_dispatch:
 
+# Workflow-level default for the release job; the `docs` job narrows its own
+# permissions to what GitHub Pages deployment requires.
 permissions:
   contents: write
 
@@ -14,10 +27,13 @@ jobs:
   # ─────────────────────────────────────────────────────────────
   release:
     name: Release
+    # Only cut binaries + the GitHub release on a tag push; a manual
+    # workflow_dispatch run publishes docs only (see the `docs` job).
+    if: github.event_name == 'push'
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: apps/envx
+        working-directory: app
     steps:
       - name: Checkout code
         uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
@@ -32,3 +48,57 @@ jobs:
         run: goreleaser release --clean
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # Publish the Go module version tag (`app/vX.Y.Z`) on the released commit so
+      # `go install github.com/go-envx/envx/app/cmd/envx@vX.Y.Z` (and `@latest`)
+      # resolves. Runs only after GoReleaser succeeds; safe to re-run.
+      - name: Publish Go module tag
+        env:
+          MODULE_TAG: "app/${{ github.ref_name }}"
+        run: |
+          if git rev-parse -q --verify "refs/tags/${MODULE_TAG}" >/dev/null; then
+            echo "Tag ${MODULE_TAG} already exists; skipping."
+          else
+            git tag "${MODULE_TAG}"
+            git push origin "${MODULE_TAG}"
+          fi
+
+  # ─────────────────────────────────────────────────────────────
+  # Docs: Build and publish the documentation site to GitHub Pages
+  # ─────────────────────────────────────────────────────────────
+  docs:
+    name: Deploy Docs
+    runs-on: ubuntu-latest
+    # GITHUB_TOKEN scopes for the OIDC-based Pages deployment.
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    # Serialize Pages deployments and let any in-progress deploy finish.
+    concurrency:
+      group: pages
+      cancel-in-progress: false
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    defaults:
+      run:
+        working-directory: docs
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+      - name: Setup tools
+        uses: jdx/mise-action@dba19683ed58901619b14f395a24841710cb4925 # v4.1.0
+        with:
+          install_args: node pnpm task
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Build site
+        run: task build
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
+        with:
+          path: docs/dist
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@cd2ce8fcbc39b97be8ca5fce6e763baed58fa128 # v5.0.0

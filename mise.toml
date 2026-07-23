@@ -33,4 +33,4 @@ pnpm = "11.6.0"                   # https://pnpm.io/motivation
 # Tools
 claude = "2.1.175"                # https://code.claude.com/docs/en/overview
 gh = "2.94.0"                     # https://cli.github.com/manual/
-task = "3.51.1"                   # https://taskfile.dev/docs/guide
+task = "3.52.0"                   # https://taskfile.dev/docs/guide
