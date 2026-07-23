@@ -3,8 +3,7 @@ title: Getting Started
 description: Learn the key concepts, then build your first envx workspace.
 ---
 
-This guide introduces the core ideas envx is built on and then walks through
-setting up a project from scratch.
+This guide introduces the core ideas envx is built on and then walks through setting up a project from scratch.
 
 ## Key concepts
 
@@ -19,8 +18,7 @@ envx works with three kinds of files:
 A few terms are worth naming up front:
 
 - An **environment** is a named variant such as `development` or `production`.
-- A **project** composes an ordered list of **namespaces** into one resolved
-  environment.
+- A **project** composes an ordered list of **namespaces** into one resolved environment.
 - A **namespace** is a base file plus its optional per-environment overlays.
 
 That is the whole model. Everything else is detail you can pick up as you go.
@@ -33,8 +31,7 @@ Run `envx create quick-start` to scaffold this exact workspace, then jump to ste
 
 ### 1. Workspace configuration file
 
-Create an `envx.yaml` at your workspace root. It lists your environments and the
-namespaces each project loads:
+Create an `envx.yaml` at your workspace root. It lists your environments and the namespaces each project loads:
 
 ```yaml
 # envx.yaml
@@ -54,17 +51,11 @@ projects:
       - web-server/env/values
 ```
 
-Here two projects share the `env/gateway` namespace, while `env/database` belongs
-to `api-service` alone. Entries under `includes` merge in declaration order, so if
-two namespaces define the same key, the one listed last wins.
+Here two projects share the `env/gateway` namespace, while `env/database` belongs to `api-service` alone. Entries under `includes` merge in declaration order, so if two namespaces define the same key, the one listed last wins.
 
 ### 2. Base namespace files
 
-For each namespace, create a base `<namespace>.yaml` that declares every key the
-namespace uses. Give shared keys their default value, and leave environment-specific
-values — like a database host — empty to fill in per environment (step 3). Shared
-namespaces nest their keys under the namespace name; each app keeps its own config
-flat:
+For each namespace, create a base `<namespace>.yaml`. A base value is the default an environment falls back to when its overlay doesn't set that key, so keep what's shared across environments here and leave whatever differs to the overlays (step 3).
 
 ```yaml
 # env/database.yaml
@@ -93,19 +84,13 @@ name: web-server
 
 **Things to note:**
 
-- A base declares every key the namespace uses, so its full shape lives in one
-  place. Keys with a sensible default (`port`, `timeout`) get one here;
-  environment-specific values (`host`, `url`) are left empty and set per environment.
-- Keys flatten into `SCREAMING_SNAKE_CASE`, so the nested `database.host` becomes
-  `DATABASE_HOST` and the flat `log_level` becomes `LOG_LEVEL`.
-- Nesting shared namespaces keeps their keys distinct — `DATABASE_HOST` rather
-  than a bare `HOST` that could collide with another namespace.
+- A base value is a default: `port` and `timeout` are the same across environments, so they live here. Listing an environment-specific key with no value (`host`, `url`) is optional. It documents that the namespace expects it, and each environment fills it in.
+- Keys flatten into `SCREAMING_SNAKE_CASE`, so the nested `database.host` becomes `DATABASE_HOST` and the flat `log_level` becomes `LOG_LEVEL`.
 - Lookups are case-insensitive.
 
 ### 3. Environment overlay files
 
-Add a `<namespace>.<environment>.yaml` overlay for any values that differ per
-environment. Each overlay is merged over its base, so you only write what changes:
+Add a `<namespace>.<environment>.yaml` overlay for any values that differ per environment. Each overlay is merged over its base, so you only write what changes:
 
 ```yaml
 # env/database.development.yaml
@@ -138,17 +123,13 @@ log_level: debug
 
 **Things to note:**
 
-- Each overlay supplies only what changes, so in `development` just `DATABASE_HOST`,
-  `GATEWAY_URL`, and `LOG_LEVEL` come from these files; every other key resolves
-  from its base.
-- Because `host` and `url` have no base default, each environment sets them in its
-  own overlay.
+- Each overlay supplies only what changes, so in `development` just `DATABASE_HOST`, `GATEWAY_URL`, and `LOG_LEVEL` come from these files; every other key resolves from its base.
+- Because `host` and `url` have no base default, each environment sets them in its own overlay.
 - A namespace needs an overlay only when its values change, so `web-server` has none.
 
 ### 4. Resolve and run
 
-With the files in place, resolve values, inspect them, or run a command with the
-merged environment injected:
+With the files in place, resolve values, inspect them, or run a command with the merged environment injected:
 
 ```sh
 envx get api-service DATABASE_HOST
@@ -170,14 +151,11 @@ envx run api-service -- node server.js
 # run with the merged environment
 ```
 
-Each project resolves only the namespaces in its `includes` block, so values stay
-scoped to the project that asks for them — `web-server` never sees `DATABASE_HOST`.
+Each project resolves only the namespaces in its `includes` block, so values stay scoped to the project that asks for them — `web-server` never sees `DATABASE_HOST`.
 
 ---
 
 :::tip[Next steps]
-- Learn how to shape `envx.yaml` and every available setting in
-  [Configuration](/configuration/schema/).
-- See the full command surface, with examples and flags, in
-  [Commands](/commands/overview/).
+- Learn how to shape `envx.yaml` and every available setting in [Configuration](/configuration/schema/).
+- See the full command surface, with examples and flags, in [Commands](/commands/overview/).
 :::

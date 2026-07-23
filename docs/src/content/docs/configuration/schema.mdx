@@ -301,7 +301,7 @@ Examples on this page are collapsed by default to keep it scannable.
 
   <SchemaMeta type="bool" />
 
-  Prefix each key with the name of the namespace it came from. Most workspaces avoid this by nesting shared namespaces, but it is useful when flat namespaces collide — the `worker` project below includes `cache` and `queue`, which both define `host` and `port`.
+  Prefix each key with the name of the namespace it came from. Most workspaces avoid this by nesting shared namespaces, but it is useful when flat namespaces collide. In the example below, the `worker` project includes `cache` and `queue`, which both define `host` and `port`.
 
   - **CLI Flag:** `--namespace-prefix`
   - **Environment Variable:** `ENVX_NAMESPACE_PREFIX`

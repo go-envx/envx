@@ -14,14 +14,11 @@ page explains how envx decides which one wins. For what each setting does, see
 
 ## Per-project overrides
 
-Settings can be declared globally and overridden for a single project. A project
-setting always wins over the matching global setting — for example, a project that
-sets `prefix: web` overrides a global `prefix: app`. The example below shows this.
+Settings can be declared globally and overridden for a single project. A project setting always wins over the matching global setting. For example, a project that sets `prefix: web` overrides a global `prefix: app`. The example below shows this.
 
 ## Precedence
 
-The same settings can also be supplied at the command line or through the
-environment. envx resolves each setting using this precedence, highest to lowest:
+The same settings can also be supplied at the command line or through the environment. envx resolves each setting using this precedence, highest to lowest:
 
 1. **CLI flag** (e.g. `--prefix`)
 2. **`ENVX_*` environment variable** (e.g. `ENVX_PREFIX`)
@@ -31,10 +28,7 @@ environment. envx resolves each setting using this precedence, highest to lowest
 
 ## Examples
 
-The workspace below sets `prefix: app` globally and overrides it to `prefix: web`
-on the `web` project. Watch each layer take over in turn — the project setting,
-then an `ENVX_PREFIX` variable, then a `--prefix` flag — by the prefix applied to
-every resolved key:
+The workspace below sets `prefix: app` globally and overrides it to `prefix: web` on the `web` project. Watch each layer take over in turn — the project setting, then an `ENVX_PREFIX` variable, then a `--prefix` flag — by the prefix applied to every resolved key:
 
   <ExampleBox>
     <Fragment slot="manifest">
