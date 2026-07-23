@@ -11,7 +11,7 @@ import (
 	"github.com/go-envx/envx/app/internal/exitcode"
 )
 
-// Build metadata is injected at link time via -ldflags (see .goreleaser.yml);
+// Build metadata is injected at link time via -ldflags (see .goreleaser.yaml);
 // the defaults below apply to local `go run` builds.
 var (
 	// version is the semantic version or VCS tag of the build.

@@ -35,6 +35,16 @@ task envx:install
 mise use -g github:go-envx/envx
 ```
 
+## Docker
+
+envx publishes a minimal `scratch` image to the GitHub Container Registry (`ghcr.io/go-envx/envx`) that contains only the binary. Copy it into your own image with a build stage instead of downloading and verifying a release archive yourself:
+
+```dockerfile
+COPY --from=ghcr.io/go-envx/envx:1.0.1 /envx /usr/local/bin/envx
+```
+
+Pin to an exact version for reproducible builds. The rolling `latest`, `1`, and `1.0` tags are also published.
+
 ## Verify
 
 Confirm the install:
