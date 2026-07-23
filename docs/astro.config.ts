@@ -7,11 +7,19 @@ import icon from 'astro-icon'
  * Docs site configuration:
  * https://astro.build/config
  *
- * "site" and "base" are intentionally left unset until the deployment target is
- * finalized. GitHub Pages project sites are served from a subpath, so add
- * "site: 'https://go-envx.github.io'" and "base: '/envx'" when wiring up deploy.
+ * Served from a GitHub Pages project site at https://go-envx.github.io/envx, so
+ * "base" is the repository subpath. When a custom domain is added later, change
+ * "site" to that domain and "base" to "/". Internal content links are written
+ * relative to the current page so they survive that change without edits.
  */
 export default defineConfig({
+  site: 'https://go-envx.github.io',
+  base: '/envx',
+  // Force a trailing slash on every route so relative links always resolve at
+  // the correct depth (base included). GitHub Pages already redirects to the
+  // trailing-slash form in production; this makes `astro dev` match it instead
+  // of serving base-less URLs such as `/envx` where relative links break.
+  trailingSlash: 'always',
   server: {
     host: true,
   },

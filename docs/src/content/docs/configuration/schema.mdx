@@ -11,7 +11,7 @@ import ExampleControls from '#components/ExampleControls.astro';
 import KeyboardShortcut from '#components/KeyboardShortcut.astro';
 import SchemaMeta from '#components/SchemaMeta.astro';
 
-`envx.yaml` is the workspace manifest: it declares your environments, your projects, and the settings that shape how envx resolves them. This page is the structural reference for every key. To see a manifest built from scratch, follow [Getting Started](/guide/getting-started/). To learn how envx locates the manifest, see [Discovery](/configuration/discovery/).
+`envx.yaml` is the workspace manifest: it declares your environments, your projects, and the settings that shape how envx resolves them. This page is the structural reference for every key. To see a manifest built from scratch, follow [Getting Started](../../guide/getting-started/). To learn how envx locates the manifest, see [Discovery](../discovery/).
 
 :::note
 Examples on this page are collapsed by default to keep it scannable.
@@ -186,7 +186,7 @@ Examples on this page are collapsed by default to keep it scannable.
 
 ## Settings
 
-  Every setting can be declared globally (the top-level [`settings`](#settings) block) or per project (a project's [`settings`](#settings-1) block), and each can also be supplied as a CLI flag or an `ENVX_*` environment variable. When the same setting is set in more than one place, [Settings Resolution](/configuration/settings-resolution/) decides which one wins. Each example below pairs a minimal workspace with a command that resolves the setting.
+  Every setting can be declared globally (the top-level [`settings`](#settings) block) or per project (a project's [`settings`](#settings-1) block), and each can also be supplied as a CLI flag or an `ENVX_*` environment variable. When the same setting is set in more than one place, [Settings Resolution](../settings-resolution/) decides which one wins. Each example below pairs a minimal workspace with a command that resolves the setting.
 
 ### `delimiter`
 
@@ -359,7 +359,7 @@ Examples on this page are collapsed by default to keep it scannable.
 
   <SchemaMeta type="bool" />
 
-  Let values from your files override existing OS environment variables. Applies to [`run`](/commands/run/); by default an existing OS variable wins.
+  Let values from your files override existing OS environment variables. Applies to [`run`](../../commands/run/); by default an existing OS variable wins.
 
   - **CLI Flag:** `--overload`
   - **Environment Variable:** `ENVX_OVERLOAD`
