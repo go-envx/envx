@@ -9,13 +9,6 @@ lockfile = true
 minimum_release_age = "24h"
 
 # ---------------------------------------------------------
-# Shell Aliases
-# https://mise.jdx.dev/shell-aliases.html
-# ---------------------------------------------------------
-[shell_alias]
-cc = "claude --dangerously-skip-permissions"
-
-# ---------------------------------------------------------
 # Tools
 # https://mise-versions.jdx.dev/
 # ---------------------------------------------------------
@@ -31,6 +24,5 @@ node = "24.18.0"                  # https://nodejs.org/docs/latest/api/
 pnpm = "11.15.1"                   # https://pnpm.io/motivation
 
 # Tools
-claude = "2.1.215"                # https://code.claude.com/docs/en/overview
 gh = "2.96.0"                     # https://cli.github.com/manual/
 task = "3.52.0"                   # https://taskfile.dev/docs/guide
