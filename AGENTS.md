@@ -6,3 +6,6 @@
 ## Go Cobra CLI Development
 - When writing, modifying, or reviewing code in the Go Cobra CLI app (`app/`), **always** read and apply the `go-cobra-cli` skill (`.agents/skills/go-cobra-cli/SKILL.md`).
 - When performing code reviews on Go CLI code, use the `go-cobra-cli` skill as the quality standard in addition to the `code-review` skill.
+
+## Markdown Formatting
+- When writing or modifying Markdown files (`.md` or `.mdx`), do not add hard line breaks to manually wrap text. Each paragraph and list item must remain a single continuous line of text, relying on the IDE's auto text-wrapping feature instead.
