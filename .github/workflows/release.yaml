@@ -117,6 +117,7 @@ jobs:
     environment: production # approval prompt (configure required reviewers)
     permissions:
       contents: write # create/push tags + the GitHub release
+      packages: write # push the container image to GHCR
     defaults:
       run:
         working-directory: app
@@ -131,6 +132,18 @@ jobs:
         uses: jdx/mise-action@dba19683ed58901619b14f395a24841710cb4925 # v4.1.0
         with:
           install_args: go goreleaser
+      # GoReleaser builds the multi-arch envx image with buildx. QEMU enables the
+      # arm64 build on the amd64 runner; the login lets it push to GHCR.
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@96fe6ef7f33517b61c61be40b68a1882f3264fb8 # v4.2.0
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4.2.0
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@06fb636fac595d6fb4b28a5dfcb21a6f5091859c # v4.5.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
       - name: Configure git identity
         run: |
           git config user.name "github-actions[bot]"
