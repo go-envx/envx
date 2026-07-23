@@ -1,60 +1,161 @@
 name: Release 🚀
 
+# Releases are cut MANUALLY from the Actions tab in stages,
+# mirroring a semantic-release dry-run/handshake flow but Go-native:
+#
+#   1. preview     — always runs. `svu` derives the next semver from Conventional
+#                    Commits since the last release and surfaces it in the job
+#                    summary. No approval, read-only.
+#   2. handshake   — only when `expected_version` is set. Fails early (before any
+#                    approval) if svu's computed version doesn't match what you say
+#                    you expect, so a mismatch never wastes an approval.
+#   3. release     — only when `expected_version` is set and the handshake passed.
+#                    Gated by the `production` environment (the approval prompt).
+#                    Tags the commit, runs GoReleaser (binaries + GitHub release +
+#                    changelog), and publishes the `app/vX.Y.Z` module tag.
+#   4. deploy-docs — deploys the docs site (reusable docs.yaml) after a release.
+#
+# Leave `expected_version` blank to only preview (no tag, release, or deploy).
 on:
-  push:
-    # Cut a release by pushing a semver tag, e.g. `v1.0.0`. GoReleaser builds the
-    # binaries and the GitHub release from this tag, and the docs site is
-    # published in lockstep (see the `docs` job). Because the Go module lives
-    # in the `app/` subdirectory, `go install` needs a tag prefixed with the
-    # module path (`app/v1.0.0`); the "Publish Go module tag" step below mirrors
-    # each release tag into that form. Pushing an `app/*` tag does not re-trigger
-    # this workflow, since it only fires on `v*`.
-    tags:
-      - "v*"
-  # Manually publish the documentation site without cutting a release (for a
-  # docs-only fix). Only the `docs` job runs on this event — GoReleaser does
-  # not. The site is built from the branch or tag selected when dispatched.
   workflow_dispatch:
+    inputs:
+      expected_version:
+        description: "Version you expect to release, e.g. 1.0.1. Leave blank to only preview."
+        type: string
+        required: false
+        default: ""
 
-# Workflow-level default for the release job; the `docs` job narrows its own
-# permissions to what GitHub Pages deployment requires.
+# Never cut two releases at once.
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+# Least-privilege default; each job elevates only what it needs.
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   # ─────────────────────────────────────────────────────────────
-  # Release: Build and publish binaries via GoReleaser
+  # Preview: compute the next version with svu (always runs)
   # ─────────────────────────────────────────────────────────────
-  release:
-    name: Release
-    # Only cut binaries + the GitHub release on a tag push; a manual
-    # workflow_dispatch run publishes docs only (see the `docs` job).
-    if: github.event_name == 'push'
+  preview:
+    name: Preview
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: app
+    permissions:
+      contents: read
+    outputs:
+      version: ${{ steps.svu.outputs.version }}
+      release: ${{ steps.svu.outputs.release }}
     steps:
       - name: Checkout code
         uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
         with:
-          fetch-depth: 0 # GoReleaser needs full history for changelog
+          fetch-depth: 0 # full history + tags so svu can analyze commits
       - name: Setup tools
         uses: jdx/mise-action@dba19683ed58901619b14f395a24841710cb4925 # v4.1.0
         with:
-          install_args: go goreleaser task
+          install_args: svu
+      # svu derives the next semver from Conventional Commits since the last
+      # `vX.Y.Z` tag (it ignores the non-semver `app/*` tags). If nothing since
+      # the last tag warrants a bump, `svu next` == `svu current` -> no release.
+      - name: Compute next version
+        id: svu
+        run: |
+          current="$(svu current 2>/dev/null || echo v0.0.0)"; current="${current#v}"
+          next="$(svu next)"; next="${next#v}"
+          echo "current: $current | next: $next"
+          {
+            echo "## Release preview"
+            echo ""
+            echo "- **Current:** \`$current\`"
+          } >> "$GITHUB_STEP_SUMMARY"
+          if [ "$next" = "$current" ]; then
+            echo "release=false" >> "$GITHUB_OUTPUT"
+            echo "version=" >> "$GITHUB_OUTPUT"
+            echo "- **Next:** _no release_ — no qualifying commits since the last release." >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "release=true" >> "$GITHUB_OUTPUT"
+            echo "version=$next" >> "$GITHUB_OUTPUT"
+            echo "- **Next:** \`$next\`" >> "$GITHUB_STEP_SUMMARY"
+          fi
 
+  # ─────────────────────────────────────────────────────────────
+  # Handshake: verify the expected version matches svu (pre-approval gate)
+  # ─────────────────────────────────────────────────────────────
+  handshake:
+    name: Verify Version
+    needs: preview
+    if: ${{ inputs.expected_version != '' }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Compare expected vs computed version
+        env:
+          EXPECTED: ${{ inputs.expected_version }}
+          RESOLVED: ${{ needs.preview.outputs.version }}
+          RELEASE: ${{ needs.preview.outputs.release }}
+        run: |
+          if [ "$RELEASE" != "true" ] || [ -z "$RESOLVED" ]; then
+            echo "::error::You expected $EXPECTED, but svu resolved no release (no qualifying commits). Aborting before approval."
+            exit 1
+          fi
+          if [ "$RESOLVED" != "$EXPECTED" ]; then
+            echo "::error::You expected $EXPECTED, but svu resolved $RESOLVED. Aborting before approval."
+            exit 1
+          fi
+          echo "Version handshake OK: $EXPECTED"
+
+  # ─────────────────────────────────────────────────────────────
+  # Release: tag, build binaries via GoReleaser, publish the module tag
+  # ─────────────────────────────────────────────────────────────
+  release:
+    name: Release
+    needs: [preview, handshake]
+    if: ${{ inputs.expected_version != '' }}
+    runs-on: ubuntu-latest
+    environment: production # approval prompt (configure required reviewers)
+    permissions:
+      contents: write # create/push tags + the GitHub release
+    defaults:
+      run:
+        working-directory: app
+    env:
+      VERSION: ${{ inputs.expected_version }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          fetch-depth: 0 # GoReleaser needs full history for the changelog
+      - name: Setup tools
+        uses: jdx/mise-action@dba19683ed58901619b14f395a24841710cb4925 # v4.1.0
+        with:
+          install_args: go goreleaser
+      - name: Configure git identity
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+      # Create + push the release tag GoReleaser builds from. Guarded so a re-run
+      # after a partial failure doesn't error on an already-created tag.
+      - name: Create and push release tag
+        run: |
+          if git rev-parse -q --verify "refs/tags/v${VERSION}" >/dev/null; then
+            echo "Tag v${VERSION} already exists; skipping create."
+          else
+            git tag -a "v${VERSION}" -m "v${VERSION}"
+            git push origin "v${VERSION}"
+          fi
       - name: Run GoReleaser
         run: goreleaser release --clean
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      # Publish the Go module version tag (`app/vX.Y.Z`) on the released commit so
+      # Publish the Go module version tag (`app/vX.Y.Z`) so
       # `go install github.com/go-envx/envx/app/cmd/envx@vX.Y.Z` (and `@latest`)
-      # resolves. Runs only after GoReleaser succeeds; safe to re-run.
+      # resolves. Because the module lives in the `app/` subdirectory, Go needs a
+      # tag prefixed with the module path.
       - name: Publish Go module tag
         env:
-          MODULE_TAG: "app/${{ github.ref_name }}"
+          MODULE_TAG: "app/v${{ inputs.expected_version }}"
         run: |
           if git rev-parse -q --verify "refs/tags/${MODULE_TAG}" >/dev/null; then
             echo "Tag ${MODULE_TAG} already exists; skipping."
@@ -64,41 +165,14 @@ jobs:
           fi
 
   # ─────────────────────────────────────────────────────────────
-  # Docs: Build and publish the documentation site to GitHub Pages
+  # Docs: deploy the documentation site after a successful release
   # ─────────────────────────────────────────────────────────────
-  docs:
-    name: Deploy Docs
-    runs-on: ubuntu-latest
-    # GITHUB_TOKEN scopes for the OIDC-based Pages deployment.
+  deploy-docs:
+    name: Docs
+    needs: release
+    if: ${{ inputs.expected_version != '' }}
     permissions:
       contents: read
       pages: write
       id-token: write
-    # Serialize Pages deployments and let any in-progress deploy finish.
-    concurrency:
-      group: pages
-      cancel-in-progress: false
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-    defaults:
-      run:
-        working-directory: docs
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
-      - name: Setup tools
-        uses: jdx/mise-action@dba19683ed58901619b14f395a24841710cb4925 # v4.1.0
-        with:
-          install_args: node pnpm task
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-      - name: Build site
-        run: task build
-      - name: Upload Pages artifact
-        uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
-        with:
-          path: docs/dist
-      - name: Deploy to GitHub Pages
-        id: deployment
-        uses: actions/deploy-pages@cd2ce8fcbc39b97be8ca5fce6e763baed58fa128 # v5.0.0
+    uses: ./.github/workflows/docs.yaml
