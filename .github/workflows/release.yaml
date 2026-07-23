@@ -1,18 +1,18 @@
 name: Release 🚀
 
-# Releases are cut MANUALLY from the Actions tab — never by pushing a tag — in
-# stages, mirroring a semantic-release dry-run/handshake flow but Go-native:
+# Releases are cut MANUALLY from the Actions tab in stages,
+# mirroring a semantic-release dry-run/handshake flow but Go-native:
 #
-#   1. preview   — always runs. `svu` derives the next semver from Conventional
-#                  Commits since the last release and surfaces it in the job
-#                  summary. No approval, read-only.
-#   2. handshake — only when `expected_version` is set. Fails early (before any
-#                  approval) if svu's computed version doesn't match what you say
-#                  you expect, so a mismatch never wastes an approval.
-#   3. release   — only when `expected_version` is set and the handshake passed.
-#                  Gated by the `production` environment (the approval prompt).
-#                  Tags the commit, runs GoReleaser (binaries + GitHub release +
-#                  changelog), and publishes the `app/vX.Y.Z` module tag.
+#   1. preview     — always runs. `svu` derives the next semver from Conventional
+#                    Commits since the last release and surfaces it in the job
+#                    summary. No approval, read-only.
+#   2. handshake   — only when `expected_version` is set. Fails early (before any
+#                    approval) if svu's computed version doesn't match what you say
+#                    you expect, so a mismatch never wastes an approval.
+#   3. release     — only when `expected_version` is set and the handshake passed.
+#                    Gated by the `production` environment (the approval prompt).
+#                    Tags the commit, runs GoReleaser (binaries + GitHub release +
+#                    changelog), and publishes the `app/vX.Y.Z` module tag.
 #   4. deploy-docs — deploys the docs site (reusable docs.yaml) after a release.
 #
 # Leave `expected_version` blank to only preview (no tag, release, or deploy).
