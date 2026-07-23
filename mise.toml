@@ -22,15 +22,15 @@ cc = "claude --dangerously-skip-permissions"
 [tools]
 
 # Go
-go = "1.26.4"                     # https://go.dev/ref/spec
+go = "1.26.5"                     # https://go.dev/ref/spec
 golangci-lint = "2.12.2"          # https://golangci-lint.run/
-goreleaser = "2.16.0"             # https://goreleaser.com/
+goreleaser = "2.17.0"             # https://goreleaser.com/
 
 # Node
-node = "24.16.0"                  # https://nodejs.org/docs/latest/api/
-pnpm = "11.6.0"                   # https://pnpm.io/motivation
+node = "24.18.0"                  # https://nodejs.org/docs/latest/api/
+pnpm = "11.15.1"                   # https://pnpm.io/motivation
 
 # Tools
-claude = "2.1.175"                # https://code.claude.com/docs/en/overview
-gh = "2.94.0"                     # https://cli.github.com/manual/
+claude = "2.1.215"                # https://code.claude.com/docs/en/overview
+gh = "2.96.0"                     # https://cli.github.com/manual/
 task = "3.52.0"                   # https://taskfile.dev/docs/guide
