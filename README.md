@@ -1,6 +1,6 @@
 <div align="center">
 
-<a href="docs/src/content/docs/guide/getting-started.mdx">
+<a href="https://go-envx.github.io/envx/">
   <img src="docs/src/assets/logo.png" alt="envx logo" width="200" height="200" />
 </a>
 
@@ -10,7 +10,7 @@
 
 [![Release](https://img.shields.io/github/v/release/go-envx/envx?sort=semver)](https://github.com/go-envx/envx/releases) [![Go](https://img.shields.io/badge/go-1.26-00ADD8?logo=go&logoColor=white)](https://go.dev/) [![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 
-[Installation](docs/src/content/docs/guide/installation.mdx) &bull; [Getting Started](docs/src/content/docs/guide/getting-started.mdx) &bull; [Docs](docs/src/content/docs/configuration/schema.mdx) &bull; [Contributing](docs/src/content/docs/contribute.mdx)
+[Installation](https://go-envx.github.io/envx/guide/installation/) &bull; [Getting Started]([docs/src/content/docs/guide/getting-started.mdx](https://go-envx.github.io/envx/guide/getting-started/)) &bull; [Docs](https://go-envx.github.io/envx/commands/overview/) &bull; [Contributing](https://go-envx.github.io/envx/contribute/)
 
 </div>
 
