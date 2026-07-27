@@ -18,19 +18,22 @@ func TestFlatten(t *testing.T) {
 			"user-name": "postgres",
 		},
 	}
-	got, err := flatten(in, ",")
+	got, err := flatten(in)
 	if err != nil {
 		t.Fatalf("flatten: %v", err)
 	}
-	if got["HOST"] != "localhost" {
-		t.Errorf("HOST = %q, want localhost", got["HOST"])
+	if value, _ := renderLeafValue(got["HOST"], "host", ","); value != "localhost" {
+		t.Errorf("HOST = %q, want localhost", value)
 	}
-	if got["CREDENTIALS_USER_NAME"] != "postgres" {
-		t.Errorf("CREDENTIALS_USER_NAME = %q, want postgres", got["CREDENTIALS_USER_NAME"])
+	if value, _ := renderLeafValue(
+		got["CREDENTIALS_USER_NAME"], "credentials.user-name", ",",
+	); value != "postgres" {
+		t.Errorf("CREDENTIALS_USER_NAME = %q, want postgres", value)
 	}
-	if _, ok := got["PASSWORD"]; !ok || got["PASSWORD"] != "" {
-		t.Errorf("PASSWORD = %q (present=%t), want empty string for a nil leaf",
-			got["PASSWORD"], ok)
+	password, ok := got["PASSWORD"]
+	value, _ := renderLeafValue(password, "password", ",")
+	if !ok || value != "" {
+		t.Errorf("PASSWORD = %q (present=%t), want empty string for a nil leaf", value, ok)
 	}
 }
 
@@ -46,7 +49,7 @@ func TestFlattenCollision(t *testing.T) {
 			"key": "b",
 		},
 	}
-	_, err := flatten(in, ",")
+	_, err := flatten(in)
 	if err == nil {
 		t.Fatal("expected flatten collision error")
 	}
@@ -72,21 +75,25 @@ func TestFlattenList(t *testing.T) {
 		"gappy": []any{"x", nil, "z"},
 	}
 
-	got, err := flatten(in, ",")
+	got, err := flatten(in)
 	if err != nil {
 		t.Fatalf("flatten: %v", err)
 	}
-	if got["HOSTS"] != "a,b,c" {
-		t.Errorf("HOSTS = %q, want a,b,c", got["HOSTS"])
+	hosts, _ := renderLeafValue(got["HOSTS"], "hosts", ",")
+	if hosts != "a,b,c" {
+		t.Errorf("HOSTS = %q, want a,b,c", hosts)
 	}
-	if got["PORTS"] != "5432,5433" {
-		t.Errorf("PORTS = %q, want 5432,5433", got["PORTS"])
+	ports, _ := renderLeafValue(got["PORTS"], "ports", ",")
+	if ports != "5432,5433" {
+		t.Errorf("PORTS = %q, want 5432,5433", ports)
 	}
-	if got["EMPTY"] != "" {
-		t.Errorf("EMPTY = %q, want empty string", got["EMPTY"])
+	empty, _ := renderLeafValue(got["EMPTY"], "empty", ",")
+	if empty != "" {
+		t.Errorf("EMPTY = %q, want empty string", empty)
 	}
-	if got["GAPPY"] != "x,,z" {
-		t.Errorf("GAPPY = %q, want x,,z", got["GAPPY"])
+	gappy, _ := renderLeafValue(got["GAPPY"], "gappy", ",")
+	if gappy != "x,,z" {
+		t.Errorf("GAPPY = %q, want x,,z", gappy)
 	}
 }
 
@@ -96,12 +103,17 @@ func TestFlattenList(t *testing.T) {
 func TestFlattenListCustomDelimiter(t *testing.T) {
 	t.Parallel()
 
-	got, err := flatten(map[string]any{"path": []any{"/bin", "/usr/bin"}}, ":")
+	in := map[string]any{"path": []any{"/bin", "/usr/bin"}}
+	got, err := flatten(in)
 	if err != nil {
 		t.Fatalf("flatten: %v", err)
 	}
-	if got["PATH"] != "/bin:/usr/bin" {
-		t.Errorf("PATH = %q, want /bin:/usr/bin", got["PATH"])
+	value, err := renderLeafValue(got["PATH"], "path", ":")
+	if err != nil {
+		t.Fatalf("renderLeafValue: %v", err)
+	}
+	if value != "/bin:/usr/bin" {
+		t.Errorf("PATH = %q, want /bin:/usr/bin", value)
 	}
 }
 
@@ -114,14 +126,15 @@ func TestFlattenListErrors(t *testing.T) {
 
 	t.Run("item contains delimiter", func(t *testing.T) {
 		t.Parallel()
-		if _, err := flatten(map[string]any{"hosts": []any{"a,b", "c"}}, ","); err == nil {
+		value := leafValue{items: []string{"a,b", "c"}, list: true}
+		if _, err := renderLeafValue(value, "hosts", ","); err == nil {
 			t.Fatal("expected error for item containing the delimiter")
 		}
 	})
 	t.Run("non-scalar item", func(t *testing.T) {
 		t.Parallel()
 		in := map[string]any{"servers": []any{map[string]any{"host": "a"}}}
-		if _, err := flatten(in, ","); err == nil {
+		if _, err := flatten(in); err == nil {
 			t.Fatal("expected error for non-scalar list item")
 		}
 	})

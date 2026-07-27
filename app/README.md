@@ -39,6 +39,7 @@ app/
 ├── internal/           # all application logic (not importable outside the module)
 │   ├── cli/            # root cobra command; registers each action and the --config flag
 │   ├── actions/        # one package per command verb (the imperative shell)
+│   │   ├── create/     #   scaffold an example workspace from an embedded template
 │   │   ├── diff/       #   compare a project across two environments
 │   │   ├── explain/    #   show each resolved value and where it came from
 │   │   ├── get/        #   print one resolved value
@@ -47,6 +48,7 @@ app/
 │   ├── config/         # resolution pipeline: meshes input + ENVX_* + manifest into a Result
 │   ├── manifest/       # discover, load, parse, and validate envx.yaml
 │   ├── schema/         # single source of truth: FlagSpec catalog + Manifest/Settings types
+│   ├── secrets/        # resolve secret:// references against the local secrets store
 │   ├── flags/          # translate schema specs into pflag flags and read them back
 │   ├── envmerge/       # merge a project's namespace files into one resolved environment
 │   ├── runner/         # execute a child process (env injection, signal forwarding, exit codes)
@@ -84,6 +86,7 @@ flowchart TD
         config["config"]
         manifest["manifest"]
         schema["schema"]
+        secrets["secrets"]
     end
 
     subgraph engine["Merge &amp; execution"]
@@ -107,6 +110,7 @@ flowchart TD
 
     config --> manifest
     config --> schema
+    config --> secrets
     config -.->|types only| envmerge
     config -.->|types only| runner
 
@@ -117,7 +121,7 @@ flowchart TD
 **Legend**
 
 - **Solid arrow**: imports and uses the package's functions, methods, or values.
-- **Dotted arrow**: imports for **types only**, meaning it constructs the package's structs but calls none of its functions or methods. `config` builds `envmerge.Params` and `runner.Params` without invoking either package, `flags` builds a `config.Input` without calling `config`, and `runner` returns an `exitcode.Error` value.
+- **Dotted arrow**: imports for **types only**, meaning it constructs the package's structs but calls none of its functions or methods. `config` builds `envmerge.Params` and `runner.Params` without invoking either package, `flags` builds a `config.Input` without calling `config`, and `runner` returns an `exitcode.Error` value. (`config` also builds a `secrets.Params`, but because it additionally calls `secrets.Open` that edge is solid, not dotted.)
 
 **Notes on the collapsed `actions/<verb>` node** (each verb is its own package):
 
@@ -160,7 +164,7 @@ Because a setting is threaded through several packages, adding one is a small bu
 2. **[internal/schema/manifest.go](internal/schema/manifest.go)**: add the field to the `Settings` struct with its `yaml` tag, keeping the fields in alphabetical order. Use `*bool` for booleans so an explicit `false` is distinguishable from unset.
 3. **[internal/config/config.go](internal/config/config.go)**: add the field to `Input`, then wire it into `resolveEnvmergeParams` (settings that affect merging) or `resolveRunnerParams` (execution-only settings such as `overload`) via `precedenceString` / `precedenceBool`.
 4. **The consuming engine**: add the resolved field where it is actually used:
-   - Merge-time settings: [internal/envmerge/params.go](internal/envmerge/params.go) `Settings` struct, consumed in [internal/envmerge/envmerge.go](internal/envmerge/envmerge.go) / [internal/envmerge/transform.go](internal/envmerge/transform.go). Apply any non-zero terminal default in `normalizeParams`.
+   - Merge-time settings: [internal/envmerge/params.go](internal/envmerge/params.go) `Settings` struct, consumed in [internal/envmerge/envmerge.go](internal/envmerge/envmerge.go) / [internal/envmerge/flatten.go](internal/envmerge/flatten.go). Apply any non-zero terminal default in `normalizeParams`.
    - Execution settings: [internal/runner/params.go](internal/runner/params.go).
 5. **[internal/flags/register.go](internal/flags/register.go)**: add a `WithXxx` option that registers the flag from its `FlagSpec`.
 6. **[internal/flags/input.go](internal/flags/input.go)**: read the flag back into `config.Input` inside `GetInput` (via `optString` / `optBool`).

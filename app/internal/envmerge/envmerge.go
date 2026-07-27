@@ -36,8 +36,45 @@ func Build(p Params) (*Result, error) {
 	// Build the namespace chain from the Includes list.
 	namespaces := buildNamespaces(p.Includes)
 
-	// Merge the namespaces into a single Result.
-	return mergeNamespaces(namespaces, p.Settings)
+	// Merge first, then dereference and render only the values that won.
+	return mergeNamespaces(namespaces, p.Settings, p.ValueResolver)
+}
+
+// -------------------------------------------------------------------------------------
+
+// mergeState holds flattened values and origins while base, overlay, and
+// namespace precedence selects the winners. Values remain unresolved here.
+type mergeState struct {
+	// values holds unresolved scalar or list leaves by flattened env-var key.
+	values map[string]leafValue
+	// origins records the winner and shadowed sources for each key.
+	origins map[string]Origin
+}
+
+// -------------------------------------------------------------------------------------
+
+// resolveLeafValue dereferences each scalar item in one winning leaf value. List
+// boundaries are preserved so rendering can validate and join the resolved
+// items afterward. A nil resolver is an identity operation.
+func resolveLeafValue(
+	value leafValue, resolver ValueResolver, env string,
+) (leafValue, error) {
+	if resolver == nil {
+		return value, nil
+	}
+
+	resolved := leafValue{
+		items: make([]string, len(value.items)),
+		list:  value.list,
+	}
+	for i, item := range value.items {
+		result, err := resolver.Resolve(item, env)
+		if err != nil {
+			return leafValue{}, err
+		}
+		resolved.items[i] = result
+	}
+	return resolved, nil
 }
 
 // -------------------------------------------------------------------------------------
@@ -61,11 +98,13 @@ func buildNamespaces(includes []string) []namespace {
 
 // mergeNamespaces loads and merges a sequence of namespaces using the resolved
 // settings. Namespaces are processed in declaration order (deterministic
-// last-wins) and the merged, flattened values plus per-key origins are wrapped
-// in an immutable Result.
-func mergeNamespaces(namespaces []namespace, settings Settings) (*Result, error) {
-	acc := &resolved{
-		values:  make(map[string]string),
+// last-wins). Only winning values are then dereferenced and rendered before the
+// immutable Result is constructed.
+func mergeNamespaces(
+	namespaces []namespace, settings Settings, resolver ValueResolver,
+) (*Result, error) {
+	acc := &mergeState{
+		values:  make(map[string]leafValue),
 		origins: make(map[string]Origin),
 	}
 
@@ -75,19 +114,52 @@ func mergeNamespaces(namespaces []namespace, settings Settings) (*Result, error)
 		}
 	}
 
+	resolved, err := resolveMergedValues(acc, settings, resolver)
+	if err != nil {
+		return nil, err
+	}
 	if settings.Prefix != "" || settings.Suffix != "" {
-		applyPrefixSuffix(acc, settings.Prefix, settings.Suffix)
+		applyPrefixSuffix(resolved, settings.Prefix, settings.Suffix)
 	}
 
-	return &Result{resolved: *acc}, nil
+	return &Result{resolved: *resolved}, nil
+}
+
+// -------------------------------------------------------------------------------------
+
+// resolveMergedValues dereferences and renders every winning value. Shadowed
+// values are absent from mergeState.values and therefore never reach the
+// resolver. Errors identify the winning env-var key without exposing its value.
+func resolveMergedValues(
+	acc *mergeState, settings Settings, resolver ValueResolver,
+) (*resolved, error) {
+	result := &resolved{
+		values:  make(map[string]string, len(acc.values)),
+		origins: acc.origins,
+	}
+	for key, value := range acc.values {
+		resolvedValue, err := resolveLeafValue(value, resolver, settings.Env)
+		if err != nil {
+			return nil, fmt.Errorf("resolving %s: %w", key, err)
+		}
+		path := acc.origins[key].Winner.Key
+		rendered, err := renderLeafValue(resolvedValue, path, settings.Delimiter)
+		if err != nil {
+			return nil, err
+		}
+		result.values[key] = rendered
+	}
+	return result, nil
 }
 
 // -------------------------------------------------------------------------------------
 
 // loadNamespace loads one namespace's base and optional overlay file, flattens
 // each to env-var keys, layers the overlay over the base, and integrates the
-// result into the running values/origins maps.
-func loadNamespace(ns namespace, settings Settings, acc *resolved) error {
+// unresolved result into the running values/origins maps.
+func loadNamespace(
+	ns namespace, settings Settings, acc *mergeState,
+) error {
 	baseFile := filepath.Join(ns.dir, ns.name+".yaml")
 	envFile := filepath.Join(ns.dir, ns.name+"."+settings.Env+".yaml")
 
@@ -108,17 +180,18 @@ func loadNamespace(ns namespace, settings Settings, acc *resolved) error {
 	// over the base. Equivalent nested and flat spellings (log.level and
 	// log_level) collapse to the same env key, so an overlay can override a base
 	// value written in the other style, while flatten still rejects two spellings
-	// colliding within a single file.
-	baseFlat, err := flatten(baseMap, settings.Delimiter)
+	// colliding within a single file. Values remain unresolved until all winners
+	// have been selected.
+	baseFlat, err := flatten(baseMap)
 	if err != nil {
 		return fmt.Errorf("namespace %s/%s: %w", ns.dir, ns.name, err)
 	}
-	envFlat, err := flatten(envMap, settings.Delimiter)
+	envFlat, err := flatten(envMap)
 	if err != nil {
 		return fmt.Errorf("namespace %s/%s: %w", ns.dir, ns.name, err)
 	}
 
-	flat := make(map[string]string, len(baseFlat)+len(envFlat))
+	flat := make(map[string]leafValue, len(baseFlat)+len(envFlat))
 	maps.Copy(flat, baseFlat)
 	maps.Copy(flat, envFlat)
 
@@ -170,7 +243,7 @@ func namespaceSources(
 // first, then its former winner — ahead of this namespace's own lower-priority
 // sources. The last source, the highest priority, becomes the new winner, so
 // Shadowed always reads oldest-to-newest and Winner is the surviving source.
-func integrateSources(acc *resolved, key string, sources []Source) {
+func integrateSources(acc *mergeState, key string, sources []Source) {
 	var shadowed []Source
 	if existing, ok := acc.origins[key]; ok {
 		shadowed = append(shadowed, existing.Shadowed...)

@@ -1,8 +1,10 @@
 package envmerge
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -132,7 +134,7 @@ func TestMergeNamespacesOverlay(t *testing.T) {
 	writeYAML(t, dir, "postgres.development.yaml", "host: dev-db.local\n")
 
 	res, err := mergeNamespaces(
-		[]namespace{{dir: dir, name: "postgres"}}, Settings{Env: "development"},
+		[]namespace{{dir: dir, name: "postgres"}}, Settings{Env: "development"}, nil,
 	)
 	if err != nil {
 		t.Fatalf("mergeNamespaces: %v", err)
@@ -167,7 +169,7 @@ func TestMergeNamespacesShadowTracksBase(t *testing.T) {
 	writeYAML(t, dir, "postgres.production.yaml", "host: prod-db\n")
 
 	res, err := mergeNamespaces(
-		[]namespace{{dir: dir, name: "postgres"}}, Settings{Env: "production"},
+		[]namespace{{dir: dir, name: "postgres"}}, Settings{Env: "production"}, nil,
 	)
 	if err != nil {
 		t.Fatalf("mergeNamespaces: %v", err)
@@ -210,11 +212,11 @@ func TestMergeNamespacesRequireOverlaysMissingOverlay(t *testing.T) {
 	writeYAML(t, dir, "postgres.yaml", "host: localhost\n")
 
 	ns := []namespace{{dir: dir, name: "postgres"}}
-	_, err := mergeNamespaces(ns, Settings{Env: "production", RequireOverlays: true})
+	_, err := mergeNamespaces(ns, Settings{Env: "production", RequireOverlays: true}, nil)
 	if err == nil {
 		t.Error("expected require_overlays error for missing overlay")
 	}
-	if _, err := mergeNamespaces(ns, Settings{Env: "production"}); err != nil {
+	if _, err := mergeNamespaces(ns, Settings{Env: "production"}, nil); err != nil {
 		t.Errorf("lax mode should tolerate missing overlay, got %v", err)
 	}
 }
@@ -234,7 +236,7 @@ func TestMergeNamespacesNestedFlatEquivalence(t *testing.T) {
 	writeYAML(t, dir, "app.production.yaml", "log_level: warn\n")
 
 	res, err := mergeNamespaces(
-		[]namespace{{dir: dir, name: "app"}}, Settings{Env: "production"},
+		[]namespace{{dir: dir, name: "app"}}, Settings{Env: "production"}, nil,
 	)
 	if err != nil {
 		t.Fatalf("mergeNamespaces: %v", err)
@@ -271,7 +273,7 @@ func TestMergeNamespacesNestedPartialOverride(t *testing.T) {
 	writeYAML(t, dir, "app.production.yaml", "log:\n  level: warn\n")
 
 	res, err := mergeNamespaces(
-		[]namespace{{dir: dir, name: "app"}}, Settings{Env: "production"},
+		[]namespace{{dir: dir, name: "app"}}, Settings{Env: "production"}, nil,
 	)
 	if err != nil {
 		t.Fatalf("mergeNamespaces: %v", err)
@@ -297,7 +299,7 @@ func TestMergeNamespacesSingleFileCollision(t *testing.T) {
 	writeYAML(t, dir, "app.yaml", "log:\n  level: info\nlog_level: warn\n")
 
 	_, err := mergeNamespaces(
-		[]namespace{{dir: dir, name: "app"}}, Settings{Env: "development"},
+		[]namespace{{dir: dir, name: "app"}}, Settings{Env: "development"}, nil,
 	)
 	if err == nil {
 		t.Fatal("expected collision error for two spellings in one file")
@@ -317,6 +319,7 @@ func TestMergeNamespacesPrefixSuffix(t *testing.T) {
 	res, err := mergeNamespaces(
 		[]namespace{{dir: dir, name: "postgres"}},
 		Settings{Env: "development", Prefix: "app", Suffix: "v2", NamespacePrefix: true},
+		nil,
 	)
 	if err != nil {
 		t.Fatalf("mergeNamespaces: %v", err)
@@ -339,6 +342,7 @@ func TestMergeNamespacesJoinsList(t *testing.T) {
 	res, err := mergeNamespaces(
 		[]namespace{{dir: dir, name: "app"}},
 		Settings{Env: "development", Delimiter: "|"},
+		nil,
 	)
 	if err != nil {
 		t.Fatalf("mergeNamespaces: %v", err)
@@ -367,5 +371,179 @@ func TestBuildJoinsListWithDefaultDelimiter(t *testing.T) {
 	}
 	if v, _ := res.Get("HOSTS"); v != "a,b" {
 		t.Errorf("HOSTS = %q, want a,b (default comma)", v)
+	}
+}
+
+// -------------------------------------------------------------------------------------
+
+// fakeResolver implements Resolver for testing the reference-resolution step: it
+// maps known reference values to results, fails a designated value, and passes
+// everything else through unchanged.
+type fakeResolver struct {
+	values map[string]string
+	fail   string
+}
+
+// -------------------------------------------------------------------------------------
+
+// Resolve maps value to its result, erroring on the designated failure value and
+// returning unknown values unchanged.
+func (f fakeResolver) Resolve(value, _ string) (string, error) {
+	if f.fail != "" && value == f.fail {
+		return "", errors.New("resolve failed")
+	}
+	if v, ok := f.values[value]; ok {
+		return v, nil
+	}
+	return value, nil
+}
+
+// -------------------------------------------------------------------------------------
+
+// TestBuildResolvesReferences verifies Build routes each merged value through the
+// resolver, dereferencing references while leaving plain values untouched.
+func TestBuildResolvesReferences(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+	writeYAML(t, dir, "app.yaml", "password: secret://x\nplain: keep\n")
+
+	res, err := Build(Params{
+		Includes:      []string{filepath.Join(dir, "app")},
+		Environments:  []string{"development"},
+		ValueResolver: fakeResolver{values: map[string]string{"secret://x": "resolved-pw"}},
+	})
+	if err != nil {
+		t.Fatalf("Build: %v", err)
+	}
+	if v, _ := res.Get("PASSWORD"); v != "resolved-pw" {
+		t.Errorf("PASSWORD = %q, want resolved-pw", v)
+	}
+	if v, _ := res.Get("PLAIN"); v != "keep" {
+		t.Errorf("PLAIN = %q, want keep (passthrough)", v)
+	}
+}
+
+// -------------------------------------------------------------------------------------
+
+// TestBuildResolverError verifies a resolver failure surfaces from Build.
+func TestBuildResolverError(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+	writeYAML(t, dir, "app.yaml", "password: secret://boom\n")
+
+	_, err := Build(Params{
+		Includes:      []string{filepath.Join(dir, "app")},
+		Environments:  []string{"development"},
+		ValueResolver: fakeResolver{fail: "secret://boom"},
+	})
+	if err == nil {
+		t.Fatal("expected error from resolver")
+	}
+}
+
+// -------------------------------------------------------------------------------------
+
+// TestBuildSkipsShadowedReferences verifies references discarded by overlay or
+// namespace precedence never reach the resolver.
+func TestBuildSkipsShadowedReferences(t *testing.T) {
+	t.Parallel()
+
+	t.Run("overlay winner", func(t *testing.T) {
+		t.Parallel()
+
+		dir := t.TempDir()
+		writeYAML(t, dir, "app.yaml", "password: secret://stale\n")
+		writeYAML(t, dir, "app.production.yaml", "password: replacement\n")
+
+		res, err := Build(Params{
+			Includes:      []string{filepath.Join(dir, "app")},
+			Environments:  []string{"production"},
+			ValueResolver: fakeResolver{fail: "secret://stale"},
+		})
+		if err != nil {
+			t.Fatalf("Build: %v", err)
+		}
+		if value, _ := res.Get("PASSWORD"); value != "replacement" {
+			t.Errorf("PASSWORD = %q, want replacement", value)
+		}
+	})
+
+	t.Run("namespace winner", func(t *testing.T) {
+		t.Parallel()
+
+		dir := t.TempDir()
+		writeYAML(t, dir, "first.yaml", "password: secret://stale\n")
+		writeYAML(t, dir, "second.yaml", "password: replacement\n")
+
+		res, err := Build(Params{
+			Includes: []string{
+				filepath.Join(dir, "first"),
+				filepath.Join(dir, "second"),
+			},
+			Environments:  []string{"production"},
+			ValueResolver: fakeResolver{fail: "secret://stale"},
+		})
+		if err != nil {
+			t.Fatalf("Build: %v", err)
+		}
+		if value, _ := res.Get("PASSWORD"); value != "replacement" {
+			t.Errorf("PASSWORD = %q, want replacement", value)
+		}
+	})
+}
+
+// -------------------------------------------------------------------------------------
+
+// TestBuildResolvesListReferences verifies references inside a list are
+// dereferenced per item after winner selection and before the list is joined.
+func TestBuildResolvesListReferences(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+	writeYAML(t, dir, "app.yaml", "tokens:\n  - secret://a\n  - secret://b\n")
+
+	res, err := Build(Params{
+		Includes:     []string{filepath.Join(dir, "app")},
+		Environments: []string{"development"},
+		ValueResolver: fakeResolver{values: map[string]string{
+			"secret://a": "tok-a",
+			"secret://b": "tok-b",
+		}},
+	})
+	if err != nil {
+		t.Fatalf("Build: %v", err)
+	}
+	if v, _ := res.Get("TOKENS"); v != "tok-a,tok-b" {
+		t.Errorf("TOKENS = %q, want tok-a,tok-b (list items resolved)", v)
+	}
+}
+
+// -------------------------------------------------------------------------------------
+
+// TestBuildRedactsResolvedListItemErrors verifies rendering errors identify a
+// list item's location without exposing its resolved plaintext.
+func TestBuildRedactsResolvedListItemErrors(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+	writeYAML(t, dir, "app.yaml", "tokens:\n  - secret://sensitive\n")
+
+	_, err := Build(Params{
+		Includes:     []string{filepath.Join(dir, "app")},
+		Environments: []string{"development"},
+		ValueResolver: fakeResolver{values: map[string]string{
+			"secret://sensitive": "plaintext,secret",
+		}},
+	})
+	if err == nil {
+		t.Fatal("expected delimiter error")
+	}
+	if strings.Contains(err.Error(), "plaintext") {
+		t.Errorf("error exposes resolved value: %v", err)
+	}
+	if !strings.Contains(err.Error(), `list item 1 at "tokens"`) {
+		t.Errorf("error does not identify the list item: %v", err)
 	}
 }

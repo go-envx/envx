@@ -3,60 +3,28 @@ package envmerge
 import (
 	"fmt"
 	"strings"
-
-	"gopkg.in/yaml.v3"
-
-	"github.com/go-envx/envx/app/pkg/file"
 )
 
 // -------------------------------------------------------------------------------------
 
-// loadYAML reads and unmarshals a YAML file into a generic map. It returns a
-// wrapped os.ErrNotExist when the file is missing so callers can distinguish
-// "missing" from "malformed".
-func loadYAML(path string) (map[string]any, error) {
-	data, err := file.Read(path)
-	if err != nil {
-		return nil, err
-	}
-	var m map[string]any
-	if err := yaml.Unmarshal(data, &m); err != nil {
-		return nil, fmt.Errorf("parsing %s: %w", path, err)
-	}
-	if m == nil {
-		m = make(map[string]any)
-	}
-	return m, nil
+// leafValue preserves whether a YAML leaf was a scalar or list while
+// base, overlay, and namespace winners are selected. Its items remain unresolved
+// until the merge is complete.
+type leafValue struct {
+	// items holds one scalar value or every scalar item from a list.
+	items []string
+	// list distinguishes a YAML list from a scalar, including an empty list.
+	list bool
 }
 
 // -------------------------------------------------------------------------------------
 
-// toMap coerces a value into map[string]any, handling both the standard form
-// and the map[any]any variant that yaml.v3 can produce.
-func toMap(v any) (map[string]any, bool) {
-	switch m := v.(type) {
-	case map[string]any:
-		return m, true
-	case map[any]any:
-		result := make(map[string]any, len(m))
-		for k, val := range m {
-			result[fmt.Sprintf("%v", k)] = val
-		}
-		return result, true
-	}
-	return nil, false
-}
-
-// -------------------------------------------------------------------------------------
-
-// flatten converts a nested map to flat KEY=VALUE pairs suitable for env vars.
-// Key paths are joined with "_" and uppercased (postgres.username ->
-// POSTGRES_USERNAME) and a list leaf is joined into a single delimiter-separated
-// string. It returns an error when two distinct paths collapse to the same flat
-// key (preventing silent data loss) or when a list cannot be rendered (see
-// leafValue).
-func flatten(m map[string]any, delimiter string) (map[string]string, error) {
-	result := make(map[string]string)
+// flatten converts a nested map to flat KEY=VALUE pairs while preserving scalar
+// and list structure. Key paths are joined with "_" and uppercased
+// (postgres.username -> POSTGRES_USERNAME). It errors when two distinct paths
+// collapse to the same flat key or a list contains a non-scalar item.
+func flatten(m map[string]any) (map[string]leafValue, error) {
+	result := make(map[string]leafValue)
 	origins := make(map[string]string)
 
 	var walk func(prefix string, node map[string]any) error
@@ -87,7 +55,7 @@ func flatten(m map[string]any, delimiter string) (map[string]string, error) {
 				)
 			}
 			origins[flatKey] = path
-			value, err := leafValue(v, path, delimiter)
+			value, err := leafValueFromYAML(v, path)
 			if err != nil {
 				return err
 			}
@@ -104,41 +72,59 @@ func flatten(m map[string]any, delimiter string) (map[string]string, error) {
 
 // -------------------------------------------------------------------------------------
 
-// leafValue renders a flattened leaf to its env-var string form. A scalar yields
-// itself and a nil leaf (a bare "key:") yields "", rather than the "<nil>" fmt
-// would otherwise produce. A list is joined into a single delimiter-separated
-// string so a value can be authored as a YAML sequence; it errors when an item
-// is itself a list or mapping (which has no flat env-var form) or contains the
-// delimiter (which would make the joined value impossible to split back).
-func leafValue(v any, path, delimiter string) (string, error) {
+// leafValueFromYAML converts one YAML scalar or list leaf into its mergeable form. A
+// list item must be scalar because nested lists and mappings have no flat env-var
+// representation.
+func leafValueFromYAML(v any, path string) (leafValue, error) {
 	list, ok := v.([]any)
 	if !ok {
-		if v == nil {
-			return "", nil
-		}
-		return fmt.Sprintf("%v", v), nil
+		return leafValue{items: []string{scalarString(v)}}, nil
 	}
 
 	items := make([]string, len(list))
 	for i, item := range list {
 		if !isScalar(item) {
-			return "", fmt.Errorf(
+			return leafValue{}, fmt.Errorf(
 				"list at %q has a non-scalar item; cannot flatten to an env var",
 				path,
 			)
 		}
-		s := ""
-		if item != nil {
-			s = fmt.Sprintf("%v", item)
-		}
-		if delimiter != "" && strings.Contains(s, delimiter) {
+		items[i] = scalarString(item)
+	}
+	return leafValue{items: items, list: true}, nil
+}
+
+// -------------------------------------------------------------------------------------
+
+// renderLeafValue converts one resolved winning value to its final env-var
+// string. Lists are joined with delimiter; an item containing that delimiter is
+// rejected without including the potentially secret value in the error.
+func renderLeafValue(
+	value leafValue, path, delimiter string,
+) (string, error) {
+	if !value.list {
+		return value.items[0], nil
+	}
+
+	for i, item := range value.items {
+		if delimiter != "" && strings.Contains(item, delimiter) {
 			return "", fmt.Errorf(
-				"list item %q at %q contains the delimiter %q", s, path, delimiter,
+				"list item %d at %q contains the delimiter %q", i+1, path, delimiter,
 			)
 		}
-		items[i] = s
 	}
-	return strings.Join(items, delimiter), nil
+	return strings.Join(value.items, delimiter), nil
+}
+
+// -------------------------------------------------------------------------------------
+
+// scalarString renders a scalar leaf value to its string form, mapping a nil
+// leaf (a bare "key:") to "" rather than the "<nil>" fmt would produce.
+func scalarString(v any) string {
+	if v == nil {
+		return ""
+	}
+	return fmt.Sprintf("%v", v)
 }
 
 // -------------------------------------------------------------------------------------

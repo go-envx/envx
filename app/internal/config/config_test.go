@@ -1,8 +1,10 @@
 package config
 
 import (
+	"path/filepath"
 	"testing"
 
+	"github.com/go-envx/envx/app/internal/envmerge"
 	"github.com/go-envx/envx/app/internal/fixtures"
 	"github.com/go-envx/envx/app/internal/schema"
 )
@@ -204,18 +206,134 @@ func TestOverloadResolution(t *testing.T) {
 
 // -------------------------------------------------------------------------------------
 
-// TestResolve verifies the facade loads the manifest from the input's config path
-// and resolves a known fixture project end to end.
-func TestResolve(t *testing.T) {
+// TestResolveProject verifies ResolveProject loads the manifest from the input's
+// config path and resolves a known fixture project end to end.
+func TestResolveProject(t *testing.T) {
 	t.Parallel()
 
 	path := fixtures.Manifest("basic")
-	r, err := Resolve(&Input{ConfigPath: &path}, "api-core")
+	r, err := ResolveProject(&Input{ConfigPath: &path}, "api-core")
 	if err != nil {
-		t.Fatalf("Resolve: %v", err)
+		t.Fatalf("ResolveProject: %v", err)
 	}
 	if len(r.Envmerge.Includes) == 0 {
 		t.Error("expected includes from the fixture project")
+	}
+}
+
+// -------------------------------------------------------------------------------------
+
+// TestResolveWorkspace verifies ResolveWorkspace surfaces the resolved secrets
+// store location and group policy as data, resolves no project, and never wires a
+// value resolver — opening the store is ResolveProject's job.
+func TestResolveWorkspace(t *testing.T) {
+	t.Parallel()
+
+	// Default: secrets.yaml beside the manifest, shorthand enabled, no project.
+	base := fixtures.Manifest("basic")
+	r, err := ResolveWorkspace(&Input{ConfigPath: &base})
+	if err != nil {
+		t.Fatalf("ResolveWorkspace basic: %v", err)
+	}
+	if filepath.Base(r.Secrets.Path) != "secrets.yaml" {
+		t.Errorf("Secrets.Path = %q, want .../secrets.yaml", r.Secrets.Path)
+	}
+	if r.Secrets.RequireGroup {
+		t.Error("RequireGroup should default to false")
+	}
+	if r.Envmerge.ValueResolver != nil {
+		t.Error("ResolveWorkspace must not wire a value resolver")
+	}
+	if len(r.Envmerge.Includes) != 0 {
+		t.Error("ResolveWorkspace resolves no project, so it has no includes")
+	}
+
+	// A manifest secrets block flows through to the policy field.
+	rg := fixtures.Manifest("resolve/require-group")
+	r2, err := ResolveWorkspace(&Input{ConfigPath: &rg})
+	if err != nil {
+		t.Fatalf("ResolveWorkspace require-group: %v", err)
+	}
+	if !r2.Secrets.RequireGroup {
+		t.Error("RequireGroup should be true from the manifest secrets block")
+	}
+}
+
+// -------------------------------------------------------------------------------------
+
+// TestResolveProjectResolvesSecretReference verifies ResolveProject wires the
+// resolver so secret references dereference end to end: an implicit-group
+// reference resolves against the active environment's group, and an explicit
+// shared reference resolves against it.
+func TestResolveProjectResolvesSecretReference(t *testing.T) {
+	t.Parallel()
+
+	path := fixtures.Manifest("resolve/secret-reference")
+	res, err := ResolveProject(&Input{ConfigPath: &path}, "api")
+	if err != nil {
+		t.Fatalf("ResolveProject: %v", err)
+	}
+	env, err := envmerge.Build(res.Envmerge)
+	if err != nil {
+		t.Fatalf("Build: %v", err)
+	}
+	if v, _ := env.Get("PASSWORD"); v != "dev-secret" {
+		t.Errorf("PASSWORD = %q, want dev-secret (implicit group=development)", v)
+	}
+	if v, _ := env.Get("TOKEN"); v != "t0k" {
+		t.Errorf("TOKEN = %q, want t0k (shared group)", v)
+	}
+}
+
+// -------------------------------------------------------------------------------------
+
+// TestResolveProjectRequiresExplicitSecretGroup verifies the manifest policy
+// reaches the value resolver and rejects an environment-implicit reference.
+func TestResolveProjectRequiresExplicitSecretGroup(t *testing.T) {
+	t.Parallel()
+
+	path := fixtures.Manifest("resolve/require-group")
+	res, err := ResolveProject(&Input{ConfigPath: &path}, "api")
+	if err != nil {
+		t.Fatalf("ResolveProject: %v", err)
+	}
+	if _, err := envmerge.Build(res.Envmerge); err == nil {
+		t.Fatal("expected implicit secret group to be rejected")
+	}
+}
+
+// -------------------------------------------------------------------------------------
+
+// TestResolveWorkspaceIgnoresSecretsStore verifies a workspace resolution skips
+// the secrets store entirely — it neither reads a malformed store nor wires a
+// resolver.
+func TestResolveWorkspaceIgnoresSecretsStore(t *testing.T) {
+	t.Parallel()
+
+	path := fixtures.Manifest("resolve/global-ignores-store")
+	res, err := ResolveWorkspace(&Input{ConfigPath: &path})
+	if err != nil {
+		t.Fatalf("ResolveWorkspace: %v", err)
+	}
+	if res.Envmerge.ValueResolver != nil {
+		t.Error("workspace resolution should not construct a value resolver")
+	}
+}
+
+// -------------------------------------------------------------------------------------
+
+// TestResolveProjectDanglingSecretReference verifies a reference with no matching
+// store entry fails loudly at Build rather than leaking the raw reference string.
+func TestResolveProjectDanglingSecretReference(t *testing.T) {
+	t.Parallel()
+
+	path := fixtures.Manifest("resolve/dangling-reference")
+	res, err := ResolveProject(&Input{ConfigPath: &path}, "api")
+	if err != nil {
+		t.Fatalf("ResolveProject: %v", err)
+	}
+	if _, err := envmerge.Build(res.Envmerge); err == nil {
+		t.Fatal("expected dangling reference error")
 	}
 }
 

@@ -10,7 +10,7 @@
 
 [![Release](https://img.shields.io/github/v/release/go-envx/envx?sort=semver)](https://github.com/go-envx/envx/releases) [![Go](https://img.shields.io/badge/go-1.26-00ADD8?logo=go&logoColor=white)](https://go.dev/) [![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 
-[Installation](https://go-envx.github.io/envx/guide/installation/) &bull; [Getting Started]([docs/src/content/docs/guide/getting-started.mdx](https://go-envx.github.io/envx/guide/getting-started/)) &bull; [Docs](https://go-envx.github.io/envx/commands/overview/) &bull; [Contributing](https://go-envx.github.io/envx/contribute/)
+[Installation](https://go-envx.github.io/envx/guide/installation/) &bull; [Getting Started](https://go-envx.github.io/envx/guide/getting-started/) &bull; [Docs](https://go-envx.github.io/envx/commands/overview/) &bull; [Contributing](https://go-envx.github.io/envx/contribute/)
 
 </div>
 

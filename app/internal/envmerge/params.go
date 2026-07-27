@@ -12,10 +12,9 @@ const defaultDelimiter = ","
 
 // -------------------------------------------------------------------------------------
 
-// Params is envmerge's input contract: a plain data bag the caller fully
-// populates. envmerge knows nothing about where its inputs came from or how they
-// were produced. Every field is optional and envmerge fills in terminal defaults
-// itself. The resolved knobs live in Settings, the value form envmerge merges.
+// Params is envmerge's input contract. The caller supplies namespace paths,
+// settings, and optional value-resolution behavior without exposing where they
+// came from. envmerge fills in terminal defaults itself.
 type Params struct {
 	// Includes is an ordered chain of namespaces to merge, given as absolute paths
 	// the caller has already resolved.
@@ -24,6 +23,20 @@ type Params struct {
 	Environments []string
 	// Settings holds the fully-resolved env-resolution knobs the merge reads.
 	Settings Settings
+	// ValueResolver dereferences reference-valued leaves after winner selection.
+	// A nil resolver leaves every value untouched.
+	ValueResolver ValueResolver
+}
+
+// -------------------------------------------------------------------------------------
+
+// ValueResolver dereferences one winning scalar value and returns unrecognized
+// values unchanged. env is the active environment, used by implementations that
+// support environment-implicit references.
+type ValueResolver interface {
+	// Resolve returns value with any recognized reference dereferenced, or value
+	// unchanged when it is not a reference.
+	Resolve(value, env string) (string, error)
 }
 
 // -------------------------------------------------------------------------------------

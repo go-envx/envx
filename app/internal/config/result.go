@@ -6,6 +6,7 @@ import (
 
 	"github.com/go-envx/envx/app/internal/envmerge"
 	"github.com/go-envx/envx/app/internal/runner"
+	"github.com/go-envx/envx/app/internal/secrets"
 )
 
 // -------------------------------------------------------------------------------------
@@ -21,6 +22,11 @@ type Result struct {
 	// resolves only the Overload knob (flag > ENVX_OVERLOAD > project > global); the
 	// run action supplies the merged Env and output streams before invoking runner.
 	Runner runner.Params
+
+	// Secrets locates the workspace secrets store: the resolved store path and the
+	// workspace group policy. ResolveProject opens it and wires the value resolver;
+	// ResolveWorkspace leaves it as data and never reads the store.
+	Secrets secrets.Params
 
 	// manifestContext retains the loaded manifest and its directory so OverlayPath
 	// can validate and join a target without re-loading.

@@ -50,7 +50,7 @@ type actionResultChange struct {
 // to the pure core.
 func execute(p actionParams, in *config.Input) (actionResult, error) {
 	// resolve the shared config
-	resolved, err := config.Resolve(in, p.Project)
+	resolved, err := config.ResolveProject(in, p.Project)
 	if err != nil {
 		return actionResult{}, err
 	}
