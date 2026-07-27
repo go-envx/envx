@@ -1,6 +1,9 @@
 package secrets
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
 
 // -------------------------------------------------------------------------------------
 
@@ -76,5 +79,23 @@ func TestResolveErrors(t *testing.T) {
 				t.Errorf("Resolve(%q) expected error", tt.value)
 			}
 		})
+	}
+}
+
+// -------------------------------------------------------------------------------------
+
+// TestResolveEmptyReferenceMessage verifies an empty reference reports the empty
+// fault even when a group is required: a missing key is the more specific
+// problem than the disabled shorthand.
+func TestResolveEmptyReferenceMessage(t *testing.T) {
+	t.Parallel()
+
+	r := newTestResolver(true)
+	_, err := r.Resolve("secret://", "production")
+	if err == nil {
+		t.Fatal("expected error for empty reference")
+	}
+	if !strings.Contains(err.Error(), "empty secret reference") {
+		t.Errorf("error = %v, want it to mention an empty secret reference", err)
 	}
 }

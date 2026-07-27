@@ -18,7 +18,8 @@ import (
 // command today, an HTTP handler tomorrow). Each setting is optional: a non-nil
 // value means the user provided it explicitly and it wins the precedence chain,
 // while nil means "fall through" to the ENVX_* var and then the manifest layers.
-// ConfigPath selects the manifest. Resolve turns it into a *Result.
+// ConfigPath selects the manifest. ResolveProject and ResolveWorkspace turn it
+// into a *Result.
 type Input struct {
 	// ConfigPath selects the manifest file; nil or empty triggers auto-discovery.
 	ConfigPath *string

@@ -111,10 +111,13 @@ func (r *Resolver) splitRef(body, env string) (reference, error) {
 // -------------------------------------------------------------------------------------
 
 // implicitRef resolves a group-less "secret://<key>" reference, defaulting the
-// group to the active environment. It errors when the group is required, when no
-// active environment is available, or when the key is empty.
+// group to the active environment. An empty key is the most specific fault and
+// is reported first; otherwise it errors when the group is required or when no
+// active environment is available to supply the group.
 func (r *Resolver) implicitRef(key, env string) (reference, error) {
 	switch {
+	case key == "":
+		return reference{}, errors.New("empty secret reference")
 	case r.requireGroup:
 		return reference{}, fmt.Errorf(
 			"secret reference %q has no group and the shorthand is disabled",
@@ -125,8 +128,6 @@ func (r *Resolver) implicitRef(key, env string) (reference, error) {
 			"secret reference %q needs an active environment to resolve its group",
 			scheme+key,
 		)
-	case key == "":
-		return reference{}, errors.New("empty secret reference")
 	default:
 		return reference{group: env, key: key}, nil
 	}

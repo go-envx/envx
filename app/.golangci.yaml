@@ -31,8 +31,6 @@ linters:
       settings:
         hugeParam:
           sizeThreshold: 256
-        rangeValCopy:
-          sizeThreshold: 256
     lll:
       line-length: 88
     gosec:
