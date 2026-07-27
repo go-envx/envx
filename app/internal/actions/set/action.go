@@ -32,8 +32,8 @@ type actionParams struct {
 // tree in place preserves the file's comments, key order, and formatting; set
 // never invokes envmerge since no project means there is nothing to merge.
 func execute(p actionParams, in *config.Input) error {
-	// resolve the global context (no project) and derive the target overlay file
-	resolved, err := config.Resolve(in, "")
+	// resolve the workspace (no project) and derive the target overlay file
+	resolved, err := config.ResolveWorkspace(in)
 	if err != nil {
 		return err
 	}

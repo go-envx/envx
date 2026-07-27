@@ -9,6 +9,7 @@ import (
 	"github.com/go-envx/envx/app/internal/manifest"
 	"github.com/go-envx/envx/app/internal/runner"
 	"github.com/go-envx/envx/app/internal/schema"
+	"github.com/go-envx/envx/app/internal/secrets"
 )
 
 // -------------------------------------------------------------------------------------
@@ -66,14 +67,49 @@ type projectLayer struct {
 
 // -------------------------------------------------------------------------------------
 
-// Resolve loads the manifest (honoring --config, then ENVX_CONFIG, then a walk-up
-// search) and meshes it with the input's values and ENVX_* vars into a single
-// *Result, applying the precedence explicit > ENVX_* > project > global. An
-// empty project resolves the global context only (no project layer, no includes,
-// and no "project not found" error) for actions that never merge a project.
-// Terminal fallbacks (e.g. the default environment) are applied downstream, so an
-// unset env stays empty here.
-func Resolve(in *Input, project string) (*Result, error) {
+// ResolveProject resolves a project's build-ready configuration: it loads the
+// manifest, meshes it with the input and ENVX_* vars, then opens the workspace
+// secrets store and wires the value resolver so envmerge can dereference
+// secret:// references. The environment-building actions (get, run, explain,
+// diff) call it. A missing store yields an empty resolver, so a reference with no
+// matching entry fails loudly as a dangling reference rather than leaking the raw
+// reference string.
+func ResolveProject(in *Input, project string) (*Result, error) {
+	res, err := resolve(in, project)
+	if err != nil {
+		return nil, err
+	}
+
+	// Open the workspace secrets store and wire the resolver onto the envmerge
+	// params so secret:// references dereference during Build.
+	resolver, err := secrets.Open(res.Secrets)
+	if err != nil {
+		return nil, err
+	}
+	res.Envmerge.ValueResolver = resolver
+	return res, nil
+}
+
+// -------------------------------------------------------------------------------------
+
+// ResolveWorkspace resolves manifest-level configuration without selecting a
+// project or opening the secrets store, leaving the value resolver nil. The set
+// action calls it to locate and edit a single overlay file, which needs no
+// project merge and no secrets I/O.
+func ResolveWorkspace(in *Input) (*Result, error) {
+	return resolve(in, "")
+}
+
+// -------------------------------------------------------------------------------------
+
+// resolve is the shared core of ResolveProject and ResolveWorkspace: it loads the
+// manifest (honoring --config, then ENVX_CONFIG, then a walk-up search) and
+// meshes it with the input's values and ENVX_* vars into a single *Result,
+// applying the precedence explicit > ENVX_* > project > global. An empty project
+// resolves the global context only (no project layer, no includes, and no
+// "project not found" error). Terminal fallbacks (e.g. the default environment)
+// are applied downstream, so an unset env stays empty here.
+func resolve(in *Input, project string) (*Result, error) {
 	manifestPath := resolveManifestPath(in)
 
 	// Load the manifest from the resolved manifest path.
@@ -85,7 +121,7 @@ func Resolve(in *Input, project string) (*Result, error) {
 	// Get the absolute directory of the manifest so project includes can be joined.
 	dir := filepath.Dir(manifestFile)
 
-	// Construct the manifest context
+	// Construct the manifest context.
 	mc := manifestContext{
 		manifest: m,
 		dir:      dir,
@@ -115,7 +151,7 @@ func resolveManifestPath(in *Input) string {
 
 // resolveManifest assembles a *Result from an already-loaded manifest: it computes
 // the project layer, then delegates to the envmerge and runner param builders that
-// layer each setting through the precedence chain. It is split from Resolve so the
+// layer each setting through the precedence chain. It is split from resolve so the
 // precedence stays unit-testable with an in-memory manifest.
 func resolveManifest(mc manifestContext, in *Input) (*Result, error) {
 	// Compute the project layer (settings + includes) from the manifest context.
@@ -128,6 +164,7 @@ func resolveManifest(mc manifestContext, in *Input) (*Result, error) {
 	return &Result{
 		Envmerge:        resolveEnvmergeParams(mc, in, pl),
 		Runner:          resolveRunnerParams(mc, in, pl),
+		Secrets:         resolveSecretsParams(mc),
 		manifestContext: mc,
 	}, nil
 }
@@ -230,4 +267,34 @@ func resolveRunnerParams(
 			mc.manifest.Settings.Overload,
 		),
 	}
+}
+
+// -------------------------------------------------------------------------------------
+
+// resolveSecretsParams builds the secrets input: the resolved store path plus the
+// workspace group policy. Secrets are workspace-level — not project- or flag-
+// overridable — so it reads only the manifest context; opening the store is
+// ResolveProject's job.
+func resolveSecretsParams(mc manifestContext) secrets.Params {
+	return secrets.Params{
+		Path:         secretsStorePath(mc.manifest, mc.dir),
+		RequireGroup: mc.manifest.Secrets.RequireGroup,
+	}
+}
+
+// -------------------------------------------------------------------------------------
+
+// secretsStorePath resolves the absolute location of the secrets store: the
+// manifest's secrets.path (joined against the manifest directory when relative),
+// defaulting to secrets.yaml beside the manifest. Reading the file is the secrets
+// package's job; config only resolves where it lives.
+func secretsStorePath(m *schema.Manifest, dir string) string {
+	path := m.Secrets.Path
+	if path == "" {
+		return filepath.Join(dir, "secrets.yaml")
+	}
+	if !filepath.IsAbs(path) {
+		return filepath.Join(dir, path)
+	}
+	return path
 }

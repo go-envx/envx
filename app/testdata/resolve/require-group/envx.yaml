@@ -1,0 +1,6 @@
+environments: [development]
+secrets:
+  require_group: true
+projects:
+  api:
+    includes: [env/app]
