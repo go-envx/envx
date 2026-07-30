@@ -10,6 +10,7 @@ import (
 	"github.com/go-envx/envx/app/internal/runner"
 	"github.com/go-envx/envx/app/internal/schema"
 	"github.com/go-envx/envx/app/internal/secrets"
+	"github.com/go-envx/envx/app/pkg/file"
 )
 
 // -------------------------------------------------------------------------------------
@@ -165,7 +166,7 @@ func resolveManifest(mc manifestContext, in *Input) (*Result, error) {
 	return &Result{
 		Envmerge:        resolveEnvmergeParams(mc, in, pl),
 		Runner:          resolveRunnerParams(mc, in, pl),
-		Secrets:         resolveSecretsParams(mc),
+		Secrets:         resolveSecretsSettings(mc),
 		manifestContext: mc,
 	}, nil
 }
@@ -272,30 +273,19 @@ func resolveRunnerParams(
 
 // -------------------------------------------------------------------------------------
 
-// resolveSecretsParams builds the secrets input: the resolved store path plus the
-// workspace group policy. Secrets are workspace-level — not project- or flag-
-// overridable — so it reads only the manifest context; opening the store is
+// resolveSecretsSettings builds the secrets input: the resolved workspace store
+// path. Secrets are workspace-level — not project- or flag-overridable — so it
+// reads only the workspace-level manifest secrets block; opening the store is
 // ResolveProject's job.
-func resolveSecretsParams(mc manifestContext) secrets.Params {
-	return secrets.Params{
-		Path:         secretsStorePath(mc.manifest, mc.dir),
-		RequireGroup: mc.manifest.Secrets.RequireGroup,
+func resolveSecretsSettings(mc manifestContext) secrets.Settings {
+	// Look up the secrets path in the manifest; default to "secrets.yaml" if unset.
+	secretsPath := mc.manifest.Secrets.SecretsPath
+	if secretsPath == "" {
+		secretsPath = "secrets.yaml"
 	}
-}
 
-// -------------------------------------------------------------------------------------
-
-// secretsStorePath resolves the absolute location of the secrets store: the
-// manifest's secrets.path (joined against the manifest directory when relative),
-// defaulting to secrets.yaml beside the manifest. Reading the file is the secrets
-// package's job; config only resolves where it lives.
-func secretsStorePath(m *schema.Manifest, dir string) string {
-	path := m.Secrets.Path
-	if path == "" {
-		return filepath.Join(dir, "secrets.yaml")
+	// Return the secrets settings.
+	return secrets.Settings{
+		SecretsPath: file.ResolvePath(mc.dir, secretsPath),
 	}
-	if !filepath.IsAbs(path) {
-		return filepath.Join(dir, path)
-	}
-	return path
 }

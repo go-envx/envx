@@ -1,0 +1,7 @@
+environments: [development, production]
+secrets:
+  path: ./private/secrets.yaml
+projects:
+  api:
+    includes:
+      - env/postgres

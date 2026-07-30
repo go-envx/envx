@@ -121,7 +121,7 @@ flowchart TD
 **Legend**
 
 - **Solid arrow**: imports and uses the package's functions, methods, or values.
-- **Dotted arrow**: imports for **types only**, meaning it constructs the package's structs but calls none of its functions or methods. `config` builds `envmerge.Params` and `runner.Params` without invoking either package, `flags` builds a `config.Input` without calling `config`, and `runner` returns an `exitcode.Error` value. (`config` also builds a `secrets.Params`, but because it additionally calls `secrets.Open` that edge is solid, not dotted.)
+- **Dotted arrow**: imports for **types only**, meaning it constructs the package's structs but calls none of its functions or methods. `config` builds `envmerge.Params` and `runner.Params` without invoking either package, `flags` builds a `config.Input` without calling `config`, and `runner` returns an `exitcode.Error` value. (`config` also builds a `secrets.Settings`, but because it additionally calls `secrets.Open` that edge is solid, not dotted.)
 
 **Notes on the collapsed `actions/<verb>` node** (each verb is its own package):
 

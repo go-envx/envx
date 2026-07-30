@@ -15,57 +15,47 @@ const scheme = "secret://"
 
 // -------------------------------------------------------------------------------------
 
-// Params is secrets' input contract: where the store lives and its group policy.
-// A caller (config) populates it as plain data; Open reads the store at Path and
-// returns a Resolver bound to it. Keeping it a struct mirrors envmerge.Params and
-// runner.Params, so config aggregates each tool's input uniformly.
-type Params struct {
-	// Path is the absolute path of the secrets store (secrets.yaml).
-	Path string
-	// RequireGroup rejects the environment-implicit "secret://<key>" shorthand,
-	// requiring every reference to name its group (secret://<group>/<key>).
-	RequireGroup bool
+// Settings is secrets' input contract: where the store lives. A caller (config)
+// populates it as plain data; Open reads the store at SecretsPath and returns a
+// Resolver bound to it.
+type Settings struct {
+	// SecretsPath is the absolute path of the secrets store (secrets.yaml).
+	SecretsPath string
 }
 
 // -------------------------------------------------------------------------------------
 
 // Resolver dereferences secret references against a secrets store. It recognizes
-// values of the form "secret://<group>/<key>" and, unless a group is required,
-// "secret://<key>" (defaulting the group to the active environment); every other
-// value passes through unchanged.
+// values of the form "secret://<group>/<key>"; every other value passes through
+// unchanged.
 type Resolver struct {
 	// store holds the secret values the resolver dereferences against.
 	store *store
-	// requireGroup rejects the group-less "secret://<key>" shorthand.
-	requireGroup bool
 }
 
 // -------------------------------------------------------------------------------------
 
-// Open reads the secrets store at p.Path and returns a Resolver bound to it. A
-// missing store yields an empty one, so a reference against it fails loudly as a
-// dangling reference rather than leaking the raw reference string. When
-// p.RequireGroup is set, the environment-implicit "secret://<key>" shorthand is
-// rejected.
-func Open(p Params) (*Resolver, error) {
-	s, err := loadStore(p.Path)
+// Open reads the secrets store at p.SecretsPath and returns a Resolver bound to
+// it. A missing store yields an empty one, so a reference against it fails loudly
+// as a dangling reference rather than leaking the raw reference string.
+func Open(p Settings) (*Resolver, error) {
+	s, err := loadStore(p.SecretsPath)
 	if err != nil {
 		return nil, err
 	}
 	return &Resolver{
-		store:        s,
-		requireGroup: p.RequireGroup,
+		store: s,
 	}, nil
 }
 
 // -------------------------------------------------------------------------------------
 
-// Resolve dereferences value in the context of the active environment env. A
-// plain value is returned unchanged. A value beginning with the reserved scheme
-// is parsed and looked up in the store, and a missing entry is an error (a
-// dangling reference). A leading backslash escapes a literal that would
-// otherwise look like a reference: "\secret://x" resolves to "secret://x".
-func (r *Resolver) Resolve(value, env string) (string, error) {
+// Resolve dereferences value against the store. A plain value is returned
+// unchanged. A value beginning with the reserved scheme is parsed and looked up
+// in the store, and a missing entry is an error (a dangling reference). A leading
+// backslash escapes a literal that would otherwise look like a reference:
+// "\secret://x" resolves to "secret://x".
+func (r *Resolver) Resolve(value, _ string) (string, error) {
 	if strings.HasPrefix(value, `\`+scheme) {
 		return value[1:], nil
 	}
@@ -74,7 +64,7 @@ func (r *Resolver) Resolve(value, env string) (string, error) {
 	}
 
 	body := strings.TrimPrefix(value, scheme)
-	ref, err := r.splitRef(body, env)
+	ref, err := splitRef(body)
 	if err != nil {
 		return "", err
 	}
@@ -89,46 +79,26 @@ func (r *Resolver) Resolve(value, env string) (string, error) {
 // -------------------------------------------------------------------------------------
 
 // splitRef parses the portion of a reference after the scheme into a reference.
-// "group/key" names both explicitly; a bare "key" defaults the group to the
-// active environment when implicit groups are enabled. Keys may not contain "/".
-func (r *Resolver) splitRef(body, env string) (reference, error) {
-	parts := strings.Split(body, "/")
-	switch len(parts) {
-	case 1:
-		return r.implicitRef(parts[0], env)
-	case 2:
-		if parts[0] == "" || parts[1] == "" {
-			return reference{}, fmt.Errorf("invalid secret reference %q", scheme+body)
+// References must name both the group and key explicitly. Keys may not contain
+// "/".
+func splitRef(body string) (reference, error) {
+	group, key, found := strings.Cut(body, "/")
+	if !found {
+		if body == "" {
+			return reference{}, errors.New("empty secret reference")
 		}
-		return reference{group: parts[0], key: parts[1]}, nil
-	default:
+		return reference{}, fmt.Errorf(
+			"invalid secret reference %q (references must name a group and key)",
+			scheme+body,
+		)
+	}
+	if strings.Contains(key, "/") {
 		return reference{}, fmt.Errorf(
 			"invalid secret reference %q (keys may not contain '/')", scheme+body,
 		)
 	}
-}
-
-// -------------------------------------------------------------------------------------
-
-// implicitRef resolves a group-less "secret://<key>" reference, defaulting the
-// group to the active environment. An empty key is the most specific fault and
-// is reported first; otherwise it errors when the group is required or when no
-// active environment is available to supply the group.
-func (r *Resolver) implicitRef(key, env string) (reference, error) {
-	switch {
-	case key == "":
-		return reference{}, errors.New("empty secret reference")
-	case r.requireGroup:
-		return reference{}, fmt.Errorf(
-			"secret reference %q has no group and the shorthand is disabled",
-			scheme+key,
-		)
-	case env == "":
-		return reference{}, fmt.Errorf(
-			"secret reference %q needs an active environment to resolve its group",
-			scheme+key,
-		)
-	default:
-		return reference{group: env, key: key}, nil
+	if group == "" || key == "" {
+		return reference{}, fmt.Errorf("invalid secret reference %q", scheme+body)
 	}
+	return reference{group: group, key: key}, nil
 }
