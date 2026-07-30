@@ -23,10 +23,10 @@ type Result struct {
 	// run action supplies the merged Env and output streams before invoking runner.
 	Runner runner.Params
 
-	// Secrets locates the workspace secrets store: the resolved store path and the
-	// workspace group policy. ResolveProject opens it and wires the value resolver;
-	// ResolveWorkspace leaves it as data and never reads the store.
-	Secrets secrets.Params
+	// Secrets locates the workspace secrets store. ResolveProject opens it and
+	// wires the value resolver; ResolveWorkspace leaves it as data and never reads
+	// the store.
+	Secrets secrets.Settings
 
 	// manifestContext retains the loaded manifest and its directory so OverlayPath
 	// can validate and join a target without re-loading.

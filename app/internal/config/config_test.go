@@ -224,22 +224,22 @@ func TestResolveProject(t *testing.T) {
 // -------------------------------------------------------------------------------------
 
 // TestResolveWorkspace verifies ResolveWorkspace surfaces the resolved secrets
-// store location and group policy as data, resolves no project, and never wires a
-// value resolver — opening the store is ResolveProject's job.
+// store location as data, resolves no project, and never wires a value resolver —
+// opening the store is ResolveProject's job.
 func TestResolveWorkspace(t *testing.T) {
 	t.Parallel()
 
-	// Default: secrets.yaml beside the manifest, shorthand enabled, no project.
+	// Default: secrets.yaml beside the manifest, no project.
 	base := fixtures.Manifest("basic")
 	r, err := ResolveWorkspace(&Input{ConfigPath: &base})
 	if err != nil {
 		t.Fatalf("ResolveWorkspace basic: %v", err)
 	}
-	if filepath.Base(r.Secrets.Path) != "secrets.yaml" {
-		t.Errorf("Secrets.Path = %q, want .../secrets.yaml", r.Secrets.Path)
-	}
-	if r.Secrets.RequireGroup {
-		t.Error("RequireGroup should default to false")
+	if filepath.Base(r.Secrets.SecretsPath) != "secrets.yaml" {
+		t.Errorf(
+			"Secrets.SecretsPath = %q, want .../secrets.yaml",
+			r.Secrets.SecretsPath,
+		)
 	}
 	if r.Envmerge.ValueResolver != nil {
 		t.Error("ResolveWorkspace must not wire a value resolver")
@@ -248,23 +248,25 @@ func TestResolveWorkspace(t *testing.T) {
 		t.Error("ResolveWorkspace resolves no project, so it has no includes")
 	}
 
-	// A manifest secrets block flows through to the policy field.
-	rg := fixtures.Manifest("resolve/require-group")
-	r2, err := ResolveWorkspace(&Input{ConfigPath: &rg})
+	// A workspace secrets path flows through to the secrets input.
+	m := testManifest()
+	m.Secrets.SecretsPath = "private/secrets.yaml"
+	dir := t.TempDir()
+	r2, err := resolveManifest(manifestContext{manifest: m, dir: dir}, &Input{})
 	if err != nil {
-		t.Fatalf("ResolveWorkspace require-group: %v", err)
+		t.Fatalf("resolveManifest secrets path: %v", err)
 	}
-	if !r2.Secrets.RequireGroup {
-		t.Error("RequireGroup should be true from the manifest secrets block")
+	wantPath := filepath.Join(dir, "private", "secrets.yaml")
+	if r2.Secrets.SecretsPath != wantPath {
+		t.Errorf("Secrets.SecretsPath = %q, want %q", r2.Secrets.SecretsPath, wantPath)
 	}
 }
 
 // -------------------------------------------------------------------------------------
 
 // TestResolveProjectResolvesSecretReference verifies ResolveProject wires the
-// resolver so secret references dereference end to end: an implicit-group
-// reference resolves against the active environment's group, and an explicit
-// shared reference resolves against it.
+// resolver so secret references dereference end to end: explicit environment and
+// shared groups both resolve against the store.
 func TestResolveProjectResolvesSecretReference(t *testing.T) {
 	t.Parallel()
 
@@ -278,31 +280,12 @@ func TestResolveProjectResolvesSecretReference(t *testing.T) {
 		t.Fatalf("Build: %v", err)
 	}
 	if v, _ := env.Get("PASSWORD"); v != "dev-secret" {
-		t.Errorf("PASSWORD = %q, want dev-secret (implicit group=development)", v)
+		t.Errorf("PASSWORD = %q, want dev-secret (development group)", v)
 	}
 	if v, _ := env.Get("TOKEN"); v != "t0k" {
 		t.Errorf("TOKEN = %q, want t0k (shared group)", v)
 	}
 }
-
-// -------------------------------------------------------------------------------------
-
-// TestResolveProjectRequiresExplicitSecretGroup verifies the manifest policy
-// reaches the value resolver and rejects an environment-implicit reference.
-func TestResolveProjectRequiresExplicitSecretGroup(t *testing.T) {
-	t.Parallel()
-
-	path := fixtures.Manifest("resolve/require-group")
-	res, err := ResolveProject(&Input{ConfigPath: &path}, "api")
-	if err != nil {
-		t.Fatalf("ResolveProject: %v", err)
-	}
-	if _, err := envmerge.Build(res.Envmerge); err == nil {
-		t.Fatal("expected implicit secret group to be rejected")
-	}
-}
-
-// -------------------------------------------------------------------------------------
 
 // TestResolveWorkspaceIgnoresSecretsStore verifies a workspace resolution skips
 // the secrets store entirely — it neither reads a malformed store nor wires a

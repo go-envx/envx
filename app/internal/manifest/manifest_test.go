@@ -26,13 +26,7 @@ func writeManifest(t *testing.T, body string) string {
 func TestLoadValid(t *testing.T) {
 	t.Parallel()
 
-	path := writeManifest(t, `
-environments: [development, production]
-projects:
-  api:
-    includes:
-      - env/postgres
-`)
+	path := fixtures.Manifest("manifest/valid-secrets")
 	m, got, err := Load(path)
 	if err != nil {
 		t.Fatalf("Load: %v", err)
@@ -42,6 +36,9 @@ projects:
 	}
 	if !m.HasEnvironment("production") {
 		t.Error("expected production environment to be present")
+	}
+	if m.Secrets.SecretsPath != "./private/secrets.yaml" {
+		t.Errorf("SecretsPath = %q, want ./private/secrets.yaml", m.Secrets.SecretsPath)
 	}
 	if _, ok := m.LookupProject("api"); !ok {
 		t.Error("expected project api to be present")

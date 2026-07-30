@@ -8,7 +8,7 @@ import (
 // -------------------------------------------------------------------------------------
 
 // newTestResolver builds a Resolver over an in-memory store for resolution tests.
-func newTestResolver(requireGroup bool) *Resolver {
+func newTestResolver() *Resolver {
 	return &Resolver{
 		store: &store{
 			secrets: map[reference]string{
@@ -16,26 +16,23 @@ func newTestResolver(requireGroup bool) *Resolver {
 				{group: "shared", key: "api_key"}:               "shared-key",
 			},
 		},
-		requireGroup: requireGroup,
 	}
 }
 
 // -------------------------------------------------------------------------------------
 
 // TestResolve verifies plain values pass through and references dereference,
-// covering explicit groups, the environment-implicit shorthand, the shared
-// group, and the backslash escape hatch.
+// covering explicit groups, the shared group, and the backslash escape hatch.
 func TestResolve(t *testing.T) {
 	t.Parallel()
 
-	r := newTestResolver(false)
+	r := newTestResolver()
 	tests := []struct {
 		name, value, env, want string
 	}{
 		{"plain value", "localhost", "production", "localhost"},
 		{"url passes through", "postgres://u@h/db", "production", "postgres://u@h/db"},
 		{"explicit group", "secret://production/postgres_password", "dev", "prod-pw"},
-		{"implicit group uses env", "secret://postgres_password", "production", "prod-pw"},
 		{"shared group", "secret://shared/api_key", "production", "shared-key"},
 		{"escaped literal", `\secret://x`, "production", "secret://x"},
 	}
@@ -62,19 +59,17 @@ func TestResolveErrors(t *testing.T) {
 
 	tests := []struct {
 		name, value, env string
-		requireGroup     bool
 	}{
-		{"dangling key", "secret://production/missing", "production", false},
-		{"dangling group", "secret://ghost/key", "production", false},
-		{"shorthand disabled", "secret://postgres_password", "production", true},
-		{"implicit needs env", "secret://postgres_password", "", false},
-		{"too many slashes", "secret://a/b/c", "production", false},
-		{"empty reference", "secret://", "production", false},
+		{"dangling key", "secret://production/missing", "production"},
+		{"dangling group", "secret://ghost/key", "production"},
+		{"group-less key", "secret://postgres_password", "production"},
+		{"too many slashes", "secret://a/b/c", "production"},
+		{"empty reference", "secret://", "production"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			r := newTestResolver(tt.requireGroup)
+			r := newTestResolver()
 			if _, err := r.Resolve(tt.value, tt.env); err == nil {
 				t.Errorf("Resolve(%q) expected error", tt.value)
 			}
@@ -85,12 +80,11 @@ func TestResolveErrors(t *testing.T) {
 // -------------------------------------------------------------------------------------
 
 // TestResolveEmptyReferenceMessage verifies an empty reference reports the empty
-// fault even when a group is required: a missing key is the more specific
-// problem than the disabled shorthand.
+// fault rather than a generic malformed-reference error.
 func TestResolveEmptyReferenceMessage(t *testing.T) {
 	t.Parallel()
 
-	r := newTestResolver(true)
+	r := newTestResolver()
 	_, err := r.Resolve("secret://", "production")
 	if err == nil {
 		t.Fatal("expected error for empty reference")

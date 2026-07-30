@@ -22,23 +22,18 @@ type Manifest struct {
 	// ordered list of includes (namespaces) to load and merge for that project, plus
 	// optional project-specific settings that override the global settings.
 	Projects map[string]Project `yaml:"projects"`
-	// Secrets configures the workspace secrets store used to resolve secret://
-	// references. It is workspace-level (not per-project); its zero value discovers
-	// secrets.yaml beside the manifest and keeps the implicit-group shorthand on.
+	// Secrets configures the workspace-level secrets store.
 	Secrets SecretsConfig `yaml:"secrets"`
 }
 
 // -------------------------------------------------------------------------------------
 
-// SecretsConfig configures how secret references resolve against the workspace
-// secrets store. Both fields are optional.
+// SecretsConfig configures the workspace-level secrets store. Its zero value
+// discovers secrets.yaml beside the manifest.
 type SecretsConfig struct {
-	// Path overrides the secrets file location. Empty discovers secrets.yaml beside
-	// the manifest; a relative path is joined against the manifest directory.
-	Path string `yaml:"path"`
-	// RequireGroup, when true, rejects the "secret://<key>" shorthand and requires
-	// every reference to name its group (secret://<group>/<key>).
-	RequireGroup bool `yaml:"require_group"`
+	// SecretsPath overrides the secrets file location. A relative path is joined
+	// against the manifest directory.
+	SecretsPath string `yaml:"path"`
 }
 
 // -------------------------------------------------------------------------------------
@@ -104,8 +99,8 @@ func (m *Manifest) HasEnvironment(env string) bool {
 // list. It is the pure schema predicate config uses to validate a set target
 // before joining the include against the workspace directory.
 func (m *Manifest) HasInclude(includePath string) bool {
-	for _, p := range m.Projects {
-		if slices.Contains(p.Includes, includePath) {
+	for _, project := range m.Projects {
+		if slices.Contains(project.Includes, includePath) {
 			return true
 		}
 	}
@@ -134,11 +129,11 @@ func (m *Manifest) Validate() error {
 		return errors.New("manifest: at least one project must be defined")
 	}
 
-	for name, p := range m.Projects {
-		if len(p.Includes) == 0 {
+	for name, project := range m.Projects {
+		if len(project.Includes) == 0 {
 			return fmt.Errorf("manifest: project %q has no includes", name)
 		}
-		if slices.Contains(p.Includes, "") {
+		if slices.Contains(project.Includes, "") {
 			return fmt.Errorf("manifest: project %q contains an empty include", name)
 		}
 	}
