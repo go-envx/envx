@@ -2,6 +2,7 @@
 - [Task](https://taskfile.dev/) is the universal task runner for *all* apps and packages. Run `task --list` to see all available tasks.
 - When creating new apps or packages, it is recommended that a `clean`, `check`, and `test` task be added in the projects `Taskfile.yaml`.
 - *IMPORTANT*: Prior to running any command, you must refer to `task --list`. If it is possible to run the command via `task`, that is preferable.
+- Only run `docs:check` when files under `docs/` are updated; do not run them for changes outside that directory.
 
 ## Go Cobra CLI Development
 - When writing, modifying, or reviewing code in the Go Cobra CLI app (`app/`), **always** read and apply the `go-cobra-cli` skill (`.agents/skills/go-cobra-cli/SKILL.md`).
