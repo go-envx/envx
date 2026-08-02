@@ -55,6 +55,34 @@ func (ageCipher) Keypair() (Keypair, error) {
 
 // -------------------------------------------------------------------------------------
 
+// ValidateKeypair checks that both age keys are valid and represent one identity.
+func (ageCipher) ValidateKeypair(publicKey, privateKey string) error {
+	nativePublicKey, found := strings.CutPrefix(publicKey, agePublicKeyPrefix)
+	if !found {
+		return fmt.Errorf("invalid age public key")
+	}
+	recipient, err := age.ParseX25519Recipient(nativePublicKey)
+	if err != nil {
+		return fmt.Errorf("parse age public key: %w", err)
+	}
+
+	nativePrivateKey, found := strings.CutPrefix(privateKey, agePrivateKeyPrefix)
+	if !found {
+		return fmt.Errorf("invalid age private key")
+	}
+	identity, err := age.ParseX25519Identity(nativePrivateKey)
+	if err != nil {
+		return fmt.Errorf("parse age private key: %w", err)
+	}
+
+	if recipient.String() != identity.Recipient().String() {
+		return fmt.Errorf("age public and private keys do not match")
+	}
+	return nil
+}
+
+// -------------------------------------------------------------------------------------
+
 // Encrypt encrypts plaintext for an age X25519 recipient and returns native
 // age ciphertext bytes.
 func (ageCipher) Encrypt(plaintext, publicKey string) ([]byte, error) {

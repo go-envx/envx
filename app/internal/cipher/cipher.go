@@ -46,6 +46,8 @@ type Keypair struct {
 type Cipher interface {
 	// Keypair generates a new public/private keypair.
 	Keypair() (Keypair, error)
+	// ValidateKeypair checks key format and public/private correspondence.
+	ValidateKeypair(publicKey, privateKey string) error
 	// Encrypt encrypts plaintext for publicKey and returns native ciphertext bytes.
 	Encrypt(plaintext, publicKey string) ([]byte, error)
 	// Decrypt decrypts native ciphertext bytes with privateKey.
