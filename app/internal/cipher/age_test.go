@@ -73,6 +73,60 @@ func TestAgeRejectsWrongKey(t *testing.T) {
 
 // -------------------------------------------------------------------------------------
 
+// TestAgeValidatesKeypair checks age key format and public/private matching.
+func TestAgeValidatesKeypair(t *testing.T) {
+	t.Parallel()
+
+	selected, err := New(Age, AgeOptions{})
+	if err != nil {
+		t.Fatalf("New(age) error = %v", err)
+	}
+	first, err := selected.Keypair()
+	if err != nil {
+		t.Fatalf("first Keypair() error = %v", err)
+	}
+	second, err := selected.Keypair()
+	if err != nil {
+		t.Fatalf("second Keypair() error = %v", err)
+	}
+
+	tests := []struct {
+		name       string
+		publicKey  string
+		privateKey string
+	}{
+		{
+			name:       "malformed public",
+			publicKey:  "invalid",
+			privateKey: first.PrivateKey,
+		},
+		{
+			name:       "malformed private",
+			publicKey:  first.PublicKey,
+			privateKey: "invalid",
+		},
+		{
+			name:       "mismatched",
+			publicKey:  first.PublicKey,
+			privateKey: second.PrivateKey,
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+			if err := selected.ValidateKeypair(test.publicKey, test.privateKey); err == nil {
+				t.Fatal("ValidateKeypair() succeeded")
+			}
+		})
+	}
+
+	if err := selected.ValidateKeypair(first.PublicKey, first.PrivateKey); err != nil {
+		t.Fatalf("ValidateKeypair() error = %v", err)
+	}
+}
+
+// -------------------------------------------------------------------------------------
+
 // TestAgeRejectsMalformedInputs keeps algorithm-specific parsing errors behind
 // the Cipher boundary.
 func TestAgeRejectsMalformedInputs(t *testing.T) {

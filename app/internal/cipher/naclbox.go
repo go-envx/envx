@@ -55,6 +55,25 @@ func (naclBoxCipher) Keypair() (Keypair, error) {
 
 // -------------------------------------------------------------------------------------
 
+// ValidateKeypair checks that both NaCl Box keys are valid and correspond.
+func (naclBoxCipher) ValidateKeypair(publicKey, privateKey string) error {
+	nativePublicKey, err := decodeNaClBoxPublicKey(publicKey)
+	if err != nil {
+		return err
+	}
+	privatePublicKey, _, err := decodeNaClBoxPrivateKey(privateKey)
+	if err != nil {
+		return err
+	}
+
+	if *nativePublicKey != *privatePublicKey {
+		return fmt.Errorf("NaCl Box public and private keys do not match")
+	}
+	return nil
+}
+
+// -------------------------------------------------------------------------------------
+
 // Encrypt encrypts plaintext for a NaCl Box recipient and returns native sealed
 // box bytes.
 func (naclBoxCipher) Encrypt(plaintext, publicKey string) ([]byte, error) {

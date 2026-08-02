@@ -1,6 +1,7 @@
 package cipher
 
 import (
+	"fmt"
 	"strings"
 	"testing"
 )
@@ -50,6 +51,9 @@ func TestCipherInterfaceAcceptsAnotherImplementation(t *testing.T) {
 	if pair.PublicKey == "" || pair.PrivateKey == "" {
 		t.Fatal("alternate Keypair() returned incomplete key material")
 	}
+	if err := selected.ValidateKeypair(pair.PublicKey, pair.PrivateKey); err != nil {
+		t.Fatalf("alternate ValidateKeypair() error = %v", err)
+	}
 	ciphertext, err := selected.Encrypt("secret", pair.PublicKey)
 	if err != nil {
 		t.Fatalf("alternate Encrypt() error = %v", err)
@@ -74,6 +78,16 @@ type alternateCipher struct{}
 // Keypair returns representative opaque key strings for the test cipher.
 func (alternateCipher) Keypair() (Keypair, error) {
 	return Keypair{PublicKey: "alternate-public", PrivateKey: "alternate-private"}, nil
+}
+
+// -------------------------------------------------------------------------------------
+
+// ValidateKeypair accepts the fixed key material used by the test cipher.
+func (alternateCipher) ValidateKeypair(publicKey, privateKey string) error {
+	if publicKey != "alternate-public" || privateKey != "alternate-private" {
+		return fmt.Errorf("invalid alternate keypair")
+	}
+	return nil
 }
 
 // -------------------------------------------------------------------------------------
