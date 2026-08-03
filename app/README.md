@@ -48,9 +48,9 @@ app/
 │   ├── config/         # resolution pipeline: meshes input + ENVX_* + manifest into a Result
 │   ├── manifest/       # discover, load, parse, and validate envx.yaml
 │   ├── schema/         # single source of truth: FlagSpec catalog + Manifest/Settings types
-│   ├── secrets/        # resolve secret:// references against the local secrets store
 │   ├── flags/          # translate schema specs into pflag flags and read them back
 │   ├── envmerge/       # merge a project's namespace files into one resolved environment
+│   ├── secrets/        # materialize secret:// references from the local secrets store
 │   ├── runner/         # execute a child process (env injection, signal forwarding, exit codes)
 │   ├── exitcode/       # shared error type carrying a numeric exit code
 │   └── fixtures/       # test-only helpers for locating testdata
@@ -65,7 +65,7 @@ Each package under `internal/` carries a `doc.go` with a package-level comment d
 
 ## Architecture
 
-envx follows an **imperative-shell / pure-core** design. The action packages are the thin imperative shell: they parse arguments, call the resolution pipeline, and render output. The heavy lifting (precedence resolution, merging, and process execution) lives in dedicated packages that take plain value inputs and are framework-agnostic (no cobra below the action layer).
+envx follows an **imperative-shell / pure-core** design. The action packages are the thin imperative shell: they parse arguments, call the resolution pipeline, and render output. The heavy lifting (precedence resolution, secret materialization, merging, and process execution) lives in dedicated packages that take plain value inputs and are framework-agnostic (no cobra below the action layer).
 
 Two ideas hold the design together:
 
@@ -82,15 +82,15 @@ flowchart TD
         flags["flags"]
     end
 
-    subgraph resolution["Resolution"]
+    subgraph resolution["Configuration"]
         config["config"]
         manifest["manifest"]
         schema["schema"]
-        secrets["secrets"]
     end
 
-    subgraph engine["Merge &amp; execution"]
+    subgraph engine["Merge, secret resolution &amp; execution"]
         envmerge["envmerge"]
+        secrets["secrets"]
         runner["runner"]
     end
 
@@ -117,20 +117,6 @@ flowchart TD
     manifest --> schema
     runner -.->|types only| exitcode
 ```
-
-**Legend**
-
-- **Solid arrow**: imports and uses the package's functions, methods, or values.
-- **Dotted arrow**: imports for **types only**, meaning it constructs the package's structs but calls none of its functions or methods. `config` builds `envmerge.Params` and `runner.Params` without invoking either package, `flags` builds a `config.Input` without calling `config`, and `runner` returns an `exitcode.Error` value. (`config` also builds a `secrets.Settings`, but because it additionally calls `secrets.Open` that edge is solid, not dotted.)
-
-**Notes on the collapsed `actions/<verb>` node** (each verb is its own package):
-
-- Every verb imports `config` and `flags`.
-- `get`, `run`, `explain`, and `diff` import `envmerge`; `set` does not (it edits the YAML node tree directly and never flattens).
-- Only `run` imports `runner`.
-- Only `explain` and `diff` import `schema` directly, for the `--output` flag spec they register themselves.
-
-`schema` and `exitcode` are pure leaves that import only the standard library, so any layer can depend on them without risking an import cycle.
 
 ## Settings resolution
 

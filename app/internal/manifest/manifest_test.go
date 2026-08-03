@@ -40,6 +40,9 @@ func TestLoadValid(t *testing.T) {
 	if m.Secrets.SecretsPath != "./private/secrets.yaml" {
 		t.Errorf("SecretsPath = %q, want ./private/secrets.yaml", m.Secrets.SecretsPath)
 	}
+	if m.Secrets.KeysPath != "./private/envx.keys" {
+		t.Errorf("KeysPath = %q, want ./private/envx.keys", m.Secrets.KeysPath)
+	}
 	if _, ok := m.LookupProject("api"); !ok {
 		t.Error("expected project api to be present")
 	}

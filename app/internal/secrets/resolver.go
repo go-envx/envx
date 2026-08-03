@@ -15,12 +15,14 @@ const scheme = "secret://"
 
 // -------------------------------------------------------------------------------------
 
-// Settings is secrets' input contract: where the store lives. A caller (config)
-// populates it as plain data; Open reads the store at SecretsPath and returns a
-// Resolver bound to it.
-type Settings struct {
+// Params is secrets' input contract: where the store and private-key file live.
+// A caller (config) populates it as plain data; Open reads the store at
+// SecretsPath and returns a Resolver bound to it.
+type Params struct {
 	// SecretsPath is the absolute path of the secrets store (secrets.yaml).
 	SecretsPath string
+	// KeysPath is the absolute path of the private-key file (envx.keys).
+	KeysPath string
 }
 
 // -------------------------------------------------------------------------------------
@@ -38,7 +40,7 @@ type Resolver struct {
 // Open reads the secrets store at p.SecretsPath and returns a Resolver bound to
 // it. A missing store yields an empty one, so a reference against it fails loudly
 // as a dangling reference rather than leaking the raw reference string.
-func Open(p Settings) (*Resolver, error) {
+func Open(p Params) (*Resolver, error) {
 	s, err := loadStore(p.SecretsPath)
 	if err != nil {
 		return nil, err

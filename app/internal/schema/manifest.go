@@ -34,6 +34,9 @@ type SecretsConfig struct {
 	// SecretsPath overrides the secrets file location. A relative path is joined
 	// against the manifest directory.
 	SecretsPath string `yaml:"path"`
+	// KeysPath overrides the private-key file location. A relative path is joined
+	// against the manifest directory.
+	KeysPath string `yaml:"keys_path"`
 }
 
 // -------------------------------------------------------------------------------------
