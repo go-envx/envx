@@ -166,7 +166,7 @@ func resolveManifest(mc manifestContext, in *Input) (*Result, error) {
 	return &Result{
 		Envmerge:        resolveEnvmergeParams(mc, in, pl),
 		Runner:          resolveRunnerParams(mc, in, pl),
-		Secrets:         resolveSecretsSettings(mc),
+		Secrets:         resolveSecretsParams(mc),
 		manifestContext: mc,
 	}, nil
 }
@@ -273,19 +273,30 @@ func resolveRunnerParams(
 
 // -------------------------------------------------------------------------------------
 
-// resolveSecretsSettings builds the secrets input: the resolved workspace store
-// path. Secrets are workspace-level — not project- or flag-overridable — so it
-// reads only the workspace-level manifest secrets block; opening the store is
-// ResolveProject's job.
-func resolveSecretsSettings(mc manifestContext) secrets.Settings {
+// resolveSecretsParams builds the secrets input: the resolved workspace store
+// and private-key paths. Secrets are workspace-level — not project- or
+// flag-overridable — so it reads only the workspace-level manifest secrets
+// block; opening the store is ResolveProject's job.
+func resolveSecretsParams(mc manifestContext) secrets.Params {
 	// Look up the secrets path in the manifest; default to "secrets.yaml" if unset.
 	secretsPath := mc.manifest.Secrets.SecretsPath
 	if secretsPath == "" {
 		secretsPath = "secrets.yaml"
 	}
+	resolvedSecretsPath := file.ResolvePath(mc.dir, secretsPath)
 
-	// Return the secrets settings.
-	return secrets.Settings{
-		SecretsPath: file.ResolvePath(mc.dir, secretsPath),
+	// Look up the private-key path in the manifest; default beside the resolved
+	// secrets store and resolve explicit relative paths beside the manifest.
+	keysPath := mc.manifest.Secrets.KeysPath
+	if keysPath == "" {
+		keysPath = filepath.Join(filepath.Dir(resolvedSecretsPath), "envx.keys")
+	} else {
+		keysPath = file.ResolvePath(mc.dir, keysPath)
+	}
+
+	// Return the secrets parameters.
+	return secrets.Params{
+		SecretsPath: resolvedSecretsPath,
+		KeysPath:    keysPath,
 	}
 }

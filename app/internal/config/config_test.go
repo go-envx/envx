@@ -241,6 +241,10 @@ func TestResolveWorkspace(t *testing.T) {
 			r.Secrets.SecretsPath,
 		)
 	}
+	wantDefaultKeys := filepath.Join(filepath.Dir(r.Secrets.SecretsPath), "envx.keys")
+	if r.Secrets.KeysPath != wantDefaultKeys {
+		t.Errorf("Secrets.KeysPath = %q, want %q", r.Secrets.KeysPath, wantDefaultKeys)
+	}
 	if r.Envmerge.ValueResolver != nil {
 		t.Error("ResolveWorkspace must not wire a value resolver")
 	}
@@ -259,6 +263,41 @@ func TestResolveWorkspace(t *testing.T) {
 	wantPath := filepath.Join(dir, "private", "secrets.yaml")
 	if r2.Secrets.SecretsPath != wantPath {
 		t.Errorf("Secrets.SecretsPath = %q, want %q", r2.Secrets.SecretsPath, wantPath)
+	}
+	wantKeysPath := filepath.Join(dir, "private", "envx.keys")
+	if r2.Secrets.KeysPath != wantKeysPath {
+		t.Errorf("Secrets.KeysPath = %q, want %q", r2.Secrets.KeysPath, wantKeysPath)
+	}
+
+	// An explicit relative key path is resolved against the manifest directory,
+	// not against the custom secrets store directory.
+	m.Secrets.KeysPath = "keys/envx.keys"
+	r3, err := resolveManifest(manifestContext{manifest: m, dir: dir}, &Input{})
+	if err != nil {
+		t.Fatalf("resolveManifest relative keys path: %v", err)
+	}
+	wantRelativeKeysPath := filepath.Join(dir, "keys", "envx.keys")
+	if r3.Secrets.KeysPath != wantRelativeKeysPath {
+		t.Errorf(
+			"Secrets.KeysPath = %q, want %q",
+			r3.Secrets.KeysPath,
+			wantRelativeKeysPath,
+		)
+	}
+
+	// An explicit absolute key path remains rooted at its own location.
+	absoluteKeysPath := filepath.Join(t.TempDir(), "envx.keys")
+	m.Secrets.KeysPath = absoluteKeysPath
+	r4, err := resolveManifest(manifestContext{manifest: m, dir: dir}, &Input{})
+	if err != nil {
+		t.Fatalf("resolveManifest absolute keys path: %v", err)
+	}
+	if r4.Secrets.KeysPath != absoluteKeysPath {
+		t.Errorf(
+			"Secrets.KeysPath = %q, want %q",
+			r4.Secrets.KeysPath,
+			absoluteKeysPath,
+		)
 	}
 }
 
