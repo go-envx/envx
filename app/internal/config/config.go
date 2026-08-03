@@ -13,6 +13,13 @@ import (
 	"github.com/go-envx/envx/app/pkg/file"
 )
 
+const (
+	// defaultSecretsFilename is the default workspace secrets store filename.
+	defaultSecretsFilename = "secrets.yaml"
+	// defaultKeysFilename is the default workspace private-key filename.
+	defaultKeysFilename = "envx.keys"
+)
+
 // -------------------------------------------------------------------------------------
 
 // Input is the raw user input one action gathers at the frontend edge (a cobra
@@ -278,10 +285,10 @@ func resolveRunnerParams(
 // flag-overridable — so it reads only the workspace-level manifest secrets
 // block; opening the store is ResolveProject's job.
 func resolveSecretsParams(mc manifestContext) secrets.Params {
-	// Look up the secrets path in the manifest; default to "secrets.yaml" if unset.
+	// Look up the secrets path in the manifest; use the default filename if unset.
 	secretsPath := mc.manifest.Secrets.SecretsPath
 	if secretsPath == "" {
-		secretsPath = "secrets.yaml"
+		secretsPath = defaultSecretsFilename
 	}
 	resolvedSecretsPath := file.ResolvePath(mc.dir, secretsPath)
 
@@ -289,7 +296,7 @@ func resolveSecretsParams(mc manifestContext) secrets.Params {
 	// secrets store and resolve explicit relative paths beside the manifest.
 	keysPath := mc.manifest.Secrets.KeysPath
 	if keysPath == "" {
-		keysPath = filepath.Join(filepath.Dir(resolvedSecretsPath), "envx.keys")
+		keysPath = filepath.Join(filepath.Dir(resolvedSecretsPath), defaultKeysFilename)
 	} else {
 		keysPath = file.ResolvePath(mc.dir, keysPath)
 	}
