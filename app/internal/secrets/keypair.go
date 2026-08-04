@@ -1,0 +1,225 @@
+package secrets
+
+import (
+	"context"
+	"errors"
+	"fmt"
+	"os"
+	"os/exec"
+	"path/filepath"
+	"strings"
+	"unicode"
+
+	"github.com/go-envx/envx/app/internal/secrets/internal/privatekey"
+	"github.com/go-envx/envx/app/internal/secrets/internal/store"
+	"github.com/go-envx/envx/app/pkg/file"
+)
+
+// -------------------------------------------------------------------------------------
+
+// GenerateKeypair creates a missing group identity and commits its public key
+// only after the private-key destination has accepted the new private key.
+func (m *Manager) GenerateKeypair(group string) (KeypairMetadata, error) {
+	var err error
+	group, err = normalizeGroupName(group)
+	if err != nil {
+		return KeypairMetadata{}, err
+	}
+
+	document, err := store.Open(m.secretsPath)
+	if err != nil {
+		return KeypairMetadata{}, err
+	}
+	if _, exists := document.PublicKey(group); exists {
+		return KeypairMetadata{}, fmt.Errorf(
+			"group %q already has a public key", group,
+		)
+	}
+
+	pair, err := m.cipher.Keypair()
+	if err != nil {
+		return KeypairMetadata{}, fmt.Errorf(
+			"generating keypair for group %q: %w", group, err,
+		)
+	}
+	if pair.PublicKey == "" || pair.PrivateKey == "" {
+		return KeypairMetadata{}, errors.New("cipher generated an incomplete keypair")
+	}
+	if err := m.cipher.ValidateKeypair(pair.PublicKey, pair.PrivateKey); err != nil {
+		return KeypairMetadata{}, fmt.Errorf("generated keypair is invalid: %w", err)
+	}
+	if err := document.SetPublicKey(group, pair.PublicKey); err != nil {
+		return KeypairMetadata{}, err
+	}
+
+	if m.privateKeyDestination == nil {
+		return KeypairMetadata{}, errors.New("private-key destination is nil")
+	}
+	if keysPath, isFile := privatekey.FilePath(m.privateKeyDestination); isFile {
+		if err := ensureGitIgnored(keysPath); err != nil {
+			return KeypairMetadata{}, err
+		}
+	}
+	if err := m.privateKeyDestination.Write(group, pair.PrivateKey); err != nil {
+		return KeypairMetadata{}, fmt.Errorf(
+			"writing private key for group %q: %w", group, err,
+		)
+	}
+	if err := document.Save(); err != nil {
+		return KeypairMetadata{}, fmt.Errorf(
+			"private key for group %q was written, but secrets store %s was not "+
+				"committed: %w; keep the private key and retry the operation",
+			group, m.secretsPath, err,
+		)
+	}
+
+	return KeypairMetadata{
+		Group:            group,
+		PublicKey:        pair.PublicKey,
+		PrivateKeyStatus: PrivateKeyValid,
+	}, nil
+}
+
+// -------------------------------------------------------------------------------------
+
+// InspectKeypair reports the safe status of a group's public and private keys
+// without writing, prompting, or returning private-key material.
+func (m *Manager) InspectKeypair(group string) (KeypairMetadata, error) {
+	var err error
+	group, err = normalizeGroupName(group)
+	if err != nil {
+		return KeypairMetadata{}, err
+	}
+
+	document, err := store.Open(m.secretsPath)
+	if err != nil {
+		return KeypairMetadata{}, err
+	}
+	publicKey, exists := document.PublicKey(group)
+	if !exists {
+		return KeypairMetadata{}, fmt.Errorf("group %q has no public key", group)
+	}
+
+	metadata := KeypairMetadata{
+		Group:            group,
+		PublicKey:        publicKey,
+		PrivateKeyStatus: PrivateKeyNotAvailable,
+	}
+	if m.privateKeyResolver == nil {
+		return metadata, nil
+	}
+
+	privateKey, err := m.privateKeyResolver.Resolve(group)
+	if err != nil {
+		if errors.Is(err, privatekey.ErrNotAvailable) {
+			return metadata, nil
+		}
+		return KeypairMetadata{}, fmt.Errorf(
+			"resolving private key for group %q: %w", group, err,
+		)
+	}
+	if privateKey.Value == "" ||
+		m.cipher.ValidateKeypair(publicKey, privateKey.Value) != nil {
+		metadata.PrivateKeyStatus = PrivateKeyInvalid
+		return metadata, nil
+	}
+
+	metadata.PrivateKeyStatus = PrivateKeyValid
+	return metadata, nil
+}
+
+// -------------------------------------------------------------------------------------
+
+// normalizeGroupName validates a key-group name and returns its canonical form.
+func normalizeGroupName(group string) (string, error) {
+	if strings.TrimSpace(group) == "" {
+		return "", errors.New("secret group is empty")
+	}
+	if strings.IndexFunc(group, unicode.IsSpace) >= 0 ||
+		strings.ContainsAny(group, "/\r\n=") {
+		return "", fmt.Errorf("invalid secret group %q", group)
+	}
+	return strings.ToLower(group), nil
+}
+
+// -------------------------------------------------------------------------------------
+
+// ensureGitIgnored verifies a file is ignored by Git or adds a local rule before
+// any private-key bytes are written. A repository ancestor's rule is sufficient.
+func ensureGitIgnored(keysPath string) error {
+	if keysPath == "" {
+		return errors.New("private-key file path is empty")
+	}
+
+	dir := filepath.Dir(keysPath)
+	if err := os.MkdirAll(dir, 0o750); err != nil {
+		return fmt.Errorf("creating private-key directory %s: %w", dir, err)
+	}
+
+	ignored, err := gitIgnores(dir, filepath.Base(keysPath))
+	if err != nil {
+		return err
+	}
+	if ignored {
+		return nil
+	}
+
+	ignorePath := filepath.Join(dir, ".gitignore")
+	data, err := file.Read(ignorePath)
+	if err != nil && !errors.Is(err, os.ErrNotExist) {
+		return fmt.Errorf("reading %s: %w", ignorePath, err)
+	}
+	if hasIgnoreRule(string(data), filepath.Base(keysPath)) {
+		return nil
+	}
+
+	content := string(data)
+	if content != "" && !strings.HasSuffix(content, "\n") {
+		content += "\n"
+	}
+	content += filepath.Base(keysPath) + "\n"
+	if err := file.WriteAtomic(ignorePath, []byte(content)); err != nil {
+		return fmt.Errorf("protecting private-key file with %s: %w", ignorePath, err)
+	}
+	return nil
+}
+
+// -------------------------------------------------------------------------------------
+
+// gitIgnores asks Git's effective matcher whether name is ignored from dir.
+func gitIgnores(dir, name string) (bool, error) {
+	//nolint:gosec // Git is fixed; name is only a path basename, never a command.
+	cmd := exec.CommandContext(
+		context.Background(), "git", "check-ignore", "--no-index", "--quiet", "--", name,
+	)
+	cmd.Dir = dir
+	if err := cmd.Run(); err == nil {
+		return true, nil
+	} else {
+		var exitError *exec.ExitError
+		if errors.As(err, &exitError) &&
+			(exitError.ExitCode() == 1 || exitError.ExitCode() == 128) {
+			return false, nil
+		}
+		if errors.Is(err, exec.ErrNotFound) {
+			return false, nil
+		}
+		return false, fmt.Errorf(
+			"checking Git ignore for %s: %w", filepath.Join(dir, name), err,
+		)
+	}
+}
+
+// -------------------------------------------------------------------------------------
+
+// hasIgnoreRule reports whether a local ignore file already contains an exact
+// rule for the private-key basename.
+func hasIgnoreRule(content, name string) bool {
+	for _, line := range strings.Split(content, "\n") {
+		line = strings.TrimSpace(line)
+		if line == name || line == "/"+name {
+			return true
+		}
+	}
+	return false
+}

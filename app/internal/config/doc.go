@@ -2,8 +2,8 @@
 // values, ENVX_* environment variables, and the loaded manifest into a single
 // resolved *Result, applying the precedence explicit > ENVX_* > project >
 // global. It exposes two entry points for the two workflows actions need:
-// ResolveProject resolves a project's build-ready configuration and opens the
-// secrets store, wiring the value resolver so envmerge can dereference secret://
+// ResolveProject resolves a project's build-ready configuration, constructs the
+// secrets manager, and wires its resolver so envmerge can dereference secret://
 // references; ResolveWorkspace resolves manifest-level data without selecting a
 // project or touching the store, for actions that locate and edit an overlay.
 // Each call loads the manifest once and returns the aggregate the action reads.

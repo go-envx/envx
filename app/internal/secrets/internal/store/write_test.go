@@ -8,9 +8,9 @@ import (
 
 // -------------------------------------------------------------------------------------
 
-// TestMutations verifies additions, updates, deletion, and retention of an
+// TestWrites verifies additions, updates, deletion, and retention of an
 // empty group after its last secret is removed.
-func TestMutations(t *testing.T) {
+func TestWrites(t *testing.T) {
 	t.Parallel()
 
 	path := writeDocument(t, "secrets:\n  production:\n    first: one\n    second: two\n")

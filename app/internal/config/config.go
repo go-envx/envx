@@ -77,8 +77,8 @@ type projectLayer struct {
 // -------------------------------------------------------------------------------------
 
 // ResolveProject resolves a project's build-ready configuration: it loads the
-// manifest, meshes it with the input and ENVX_* vars, then opens the workspace
-// secrets store and wires the value resolver so envmerge can dereference
+// manifest, meshes it with the input and ENVX_* vars, then constructs the
+// workspace secrets manager and wires its resolver so envmerge can dereference
 // secret:// references. The environment-building actions (get, run, explain,
 // diff) call it. A missing store yields an empty resolver, so a reference with no
 // matching entry fails loudly as a dangling reference rather than leaking the raw
@@ -89,13 +89,17 @@ func ResolveProject(in *Input, project string) (*Result, error) {
 		return nil, err
 	}
 
-	// Open the workspace secrets store and wire the resolver onto the envmerge
-	// params so secret:// references dereference during Build.
-	resolver, err := secrets.Open(res.Secrets)
+	// Construct the workspace secrets secretsManager and wire its resolver onto the
+	// envmerge params so secret:// references dereference during Build.
+	secretsManager, err := secrets.New(res.Secrets)
 	if err != nil {
 		return nil, err
 	}
-	res.Envmerge.ValueResolver = resolver
+	secretsResolver, err := secretsManager.Resolver()
+	if err != nil {
+		return nil, err
+	}
+	res.Envmerge.ValueResolver = secretsResolver
 	return res, nil
 }
 
@@ -283,7 +287,8 @@ func resolveRunnerParams(
 // resolveSecretsParams builds the secrets input: the resolved workspace store
 // and private-key paths. Secrets are workspace-level — not project- or
 // flag-overridable — so it reads only the workspace-level manifest secrets
-// block; opening the store is ResolveProject's job.
+// block; constructing the manager and opening the store are ResolveProject's
+// jobs.
 func resolveSecretsParams(mc manifestContext) secrets.Params {
 	// Look up the secrets path in the manifest; use the default filename if unset.
 	secretsPath := mc.manifest.Secrets.SecretsPath
