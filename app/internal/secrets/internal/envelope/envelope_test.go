@@ -1,4 +1,4 @@
-package secrets
+package envelope
 
 import (
 	"bytes"
@@ -10,40 +10,40 @@ import (
 
 // -------------------------------------------------------------------------------------
 
-// TestCiphertextEnvelopeRoundTrip verifies algorithm metadata and native bytes
-// survive the single-line storage encoding unchanged.
-func TestCiphertextEnvelopeRoundTrip(t *testing.T) {
+// TestRoundTrip verifies algorithm metadata and native bytes survive the
+// single-line storage encoding unchanged.
+func TestRoundTrip(t *testing.T) {
 	t.Parallel()
 
 	payload := []byte("age-encryption.org/v1\n\x00\xff")
-	value, err := encodeCiphertext(cipher.Age, payload)
+	value, err := Encode(cipher.Age, payload)
 	if err != nil {
-		t.Fatalf("encodeCiphertext() error = %v", err)
+		t.Fatalf("Encode() error = %v", err)
 	}
 	if strings.ContainsAny(value, "\r\n") {
-		t.Fatalf("encodeCiphertext() returned a multiline value: %q", value)
+		t.Fatalf("Encode() returned a multiline value: %q", value)
 	}
 	if !strings.HasPrefix(value, "encrypted-age:") {
-		t.Fatalf("encodeCiphertext() = %q, want encrypted-age prefix", value)
+		t.Fatalf("Encode() = %q, want encrypted-age prefix", value)
 	}
 
-	algorithm, decoded, err := decodeCiphertext(value)
+	algorithm, decoded, err := Decode(value)
 	if err != nil {
-		t.Fatalf("decodeCiphertext() error = %v", err)
+		t.Fatalf("Decode() error = %v", err)
 	}
 	if algorithm != cipher.Age {
-		t.Fatalf("decodeCiphertext() algorithm = %q, want %q", algorithm, cipher.Age)
+		t.Fatalf("Decode() algorithm = %q, want %q", algorithm, cipher.Age)
 	}
 	if !bytes.Equal(decoded, payload) {
-		t.Fatalf("decodeCiphertext() payload = %x, want %x", decoded, payload)
+		t.Fatalf("Decode() payload = %x, want %x", decoded, payload)
 	}
 }
 
 // -------------------------------------------------------------------------------------
 
-// TestCiphertextEnvelopeComposesWithAge verifies the storage envelope can
-// carry and restore a real age ciphertext without involving armor.
-func TestCiphertextEnvelopeComposesWithAge(t *testing.T) {
+// TestComposesWithAge verifies the storage envelope can carry and restore a
+// real age ciphertext without involving armor.
+func TestComposesWithAge(t *testing.T) {
 	t.Parallel()
 
 	selected, err := cipher.New(cipher.Age, cipher.AgeOptions{})
@@ -58,14 +58,14 @@ func TestCiphertextEnvelopeComposesWithAge(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Encrypt() error = %v", err)
 	}
-	storedValue, err := encodeCiphertext(cipher.Age, nativeCiphertext)
+	storedValue, err := Encode(cipher.Age, nativeCiphertext)
 	if err != nil {
-		t.Fatalf("encodeCiphertext() error = %v", err)
+		t.Fatalf("Encode() error = %v", err)
 	}
 
-	algorithm, decodedCiphertext, err := decodeCiphertext(storedValue)
+	algorithm, decodedCiphertext, err := Decode(storedValue)
 	if err != nil {
-		t.Fatalf("decodeCiphertext() error = %v", err)
+		t.Fatalf("Decode() error = %v", err)
 	}
 	selected, err = cipher.New(algorithm, cipher.AgeOptions{})
 	if err != nil {
@@ -82,9 +82,9 @@ func TestCiphertextEnvelopeComposesWithAge(t *testing.T) {
 
 // -------------------------------------------------------------------------------------
 
-// TestCiphertextEnvelopeComposesWithNaClBox verifies a second algorithm uses
-// the same single-line storage envelope without special-case parsing.
-func TestCiphertextEnvelopeComposesWithNaClBox(t *testing.T) {
+// TestComposesWithNaClBox verifies a second algorithm uses the same envelope
+// without special-case parsing.
+func TestComposesWithNaClBox(t *testing.T) {
 	t.Parallel()
 
 	selected, err := cipher.New(cipher.NaClBox, cipher.NaClBoxOptions{})
@@ -99,17 +99,17 @@ func TestCiphertextEnvelopeComposesWithNaClBox(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Encrypt() error = %v", err)
 	}
-	storedValue, err := encodeCiphertext(cipher.NaClBox, nativeCiphertext)
+	storedValue, err := Encode(cipher.NaClBox, nativeCiphertext)
 	if err != nil {
-		t.Fatalf("encodeCiphertext() error = %v", err)
+		t.Fatalf("Encode() error = %v", err)
 	}
 	if !strings.HasPrefix(storedValue, "encrypted-nacl-box:") {
-		t.Fatalf("encodeCiphertext() = %q, want encrypted-nacl-box prefix", storedValue)
+		t.Fatalf("Encode() = %q, want encrypted-nacl-box prefix", storedValue)
 	}
 
-	algorithm, decodedCiphertext, err := decodeCiphertext(storedValue)
+	algorithm, decodedCiphertext, err := Decode(storedValue)
 	if err != nil {
-		t.Fatalf("decodeCiphertext() error = %v", err)
+		t.Fatalf("Decode() error = %v", err)
 	}
 	selected, err = cipher.New(algorithm, cipher.NaClBoxOptions{})
 	if err != nil {
@@ -126,9 +126,9 @@ func TestCiphertextEnvelopeComposesWithNaClBox(t *testing.T) {
 
 // -------------------------------------------------------------------------------------
 
-// TestDecodeCiphertextRejectsMalformedEnvelopes verifies the envelope parser
-// rejects malformed structure, algorithms, and payloads.
-func TestDecodeCiphertextRejectsMalformedEnvelopes(t *testing.T) {
+// TestDecodeRejectsMalformedEnvelopes verifies malformed structure, algorithms,
+// and payloads are rejected.
+func TestDecodeRejectsMalformedEnvelopes(t *testing.T) {
 	t.Parallel()
 
 	tests := []string{
@@ -145,17 +145,17 @@ func TestDecodeCiphertextRejectsMalformedEnvelopes(t *testing.T) {
 		"encrypted-age:cGF5bG9hZA=",
 	}
 	for _, value := range tests {
-		if _, _, err := decodeCiphertext(value); err == nil {
-			t.Errorf("decodeCiphertext(%q) succeeded", value)
+		if _, _, err := Decode(value); err == nil {
+			t.Errorf("Decode(%q) succeeded", value)
 		}
 	}
 }
 
 // -------------------------------------------------------------------------------------
 
-// TestEncodeCiphertextRejectsInvalidInputs verifies invalid algorithm names
-// and empty native payloads cannot enter the store format.
-func TestEncodeCiphertextRejectsInvalidInputs(t *testing.T) {
+// TestEncodeRejectsInvalidInputs verifies invalid algorithm names and empty
+// native payloads cannot enter the store format.
+func TestEncodeRejectsInvalidInputs(t *testing.T) {
 	t.Parallel()
 
 	algorithms := []cipher.Algorithm{
@@ -165,11 +165,26 @@ func TestEncodeCiphertextRejectsInvalidInputs(t *testing.T) {
 		"bad\nalgorithm",
 	}
 	for _, algorithm := range algorithms {
-		if _, err := encodeCiphertext(algorithm, []byte("payload")); err == nil {
-			t.Errorf("encodeCiphertext(%q) succeeded", algorithm)
+		if _, err := Encode(algorithm, []byte("payload")); err == nil {
+			t.Errorf("Encode(%q) succeeded", algorithm)
 		}
 	}
-	if _, err := encodeCiphertext(cipher.Age, nil); err == nil {
-		t.Fatal("encodeCiphertext() accepted an empty payload")
+	if _, err := Encode(cipher.Age, nil); err == nil {
+		t.Fatal("Encode() accepted an empty payload")
+	}
+}
+
+// -------------------------------------------------------------------------------------
+
+// TestIsCiphertext verifies the marker check distinguishes claimed envelopes
+// from ordinary plaintext values.
+func TestIsCiphertext(t *testing.T) {
+	t.Parallel()
+
+	if !IsCiphertext("encrypted-age:payload") {
+		t.Error("IsCiphertext() rejected an envelope marker")
+	}
+	if IsCiphertext("plaintext") {
+		t.Error("IsCiphertext() accepted plaintext")
 	}
 }

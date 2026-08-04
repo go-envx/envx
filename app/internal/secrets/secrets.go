@@ -4,6 +4,8 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+
+	secretstore "github.com/go-envx/envx/app/internal/secrets/internal/store"
 )
 
 // -------------------------------------------------------------------------------------
@@ -27,12 +29,23 @@ type Params struct {
 
 // -------------------------------------------------------------------------------------
 
+// reference identifies one secret by its group and key. It is resolver
+// identity, not document storage, so the document store owns no reference type.
+type reference struct {
+	// group is the key-group the referenced entry belongs to.
+	group string
+	// key is the entry's name within the group.
+	key string
+}
+
+// -------------------------------------------------------------------------------------
+
 // Resolver dereferences secret references against a secrets store. It recognizes
 // values of the form "secret://<group>/<key>"; every other value passes through
 // unchanged.
 type Resolver struct {
-	// store holds the secret values the resolver dereferences against.
-	store *store
+	// values holds secret values keyed by their resolver reference.
+	values map[reference]string
 }
 
 // -------------------------------------------------------------------------------------
@@ -41,12 +54,19 @@ type Resolver struct {
 // it. A missing store yields an empty one, so a reference against it fails loudly
 // as a dangling reference rather than leaking the raw reference string.
 func Open(p Params) (*Resolver, error) {
-	s, err := loadStore(p.SecretsPath)
+	document, err := secretstore.Open(p.SecretsPath)
 	if err != nil {
 		return nil, err
 	}
+	values := make(map[reference]string)
+	for _, secret := range document.Secrets() {
+		values[reference{
+			group: strings.ToLower(secret.Group),
+			key:   secret.Key,
+		}] = secret.Value
+	}
 	return &Resolver{
-		store: s,
+		values: values,
 	}, nil
 }
 
@@ -71,7 +91,7 @@ func (r *Resolver) Resolve(value, _ string) (string, error) {
 		return "", err
 	}
 
-	v, ok := r.store.lookup(ref)
+	v, ok := r.values[ref]
 	if !ok {
 		return "", fmt.Errorf("secret %q not found in group %q", ref.key, ref.group)
 	}
@@ -102,5 +122,5 @@ func splitRef(body string) (reference, error) {
 	if group == "" || key == "" {
 		return reference{}, fmt.Errorf("invalid secret reference %q", scheme+body)
 	}
-	return reference{group: group, key: key}, nil
+	return reference{group: strings.ToLower(group), key: key}, nil
 }
