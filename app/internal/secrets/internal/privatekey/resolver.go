@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"os"
 	"strings"
-	"unicode"
 
 	"github.com/go-envx/envx/app/pkg/file"
 )
@@ -119,20 +118,6 @@ func (r resolver) Resolve(group string) (PrivateKey, error) {
 		return PrivateKey{}, unavailable(group)
 	}
 	return PrivateKey{Value: key, Origin: r.keysPath}, nil
-}
-
-// -------------------------------------------------------------------------------------
-
-// validateGroup rejects empty, whitespace, or line-breaking group names so
-// lookups match normalized file entries and cannot corrupt env-var names.
-func validateGroup(group string) error {
-	if strings.TrimSpace(group) == "" {
-		return errors.New("private-key group is empty")
-	}
-	if strings.ContainsRune(group, '=') || strings.IndexFunc(group, unicode.IsSpace) >= 0 {
-		return fmt.Errorf("invalid private-key group %q", group)
-	}
-	return nil
 }
 
 // -------------------------------------------------------------------------------------

@@ -2,8 +2,24 @@ package privatekey
 
 import (
 	"errors"
+	"fmt"
 	"strings"
+	"unicode"
 )
+
+// -------------------------------------------------------------------------------------
+
+// validateGroup rejects empty, whitespace, or line-breaking group names so
+// lookups match normalized file entries and cannot corrupt env-var names.
+func validateGroup(group string) error {
+	if strings.TrimSpace(group) == "" {
+		return errors.New("private-key group is empty")
+	}
+	if strings.ContainsRune(group, '=') || strings.IndexFunc(group, unicode.IsSpace) >= 0 {
+		return fmt.Errorf("invalid private-key group %q", group)
+	}
+	return nil
+}
 
 // -------------------------------------------------------------------------------------
 
