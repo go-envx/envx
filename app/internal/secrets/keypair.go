@@ -10,7 +10,7 @@ import (
 	"strings"
 	"unicode"
 
-	"github.com/go-envx/envx/app/internal/secrets/internal/privatekey"
+	"github.com/go-envx/envx/app/internal/privatekey"
 	"github.com/go-envx/envx/app/internal/secrets/internal/store"
 	"github.com/go-envx/envx/app/pkg/file"
 )
@@ -20,12 +20,14 @@ import (
 // GenerateKeypair creates a missing group identity and commits its public key
 // only after the private-key destination has accepted the new private key.
 func (m *Manager) GenerateKeypair(group string) (KeypairMetadata, error) {
+	// Normalize the group before using it in storage or key paths.
 	var err error
 	group, err = normalizeGroupName(group)
 	if err != nil {
 		return KeypairMetadata{}, err
 	}
 
+	// Load the store and ensure this group does not already exist.
 	document, err := store.Open(m.secretsPath)
 	if err != nil {
 		return KeypairMetadata{}, err
@@ -36,6 +38,7 @@ func (m *Manager) GenerateKeypair(group string) (KeypairMetadata, error) {
 		)
 	}
 
+	// Generate and validate both key halves before changing the document.
 	pair, err := m.cipher.Keypair()
 	if err != nil {
 		return KeypairMetadata{}, fmt.Errorf(
@@ -48,10 +51,12 @@ func (m *Manager) GenerateKeypair(group string) (KeypairMetadata, error) {
 	if err := m.cipher.ValidateKeypair(pair.PublicKey, pair.PrivateKey); err != nil {
 		return KeypairMetadata{}, fmt.Errorf("generated keypair is invalid: %w", err)
 	}
+	// Stage the public key until private-key delivery succeeds.
 	if err := document.SetPublicKey(group, pair.PublicKey); err != nil {
 		return KeypairMetadata{}, err
 	}
 
+	// Protect file-based destinations before writing private-key material.
 	if m.privateKeyDestination == nil {
 		return KeypairMetadata{}, errors.New("private-key destination is nil")
 	}
@@ -60,11 +65,13 @@ func (m *Manager) GenerateKeypair(group string) (KeypairMetadata, error) {
 			return KeypairMetadata{}, err
 		}
 	}
+	// Deliver the private key before committing its matching public key.
 	if err := m.privateKeyDestination.Write(group, pair.PrivateKey); err != nil {
 		return KeypairMetadata{}, fmt.Errorf(
 			"writing private key for group %q: %w", group, err,
 		)
 	}
+	// Commit the staged public key after the private key was accepted.
 	if err := document.Save(); err != nil {
 		return KeypairMetadata{}, fmt.Errorf(
 			"private key for group %q was written, but secrets store %s was not "+
@@ -85,12 +92,14 @@ func (m *Manager) GenerateKeypair(group string) (KeypairMetadata, error) {
 // InspectKeypair reports the safe status of a group's public and private keys
 // without writing, prompting, or returning private-key material.
 func (m *Manager) InspectKeypair(group string) (KeypairMetadata, error) {
+	// Normalize the group before looking it up.
 	var err error
 	group, err = normalizeGroupName(group)
 	if err != nil {
 		return KeypairMetadata{}, err
 	}
 
+	// Load the store and retrieve the group's public key.
 	document, err := store.Open(m.secretsPath)
 	if err != nil {
 		return KeypairMetadata{}, err
@@ -100,6 +109,7 @@ func (m *Manager) InspectKeypair(group string) (KeypairMetadata, error) {
 		return KeypairMetadata{}, fmt.Errorf("group %q has no public key", group)
 	}
 
+	// Start with the safest status until usable private-key material is found.
 	metadata := KeypairMetadata{
 		Group:            group,
 		PublicKey:        publicKey,
@@ -109,6 +119,7 @@ func (m *Manager) InspectKeypair(group string) (KeypairMetadata, error) {
 		return metadata, nil
 	}
 
+	// Resolve and validate the private key without exposing its contents.
 	privateKey, err := m.privateKeyResolver.Resolve(group)
 	if err != nil {
 		if errors.Is(err, privatekey.ErrNotAvailable) {
@@ -147,6 +158,7 @@ func normalizeGroupName(group string) (string, error) {
 // ensureGitIgnored verifies a file is ignored by Git or adds a local rule before
 // any private-key bytes are written. A repository ancestor's rule is sufficient.
 func ensureGitIgnored(keysPath string) error {
+	// Validate the path and prepare its parent directory.
 	if keysPath == "" {
 		return errors.New("private-key file path is empty")
 	}
@@ -156,6 +168,7 @@ func ensureGitIgnored(keysPath string) error {
 		return fmt.Errorf("creating private-key directory %s: %w", dir, err)
 	}
 
+	// Respect existing Git ignore rules, including repository-level rules.
 	ignored, err := gitIgnores(dir, filepath.Base(keysPath))
 	if err != nil {
 		return err
@@ -164,6 +177,7 @@ func ensureGitIgnored(keysPath string) error {
 		return nil
 	}
 
+	// Read the local ignore file before adding a rule.
 	ignorePath := filepath.Join(dir, ".gitignore")
 	data, err := file.Read(ignorePath)
 	if err != nil && !errors.Is(err, os.ErrNotExist) {
@@ -173,6 +187,7 @@ func ensureGitIgnored(keysPath string) error {
 		return nil
 	}
 
+	// Append a local rule so future private-key writes remain protected.
 	content := string(data)
 	if content != "" && !strings.HasSuffix(content, "\n") {
 		content += "\n"

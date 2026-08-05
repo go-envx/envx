@@ -2,12 +2,10 @@ package secrets
 
 import (
 	"errors"
-	"fmt"
-	"path/filepath"
 	"strings"
 
 	"github.com/go-envx/envx/app/internal/cipher"
-	"github.com/go-envx/envx/app/internal/secrets/internal/privatekey"
+	"github.com/go-envx/envx/app/internal/privatekey"
 )
 
 // -------------------------------------------------------------------------------------
@@ -28,45 +26,40 @@ type Manager struct {
 
 // -------------------------------------------------------------------------------------
 
-// New binds paths and dependencies into a manager. Missing cipher, resolver, and
-// destination dependencies select the safe local age, environment/file, and
-// configured-file defaults respectively.
+// New binds paths and dependencies into a manager. All paths and operational
+// dependencies must be supplied by the composition layer.
 func New(params Params) (*Manager, error) {
+	// Require a path for the secrets store.
 	if strings.TrimSpace(params.SecretsPath) == "" {
 		return nil, errors.New("secrets path is empty")
 	}
 
-	keysPath := params.KeysPath
-	if keysPath == "" {
-		keysPath = filepath.Join(filepath.Dir(params.SecretsPath), "envx.keys")
+	// Require the private-key path from the configuration layer.
+	if strings.TrimSpace(params.KeysPath) == "" {
+		return nil, errors.New("keys path is empty")
 	}
 
-	selectedCipher := params.Cipher
-	if selectedCipher == nil {
-		var err error
-		selectedCipher, err = cipher.New(cipher.DefaultAlgorithm, cipher.AgeOptions{})
-		if err != nil {
-			return nil, fmt.Errorf("creating default cipher: %w", err)
-		}
+	// Require the cipher from the composition layer.
+	if params.Cipher == nil {
+		return nil, errors.New("cipher is nil")
 	}
 
-	selectedResolver := params.PrivateKeyResolver
-	if selectedResolver == nil {
-		selectedResolver = privatekey.NewResolver(privatekey.ResolverOptions{
-			KeysPath: keysPath,
-		})
+	// Require the private-key resolver from the composition layer.
+	if params.PrivateKeyResolver == nil {
+		return nil, errors.New("private-key resolver is nil")
 	}
 
-	selectedDestination := params.PrivateKeyDestination
-	if selectedDestination == nil {
-		selectedDestination = privatekey.NewFileDestination(keysPath)
+	// Require the private-key destination from the composition layer.
+	if params.PrivateKeyDestination == nil {
+		return nil, errors.New("private-key destination is nil")
 	}
 
+	// Assemble the manager with resolved paths and dependencies.
 	return &Manager{
 		secretsPath:           params.SecretsPath,
-		keysPath:              keysPath,
-		cipher:                selectedCipher,
-		privateKeyResolver:    selectedResolver,
-		privateKeyDestination: selectedDestination,
+		keysPath:              params.KeysPath,
+		cipher:                params.Cipher,
+		privateKeyResolver:    params.PrivateKeyResolver,
+		privateKeyDestination: params.PrivateKeyDestination,
 	}, nil
 }

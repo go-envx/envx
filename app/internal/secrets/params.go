@@ -2,7 +2,7 @@ package secrets
 
 import (
 	"github.com/go-envx/envx/app/internal/cipher"
-	"github.com/go-envx/envx/app/internal/secrets/internal/privatekey"
+	"github.com/go-envx/envx/app/internal/privatekey"
 )
 
 // -------------------------------------------------------------------------------------

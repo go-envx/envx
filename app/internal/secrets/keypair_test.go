@@ -9,7 +9,7 @@ import (
 	"testing"
 
 	"github.com/go-envx/envx/app/internal/cipher"
-	"github.com/go-envx/envx/app/internal/secrets/internal/privatekey"
+	"github.com/go-envx/envx/app/internal/privatekey"
 	"github.com/go-envx/envx/app/internal/secrets/internal/store"
 )
 
@@ -95,6 +95,7 @@ func TestGenerateKeypairCommitsPublicStateAfterPrivateHandoff(t *testing.T) {
 
 	dir := t.TempDir()
 	storePath := filepath.Join(dir, "secrets.yaml")
+	keysPath := filepath.Join(dir, "envx.keys")
 	const privateValue = "private-test-value"
 	cipherDouble := keypairTestCipher{
 		pair: cipher.Keypair{
@@ -121,7 +122,9 @@ func TestGenerateKeypairCommitsPublicStateAfterPrivateHandoff(t *testing.T) {
 
 	manager, err := New(Params{
 		SecretsPath:           storePath,
+		KeysPath:              keysPath,
 		Cipher:                cipherDouble,
+		PrivateKeyResolver:    newPrivateKeyTestResolver(),
 		PrivateKeyDestination: destination,
 	})
 	if err != nil {
@@ -159,10 +162,12 @@ func TestGenerateKeypairRefusesExistingIdentity(t *testing.T) {
 	called := false
 	manager, err := New(Params{
 		SecretsPath: storePath,
+		KeysPath:    filepath.Join(filepath.Dir(storePath), "envx.keys"),
 		Cipher: keypairTestCipher{
 			pair:         cipher.Keypair{PublicKey: "new-public", PrivateKey: "new-private"},
 			validPrivate: "new-private",
 		},
+		PrivateKeyResolver: newPrivateKeyTestResolver(),
 		PrivateKeyDestination: keypairTestDestination{
 			write: func(string, string) error {
 				called = true
@@ -227,10 +232,11 @@ func TestInspectKeypairStatuses(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			manager, err := New(Params{
-				SecretsPath:        storePath,
-				Cipher:             cipherDouble,
-				PrivateKeyResolver: tt.resolver,
-				KeysPath:           filepath.Join(t.TempDir(), "envx.keys"),
+				SecretsPath:           storePath,
+				KeysPath:              filepath.Join(t.TempDir(), "envx.keys"),
+				Cipher:                cipherDouble,
+				PrivateKeyResolver:    tt.resolver,
+				PrivateKeyDestination: newPrivateKeyTestDestination(),
 			})
 			if err != nil {
 				t.Fatalf("New(): %v", err)
@@ -259,9 +265,11 @@ func TestGenerateKeypairReportsRecoverableStoreFailure(t *testing.T) {
 
 	dir := t.TempDir()
 	storePath := filepath.Join(dir, "missing", "secrets.yaml")
+	keysPath := filepath.Join(dir, "envx.keys")
 	const privateValue = "private-test-value"
 	manager, err := New(Params{
 		SecretsPath: storePath,
+		KeysPath:    keysPath,
 		Cipher: keypairTestCipher{
 			pair: cipher.Keypair{
 				PublicKey:  "public-test-value",
@@ -269,6 +277,7 @@ func TestGenerateKeypairReportsRecoverableStoreFailure(t *testing.T) {
 			},
 			validPrivate: privateValue,
 		},
+		PrivateKeyResolver: newPrivateKeyTestResolver(),
 		PrivateKeyDestination: keypairTestDestination{
 			write: func(string, string) error { return nil },
 		},
@@ -298,7 +307,15 @@ func TestGenerateDefaultKeypairRoundTrip(t *testing.T) {
 	dir := t.TempDir()
 	storePath := filepath.Join(dir, "secrets.yaml")
 	keysPath := filepath.Join(dir, "envx.keys")
-	manager, err := New(Params{SecretsPath: storePath})
+	manager, err := New(Params{
+		SecretsPath: storePath,
+		KeysPath:    keysPath,
+		Cipher:      newTestCipher(t),
+		PrivateKeyResolver: privatekey.NewResolver(privatekey.ResolverOptions{
+			KeysPath: keysPath,
+		}),
+		PrivateKeyDestination: privatekey.NewFileDestination(keysPath),
+	})
 	if err != nil {
 		t.Fatalf("New(): %v", err)
 	}

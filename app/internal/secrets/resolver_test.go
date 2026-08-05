@@ -25,9 +25,16 @@ func newTestResolver() *Resolver {
 func TestManagerResolverLoadsSecrets(t *testing.T) {
 	t.Parallel()
 
-	manager, err := New(Params{SecretsPath: writeStore(t,
+	storePath := writeStore(t,
 		"secrets:\n  production:\n    postgres_password: prod-pw\n",
-	)})
+	)
+	manager, err := New(Params{
+		SecretsPath:           storePath,
+		KeysPath:              filepath.Join(filepath.Dir(storePath), "envx.keys"),
+		Cipher:                newTestCipher(t),
+		PrivateKeyResolver:    newPrivateKeyTestResolver(),
+		PrivateKeyDestination: newPrivateKeyTestDestination(),
+	})
 	if err != nil {
 		t.Fatalf("New(): %v", err)
 	}
@@ -53,7 +60,11 @@ func TestManagerResolverMissingFileIsEmpty(t *testing.T) {
 	t.Parallel()
 
 	manager, err := New(Params{
-		SecretsPath: filepath.Join(t.TempDir(), "nope.yaml"),
+		SecretsPath:           filepath.Join(t.TempDir(), "nope.yaml"),
+		KeysPath:              filepath.Join(t.TempDir(), "envx.keys"),
+		Cipher:                newTestCipher(t),
+		PrivateKeyResolver:    newPrivateKeyTestResolver(),
+		PrivateKeyDestination: newPrivateKeyTestDestination(),
 	})
 	if err != nil {
 		t.Fatalf("New() absent: %v", err)
@@ -73,7 +84,14 @@ func TestManagerResolverMissingFileIsEmpty(t *testing.T) {
 func TestManagerResolverMalformed(t *testing.T) {
 	t.Parallel()
 
-	manager, err := New(Params{SecretsPath: writeStore(t, "{")})
+	storePath := writeStore(t, "{")
+	manager, err := New(Params{
+		SecretsPath:           storePath,
+		KeysPath:              filepath.Join(filepath.Dir(storePath), "envx.keys"),
+		Cipher:                newTestCipher(t),
+		PrivateKeyResolver:    newPrivateKeyTestResolver(),
+		PrivateKeyDestination: newPrivateKeyTestDestination(),
+	})
 	if err != nil {
 		t.Fatalf("New(): %v", err)
 	}
@@ -121,7 +139,13 @@ func TestResolveGroupCaseInsensitive(t *testing.T) {
 	t.Parallel()
 
 	path := writeStore(t, "secrets:\n  Production:\n    token: value\n")
-	manager, err := New(Params{SecretsPath: path})
+	manager, err := New(Params{
+		SecretsPath:           path,
+		KeysPath:              filepath.Join(filepath.Dir(path), "envx.keys"),
+		Cipher:                newTestCipher(t),
+		PrivateKeyResolver:    newPrivateKeyTestResolver(),
+		PrivateKeyDestination: newPrivateKeyTestDestination(),
+	})
 	if err != nil {
 		t.Fatalf("New() error = %v", err)
 	}

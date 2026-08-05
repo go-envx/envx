@@ -5,8 +5,10 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/go-envx/envx/app/internal/cipher"
 	"github.com/go-envx/envx/app/internal/envmerge"
 	"github.com/go-envx/envx/app/internal/manifest"
+	"github.com/go-envx/envx/app/internal/privatekey"
 	"github.com/go-envx/envx/app/internal/runner"
 	"github.com/go-envx/envx/app/internal/schema"
 	"github.com/go-envx/envx/app/internal/secrets"
@@ -89,9 +91,23 @@ func ResolveProject(in *Input, project string) (*Result, error) {
 		return nil, err
 	}
 
-	// Construct the workspace secrets secretsManager and wire its resolver onto the
+	// Construct the default cipher at the application composition boundary.
+	selectedCipher, err := cipher.New(cipher.DefaultAlgorithm, cipher.AgeOptions{})
+	if err != nil {
+		return nil, fmt.Errorf("creating default cipher: %w", err)
+	}
+
+	// Construct the workspace secrets manager and wire its resolver onto the
 	// envmerge params so secret:// references dereference during Build.
-	secretsManager, err := secrets.New(res.Secrets)
+	secretsParams := res.Secrets
+	secretsParams.Cipher = selectedCipher
+	secretsParams.PrivateKeyResolver = privatekey.NewResolver(privatekey.ResolverOptions{
+		KeysPath: secretsParams.KeysPath,
+	})
+	secretsParams.PrivateKeyDestination = privatekey.NewFileDestination(
+		secretsParams.KeysPath,
+	)
+	secretsManager, err := secrets.New(secretsParams)
 	if err != nil {
 		return nil, err
 	}
