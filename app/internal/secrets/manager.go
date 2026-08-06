@@ -10,18 +10,26 @@ import (
 
 // -------------------------------------------------------------------------------------
 
+// Params supplies paths and dependencies for a Manager.
+type Params struct {
+	// SecretsPath is the absolute path of the secrets store.
+	SecretsPath string
+	// KeysPath is the absolute path of the private-key file.
+	KeysPath string
+	// Cipher performs key generation and keypair validation.
+	Cipher cipher.Cipher
+	// PrivateKeyResolver resolves private-key material for read operations.
+	PrivateKeyResolver privatekey.Resolver
+	// PrivateKeyDestination receives newly generated private-key material.
+	PrivateKeyDestination privatekey.Destination
+}
+
+// -------------------------------------------------------------------------------------
+
 // Manager coordinates secret workflows over the store and key-material ports.
 type Manager struct {
-	// secretsPath is the bound secrets.yaml path.
-	secretsPath string
-	// keysPath is the configured local private-key path.
-	keysPath string
-	// cipher performs key generation and validation.
-	cipher cipher.Cipher
-	// privateKeyResolver resolves private-key material.
-	privateKeyResolver privatekey.Resolver
-	// privateKeyDestination receives generated private-key material.
-	privateKeyDestination privatekey.Destination
+	// params holds the validated construction input privately.
+	params Params
 }
 
 // -------------------------------------------------------------------------------------
@@ -54,12 +62,6 @@ func New(params Params) (*Manager, error) {
 		return nil, errors.New("private-key destination is nil")
 	}
 
-	// Assemble the manager with resolved paths and dependencies.
-	return &Manager{
-		secretsPath:           params.SecretsPath,
-		keysPath:              params.KeysPath,
-		cipher:                params.Cipher,
-		privateKeyResolver:    params.PrivateKeyResolver,
-		privateKeyDestination: params.PrivateKeyDestination,
-	}, nil
+	// Assemble the manager with the validated paths and dependencies.
+	return &Manager{params: params}, nil
 }

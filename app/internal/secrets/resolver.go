@@ -24,7 +24,7 @@ type Resolver struct {
 // loudly as a dangling reference rather than leaking the raw reference string.
 func (m *Manager) Resolver() (*Resolver, error) {
 	// Open the current store so references resolve against its contents.
-	document, err := store.Open(m.secretsPath)
+	document, err := store.Open(m.params.SecretsPath)
 	if err != nil {
 		return nil, err
 	}

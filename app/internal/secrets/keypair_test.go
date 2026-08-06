@@ -299,6 +299,24 @@ func TestGenerateKeypairReportsRecoverableStoreFailure(t *testing.T) {
 
 // -------------------------------------------------------------------------------------
 
+// TestEnsureGitIgnoredSkipsWhenGitIsUnavailable verifies no ignore file is
+// created when the Git executable cannot be found.
+func TestEnsureGitIgnoredSkipsWhenGitIsUnavailable(t *testing.T) {
+	gitlessPath := t.TempDir()
+	t.Setenv("PATH", gitlessPath)
+
+	keysPath := filepath.Join(t.TempDir(), "nested", "envx.keys")
+	if err := ensureGitIgnored(keysPath); err != nil {
+		t.Fatalf("ensureGitIgnored(): %v", err)
+	}
+	ignorePath := filepath.Join(filepath.Dir(keysPath), ".gitignore")
+	if _, err := os.Stat(ignorePath); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf(".gitignore stat error = %v, want file not to exist", err)
+	}
+}
+
+// -------------------------------------------------------------------------------------
+
 // TestGenerateDefaultKeypairRoundTrip verifies the default age cipher, local
 // key-file destination, private permissions, and local Git ignore protection.
 func TestGenerateDefaultKeypairRoundTrip(t *testing.T) {

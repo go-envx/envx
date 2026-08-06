@@ -175,16 +175,16 @@ func TestNewPreservesConfiguredKeysPath(t *testing.T) {
 	if err != nil {
 		t.Fatalf("New(): %v", err)
 	}
-	if manager.keysPath != keysPath {
-		t.Errorf("keysPath = %q, want %q", manager.keysPath, keysPath)
+	if manager.params.KeysPath != keysPath {
+		t.Errorf("keysPath = %q, want %q", manager.params.KeysPath, keysPath)
 	}
-	if manager.cipher == nil {
+	if manager.params.Cipher == nil {
 		t.Error("cipher is nil")
 	}
-	if manager.privateKeyResolver == nil {
+	if manager.params.PrivateKeyResolver == nil {
 		t.Error("privateKeyResolver is nil")
 	}
-	if manager.privateKeyDestination == nil {
+	if manager.params.PrivateKeyDestination == nil {
 		t.Error("privateKeyDestination is nil")
 	}
 }
