@@ -24,8 +24,9 @@ type Result struct {
 	Runner runner.Params
 
 	// Secrets locates the workspace secrets store and private-key file.
-	// ResolveProject opens the store and wires the value resolver; ResolveWorkspace
-	// leaves these paths as data and never reads the store.
+	// ResolveProject constructs the manager, opens the store through its resolver,
+	// and wires the value resolver; ResolveWorkspace leaves these paths as data
+	// and never reads the store.
 	Secrets secrets.Params
 
 	// manifestContext retains the loaded manifest and its directory so OverlayPath

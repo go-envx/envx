@@ -1,23 +1,10 @@
 package secrets
 
 import (
-	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 )
-
-// -------------------------------------------------------------------------------------
-
-// writeStore writes body to a secrets.yaml in a fresh temp dir and returns its path.
-func writeStore(t *testing.T, body string) string {
-	t.Helper()
-	path := filepath.Join(t.TempDir(), "secrets.yaml")
-	if err := os.WriteFile(path, []byte(body), 0o600); err != nil {
-		t.Fatal(err)
-	}
-	return path
-}
 
 // -------------------------------------------------------------------------------------
 
@@ -33,16 +20,27 @@ func newTestResolver() *Resolver {
 
 // -------------------------------------------------------------------------------------
 
-// TestOpenLoadsSecrets verifies Open reads a valid document and makes its
-// entries available to reference resolution.
-func TestOpenLoadsSecrets(t *testing.T) {
+// TestManagerResolverLoadsSecrets verifies Manager.Resolver reads a valid
+// document and makes its entries available to reference resolution.
+func TestManagerResolverLoadsSecrets(t *testing.T) {
 	t.Parallel()
 
-	r, err := Open(Params{SecretsPath: writeStore(t,
+	storePath := writeStore(t,
 		"secrets:\n  production:\n    postgres_password: prod-pw\n",
-	)})
+	)
+	manager, err := New(Params{
+		SecretsPath:           storePath,
+		KeysPath:              filepath.Join(filepath.Dir(storePath), "envx.keys"),
+		Cipher:                newTestCipher(t),
+		PrivateKeyResolver:    newPrivateKeyTestResolver(),
+		PrivateKeyDestination: newPrivateKeyTestDestination(),
+	})
 	if err != nil {
-		t.Fatalf("Open(): %v", err)
+		t.Fatalf("New(): %v", err)
+	}
+	r, err := manager.Resolver()
+	if err != nil {
+		t.Fatalf("Resolver(): %v", err)
 	}
 
 	got, err := r.Resolve("secret://production/postgres_password", "")
@@ -56,14 +54,24 @@ func TestOpenLoadsSecrets(t *testing.T) {
 
 // -------------------------------------------------------------------------------------
 
-// TestOpenMissingFileIsEmpty verifies an absent secrets file is optional and
-// produces a resolver that reports references as dangling.
-func TestOpenMissingFileIsEmpty(t *testing.T) {
+// TestManagerResolverMissingFileIsEmpty verifies an absent secrets file is
+// optional and produces a resolver that reports references as dangling.
+func TestManagerResolverMissingFileIsEmpty(t *testing.T) {
 	t.Parallel()
 
-	r, err := Open(Params{SecretsPath: filepath.Join(t.TempDir(), "nope.yaml")})
+	manager, err := New(Params{
+		SecretsPath:           filepath.Join(t.TempDir(), "nope.yaml"),
+		KeysPath:              filepath.Join(t.TempDir(), "envx.keys"),
+		Cipher:                newTestCipher(t),
+		PrivateKeyResolver:    newPrivateKeyTestResolver(),
+		PrivateKeyDestination: newPrivateKeyTestDestination(),
+	})
 	if err != nil {
-		t.Fatalf("Open() absent: %v", err)
+		t.Fatalf("New() absent: %v", err)
+	}
+	r, err := manager.Resolver()
+	if err != nil {
+		t.Fatalf("Resolver() absent: %v", err)
 	}
 	if _, err := r.Resolve("secret://any/thing", ""); err == nil {
 		t.Error("expected a missing-file resolver to reject a dangling reference")
@@ -72,12 +80,23 @@ func TestOpenMissingFileIsEmpty(t *testing.T) {
 
 // -------------------------------------------------------------------------------------
 
-// TestOpenMalformed verifies a malformed secrets file is an error.
-func TestOpenMalformed(t *testing.T) {
+// TestManagerResolverMalformed verifies a malformed secrets file is an error.
+func TestManagerResolverMalformed(t *testing.T) {
 	t.Parallel()
 
-	if _, err := Open(Params{SecretsPath: writeStore(t, "{")}); err == nil {
-		t.Error("expected Open() to reject a malformed secrets file")
+	storePath := writeStore(t, "{")
+	manager, err := New(Params{
+		SecretsPath:           storePath,
+		KeysPath:              filepath.Join(filepath.Dir(storePath), "envx.keys"),
+		Cipher:                newTestCipher(t),
+		PrivateKeyResolver:    newPrivateKeyTestResolver(),
+		PrivateKeyDestination: newPrivateKeyTestDestination(),
+	})
+	if err != nil {
+		t.Fatalf("New(): %v", err)
+	}
+	if _, err := manager.Resolver(); err == nil {
+		t.Error("expected Resolver() to reject a malformed secrets file")
 	}
 }
 
@@ -120,9 +139,19 @@ func TestResolveGroupCaseInsensitive(t *testing.T) {
 	t.Parallel()
 
 	path := writeStore(t, "secrets:\n  Production:\n    token: value\n")
-	r, err := Open(Params{SecretsPath: path})
+	manager, err := New(Params{
+		SecretsPath:           path,
+		KeysPath:              filepath.Join(filepath.Dir(path), "envx.keys"),
+		Cipher:                newTestCipher(t),
+		PrivateKeyResolver:    newPrivateKeyTestResolver(),
+		PrivateKeyDestination: newPrivateKeyTestDestination(),
+	})
 	if err != nil {
-		t.Fatalf("Open() error = %v", err)
+		t.Fatalf("New() error = %v", err)
+	}
+	r, err := manager.Resolver()
+	if err != nil {
+		t.Fatalf("Resolver() error = %v", err)
 	}
 
 	for _, value := range []string{

@@ -225,7 +225,7 @@ func TestResolveProject(t *testing.T) {
 
 // TestResolveWorkspace verifies ResolveWorkspace surfaces the resolved secrets
 // store location as data, resolves no project, and never wires a value resolver —
-// opening the store is ResolveProject's job.
+// constructing the manager and opening the store are ResolveProject's jobs.
 func TestResolveWorkspace(t *testing.T) {
 	t.Parallel()
 
