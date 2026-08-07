@@ -26,7 +26,10 @@ func writeStore(t *testing.T, body string) string {
 // newTestCipher creates the default cipher for manager construction tests.
 func newTestCipher(t *testing.T) cipher.Cipher {
 	t.Helper()
-	selected, err := cipher.New(cipher.DefaultAlgorithm, cipher.AgeOptions{})
+	selected, err := cipher.New(cipher.Params{
+		Algorithm: cipher.Age,
+		Options:   cipher.AgeOptions{},
+	})
 	if err != nil {
 		t.Fatal(err)
 	}

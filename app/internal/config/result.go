@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"path/filepath"
 
+	"github.com/go-envx/envx/app/internal/cipher"
 	"github.com/go-envx/envx/app/internal/envmerge"
 	"github.com/go-envx/envx/app/internal/runner"
 	"github.com/go-envx/envx/app/internal/secrets"
@@ -28,6 +29,10 @@ type Result struct {
 	// and wires the value resolver; ResolveWorkspace leaves these paths as data
 	// and never reads the store.
 	Secrets secrets.Params
+
+	// Cipher contains the configured cipher construction parameters used to
+	// compose the secrets manager.
+	Cipher cipher.Params
 
 	// manifestContext retains the loaded manifest and its directory so OverlayPath
 	// can validate and join a target without re-loading.

@@ -92,6 +92,12 @@ var (
 		Short: "o",
 		Usage: "output format: table|json",
 	}
+
+	// Stdout generates a keypair to stdout without storing it.
+	Stdout = FlagSpec{
+		Name:  "stdout",
+		Usage: "generate a keypair to stdout without storing it",
+	}
 )
 
 // -------------------------------------------------------------------------------------

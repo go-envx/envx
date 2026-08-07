@@ -4,6 +4,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/go-envx/envx/app/internal/cipher"
 	"github.com/go-envx/envx/app/internal/envmerge"
 	"github.com/go-envx/envx/app/internal/fixtures"
 	"github.com/go-envx/envx/app/internal/schema"
@@ -245,6 +246,16 @@ func TestResolveWorkspace(t *testing.T) {
 	if r.Secrets.KeysPath != wantDefaultKeys {
 		t.Errorf("Secrets.KeysPath = %q, want %q", r.Secrets.KeysPath, wantDefaultKeys)
 	}
+	if r.Cipher.Algorithm != defaultCipherAlgorithm {
+		t.Errorf(
+			"Cipher.Algorithm = %q, want %q",
+			r.Cipher.Algorithm,
+			defaultCipherAlgorithm,
+		)
+	}
+	if r.Cipher.Options != nil {
+		t.Errorf("Cipher.Options = %T, want nil defaults", r.Cipher.Options)
+	}
 	if r.Envmerge.ValueResolver != nil {
 		t.Error("ResolveWorkspace must not wire a value resolver")
 	}
@@ -267,6 +278,21 @@ func TestResolveWorkspace(t *testing.T) {
 	wantKeysPath := filepath.Join(dir, "private", "envx.keys")
 	if r2.Secrets.KeysPath != wantKeysPath {
 		t.Errorf("Secrets.KeysPath = %q, want %q", r2.Secrets.KeysPath, wantKeysPath)
+	}
+	m.Secrets.Cipher = string(cipher.NaClBox)
+	r2, err = resolveManifest(manifestContext{manifest: m, dir: dir}, &Input{})
+	if err != nil {
+		t.Fatalf("resolveManifest cipher setting: %v", err)
+	}
+	if r2.Cipher.Algorithm != cipher.NaClBox {
+		t.Errorf(
+			"Cipher.Algorithm = %q, want %q",
+			r2.Cipher.Algorithm,
+			cipher.NaClBox,
+		)
+	}
+	if r2.Cipher.Options != nil {
+		t.Errorf("Cipher.Options = %T, want nil defaults", r2.Cipher.Options)
 	}
 
 	// An explicit relative key path is resolved against the manifest directory,

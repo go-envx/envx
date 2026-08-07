@@ -37,6 +37,8 @@ type SecretsConfig struct {
 	// KeysPath overrides the private-key file location. A relative path is joined
 	// against the manifest directory.
 	KeysPath string `yaml:"keys_path"`
+	// Cipher selects the encryption algorithm used for new keypairs and values.
+	Cipher string `yaml:"cipher"`
 }
 
 // -------------------------------------------------------------------------------------
