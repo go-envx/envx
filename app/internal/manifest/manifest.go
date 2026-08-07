@@ -25,21 +25,50 @@ func Load(path string) (m *schema.Manifest, manifestPath string, err error) {
 	if err != nil {
 		return nil, "", err
 	}
+	m, err = load(found)
+	return m, found, err
+}
 
-	// Read the manifest file from disk.
-	data, err := file.Read(found)
+// -------------------------------------------------------------------------------------
+
+// LoadOptional loads the manifest when one is available. It returns a nil
+// manifest when the explicit or discovered path does not exist, allowing callers
+// such as standalone key generation to use application defaults without a
+// workspace.
+func LoadOptional(path string) (m *schema.Manifest, manifestPath string, err error) {
+	manifestPath, err = discover(path)
 	if err != nil {
-		return nil, "", fmt.Errorf("reading manifest: %w", err)
+		if errors.Is(err, file.ErrNotFound) || errors.Is(err, os.ErrNotExist) {
+			return nil, "", nil
+		}
+		return nil, "", err
 	}
-
-	// Parse the manifest file into a schema.Manifest.
-	m, err = parse(data)
+	m, err = load(manifestPath)
 	if err != nil {
 		return nil, "", err
 	}
+	return m, manifestPath, nil
+}
 
-	// Return the manifest struct and the path it was loaded from.
-	return m, found, nil
+// -------------------------------------------------------------------------------------
+
+// load reads and validates a manifest at a path already discovered by the
+// loader's discovery step.
+func load(found string) (*schema.Manifest, error) {
+	// Read the manifest file from disk.
+	data, err := file.Read(found)
+	if err != nil {
+		return nil, fmt.Errorf("reading manifest: %w", err)
+	}
+
+	// Parse the manifest file into a schema.Manifest.
+	m, err := parse(data)
+	if err != nil {
+		return nil, err
+	}
+
+	// Return the parsed manifest.
+	return m, nil
 }
 
 // -------------------------------------------------------------------------------------
@@ -92,8 +121,9 @@ func discover(explicitPath string) (string, error) {
 	found, err := file.FindUp(cwd, defaultFilename, ".git")
 	if errors.Is(err, file.ErrNotFound) {
 		return "", fmt.Errorf(
-			"%s not found (searched from cwd to git/filesystem root)",
+			"%s not found (searched from cwd to git/filesystem root): %w",
 			defaultFilename,
+			err,
 		)
 	}
 

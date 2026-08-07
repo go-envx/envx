@@ -12,10 +12,6 @@ const (
 	Age Algorithm = "age"
 	// NaClBox identifies NaCl sealed-box encryption using Curve25519.
 	NaClBox Algorithm = "nacl-box"
-
-	// DefaultAlgorithm is the algorithm used by envx when no selection is
-	// supplied by a future caller.
-	DefaultAlgorithm = Age
 )
 
 // -------------------------------------------------------------------------------------
@@ -24,6 +20,17 @@ const (
 // by New. Each supported algorithm provides its own concrete options type.
 type AlgorithmOptions interface {
 	algorithmOptions()
+}
+
+// -------------------------------------------------------------------------------------
+
+// Params selects a cipher implementation and supplies its algorithm-specific options.
+type Params struct {
+	// Algorithm identifies the cipher implementation to construct.
+	Algorithm Algorithm
+	// Options contains the options for Algorithm. A nil value selects the
+	// algorithm's default options.
+	Options AlgorithmOptions
 }
 
 // -------------------------------------------------------------------------------------
@@ -56,17 +63,29 @@ type Cipher interface {
 
 // -------------------------------------------------------------------------------------
 
-// New constructs the cipher implementation selected by algorithm and options.
-// The selector is explicit so each algorithm can own its option type.
-func New(algorithm Algorithm, options AlgorithmOptions) (Cipher, error) {
-	switch algorithm {
+// New constructs the cipher implementation selected by params. The selector is
+// explicit so each algorithm can own its option type.
+func New(params Params) (Cipher, error) {
+	switch params.Algorithm {
+
+	// Validate Age algorithm options and construct the cipher.
 	case Age:
+		options := params.Options
+		if options == nil {
+			options = AgeOptions{}
+		}
 		ageOptions, ok := options.(AgeOptions)
 		if !ok {
 			return nil, fmt.Errorf("options for %q must be cipher.AgeOptions", Age)
 		}
 		return newAgeCipher(ageOptions)
+
+	// Validate NaCl Box algorithm options and construct the cipher.
 	case NaClBox:
+		options := params.Options
+		if options == nil {
+			options = NaClBoxOptions{}
+		}
 		naclBoxOptions, ok := options.(NaClBoxOptions)
 		if !ok {
 			return nil, fmt.Errorf(
@@ -74,7 +93,10 @@ func New(algorithm Algorithm, options AlgorithmOptions) (Cipher, error) {
 			)
 		}
 		return newNaClBoxCipher(naclBoxOptions)
+
+	// Reject any unsupported algorithm selection.
 	default:
-		return nil, fmt.Errorf("unsupported cipher algorithm %q", algorithm)
+		return nil, fmt.Errorf("unsupported cipher algorithm %q", params.Algorithm)
+
 	}
 }

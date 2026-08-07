@@ -46,7 +46,10 @@ func TestRoundTrip(t *testing.T) {
 func TestComposesWithAge(t *testing.T) {
 	t.Parallel()
 
-	selected, err := cipher.New(cipher.Age, cipher.AgeOptions{})
+	selected, err := cipher.New(cipher.Params{
+		Algorithm: cipher.Age,
+		Options:   cipher.AgeOptions{},
+	})
 	if err != nil {
 		t.Fatalf("cipher.New() error = %v", err)
 	}
@@ -67,7 +70,10 @@ func TestComposesWithAge(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Decode() error = %v", err)
 	}
-	selected, err = cipher.New(algorithm, cipher.AgeOptions{})
+	selected, err = cipher.New(cipher.Params{
+		Algorithm: algorithm,
+		Options:   cipher.AgeOptions{},
+	})
 	if err != nil {
 		t.Fatalf("cipher.New(decoded algorithm) error = %v", err)
 	}
@@ -87,7 +93,10 @@ func TestComposesWithAge(t *testing.T) {
 func TestComposesWithNaClBox(t *testing.T) {
 	t.Parallel()
 
-	selected, err := cipher.New(cipher.NaClBox, cipher.NaClBoxOptions{})
+	selected, err := cipher.New(cipher.Params{
+		Algorithm: cipher.NaClBox,
+		Options:   cipher.NaClBoxOptions{},
+	})
 	if err != nil {
 		t.Fatalf("cipher.New() error = %v", err)
 	}
@@ -111,7 +120,10 @@ func TestComposesWithNaClBox(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Decode() error = %v", err)
 	}
-	selected, err = cipher.New(algorithm, cipher.NaClBoxOptions{})
+	selected, err = cipher.New(cipher.Params{
+		Algorithm: algorithm,
+		Options:   cipher.NaClBoxOptions{},
+	})
 	if err != nil {
 		t.Fatalf("cipher.New(decoded algorithm) error = %v", err)
 	}

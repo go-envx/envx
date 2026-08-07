@@ -8,7 +8,6 @@ import (
 	"github.com/go-envx/envx/app/internal/cipher"
 	"github.com/go-envx/envx/app/internal/envmerge"
 	"github.com/go-envx/envx/app/internal/manifest"
-	"github.com/go-envx/envx/app/internal/privatekey"
 	"github.com/go-envx/envx/app/internal/runner"
 	"github.com/go-envx/envx/app/internal/schema"
 	"github.com/go-envx/envx/app/internal/secrets"
@@ -20,6 +19,8 @@ const (
 	defaultSecretsFilename = "secrets.yaml"
 	// defaultKeysFilename is the default workspace private-key filename.
 	defaultKeysFilename = "envx.keys"
+	// defaultCipherAlgorithm is the application's default encryption algorithm.
+	defaultCipherAlgorithm = cipher.Age
 )
 
 // -------------------------------------------------------------------------------------
@@ -91,23 +92,9 @@ func ResolveProject(in *Input, project string) (*Result, error) {
 		return nil, err
 	}
 
-	// Construct the default cipher at the application composition boundary.
-	selectedCipher, err := cipher.New(cipher.DefaultAlgorithm, cipher.AgeOptions{})
-	if err != nil {
-		return nil, fmt.Errorf("creating default cipher: %w", err)
-	}
-
 	// Construct the workspace secrets manager and wire its resolver onto the
 	// envmerge params so secret:// references dereference during Build.
-	secretsParams := res.Secrets
-	secretsParams.Cipher = selectedCipher
-	secretsParams.PrivateKeyResolver = privatekey.NewResolver(privatekey.ResolverOptions{
-		KeysPath: secretsParams.KeysPath,
-	})
-	secretsParams.PrivateKeyDestination = privatekey.NewFileDestination(
-		secretsParams.KeysPath,
-	)
-	secretsManager, err := secrets.New(secretsParams)
+	secretsManager, err := NewSecretsManager(res.Secrets, res.Cipher)
 	if err != nil {
 		return nil, err
 	}
@@ -194,6 +181,7 @@ func resolveManifest(mc manifestContext, in *Input) (*Result, error) {
 		Envmerge:        resolveEnvmergeParams(mc, in, pl),
 		Runner:          resolveRunnerParams(mc, in, pl),
 		Secrets:         resolveSecretsParams(mc),
+		Cipher:          resolveCipherParams(mc),
 		manifestContext: mc,
 	}, nil
 }
@@ -327,4 +315,16 @@ func resolveSecretsParams(mc manifestContext) secrets.Params {
 		SecretsPath: resolvedSecretsPath,
 		KeysPath:    keysPath,
 	}
+}
+
+// -------------------------------------------------------------------------------------
+
+// resolveCipherParams resolves the configured algorithm and its construction
+// options while keeping cipher selection outside the secrets package.
+func resolveCipherParams(mc manifestContext) cipher.Params {
+	algorithm := cipher.Algorithm(mc.manifest.Secrets.Cipher)
+	if algorithm == "" {
+		algorithm = defaultCipherAlgorithm
+	}
+	return cipher.Params{Algorithm: algorithm}
 }

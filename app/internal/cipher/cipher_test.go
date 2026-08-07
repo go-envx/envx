@@ -12,14 +12,14 @@ import (
 func TestNew(t *testing.T) {
 	t.Parallel()
 
-	selected, err := New(Age, AgeOptions{})
+	selected, err := New(Params{Algorithm: Age, Options: AgeOptions{}})
 	if err != nil {
 		t.Fatalf("New(age) error = %v", err)
 	}
 	if selected == nil {
 		t.Fatal("New(age) returned a nil cipher")
 	}
-	selected, err = New(NaClBox, NaClBoxOptions{})
+	selected, err = New(Params{Algorithm: NaClBox, Options: NaClBoxOptions{}})
 	if err != nil {
 		t.Fatalf("New(NaClBox) error = %v", err)
 	}
@@ -27,12 +27,57 @@ func TestNew(t *testing.T) {
 		t.Fatal("New(NaClBox) returned a nil cipher")
 	}
 
-	if _, err := New(Age, NaClBoxOptions{}); err == nil {
+	if _, err := New(Params{Algorithm: Age, Options: NaClBoxOptions{}}); err == nil {
 		t.Fatal("New(age) accepted NaClBoxOptions")
 	}
 
-	if _, err := New(Algorithm("unknown"), AgeOptions{}); err == nil {
+	if _, err := New(Params{
+		Algorithm: Algorithm("unknown"),
+		Options:   AgeOptions{},
+	}); err == nil {
 		t.Fatal("New(unknown) succeeded")
+	}
+}
+
+// -------------------------------------------------------------------------------------
+
+// TestNewAppliesDefaultOptions verifies algorithms construct successfully when
+// Params omits algorithm-specific options.
+func TestNewAppliesDefaultOptions(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name   string
+		params Params
+		prefix string
+	}{
+		{
+			name:   "age",
+			params: Params{Algorithm: Age},
+			prefix: "age-public-key:",
+		},
+		{
+			name:   "nacl box",
+			params: Params{Algorithm: NaClBox},
+			prefix: "nacl-box-public-key:",
+		},
+	}
+	for _, test := range tests {
+		test := test
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+			selected, err := New(test.params)
+			if err != nil {
+				t.Fatalf("New(): %v", err)
+			}
+			pair, err := selected.Keypair()
+			if err != nil {
+				t.Fatalf("Keypair(): %v", err)
+			}
+			if !strings.HasPrefix(pair.PublicKey, test.prefix) {
+				t.Errorf("PublicKey = %q, want prefix %q", pair.PublicKey, test.prefix)
+			}
+		})
 	}
 }
 

@@ -13,7 +13,7 @@ import (
 func TestAgeRoundTrip(t *testing.T) {
 	t.Parallel()
 
-	selected, err := New(Age, AgeOptions{})
+	selected, err := New(Params{Algorithm: Age, Options: AgeOptions{}})
 	if err != nil {
 		t.Fatalf("New(age) error = %v", err)
 	}
@@ -49,7 +49,7 @@ func TestAgeRoundTrip(t *testing.T) {
 func TestAgeRejectsWrongKey(t *testing.T) {
 	t.Parallel()
 
-	selected, err := New(Age, AgeOptions{})
+	selected, err := New(Params{Algorithm: Age, Options: AgeOptions{}})
 	if err != nil {
 		t.Fatalf("New(age) error = %v", err)
 	}
@@ -77,7 +77,7 @@ func TestAgeRejectsWrongKey(t *testing.T) {
 func TestAgeValidatesKeypair(t *testing.T) {
 	t.Parallel()
 
-	selected, err := New(Age, AgeOptions{})
+	selected, err := New(Params{Algorithm: Age, Options: AgeOptions{}})
 	if err != nil {
 		t.Fatalf("New(age) error = %v", err)
 	}
@@ -132,7 +132,7 @@ func TestAgeValidatesKeypair(t *testing.T) {
 func TestAgeRejectsMalformedInputs(t *testing.T) {
 	t.Parallel()
 
-	selected, err := New(Age, AgeOptions{})
+	selected, err := New(Params{Algorithm: Age, Options: AgeOptions{}})
 	if err != nil {
 		t.Fatalf("New(age) error = %v", err)
 	}
@@ -153,7 +153,7 @@ func TestAgeRejectsMalformedInputs(t *testing.T) {
 func TestAgeReturnsNativeCiphertext(t *testing.T) {
 	t.Parallel()
 
-	selected, err := New(Age, AgeOptions{})
+	selected, err := New(Params{Algorithm: Age, Options: AgeOptions{}})
 	if err != nil {
 		t.Fatalf("New(age) error = %v", err)
 	}

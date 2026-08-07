@@ -74,6 +74,120 @@ func TestRootShowsHelp(t *testing.T) {
 
 // -------------------------------------------------------------------------------------
 
+// TestSecretsKeypairCommandTree verifies the management commands are registered
+// under the intended nested path.
+func TestSecretsKeypairCommandTree(t *testing.T) {
+	t.Parallel()
+
+	root := NewRootCmd(BuildInfo{Version: "test"})
+	command, _, err := root.Find([]string{
+		"secrets", "keypair", "inspect",
+	})
+	if err != nil {
+		t.Fatalf("Find(): %v", err)
+	}
+	if command == nil || command.Use != "inspect <group>" {
+		t.Fatalf("command = %v, want inspect <group>", command)
+	}
+}
+
+// -------------------------------------------------------------------------------------
+
+// TestSecretsKeypairGenerateStdout verifies the public command flag selects
+// direct keypair output and honors the manifest cipher setting.
+func TestSecretsKeypairGenerateStdout(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+	configPath := filepath.Join(dir, "envx.yaml")
+	body := "environments: [production]\n" +
+		"secrets:\n  cipher: nacl-box\n" +
+		"projects:\n  app:\n    includes: [env/app]\n"
+	if err := os.WriteFile(configPath, []byte(body), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	stdout, _, err := execCmd(
+		"secrets", "keypair", "generate", "--config", configPath,
+		"--stdout", "production",
+	)
+	if err != nil {
+		t.Fatalf("secrets keypair generate --stdout: %v", err)
+	}
+	if !strings.Contains(stdout.String(), "nacl-box-public-key:") ||
+		!strings.Contains(stdout.String(), "nacl-box-private-key:") {
+		t.Errorf("stdout = %q, want configured NaCl Box keys", stdout.String())
+	}
+	for _, path := range []string{
+		filepath.Join(dir, "secrets.yaml"),
+		filepath.Join(dir, "envx.keys"),
+	} {
+		if _, err := os.Stat(path); !os.IsNotExist(err) {
+			t.Errorf("stdout command created %s, stat error = %v", path, err)
+		}
+	}
+}
+
+// -------------------------------------------------------------------------------------
+
+// TestSecretsKeypairGenerateStdoutWithoutGroup verifies stdout generation can
+// create an unassigned keypair and keeps the guidance off the data stream.
+func TestSecretsKeypairGenerateStdoutWithoutGroup(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+	configPath := filepath.Join(dir, "envx.yaml")
+	body := "environments: [production]\n" +
+		"secrets:\n  cipher: nacl-box\n" +
+		"projects:\n  app:\n    includes: [env/app]\n"
+	if err := os.WriteFile(configPath, []byte(body), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	stdout, stderr, err := execCmd(
+		"secrets", "keypair", "generate", "--config", configPath, "--stdout",
+	)
+	if err != nil {
+		t.Fatalf("secrets keypair generate --stdout: %v", err)
+	}
+	if strings.Contains(stdout.String(), "group:") ||
+		!strings.Contains(stdout.String(), "nacl-box-public-key:") ||
+		!strings.Contains(stdout.String(), "nacl-box-private-key:") {
+		t.Errorf("stdout = %q, want unassigned keypair without group label", stdout.String())
+	}
+	if !strings.Contains(
+		stderr.String(),
+		"No group provided; this keypair was not stored",
+	) {
+		t.Errorf("stderr = %q, want no-storage guidance", stderr.String())
+	}
+	for _, path := range []string{
+		filepath.Join(dir, "secrets.yaml"),
+		filepath.Join(dir, "envx.keys"),
+	} {
+		if _, err := os.Stat(path); !os.IsNotExist(err) {
+			t.Errorf("stdout command created %s, stat error = %v", path, err)
+		}
+	}
+}
+
+// -------------------------------------------------------------------------------------
+
+// TestSecretsKeypairGenerateRequiresGroup verifies persisted generation rejects
+// a missing group unless --stdout explicitly selects the unassigned workflow.
+func TestSecretsKeypairGenerateRequiresGroup(t *testing.T) {
+	t.Parallel()
+
+	_, _, err := execCmd("secrets", "keypair", "generate")
+	if err == nil || !strings.Contains(
+		err.Error(), "group is required unless --stdout is set",
+	) {
+		t.Fatalf("error = %v, want missing-group validation error", err)
+	}
+}
+
+// -------------------------------------------------------------------------------------
+
 // TestVersionFlag verifies --version prints the injected version.
 func TestVersionFlag(t *testing.T) {
 	t.Parallel()

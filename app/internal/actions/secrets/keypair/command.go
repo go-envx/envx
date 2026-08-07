@@ -1,0 +1,38 @@
+package keypair
+
+import (
+	"github.com/go-envx/envx/app/internal/actions/secrets/keypair/generate"
+	"github.com/go-envx/envx/app/internal/actions/secrets/keypair/inspect"
+	"github.com/go-envx/envx/app/pkg/str"
+	"github.com/spf13/cobra"
+)
+
+const (
+	usage = "keypair [command]"
+	short = "Manage a secret group's keypair"
+	long  = `
+		Generate or inspect the asymmetric keypair for one secret group. Public keys
+		are stored in secrets.yaml; private keys are stored in the configured
+		git-ignored envx.keys file.
+	`
+)
+
+// -------------------------------------------------------------------------------------
+
+// NewCommand builds the "keypair" parent command and registers its subcommands.
+func NewCommand() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   usage,
+		Short: short,
+		Long:  str.Dedent(long),
+		Args:  cobra.NoArgs,
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			return cmd.Help()
+		},
+	}
+	cmd.AddCommand(
+		generate.NewCommand(),
+		inspect.NewCommand(),
+	)
+	return cmd
+}

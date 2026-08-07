@@ -43,12 +43,37 @@ func TestLoadValid(t *testing.T) {
 	if m.Secrets.KeysPath != "./private/envx.keys" {
 		t.Errorf("KeysPath = %q, want ./private/envx.keys", m.Secrets.KeysPath)
 	}
+	if m.Secrets.Cipher != "age" {
+		t.Errorf("Cipher = %q, want age", m.Secrets.Cipher)
+	}
 	if _, ok := m.LookupProject("api"); !ok {
 		t.Error("expected project api to be present")
 	}
 }
 
 // -------------------------------------------------------------------------------------
+
+// TestLoadOptionalMissing verifies an absent manifest is reported as not found
+// without becoming an error.
+func TestLoadOptionalMissing(t *testing.T) {
+	t.Parallel()
+
+	path := filepath.Join(t.TempDir(), "missing.yaml")
+	m, found, err := LoadOptional(path)
+	if err != nil {
+		t.Fatalf("LoadOptional(): %v", err)
+	}
+	if m != nil || found != "" {
+		t.Errorf(
+			"LoadOptional() = (%v, %q), want (nil, \"\")",
+			m,
+			found,
+		)
+	}
+}
+
+// -------------------------------------------------------------------------------------
+
 // TestLoadInvalid verifies structural validation rejects malformed manifests.
 func TestLoadInvalid(t *testing.T) {
 	t.Parallel()

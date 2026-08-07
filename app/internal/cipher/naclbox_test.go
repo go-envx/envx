@@ -13,7 +13,7 @@ import (
 func TestNaClBoxRoundTrip(t *testing.T) {
 	t.Parallel()
 
-	selected, err := New(NaClBox, NaClBoxOptions{})
+	selected, err := New(Params{Algorithm: NaClBox, Options: NaClBoxOptions{}})
 	if err != nil {
 		t.Fatalf("New(NaClBox) error = %v", err)
 	}
@@ -53,7 +53,7 @@ func TestNaClBoxRoundTrip(t *testing.T) {
 func TestNaClBoxRejectsWrongKey(t *testing.T) {
 	t.Parallel()
 
-	selected, err := New(NaClBox, NaClBoxOptions{})
+	selected, err := New(Params{Algorithm: NaClBox, Options: NaClBoxOptions{}})
 	if err != nil {
 		t.Fatalf("New(NaClBox) error = %v", err)
 	}
@@ -81,7 +81,7 @@ func TestNaClBoxRejectsWrongKey(t *testing.T) {
 func TestNaClBoxValidatesKeypair(t *testing.T) {
 	t.Parallel()
 
-	selected, err := New(NaClBox, NaClBoxOptions{})
+	selected, err := New(Params{Algorithm: NaClBox, Options: NaClBoxOptions{}})
 	if err != nil {
 		t.Fatalf("New(NaClBox) error = %v", err)
 	}
@@ -136,7 +136,7 @@ func TestNaClBoxValidatesKeypair(t *testing.T) {
 func TestNaClBoxRejectsTampering(t *testing.T) {
 	t.Parallel()
 
-	selected, err := New(NaClBox, NaClBoxOptions{})
+	selected, err := New(Params{Algorithm: NaClBox, Options: NaClBoxOptions{}})
 	if err != nil {
 		t.Fatalf("New(NaClBox) error = %v", err)
 	}
@@ -163,7 +163,7 @@ func TestNaClBoxRejectsTampering(t *testing.T) {
 func TestNaClBoxRejectsMalformedKeys(t *testing.T) {
 	t.Parallel()
 
-	selected, err := New(NaClBox, NaClBoxOptions{})
+	selected, err := New(Params{Algorithm: NaClBox, Options: NaClBoxOptions{}})
 	if err != nil {
 		t.Fatalf("New(NaClBox) error = %v", err)
 	}
