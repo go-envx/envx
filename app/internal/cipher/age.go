@@ -40,6 +40,13 @@ type ageCipher struct{}
 
 // -------------------------------------------------------------------------------------
 
+// Algorithm identifies the envelope algorithm produced by the age cipher.
+func (ageCipher) Algorithm() Algorithm {
+	return Age
+}
+
+// -------------------------------------------------------------------------------------
+
 // Keypair creates an age X25519 identity and returns its textual key forms.
 func (ageCipher) Keypair() (Keypair, error) {
 	identity, err := age.GenerateX25519Identity()

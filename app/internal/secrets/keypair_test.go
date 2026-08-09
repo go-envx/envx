@@ -25,6 +25,13 @@ type keypairTestCipher struct {
 
 // -------------------------------------------------------------------------------------
 
+// Algorithm identifies the algorithm metadata used by the test cipher.
+func (keypairTestCipher) Algorithm() cipher.Algorithm {
+	return cipher.Age
+}
+
+// -------------------------------------------------------------------------------------
+
 // Keypair returns the deterministic test keypair.
 func (c keypairTestCipher) Keypair() (cipher.Keypair, error) {
 	return c.pair, nil

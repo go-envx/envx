@@ -8,7 +8,6 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
-	"unicode"
 
 	"github.com/go-envx/envx/app/internal/privatekey"
 	"github.com/go-envx/envx/app/internal/secrets/internal/store"
@@ -141,20 +140,6 @@ func (m *Manager) InspectKeypair(group string) (KeypairMetadata, error) {
 
 	metadata.PrivateKeyStatus = PrivateKeyValid
 	return metadata, nil
-}
-
-// -------------------------------------------------------------------------------------
-
-// normalizeGroupName validates a key-group name and returns its canonical form.
-func normalizeGroupName(group string) (string, error) {
-	if strings.TrimSpace(group) == "" {
-		return "", errors.New("secret group is empty")
-	}
-	if strings.IndexFunc(group, unicode.IsSpace) >= 0 ||
-		strings.ContainsAny(group, "/\r\n=") {
-		return "", fmt.Errorf("invalid secret group %q", group)
-	}
-	return strings.ToLower(group), nil
 }
 
 // -------------------------------------------------------------------------------------

@@ -40,6 +40,13 @@ type naclBoxCipher struct{}
 
 // -------------------------------------------------------------------------------------
 
+// Algorithm identifies the envelope algorithm produced by the NaCl Box cipher.
+func (naclBoxCipher) Algorithm() Algorithm {
+	return NaClBox
+}
+
+// -------------------------------------------------------------------------------------
+
 // Keypair creates a NaCl Box keypair and returns self-identifying textual keys.
 func (naclBoxCipher) Keypair() (Keypair, error) {
 	publicKey, privateKey, err := box.GenerateKey(rand.Reader)
