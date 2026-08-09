@@ -3,6 +3,8 @@ package set
 import (
 	"fmt"
 	"io"
+	"strconv"
+	"strings"
 )
 
 // -------------------------------------------------------------------------------------
@@ -21,10 +23,21 @@ type renderParams struct {
 func render(p *renderParams) error {
 	_, err := fmt.Fprintf(
 		p.Writer,
-		"Stored secret %q in group %q:\n  secrets store: %s\n",
+		"Stored secret %q in group %q at:\n%s\n",
 		p.Result.Key,
 		p.Result.Group,
-		p.Result.StorePath,
+		renderStorePath(p.Result.StorePath),
 	)
 	return err
+}
+
+// -------------------------------------------------------------------------------------
+
+// renderStorePath quotes a path only when a space would make its boundary
+// ambiguous in terminal output.
+func renderStorePath(path string) string {
+	if strings.Contains(path, " ") {
+		return strconv.Quote(path)
+	}
+	return path
 }

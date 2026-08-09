@@ -51,6 +51,7 @@ func TestCatalogEnvVarsUnique(t *testing.T) {
 		Output,
 		Overload,
 		Prefix,
+		NoConfirm,
 		RequireOverlays,
 		Suffix,
 	}

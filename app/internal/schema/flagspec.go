@@ -25,7 +25,7 @@ type FlagSpec struct {
 }
 
 // -------------------------------------------------------------------------------------
-// Catalog every envx setting in one block.
+// Catalog every envx setting and shared CLI flag identity in one block.
 var (
 	// Cipher selects the algorithm for ephemeral keypair generation.
 	Cipher = FlagSpec{
@@ -62,6 +62,12 @@ var (
 		Name:  "namespace-prefix",
 		Env:   "ENVX_NAMESPACE_PREFIX",
 		Usage: "prefix each key with its namespace",
+	}
+
+	// NoConfirm skips the interactive confirmation after hidden input.
+	NoConfirm = FlagSpec{
+		Name:  "no-confirm",
+		Usage: "skip the interactive confirmation prompt",
 	}
 
 	// Output selects the rendering format for tabular commands.

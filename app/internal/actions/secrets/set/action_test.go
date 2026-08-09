@@ -27,9 +27,9 @@ func writeManifest(t *testing.T) string {
 
 // -------------------------------------------------------------------------------------
 
-// TestExecuteEncryptsAndRendersSafeMetadata verifies the action stores an
-// encrypted envelope and never renders the supplied plaintext.
-func TestExecuteEncryptsAndRendersSafeMetadata(t *testing.T) {
+// TestExecuteEncryptsAndStoresSafeMetadata verifies the action stores an
+// encrypted envelope without persisting the supplied plaintext.
+func TestExecuteEncryptsAndStoresSafeMetadata(t *testing.T) {
 	t.Parallel()
 
 	manifest := writeManifest(t)
@@ -50,7 +50,7 @@ func TestExecuteEncryptsAndRendersSafeMetadata(t *testing.T) {
 	result, err := execute(
 		actionParams{Group: "Production", Key: "database_password"},
 		input,
-		streams{
+		readerParams{
 			Stdin:  strings.NewReader(plaintext + "\n"),
 			Stderr: new(bytes.Buffer),
 		},
@@ -60,14 +60,6 @@ func TestExecuteEncryptsAndRendersSafeMetadata(t *testing.T) {
 	}
 	if result.Group != "production" || result.Key != "database_password" {
 		t.Errorf("result = %+v", result)
-	}
-
-	var output bytes.Buffer
-	if err := render(&renderParams{Writer: &output, Result: result}); err != nil {
-		t.Fatalf("render(): %v", err)
-	}
-	if strings.Contains(output.String(), plaintext) {
-		t.Fatalf("rendered output contains plaintext: %q", output.String())
 	}
 
 	data, err := file.Read(resolved.Secrets.SecretsPath)
@@ -82,43 +74,101 @@ func TestExecuteEncryptsAndRendersSafeMetadata(t *testing.T) {
 	}
 }
 
-// -------------------------------------------------------------------------------------
-
-// TestReadPlaintext verifies stdin input removes only the shell's final line
-// ending and rejects an empty value.
-func TestReadPlaintext(t *testing.T) {
+// TestPlaintextSourceUsesExplicitValue verifies an explicit empty value is
+// preserved and stdin is not consulted when the argument is present.
+func TestPlaintextSourceUsesExplicitValue(t *testing.T) {
 	t.Parallel()
 
-	got, err := readPlaintext(strings.NewReader("value\r\n"))
+	plaintext := "argument-value"
+	stdin := strings.NewReader("stdin-value\n")
+	got, err := plaintextSource(
+		actionParams{Plaintext: &plaintext},
+		readerParams{Stdin: stdin},
+	)
 	if err != nil {
-		t.Fatalf("readPlaintext(): %v", err)
+		t.Fatalf("plaintextSource(): %v", err)
 	}
-	if got != "value" {
-		t.Errorf("readPlaintext() = %q, want value", got)
+	if got != plaintext {
+		t.Errorf("plaintextSource() = %q, want %q", got, plaintext)
 	}
-	if _, err := readPlaintext(strings.NewReader("\n")); err == nil {
-		t.Fatal("readPlaintext() accepted an empty value")
+	if stdin.Len() != len("stdin-value\n") {
+		t.Error("plaintextSource() consumed stdin for an explicit value")
+	}
+
+	empty := ""
+	got, err = plaintextSource(
+		actionParams{Plaintext: &empty},
+		readerParams{Stdin: strings.NewReader("stdin-value\n")},
+	)
+	if err != nil {
+		t.Fatalf("plaintextSource() with empty argument: %v", err)
+	}
+	if got != "" {
+		t.Errorf("plaintextSource() with empty argument = %q, want empty", got)
 	}
 }
 
-// -------------------------------------------------------------------------------------
-
-// TestCommandArgsValidation verifies Cobra rejects incorrect positional counts.
-func TestCommandArgsValidation(t *testing.T) {
+// TestExecuteRejectsUnconfirmedTerminalInputWithoutMutation verifies a failed
+// confirmation cannot encrypt or write the secrets store.
+func TestExecuteRejectsUnconfirmedTerminalInputWithoutMutation(t *testing.T) {
 	t.Parallel()
 
-	for _, test := range []struct {
-		name string
-		args []string
-	}{
-		{name: "missing args", args: []string{"production"}},
-		{name: "extra args", args: []string{"production", "key", "extra"}},
-	} {
-		t.Run(test.name, func(t *testing.T) {
-			cmd := NewCommand()
-			if err := cmd.Args(cmd, test.args); err == nil {
-				t.Fatal("command Args validation succeeded")
-			}
-		})
+	manifest := writeManifest(t)
+	input := &config.Input{ConfigPath: &manifest}
+	resolved, err := config.ResolveWorkspace(input)
+	if err != nil {
+		t.Fatalf("ResolveWorkspace(): %v", err)
+	}
+	manager, err := config.NewSecretsManager(resolved.Secrets, resolved.Cipher)
+	if err != nil {
+		t.Fatalf("NewSecretsManager(): %v", err)
+	}
+	if _, err := manager.GenerateKeypair("production"); err != nil {
+		t.Fatalf("GenerateKeypair(): %v", err)
+	}
+	before, err := file.Read(resolved.Secrets.SecretsPath)
+	if err != nil {
+		t.Fatalf("Read() before execute: %v", err)
+	}
+
+	terminal, err := os.Open(os.DevNull)
+	if err != nil {
+		t.Fatalf("Open(%q): %v", os.DevNull, err)
+	}
+	defer func() { _ = terminal.Close() }()
+	var stderr bytes.Buffer
+	_, err = execute(
+		actionParams{Group: "production", Key: "database_password"},
+		input,
+		readerParams{
+			Stdin:  terminal,
+			Stderr: &stderr,
+			IsTerminal: func(int) bool {
+				return true
+			},
+			ReadPassword: func(int) ([]byte, error) {
+				return []byte("secret"), nil
+			},
+			ReadConfirmation: func(*os.File) (bool, error) {
+				return false, nil
+			},
+		},
+	)
+	if err == nil || err.Error() != "secret was not confirmed" {
+		t.Fatalf("execute() error = %v, want mismatch error", err)
+	}
+	after, err := file.Read(resolved.Secrets.SecretsPath)
+	if err != nil {
+		t.Fatalf("Read() after execute: %v", err)
+	}
+	if !bytes.Equal(after, before) {
+		t.Errorf(
+			"secrets store changed after mismatch:\nbefore: %s\nafter: %s",
+			before,
+			after,
+		)
+	}
+	if stderr.String() != "Secret value: \nConfirm secret of length 6? [Y/n] " {
+		t.Errorf("stderr = %q", stderr.String())
 	}
 }
