@@ -47,10 +47,13 @@ type Keypair struct {
 
 // -------------------------------------------------------------------------------------
 
-// Cipher is the algorithm-neutral contract for key generation and secret
-// encryption. Key and ciphertext formats are implementation details, allowing
-// callers to select an algorithm without branching on its representation.
+// Cipher is the contract for key generation, secret encryption, and envelope
+// algorithm metadata. Key and ciphertext formats are implementation details,
+// allowing callers to select an algorithm without branching on its
+// representation.
 type Cipher interface {
+	// Algorithm identifies the algorithm produced by the cipher.
+	Algorithm() Algorithm
 	// Keypair generates a new public/private keypair.
 	Keypair() (Keypair, error)
 	// ValidateKeypair checks key format and public/private correspondence.

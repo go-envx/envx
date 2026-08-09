@@ -120,6 +120,13 @@ type alternateCipher struct{}
 
 // -------------------------------------------------------------------------------------
 
+// Algorithm identifies the algorithm metadata used by the test cipher.
+func (alternateCipher) Algorithm() Algorithm {
+	return Age
+}
+
+// -------------------------------------------------------------------------------------
+
 // Keypair returns representative opaque key strings for the test cipher.
 func (alternateCipher) Keypair() (Keypair, error) {
 	return Keypair{PublicKey: "alternate-public", PrivateKey: "alternate-private"}, nil

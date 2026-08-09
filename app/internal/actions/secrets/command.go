@@ -2,6 +2,7 @@ package secrets
 
 import (
 	"github.com/go-envx/envx/app/internal/actions/secrets/keypair"
+	"github.com/go-envx/envx/app/internal/actions/secrets/set"
 	"github.com/go-envx/envx/app/pkg/str"
 	"github.com/spf13/cobra"
 )
@@ -29,6 +30,7 @@ func NewCommand() *cobra.Command {
 	}
 	cmd.AddCommand(
 		keypair.NewCommand(),
+		set.NewCommand(),
 	)
 	return cmd
 }
