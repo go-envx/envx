@@ -41,7 +41,7 @@ func (m *Manager) Set(group, key string, plaintextSource PlaintextResolver) erro
 	publicKey, exists := document.PublicKey(group)
 	if !exists {
 		return fmt.Errorf(
-			"group %q has no public key; run 'envx secrets keypair generate %s' first",
+			"group %q has no public key; run 'envx keypair generate %s' first",
 			group, group,
 		)
 	}

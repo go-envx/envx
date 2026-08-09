@@ -1,9 +1,6 @@
 package inspect
 
 import (
-	"fmt"
-	"io"
-
 	"github.com/go-envx/envx/app/internal/config"
 	"github.com/go-envx/envx/app/internal/secrets"
 )
@@ -36,20 +33,4 @@ func execute(p actionParams, in *config.Input) (secrets.KeypairMetadata, error) 
 		return secrets.KeypairMetadata{}, err
 	}
 	return metadata, nil
-}
-
-// -------------------------------------------------------------------------------------
-
-// render prints public metadata and private-key status only.
-func render(w io.Writer, metadata secrets.KeypairMetadata) error {
-	_, err := fmt.Fprintf(
-		w,
-		"Keypair for group %q:\n"+
-			"  public key: %s\n"+
-			"  private key status: %s\n",
-		metadata.Group,
-		metadata.PublicKey,
-		metadata.PrivateKeyStatus,
-	)
-	return err
 }

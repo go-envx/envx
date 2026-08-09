@@ -1,17 +1,22 @@
 package generate
 
 import (
-	"fmt"
-	"io"
-
 	"github.com/go-envx/envx/app/internal/config"
 	"github.com/go-envx/envx/app/internal/secrets"
 )
 
 // -------------------------------------------------------------------------------------
 
-// actionPersistedResult contains safe metadata from a generated keypair.
-type actionPersistedResult struct {
+// actionParams are the inputs to the keypair generation workflow.
+type actionParams struct {
+	// Group identifies the secret group receiving the generated keypair.
+	Group string
+}
+
+// -------------------------------------------------------------------------------------
+
+// actionResult contains safe metadata from a generated keypair.
+type actionResult struct {
 	// Metadata contains the group, public key, and safe private-key status.
 	Metadata secrets.KeypairMetadata
 	// SecretsPath is the store path receiving the public key.
@@ -23,10 +28,10 @@ type actionPersistedResult struct {
 // -------------------------------------------------------------------------------------
 
 // execute runs the manager's safe missing-identity workflow.
-func execute(p actionParams, in *config.Input) (actionPersistedResult, error) {
+func execute(p actionParams, in *config.Input) (actionResult, error) {
 	resolved, err := config.ResolveWorkspace(in)
 	if err != nil {
-		return actionPersistedResult{}, err
+		return actionResult{}, err
 	}
 
 	secretManager, err := config.NewSecretsManager(
@@ -34,33 +39,15 @@ func execute(p actionParams, in *config.Input) (actionPersistedResult, error) {
 		resolved.Cipher,
 	)
 	if err != nil {
-		return actionPersistedResult{}, err
+		return actionResult{}, err
 	}
 	metadata, err := secretManager.GenerateKeypair(p.Group)
 	if err != nil {
-		return actionPersistedResult{}, err
+		return actionResult{}, err
 	}
-	return actionPersistedResult{
+	return actionResult{
 		Metadata:    metadata,
 		SecretsPath: resolved.Secrets.SecretsPath,
 		KeysPath:    resolved.Secrets.KeysPath,
 	}, nil
-}
-
-// -------------------------------------------------------------------------------------
-
-// render prints safe generation metadata without private-key material.
-func render(w io.Writer, result actionPersistedResult) error {
-	_, err := fmt.Fprintf(
-		w,
-		"Generated keypair for group %q:\n"+
-			"  public key: %s\n"+
-			"  secrets store: %s\n"+
-			"  private key file: %s\n",
-		result.Metadata.Group,
-		result.Metadata.PublicKey,
-		result.SecretsPath,
-		result.KeysPath,
-	)
-	return err
 }

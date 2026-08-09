@@ -27,11 +27,24 @@ type FlagSpec struct {
 // -------------------------------------------------------------------------------------
 // Catalog every envx setting in one block.
 var (
+	// Cipher selects the algorithm for ephemeral keypair generation.
+	Cipher = FlagSpec{
+		Name:  "cipher",
+		Usage: "cipher algorithm (age|nacl-box)",
+	}
+
 	// Config selects the manifest path (auto-discovered when unset).
 	Config = FlagSpec{
 		Name:  "config",
 		Env:   "ENVX_CONFIG",
 		Usage: "path to envx.yaml",
+	}
+
+	// Delimiter joins a list-valued leaf into a single env var.
+	Delimiter = FlagSpec{
+		Name:  "delimiter",
+		Env:   "ENVX_DELIMITER",
+		Usage: `string used to join list values (default ",")`,
 	}
 
 	// Env selects the target environment. It advertises no static default because
@@ -44,46 +57,11 @@ var (
 		Usage: "target environment (defaults to first declared environment in envx.yaml)",
 	}
 
-	// RequireOverlays requires every environment overlay file in the namespace to exist.
-	RequireOverlays = FlagSpec{
-		Name:  "require-overlays",
-		Env:   "ENVX_REQUIRE_OVERLAYS",
-		Usage: "require all environment overlay files to exist",
-	}
-
-	// Prefix is prepended to every resolved env-var key.
-	Prefix = FlagSpec{
-		Name:  "prefix",
-		Env:   "ENVX_PREFIX",
-		Usage: "prefix prepended to every key",
-	}
-
-	// Suffix is appended to every resolved env-var key.
-	Suffix = FlagSpec{
-		Name:  "suffix",
-		Env:   "ENVX_SUFFIX",
-		Usage: "suffix appended to every key",
-	}
-
-	// Delimiter joins a list-valued leaf into a single env var.
-	Delimiter = FlagSpec{
-		Name:  "delimiter",
-		Env:   "ENVX_DELIMITER",
-		Usage: `string used to join list values (default ",")`,
-	}
-
 	// NamespacePrefix prefixes each key with its namespace name.
 	NamespacePrefix = FlagSpec{
 		Name:  "namespace-prefix",
 		Env:   "ENVX_NAMESPACE_PREFIX",
 		Usage: "prefix each key with its namespace",
-	}
-
-	// Overload lets file values override existing OS env vars.
-	Overload = FlagSpec{
-		Name:  "overload",
-		Env:   "ENVX_OVERLOAD",
-		Usage: "file values override OS env vars",
 	}
 
 	// Output selects the rendering format for tabular commands.
@@ -93,10 +71,32 @@ var (
 		Usage: "output format: table|json",
 	}
 
-	// Stdout generates a keypair to stdout without storing it.
-	Stdout = FlagSpec{
-		Name:  "stdout",
-		Usage: "generate a keypair to stdout without storing it",
+	// Overload lets file values override existing OS env vars.
+	Overload = FlagSpec{
+		Name:  "overload",
+		Env:   "ENVX_OVERLOAD",
+		Usage: "file values override OS env vars",
+	}
+
+	// Prefix is prepended to every resolved env-var key.
+	Prefix = FlagSpec{
+		Name:  "prefix",
+		Env:   "ENVX_PREFIX",
+		Usage: "prefix prepended to every key",
+	}
+
+	// RequireOverlays requires every environment overlay file in the namespace to exist.
+	RequireOverlays = FlagSpec{
+		Name:  "require-overlays",
+		Env:   "ENVX_REQUIRE_OVERLAYS",
+		Usage: "require all environment overlay files to exist",
+	}
+
+	// Suffix is appended to every resolved env-var key.
+	Suffix = FlagSpec{
+		Name:  "suffix",
+		Env:   "ENVX_SUFFIX",
+		Usage: "suffix appended to every key",
 	}
 )
 

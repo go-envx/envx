@@ -74,14 +74,14 @@ func TestRootShowsHelp(t *testing.T) {
 
 // -------------------------------------------------------------------------------------
 
-// TestSecretsKeypairCommandTree verifies the management commands are registered
-// under the intended nested path.
-func TestSecretsKeypairCommandTree(t *testing.T) {
+// TestKeypairCommandTree verifies keypair management is registered at the root
+// and no longer appears under the secrets command.
+func TestKeypairCommandTree(t *testing.T) {
 	t.Parallel()
 
 	root := NewRootCmd(BuildInfo{Version: "test"})
 	command, _, err := root.Find([]string{
-		"secrets", "keypair", "inspect",
+		"keypair", "inspect",
 	})
 	if err != nil {
 		t.Fatalf("Find(): %v", err)
@@ -89,50 +89,29 @@ func TestSecretsKeypairCommandTree(t *testing.T) {
 	if command == nil || command.Use != "inspect <group>" {
 		t.Fatalf("command = %v, want inspect <group>", command)
 	}
-}
-
-// -------------------------------------------------------------------------------------
-
-// TestSecretsKeypairGenerateStdout verifies the public command flag selects
-// direct keypair output and honors the manifest cipher setting.
-func TestSecretsKeypairGenerateStdout(t *testing.T) {
-	t.Parallel()
-
-	dir := t.TempDir()
-	configPath := filepath.Join(dir, "envx.yaml")
-	body := "environments: [production]\n" +
-		"secrets:\n  cipher: nacl-box\n" +
-		"projects:\n  app:\n    includes: [env/app]\n"
-	if err := os.WriteFile(configPath, []byte(body), 0o600); err != nil {
-		t.Fatal(err)
-	}
-
-	stdout, _, err := execCmd(
-		"secrets", "keypair", "generate", "--config", configPath,
-		"--stdout", "production",
-	)
+	command, _, err = root.Find([]string{"keypair", "print"})
 	if err != nil {
-		t.Fatalf("secrets keypair generate --stdout: %v", err)
+		t.Fatalf("Find(print): %v", err)
 	}
-	if !strings.Contains(stdout.String(), "nacl-box-public-key:") ||
-		!strings.Contains(stdout.String(), "nacl-box-private-key:") {
-		t.Errorf("stdout = %q, want configured NaCl Box keys", stdout.String())
+	if command == nil || command.Use != "print" {
+		t.Fatalf("command = %v, want print", command)
 	}
-	for _, path := range []string{
-		filepath.Join(dir, "secrets.yaml"),
-		filepath.Join(dir, "envx.keys"),
-	} {
-		if _, err := os.Stat(path); !os.IsNotExist(err) {
-			t.Errorf("stdout command created %s, stat error = %v", path, err)
+	secretsCommand, _, err := root.Find([]string{"secrets"})
+	if err != nil {
+		t.Fatalf("Find(secrets): %v", err)
+	}
+	for _, child := range secretsCommand.Commands() {
+		if child.Name() == "keypair" {
+			t.Fatal("secrets command still contains nested keypair")
 		}
 	}
 }
 
 // -------------------------------------------------------------------------------------
 
-// TestSecretsKeypairGenerateStdoutWithoutGroup verifies stdout generation can
-// create an unassigned keypair and keeps the guidance off the data stream.
-func TestSecretsKeypairGenerateStdoutWithoutGroup(t *testing.T) {
+// TestKeypairPrintUsesConfiguredCipher verifies print honors the manifest
+// cipher, leaves stderr empty, and does not create managed files.
+func TestKeypairPrintUsesConfiguredCipher(t *testing.T) {
 	t.Parallel()
 
 	dir := t.TempDir()
@@ -145,21 +124,17 @@ func TestSecretsKeypairGenerateStdoutWithoutGroup(t *testing.T) {
 	}
 
 	stdout, stderr, err := execCmd(
-		"secrets", "keypair", "generate", "--config", configPath, "--stdout",
+		"keypair", "print", "--config", configPath,
 	)
 	if err != nil {
-		t.Fatalf("secrets keypair generate --stdout: %v", err)
+		t.Fatalf("keypair print: %v", err)
 	}
-	if strings.Contains(stdout.String(), "group:") ||
-		!strings.Contains(stdout.String(), "nacl-box-public-key:") ||
+	if !strings.Contains(stdout.String(), "nacl-box-public-key:") ||
 		!strings.Contains(stdout.String(), "nacl-box-private-key:") {
-		t.Errorf("stdout = %q, want unassigned keypair without group label", stdout.String())
+		t.Errorf("stdout = %q, want configured NaCl Box keys", stdout.String())
 	}
-	if !strings.Contains(
-		stderr.String(),
-		"No group provided; this keypair was not stored",
-	) {
-		t.Errorf("stderr = %q, want no-storage guidance", stderr.String())
+	if stderr.Len() != 0 {
+		t.Errorf("stderr = %q, want empty", stderr.String())
 	}
 	for _, path := range []string{
 		filepath.Join(dir, "secrets.yaml"),
@@ -173,15 +148,41 @@ func TestSecretsKeypairGenerateStdoutWithoutGroup(t *testing.T) {
 
 // -------------------------------------------------------------------------------------
 
-// TestSecretsKeypairGenerateRequiresGroup verifies persisted generation rejects
-// a missing group unless --stdout explicitly selects the unassigned workflow.
-func TestSecretsKeypairGenerateRequiresGroup(t *testing.T) {
+// TestKeypairPrintCipherFlagOverridesManifest verifies an explicit cipher flag
+// wins over the algorithm configured in envx.yaml.
+func TestKeypairPrintCipherFlagOverridesManifest(t *testing.T) {
 	t.Parallel()
 
-	_, _, err := execCmd("secrets", "keypair", "generate")
-	if err == nil || !strings.Contains(
-		err.Error(), "group is required unless --stdout is set",
-	) {
+	dir := t.TempDir()
+	configPath := filepath.Join(dir, "envx.yaml")
+	body := "environments: [production]\n" +
+		"secrets:\n  cipher: age\n" +
+		"projects:\n  app:\n    includes: [env/app]\n"
+	if err := os.WriteFile(configPath, []byte(body), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	stdout, _, err := execCmd(
+		"keypair", "print", "--config", configPath, "--cipher", "nacl-box",
+	)
+	if err != nil {
+		t.Fatalf("keypair print --cipher: %v", err)
+	}
+	if !strings.Contains(stdout.String(), "nacl-box-public-key:") ||
+		!strings.Contains(stdout.String(), "nacl-box-private-key:") {
+		t.Errorf("stdout = %q, want flag-selected NaCl Box keys", stdout.String())
+	}
+}
+
+// -------------------------------------------------------------------------------------
+
+// TestKeypairGenerateRequiresGroup verifies persisted generation rejects a
+// missing group before trying to resolve a workspace.
+func TestKeypairGenerateRequiresGroup(t *testing.T) {
+	t.Parallel()
+
+	_, _, err := execCmd("keypair", "generate")
+	if err == nil || !strings.Contains(err.Error(), "accepts 1 arg") {
 		t.Fatalf("error = %v, want missing-group validation error", err)
 	}
 }

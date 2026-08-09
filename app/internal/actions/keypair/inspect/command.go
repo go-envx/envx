@@ -15,7 +15,7 @@ const (
 		printed.
 	`
 	example = `
-		envx secrets keypair inspect production
+		envx keypair inspect production
 	`
 )
 
@@ -46,8 +46,10 @@ func NewCommand() *cobra.Command {
 			}
 
 			// render the result
-			writer := cmd.OutOrStdout()
-			return render(writer, result)
+			return render(&renderParams{
+				Writer: cmd.OutOrStdout(),
+				Result: result,
+			})
 		},
 	}
 }
