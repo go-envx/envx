@@ -2,8 +2,6 @@ package str
 
 import "testing"
 
-// -------------------------------------------------------------------------------------
-
 // TestDedent verifies common-indent removal, tab expansion, blank-line trimming,
 // and the optional preserve-indent argument.
 func TestDedent(t *testing.T) {

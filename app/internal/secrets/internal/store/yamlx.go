@@ -8,8 +8,6 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-// -------------------------------------------------------------------------------------
-
 // mappingEntry describes the result of a mapping lookup.
 type mappingEntry struct {
 	index int
@@ -17,8 +15,6 @@ type mappingEntry struct {
 	value *yaml.Node
 	found bool
 }
-
-// -------------------------------------------------------------------------------------
 
 // getMappingEntry finds a mapping value by key while optionally matching names.
 func getMappingEntry(mapping *yaml.Node, name string, ignoreCase bool) (
@@ -52,8 +48,6 @@ func getMappingEntry(mapping *yaml.Node, name string, ignoreCase bool) (
 	return mappingEntry{index: -1}, nil
 }
 
-// -------------------------------------------------------------------------------------
-
 // getStringValue returns a YAML scalar's string content.
 func getStringValue(node *yaml.Node, description string) (string, error) {
 	if node == nil || node.Kind != yaml.ScalarNode || node.Tag != "!!str" {
@@ -62,35 +56,25 @@ func getStringValue(node *yaml.Node, description string) (string, error) {
 	return node.Value, nil
 }
 
-// -------------------------------------------------------------------------------------
-
 // newMappingNode creates an empty YAML mapping node.
 func newMappingNode() *yaml.Node {
 	return &yaml.Node{Kind: yaml.MappingNode, Tag: "!!map"}
 }
-
-// -------------------------------------------------------------------------------------
 
 // newStringNode creates a YAML string scalar node.
 func newStringNode(value string) *yaml.Node {
 	return &yaml.Node{Kind: yaml.ScalarNode, Tag: "!!str", Value: value}
 }
 
-// -------------------------------------------------------------------------------------
-
 // appendMappingEntry appends a string key and value to mapping.
 func appendMappingEntry(mapping *yaml.Node, key, value string) {
 	appendMappingNode(mapping, key, newStringNode(value))
 }
 
-// -------------------------------------------------------------------------------------
-
 // appendMappingNode appends a string key and an existing value node to mapping.
 func appendMappingNode(mapping *yaml.Node, key string, value *yaml.Node) {
 	mapping.Content = append(mapping.Content, newStringNode(key), value)
 }
-
-// -------------------------------------------------------------------------------------
 
 // removeMappingEntry removes a key/value pair beginning at index.
 func removeMappingEntry(mapping *yaml.Node, index int) {

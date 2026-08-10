@@ -9,8 +9,6 @@ import (
 	"github.com/go-envx/envx/app/internal/fixtures"
 )
 
-// -------------------------------------------------------------------------------------
-
 // resolveBasic loads the shared "basic" fixture and resolves the api-core
 // project for the default environment (the first declared).
 func resolveBasic(t *testing.T) *envmerge.Result {
@@ -27,8 +25,6 @@ func resolveBasic(t *testing.T) *envmerge.Result {
 	return env
 }
 
-// -------------------------------------------------------------------------------------
-
 // findEntry returns the entry with the given key from a result, and whether it
 // was present.
 func findEntry(res actionResult, key string) (actionResultEntry, bool) {
@@ -39,8 +35,6 @@ func findEntry(res actionResult, key string) (actionResultEntry, bool) {
 	}
 	return actionResultEntry{}, false
 }
-
-// -------------------------------------------------------------------------------------
 
 // TestRunActionAllKeys verifies an empty key explains every resolved key, with
 // each entry carrying the file that provided its value.
@@ -68,8 +62,6 @@ func TestRunActionAllKeys(t *testing.T) {
 	}
 }
 
-// -------------------------------------------------------------------------------------
-
 // TestRunActionSpecificKey verifies a case-insensitive key explains just that
 // key and reports its origin.
 func TestRunActionSpecificKey(t *testing.T) {
@@ -90,8 +82,6 @@ func TestRunActionSpecificKey(t *testing.T) {
 		t.Errorf("SourceKey = %q, want host", res.Entries[0].SourceKey)
 	}
 }
-
-// -------------------------------------------------------------------------------------
 
 // TestRunActionMissingKey verifies an unknown key is an error.
 func TestRunActionMissingKey(t *testing.T) {

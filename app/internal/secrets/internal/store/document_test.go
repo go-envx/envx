@@ -6,8 +6,6 @@ import (
 	"testing"
 )
 
-// -------------------------------------------------------------------------------------
-
 // writeDocument writes a test document and returns its path.
 func writeDocument(t *testing.T, body string) string {
 	t.Helper()
@@ -17,8 +15,6 @@ func writeDocument(t *testing.T, body string) string {
 	}
 	return path
 }
-
-// -------------------------------------------------------------------------------------
 
 // TestOpenMissingAndMalformed verifies missing documents are empty and malformed
 // YAML or document shapes are rejected.

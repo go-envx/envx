@@ -5,8 +5,6 @@ import (
 	"github.com/spf13/pflag"
 )
 
-// -------------------------------------------------------------------------------------
-
 // BindString registers spec as a string flag on fs, writing the parsed value into
 // dst. Every string flag registration flows through here, so a spec's identity
 // (name, shorthand, default, help) is applied in exactly one place. A command
@@ -15,8 +13,6 @@ import (
 func BindString(fs *pflag.FlagSet, dst *string, spec *schema.FlagSpec) {
 	fs.StringVarP(dst, spec.Name, spec.Short, spec.DefaultString, spec.HelpText())
 }
-
-// -------------------------------------------------------------------------------------
 
 // BindBool is BindString's boolean counterpart.
 func BindBool(fs *pflag.FlagSet, dst *bool, spec *schema.FlagSpec) {

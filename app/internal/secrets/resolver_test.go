@@ -6,8 +6,6 @@ import (
 	"testing"
 )
 
-// -------------------------------------------------------------------------------------
-
 // newTestResolver builds a Resolver over an in-memory store for resolution tests.
 func newTestResolver() *Resolver {
 	return &Resolver{
@@ -17,8 +15,6 @@ func newTestResolver() *Resolver {
 		},
 	}
 }
-
-// -------------------------------------------------------------------------------------
 
 // TestManagerResolverLoadsSecrets verifies Manager.Resolver reads a valid
 // document and makes its entries available to reference resolution.
@@ -52,8 +48,6 @@ func TestManagerResolverLoadsSecrets(t *testing.T) {
 	}
 }
 
-// -------------------------------------------------------------------------------------
-
 // TestManagerResolverMissingFileIsEmpty verifies an absent secrets file is
 // optional and produces a resolver that reports references as dangling.
 func TestManagerResolverMissingFileIsEmpty(t *testing.T) {
@@ -78,8 +72,6 @@ func TestManagerResolverMissingFileIsEmpty(t *testing.T) {
 	}
 }
 
-// -------------------------------------------------------------------------------------
-
 // TestManagerResolverMalformed verifies a malformed secrets file is an error.
 func TestManagerResolverMalformed(t *testing.T) {
 	t.Parallel()
@@ -99,8 +91,6 @@ func TestManagerResolverMalformed(t *testing.T) {
 		t.Error("expected Resolver() to reject a malformed secrets file")
 	}
 }
-
-// -------------------------------------------------------------------------------------
 
 // TestResolve verifies plain values pass through and references dereference,
 // covering explicit groups, the shared group, and the backslash escape hatch.
@@ -130,8 +120,6 @@ func TestResolve(t *testing.T) {
 		})
 	}
 }
-
-// -------------------------------------------------------------------------------------
 
 // TestResolveGroupCaseInsensitive verifies stored and referenced group names
 // share the document-wide case-insensitive identity policy.
@@ -168,8 +156,6 @@ func TestResolveGroupCaseInsensitive(t *testing.T) {
 	}
 }
 
-// -------------------------------------------------------------------------------------
-
 // TestResolveErrors verifies dangling references and malformed reference forms
 // fail loudly rather than leaking the raw reference string.
 func TestResolveErrors(t *testing.T) {
@@ -194,8 +180,6 @@ func TestResolveErrors(t *testing.T) {
 		})
 	}
 }
-
-// -------------------------------------------------------------------------------------
 
 // TestResolveEmptyReferenceMessage verifies an empty reference reports the empty
 // fault rather than a generic malformed-reference error.

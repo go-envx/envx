@@ -9,8 +9,6 @@ import (
 	"github.com/go-envx/envx/app/internal/privatekey"
 )
 
-// -------------------------------------------------------------------------------------
-
 // writeStore writes body to a secrets.yaml in a fresh temp dir and returns its path.
 func writeStore(t *testing.T, body string) string {
 	t.Helper()
@@ -20,8 +18,6 @@ func writeStore(t *testing.T, body string) string {
 	}
 	return path
 }
-
-// -------------------------------------------------------------------------------------
 
 // newTestCipher creates the default cipher for manager construction tests.
 func newTestCipher(t *testing.T) cipher.Cipher {
@@ -36,43 +32,29 @@ func newTestCipher(t *testing.T) cipher.Cipher {
 	return selected
 }
 
-// -------------------------------------------------------------------------------------
-
 // newPrivateKeyTestResolver creates a resolver for manager construction tests.
 func newPrivateKeyTestResolver() privatekey.Resolver {
 	return testResolver{}
 }
-
-// -------------------------------------------------------------------------------------
 
 // newPrivateKeyTestDestination creates a destination for manager construction tests.
 func newPrivateKeyTestDestination() privatekey.Destination {
 	return testDestination{}
 }
 
-// -------------------------------------------------------------------------------------
-
 // testResolver is a no-op private-key resolver for manager construction tests.
 type testResolver struct{}
-
-// -------------------------------------------------------------------------------------
 
 // Resolve reports that no private key is available.
 func (testResolver) Resolve(string) (privatekey.PrivateKey, error) {
 	return privatekey.PrivateKey{}, privatekey.ErrNotAvailable
 }
 
-// -------------------------------------------------------------------------------------
-
 // testDestination is a no-op private-key destination for manager construction tests.
 type testDestination struct{}
 
-// -------------------------------------------------------------------------------------
-
 // Write accepts private-key material without storing it.
 func (testDestination) Write(string, string) error { return nil }
-
-// -------------------------------------------------------------------------------------
 
 // TestNewRejectsEmptySecretsPath verifies Manager construction requires a store path.
 func TestNewRejectsEmptySecretsPath(t *testing.T) {
@@ -87,8 +69,6 @@ func TestNewRejectsEmptySecretsPath(t *testing.T) {
 		t.Fatal("New() succeeded without a secrets path")
 	}
 }
-
-// -------------------------------------------------------------------------------------
 
 // TestNewRejectsEmptyKeysPath verifies Manager construction requires a key path.
 func TestNewRejectsEmptyKeysPath(t *testing.T) {
@@ -105,8 +85,6 @@ func TestNewRejectsEmptyKeysPath(t *testing.T) {
 	}
 }
 
-// -------------------------------------------------------------------------------------
-
 // TestNewRejectsNilCipher verifies Manager construction requires a cipher.
 func TestNewRejectsNilCipher(t *testing.T) {
 	t.Parallel()
@@ -121,8 +99,6 @@ func TestNewRejectsNilCipher(t *testing.T) {
 		t.Fatal("New() succeeded without a cipher")
 	}
 }
-
-// -------------------------------------------------------------------------------------
 
 // TestNewRejectsNilPrivateKeyResolver verifies Manager construction requires
 // a resolver.
@@ -140,8 +116,6 @@ func TestNewRejectsNilPrivateKeyResolver(t *testing.T) {
 	}
 }
 
-// -------------------------------------------------------------------------------------
-
 // TestNewRejectsNilPrivateKeyDestination verifies Manager construction requires
 // a destination.
 func TestNewRejectsNilPrivateKeyDestination(t *testing.T) {
@@ -158,8 +132,6 @@ func TestNewRejectsNilPrivateKeyDestination(t *testing.T) {
 		t.Fatalf("New() error = %v, want private-key destination error", err)
 	}
 }
-
-// -------------------------------------------------------------------------------------
 
 // TestNewPreservesConfiguredKeysPath verifies an explicit private-key path is
 // retained.

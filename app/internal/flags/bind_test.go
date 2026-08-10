@@ -6,8 +6,6 @@ import (
 	"github.com/go-envx/envx/app/internal/schema"
 )
 
-// -------------------------------------------------------------------------------------
-
 // TestBindString verifies BindString binds a string flag and writes the parsed
 // value into the destination.
 func TestBindString(t *testing.T) {
@@ -23,8 +21,6 @@ func TestBindString(t *testing.T) {
 		t.Errorf("output = %q, want json", output)
 	}
 }
-
-// -------------------------------------------------------------------------------------
 
 // TestBindBool verifies BindBool binds a bool flag and writes the parsed value
 // into the destination.

@@ -8,8 +8,6 @@ import (
 	"github.com/go-envx/envx/app/internal/envmerge"
 )
 
-// -------------------------------------------------------------------------------------
-
 // actionParams are the positional inputs to the explain action.
 type actionParams struct {
 	// Project is the project name to resolve.
@@ -19,15 +17,11 @@ type actionParams struct {
 	Key string
 }
 
-// -------------------------------------------------------------------------------------
-
 // actionResult is the data the explain action returns.
 type actionResult struct {
 	// Entries is the per-key explanation rows.
 	Entries []actionResultEntry
 }
-
-// -------------------------------------------------------------------------------------
 
 // actionResultEntry is one row of explain output.
 type actionResultEntry struct {
@@ -42,8 +36,6 @@ type actionResultEntry struct {
 	// Shadowed is the list of files that were overridden by the resolved value.
 	Shadowed []string
 }
-
-// -------------------------------------------------------------------------------------
 
 // execute is the imperative shell: resolve the input into an envmerge.Params, build
 // the merged environment, and hand the result to the pure core.
@@ -63,8 +55,6 @@ func execute(p actionParams, in *config.Input) (actionResult, error) {
 	// explain the resolved keys
 	return runAction(env, p)
 }
-
-// -------------------------------------------------------------------------------------
 
 // runAction reads the resolved environment and origins to output sorted rows.
 // A specific key that does not exist is an error.

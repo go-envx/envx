@@ -9,8 +9,6 @@ import (
 	"strings"
 )
 
-// -------------------------------------------------------------------------------------
-
 // namespace identifies one namespace to load. It resolves to up to two files:
 //   - base:    <dir>/<name>.yaml       (required — defines the namespace)
 //   - overlay: <dir>/<name>.<env>.yaml (optional unless require_overlays)
@@ -20,8 +18,6 @@ type namespace struct {
 	// name is the namespace's base file name, without extension.
 	name string
 }
-
-// -------------------------------------------------------------------------------------
 
 // Build is the single entry point: it normalizes the params (applying the
 // default environment and validating it against the declared set), builds the
@@ -40,8 +36,6 @@ func Build(p Params) (*Result, error) {
 	return mergeNamespaces(namespaces, p.Settings, p.ValueResolver)
 }
 
-// -------------------------------------------------------------------------------------
-
 // mergeState holds flattened values and origins while base, overlay, and
 // namespace precedence selects the winners. Values remain unresolved here.
 type mergeState struct {
@@ -50,8 +44,6 @@ type mergeState struct {
 	// origins records the winner and shadowed sources for each key.
 	origins map[string]Origin
 }
-
-// -------------------------------------------------------------------------------------
 
 // resolveLeafValue dereferences each scalar item in one winning leaf value. List
 // boundaries are preserved so rendering can validate and join the resolved
@@ -77,8 +69,6 @@ func resolveLeafValue(
 	return resolved, nil
 }
 
-// -------------------------------------------------------------------------------------
-
 // buildNamespaces resolves each include into a namespace (directory + base
 // name), preserving declaration order. Includes are already absolute paths.
 func buildNamespaces(includes []string) []namespace {
@@ -93,8 +83,6 @@ func buildNamespaces(includes []string) []namespace {
 
 	return out
 }
-
-// -------------------------------------------------------------------------------------
 
 // mergeNamespaces loads and merges a sequence of namespaces using the resolved
 // settings. Namespaces are processed in declaration order (deterministic
@@ -125,8 +113,6 @@ func mergeNamespaces(
 	return &Result{resolved: *resolved}, nil
 }
 
-// -------------------------------------------------------------------------------------
-
 // resolveMergedValues dereferences and renders every winning value. Shadowed
 // values are absent from mergeState.values and therefore never reach the
 // resolver. Errors identify the winning env-var key without exposing its value.
@@ -151,8 +137,6 @@ func resolveMergedValues(
 	}
 	return result, nil
 }
-
-// -------------------------------------------------------------------------------------
 
 // loadNamespace loads one namespace's base and optional overlay file, flattens
 // each to env-var keys, layers the overlay over the base, and integrates the
@@ -214,8 +198,6 @@ func loadNamespace(
 	return nil
 }
 
-// -------------------------------------------------------------------------------------
-
 // namespaceSources returns the sources one namespace contributes for a single
 // flattened key, in merge order: the base file first, then the environment
 // overlay. A key defined in both files yields two sources so the overlay, coming
@@ -234,8 +216,6 @@ func namespaceSources(
 	}
 	return sources
 }
-
-// -------------------------------------------------------------------------------------
 
 // integrateSources folds one namespace's ordered sources for a key into the
 // running origins, preserving the full merge history. An origin already recorded
@@ -256,8 +236,6 @@ func integrateSources(acc *mergeState, key string, sources []Source) {
 		Shadowed: shadowed,
 	}
 }
-
-// -------------------------------------------------------------------------------------
 
 // applyPrefixSuffix rewrites the resolved keys in place, prefixing and suffixing every
 // key. Both affixes are uppercased and joined with "_".

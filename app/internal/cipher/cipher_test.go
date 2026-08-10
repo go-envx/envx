@@ -6,8 +6,6 @@ import (
 	"testing"
 )
 
-// -------------------------------------------------------------------------------------
-
 // TestNew selects registered algorithms and rejects unsupported option types.
 func TestNew(t *testing.T) {
 	t.Parallel()
@@ -38,8 +36,6 @@ func TestNew(t *testing.T) {
 		t.Fatal("New(unknown) succeeded")
 	}
 }
-
-// -------------------------------------------------------------------------------------
 
 // TestNewAppliesDefaultOptions verifies algorithms construct successfully when
 // Params omits algorithm-specific options.
@@ -81,8 +77,6 @@ func TestNewAppliesDefaultOptions(t *testing.T) {
 	}
 }
 
-// -------------------------------------------------------------------------------------
-
 // TestCipherInterfaceAcceptsAnotherImplementation verifies a non-age
 // implementation can satisfy the algorithm-neutral contract.
 func TestCipherInterfaceAcceptsAnotherImplementation(t *testing.T) {
@@ -112,27 +106,19 @@ func TestCipherInterfaceAcceptsAnotherImplementation(t *testing.T) {
 	}
 }
 
-// -------------------------------------------------------------------------------------
-
 // alternateCipher is a test-only implementation that verifies callers depend
 // on the Cipher contract rather than age-specific details.
 type alternateCipher struct{}
-
-// -------------------------------------------------------------------------------------
 
 // Algorithm identifies the algorithm metadata used by the test cipher.
 func (alternateCipher) Algorithm() Algorithm {
 	return Age
 }
 
-// -------------------------------------------------------------------------------------
-
 // Keypair returns representative opaque key strings for the test cipher.
 func (alternateCipher) Keypair() (Keypair, error) {
 	return Keypair{PublicKey: "alternate-public", PrivateKey: "alternate-private"}, nil
 }
-
-// -------------------------------------------------------------------------------------
 
 // ValidateKeypair accepts the fixed key material used by the test cipher.
 func (alternateCipher) ValidateKeypair(publicKey, privateKey string) error {
@@ -142,14 +128,10 @@ func (alternateCipher) ValidateKeypair(publicKey, privateKey string) error {
 	return nil
 }
 
-// -------------------------------------------------------------------------------------
-
 // Encrypt returns a marker-prefixed value for the test cipher.
 func (alternateCipher) Encrypt(plaintext, _ string) ([]byte, error) {
 	return []byte("alternate:" + plaintext), nil
 }
-
-// -------------------------------------------------------------------------------------
 
 // Decrypt removes the test cipher marker.
 func (alternateCipher) Decrypt(ciphertext []byte, _ string) (string, error) {

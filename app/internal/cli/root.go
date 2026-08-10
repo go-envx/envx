@@ -18,8 +18,6 @@ const (
 	rootShort = "envx is a CLI tool for managing environment variables"
 )
 
-// -------------------------------------------------------------------------------------
-
 // NewRootCmd builds the command tree. It registers the persistent --config flag,
 // which every action reads back through flags.GetInput to locate the manifest.
 // The build metadata in info is rendered by the --version flag.

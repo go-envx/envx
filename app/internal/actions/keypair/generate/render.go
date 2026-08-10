@@ -5,8 +5,6 @@ import (
 	"io"
 )
 
-// -------------------------------------------------------------------------------------
-
 // renderParams bundles the output sink and safe generation result.
 type renderParams struct {
 	// Writer is the output sink to render to.
@@ -14,8 +12,6 @@ type renderParams struct {
 	// Result is the safe generated keypair metadata to render.
 	Result actionResult
 }
-
-// -------------------------------------------------------------------------------------
 
 // render prints safe generation metadata without private-key material.
 func render(p *renderParams) error {

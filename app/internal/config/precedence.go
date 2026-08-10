@@ -7,8 +7,6 @@ import (
 	"github.com/go-envx/envx/app/internal/schema"
 )
 
-// -------------------------------------------------------------------------------------
-
 // precedenceString resolves a string setting: the explicit value wins when present,
 // then the ENVX_* var, then the first non-empty layer (e.g. project then global
 // default), and finally "". It reads the setting's ENVX_* fallback straight from its
@@ -31,8 +29,6 @@ func precedenceString(
 	}
 	return ""
 }
-
-// -------------------------------------------------------------------------------------
 
 // precedenceBool resolves a boolean setting: the explicit value wins when present,
 // then the ENVX_* var (parsed), then the first non-nil layer (e.g. project then

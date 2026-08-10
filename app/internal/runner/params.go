@@ -5,8 +5,6 @@ import (
 	"os"
 )
 
-// -------------------------------------------------------------------------------------
-
 // Params configures a single child execution: the merged env to inject plus the
 // parameters controlling how Run runs the command. Every field is optional; Run
 // normalizes terminal defaults itself via normalizeParams.
@@ -26,8 +24,6 @@ type Params struct {
 	// This is configurable primarily for in-process testing.
 	Stderr io.Writer
 }
-
-// -------------------------------------------------------------------------------------
 
 // normalizeParams applies runner's terminal defaults to Params: a nil Stdout or
 // Stderr falls back to the process's os.Stdout/os.Stderr. It mutates Params in

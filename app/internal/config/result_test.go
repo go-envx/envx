@@ -7,8 +7,6 @@ import (
 	"github.com/go-envx/envx/app/internal/fixtures"
 )
 
-// -------------------------------------------------------------------------------------
-
 // TestOverlayPath verifies the set action's overlay resolution from a project-less
 // ResolveWorkspace: the default environment feeds the overlay filename, and the
 // error paths for an unknown include or an undeclared environment.

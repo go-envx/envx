@@ -10,8 +10,6 @@ import (
 	"github.com/go-envx/envx/app/internal/exitcode"
 )
 
-// -------------------------------------------------------------------------------------
-
 // TestRunInjectsEnv verifies the merged env is passed to the child and that file
 // values appear in its environment.
 func TestRunInjectsEnv(t *testing.T) {
@@ -31,8 +29,6 @@ func TestRunInjectsEnv(t *testing.T) {
 	}
 }
 
-// -------------------------------------------------------------------------------------
-
 // TestRunPropagatesExitCode verifies a non-zero child exit is surfaced as an
 // *exitcode.Error carrying the same code.
 func TestRunPropagatesExitCode(t *testing.T) {
@@ -50,8 +46,6 @@ func TestRunPropagatesExitCode(t *testing.T) {
 		t.Errorf("Code = %d, want 3", ec.Code)
 	}
 }
-
-// -------------------------------------------------------------------------------------
 
 // TestRunOverloadPrecedence verifies that Overload lets file values win over an
 // OS env var of the same name.
@@ -73,8 +67,6 @@ func TestRunOverloadPrecedence(t *testing.T) {
 	}
 }
 
-// -------------------------------------------------------------------------------------
-
 // TestRunDefaultPrecedence verifies that without Overload the OS env var wins.
 func TestRunDefaultPrecedence(t *testing.T) {
 	t.Setenv("SHARED_KEY", "from-os")
@@ -93,8 +85,6 @@ func TestRunDefaultPrecedence(t *testing.T) {
 	}
 }
 
-// -------------------------------------------------------------------------------------
-
 // TestRunNoCommand verifies an empty argument list is rejected.
 func TestRunNoCommand(t *testing.T) {
 	t.Parallel()
@@ -103,8 +93,6 @@ func TestRunNoCommand(t *testing.T) {
 		t.Fatal("expected error for empty args")
 	}
 }
-
-// -------------------------------------------------------------------------------------
 
 // TestRunCommandNotFound verifies a command missing from PATH surfaces as an
 // *exitcode.Error carrying the shell convention 127 (rather than the generic
@@ -129,8 +117,6 @@ func TestRunCommandNotFound(t *testing.T) {
 	}
 }
 
-// -------------------------------------------------------------------------------------
-
 // TestRunSignaledExitCode verifies a child terminated by a signal surfaces as an
 // *exitcode.Error carrying the shell convention 128+signum (130 for SIGINT)
 // rather than the -1 that os/exec reports for signaled processes.
@@ -150,8 +136,6 @@ func TestRunSignaledExitCode(t *testing.T) {
 		t.Errorf("Code = %d, want 130 (128+SIGINT)", ec.Code)
 	}
 }
-
-// -------------------------------------------------------------------------------------
 
 // TestShouldForward verifies the interactive guard: terminal-delivered signals
 // (SIGINT, SIGQUIT) are not re-forwarded when attached to a tty (the tty already

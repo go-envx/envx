@@ -7,8 +7,6 @@ import (
 	"text/tabwriter"
 )
 
-// -------------------------------------------------------------------------------------
-
 // jsonChange is the exported, tagged view of a change used for JSON output.
 type jsonChange struct {
 	// Key is the env-var key that differs.
@@ -18,8 +16,6 @@ type jsonChange struct {
 	// EnvB is the value under env-b (empty for removals).
 	EnvB string `json:"env_b,omitempty"`
 }
-
-// -------------------------------------------------------------------------------------
 
 // jsonResult is the exported, tagged view of the whole diff used for JSON
 // output.
@@ -32,8 +28,6 @@ type jsonResult struct {
 	Changed []jsonChange `json:"changed,omitempty"`
 }
 
-// -------------------------------------------------------------------------------------
-
 // renderParams bundles everything render needs: the output sink, the structured
 // diff, and the chosen output format.
 type renderParams struct {
@@ -44,8 +38,6 @@ type renderParams struct {
 	// Format selects the output format ("json" or the default table).
 	Format string
 }
-
-// -------------------------------------------------------------------------------------
 
 // render writes the diff to p.Writer in the requested format. An unrecognized
 // format is rejected so a typo like --output=jsonn fails loudly.
@@ -60,8 +52,6 @@ func render(p *renderParams) error {
 	}
 }
 
-// -------------------------------------------------------------------------------------
-
 // renderJSON writes the diff as an indented JSON object.
 func renderJSON(w io.Writer, res actionResult) error {
 	view := jsonResult{
@@ -74,8 +64,6 @@ func renderJSON(w io.Writer, res actionResult) error {
 	return enc.Encode(view)
 }
 
-// -------------------------------------------------------------------------------------
-
 // toJSONChanges converts internal changes to their tagged JSON view.
 func toJSONChanges(in []actionResultChange) []jsonChange {
 	out := make([]jsonChange, 0, len(in))
@@ -84,8 +72,6 @@ func toJSONChanges(in []actionResultChange) []jsonChange {
 	}
 	return out
 }
-
-// -------------------------------------------------------------------------------------
 
 // renderTable writes the diff as aligned, sign-prefixed rows:
 // (+ added, - removed, ~ changed)

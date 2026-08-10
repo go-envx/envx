@@ -21,8 +21,6 @@ const (
 	`
 )
 
-// -------------------------------------------------------------------------------------
-
 // NewCommand builds the ephemeral keypair print command.
 func NewCommand() *cobra.Command {
 	var cipherName string

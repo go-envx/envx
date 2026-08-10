@@ -25,8 +25,6 @@ const (
 	`
 )
 
-// -------------------------------------------------------------------------------------
-
 // NewCommand builds the "explain" command, which parses args into the action's
 // params/config, executes the action, and renders the result in the specified format.
 // It accepts a project and an optional key. If the key is present it explains just

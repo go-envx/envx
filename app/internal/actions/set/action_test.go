@@ -7,8 +7,6 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-// -------------------------------------------------------------------------------------
-
 // applyToYAML parses src (an empty string models a missing/fresh file), applies
 // p to the document node, and returns the re-encoded YAML so tests can assert on
 // the preserved comments, order, and formatting.
@@ -30,8 +28,6 @@ func applyToYAML(t *testing.T, src string, p actionParams) string {
 	return string(out)
 }
 
-// -------------------------------------------------------------------------------------
-
 // TestApplyFlatKeyEmptyDoc verifies a flat key is written to a fresh document.
 func TestApplyFlatKeyEmptyDoc(t *testing.T) {
 	t.Parallel()
@@ -42,8 +38,6 @@ func TestApplyFlatKeyEmptyDoc(t *testing.T) {
 		t.Errorf("apply() =\n%q\nwant\n%q", got, want)
 	}
 }
-
-// -------------------------------------------------------------------------------------
 
 // TestApplyPreservesCommentsAndOrder verifies that adding a nested key leaves the
 // document's comments and existing key order untouched.
@@ -72,8 +66,6 @@ func TestApplyPreservesCommentsAndOrder(t *testing.T) {
 	}
 }
 
-// -------------------------------------------------------------------------------------
-
 // TestApplyUpdatesExistingValueInPlace verifies overwriting a key keeps the
 // surrounding comments and replaces only the value.
 func TestApplyUpdatesExistingValueInPlace(t *testing.T) {
@@ -97,8 +89,6 @@ func TestApplyUpdatesExistingValueInPlace(t *testing.T) {
 	}
 }
 
-// -------------------------------------------------------------------------------------
-
 // TestApplyOverwritesScalarBlockingPath verifies a scalar blocking a nested path
 // is replaced with a mapping.
 func TestApplyOverwritesScalarBlockingPath(t *testing.T) {
@@ -110,8 +100,6 @@ func TestApplyOverwritesScalarBlockingPath(t *testing.T) {
 		t.Errorf("apply() =\n%q\nwant\n%q", got, want)
 	}
 }
-
-// -------------------------------------------------------------------------------------
 
 // TestApplyQuotesAmbiguousValues verifies values that look like non-strings are
 // quoted, so env values round-trip as strings.
@@ -125,8 +113,6 @@ func TestApplyQuotesAmbiguousValues(t *testing.T) {
 	}
 }
 
-// -------------------------------------------------------------------------------------
-
 // TestApplyMatchesExistingIndent verifies a new key adopts the file's existing
 // indentation width rather than a fixed default.
 func TestApplyMatchesExistingIndent(t *testing.T) {
@@ -139,8 +125,6 @@ func TestApplyMatchesExistingIndent(t *testing.T) {
 		t.Errorf("apply() =\n%q\nwant\n%q", got, want)
 	}
 }
-
-// -------------------------------------------------------------------------------------
 
 // TestDetectIndentIgnoresFlowMapping verifies an inline flow mapping's column gap
 // is not mistaken for a block indentation step, so detection falls back to the
@@ -158,8 +142,6 @@ func TestDetectIndentIgnoresFlowMapping(t *testing.T) {
 	}
 }
 
-// -------------------------------------------------------------------------------------
-
 // TestApplyRejectsNonMappingRoot verifies a document whose root is not a mapping
 // is rejected rather than clobbered.
 func TestApplyRejectsNonMappingRoot(t *testing.T) {
@@ -173,8 +155,6 @@ func TestApplyRejectsNonMappingRoot(t *testing.T) {
 		t.Fatal("expected error for non-mapping root, got nil")
 	}
 }
-
-// -------------------------------------------------------------------------------------
 
 // TestApplyRefusesToOverwriteList verifies setting a key that currently holds a
 // list is refused, so a user's hand-authored list is never collapsed into a
@@ -199,8 +179,6 @@ func TestApplyRefusesToOverwriteList(t *testing.T) {
 	}
 }
 
-// -------------------------------------------------------------------------------------
-
 // TestApplyRefusesToDescendThroughList verifies a nested set that would traverse
 // through a list is refused rather than silently discarding the list.
 func TestApplyRefusesToDescendThroughList(t *testing.T) {
@@ -214,8 +192,6 @@ func TestApplyRefusesToDescendThroughList(t *testing.T) {
 		t.Fatal("expected error descending through a list, got nil")
 	}
 }
-
-// -------------------------------------------------------------------------------------
 
 // TestApplyRefusesToOverwriteMapping verifies setting a key that currently holds
 // a nested mapping is refused, so a populated subtree is never dropped.

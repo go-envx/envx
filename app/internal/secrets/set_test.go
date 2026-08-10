@@ -10,8 +10,6 @@ import (
 	"github.com/go-envx/envx/app/internal/secrets/internal/store"
 )
 
-// -------------------------------------------------------------------------------------
-
 // TestSetEncryptsAndStoresSecret verifies Set writes an envelope that decrypts
 // back to the supplied plaintext without storing that plaintext.
 func TestSetEncryptsAndStoresSecret(t *testing.T) {
@@ -68,8 +66,6 @@ func TestSetEncryptsAndStoresSecret(t *testing.T) {
 	}
 }
 
-// -------------------------------------------------------------------------------------
-
 // TestSetUsesCipherAlgorithm verifies a configured NaCl Box cipher receives its
 // own envelope tag and can decrypt the stored value.
 func TestSetUsesCipherAlgorithm(t *testing.T) {
@@ -124,8 +120,6 @@ func TestSetUsesCipherAlgorithm(t *testing.T) {
 		t.Errorf("round trip = %q, want %q", got, plaintext)
 	}
 }
-
-// -------------------------------------------------------------------------------------
 
 // TestSetValidatesBeforeEncryption verifies invalid input and missing identity
 // state cannot invoke encryption or create a store file.
@@ -203,8 +197,6 @@ func TestSetValidatesBeforeEncryption(t *testing.T) {
 	}
 }
 
-// -------------------------------------------------------------------------------------
-
 // TestSetValidatesGeneratedPlaintext verifies a lazy source is invoked after
 // public-key lookup and its empty result is rejected before encryption.
 func TestSetValidatesGeneratedPlaintext(t *testing.T) {
@@ -239,43 +231,31 @@ func TestSetValidatesGeneratedPlaintext(t *testing.T) {
 	}
 }
 
-// -------------------------------------------------------------------------------------
-
 // setTestCipher records encryption calls for validation tests.
 type setTestCipher struct {
 	encryptCalls int
 }
-
-// -------------------------------------------------------------------------------------
 
 // Algorithm identifies the algorithm metadata used by the test cipher.
 func (setTestCipher) Algorithm() cipher.Algorithm {
 	return cipher.Age
 }
 
-// -------------------------------------------------------------------------------------
-
 // Keypair returns representative test key material.
 func (setTestCipher) Keypair() (cipher.Keypair, error) {
 	return cipher.Keypair{PublicKey: "public", PrivateKey: "private"}, nil
 }
-
-// -------------------------------------------------------------------------------------
 
 // ValidateKeypair accepts the representative test key material.
 func (setTestCipher) ValidateKeypair(string, string) error {
 	return nil
 }
 
-// -------------------------------------------------------------------------------------
-
 // Encrypt records calls and returns deterministic native ciphertext bytes.
 func (c *setTestCipher) Encrypt(string, string) ([]byte, error) {
 	c.encryptCalls++
 	return []byte("ciphertext"), nil
 }
-
-// -------------------------------------------------------------------------------------
 
 // Decrypt returns the deterministic test plaintext.
 func (setTestCipher) Decrypt([]byte, string) (string, error) {

@@ -1,7 +1,5 @@
 package secrets
 
-// -------------------------------------------------------------------------------------
-
 // PrivateKeyStatus reports whether usable private-key material is available.
 type PrivateKeyStatus string
 
@@ -14,8 +12,6 @@ const (
 	PrivateKeyInvalid PrivateKeyStatus = "invalid"
 )
 
-// -------------------------------------------------------------------------------------
-
 // KeypairMetadata reports public key metadata without private-key material.
 type KeypairMetadata struct {
 	// Group is the key-group being reported.
@@ -26,8 +22,6 @@ type KeypairMetadata struct {
 	PrivateKeyStatus PrivateKeyStatus
 }
 
-// -------------------------------------------------------------------------------------
-
 // SecretReference identifies one stored secret without carrying its value.
 type SecretReference struct {
 	// Group is the secret's key-group.
@@ -35,8 +29,6 @@ type SecretReference struct {
 	// Key is the secret's logical name.
 	Key string
 }
-
-// -------------------------------------------------------------------------------------
 
 // UpdateResult reports changed keypairs and secret identities without values.
 type UpdateResult struct {

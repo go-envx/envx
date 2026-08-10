@@ -8,8 +8,6 @@ import (
 	"github.com/go-envx/envx/app/pkg/file"
 )
 
-// -------------------------------------------------------------------------------------
-
 // loadYAML reads and unmarshals a YAML file into a generic map. It returns a
 // wrapped os.ErrNotExist when the file is missing so callers can distinguish
 // "missing" from "malformed".
@@ -27,8 +25,6 @@ func loadYAML(path string) (map[string]any, error) {
 	}
 	return m, nil
 }
-
-// -------------------------------------------------------------------------------------
 
 // toMap coerces a value into map[string]any, handling both the standard form
 // and the map[any]any variant that yaml.v3 can produce.

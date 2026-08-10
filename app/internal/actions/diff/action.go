@@ -7,8 +7,6 @@ import (
 	"github.com/go-envx/envx/app/internal/envmerge"
 )
 
-// -------------------------------------------------------------------------------------
-
 // actionParams are the positional inputs to the diff action.
 type actionParams struct {
 	// Project is the project name to resolve under both environments.
@@ -18,8 +16,6 @@ type actionParams struct {
 	// EnvB is the second ("after") environment to resolve.
 	EnvB string
 }
-
-// -------------------------------------------------------------------------------------
 
 // actionResult is the data the diff action returns.
 type actionResult struct {
@@ -31,8 +27,6 @@ type actionResult struct {
 	Changed []actionResultChange
 }
 
-// -------------------------------------------------------------------------------------
-
 // actionResultChange is one row of diff output.
 type actionResultChange struct {
 	// Key is the env-var key that differs.
@@ -42,8 +36,6 @@ type actionResultChange struct {
 	// EnvB is the value under env-b (empty for removals).
 	EnvB string
 }
-
-// -------------------------------------------------------------------------------------
 
 // execute is the imperative shell: resolve the input into a single envmerge.Params,
 // build the merged environment for each specified environment, and hand both results
@@ -69,8 +61,6 @@ func execute(p actionParams, in *config.Input) (actionResult, error) {
 	return runAction(a, b), nil
 }
 
-// -------------------------------------------------------------------------------------
-
 // buildEnv overrides only the Env on its own copy of the resolved config and
 // builds the environment for one diff side. Taking Params by value leaves the
 // shared config un-mutated so both sides resolve from identical settings except
@@ -79,8 +69,6 @@ func buildEnv(ec envmerge.Params, env string) (*envmerge.Result, error) {
 	ec.Settings.Env = env
 	return envmerge.Build(ec)
 }
-
-// -------------------------------------------------------------------------------------
 
 // runAction is the pure core: a set comparison of two resolved environments.
 // Plain data in, structured diff out.
@@ -105,8 +93,6 @@ func runAction(a, b *envmerge.Result) actionResult {
 	}
 	return res
 }
-
-// -------------------------------------------------------------------------------------
 
 // unionKeys returns the sorted union of the keys of two maps.
 func unionKeys(a, b map[string]string) []string {

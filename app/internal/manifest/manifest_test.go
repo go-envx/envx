@@ -8,7 +8,6 @@ import (
 	"github.com/go-envx/envx/app/internal/fixtures"
 )
 
-// -------------------------------------------------------------------------------------
 // writeManifest writes a manifest file into a fresh temp dir and returns its
 // path.
 func writeManifest(t *testing.T, body string) string {
@@ -21,7 +20,6 @@ func writeManifest(t *testing.T, body string) string {
 	return path
 }
 
-// -------------------------------------------------------------------------------------
 // TestLoadValid verifies a well-formed manifest parses with its path recorded.
 func TestLoadValid(t *testing.T) {
 	t.Parallel()
@@ -51,8 +49,6 @@ func TestLoadValid(t *testing.T) {
 	}
 }
 
-// -------------------------------------------------------------------------------------
-
 // TestLoadOptionalMissing verifies an absent manifest is reported as not found
 // without becoming an error.
 func TestLoadOptionalMissing(t *testing.T) {
@@ -71,8 +67,6 @@ func TestLoadOptionalMissing(t *testing.T) {
 		)
 	}
 }
-
-// -------------------------------------------------------------------------------------
 
 // TestLoadInvalid verifies structural validation rejects malformed manifests.
 func TestLoadInvalid(t *testing.T) {
@@ -96,7 +90,6 @@ func TestLoadInvalid(t *testing.T) {
 	}
 }
 
-// -------------------------------------------------------------------------------------
 // TestLoadDiscovers verifies Load discovers an explicit path and loads it.
 func TestLoadDiscovers(t *testing.T) {
 	t.Parallel()
@@ -110,7 +103,6 @@ func TestLoadDiscovers(t *testing.T) {
 	}
 }
 
-// -------------------------------------------------------------------------------------
 // TestDiscoverExplicit verifies an explicit path is honored and a missing path
 // is an error.
 func TestDiscoverExplicit(t *testing.T) {
@@ -129,7 +121,6 @@ func TestDiscoverExplicit(t *testing.T) {
 	}
 }
 
-// -------------------------------------------------------------------------------------
 // TestDiscoverWalkUp verifies that with no explicit path the search walks up from
 // the working directory to the nearest envx.yaml.
 func TestDiscoverWalkUp(t *testing.T) {

@@ -9,8 +9,6 @@ import (
 	"github.com/go-envx/envx/app/pkg/file"
 )
 
-// -------------------------------------------------------------------------------------
-
 // writeManifest creates the smallest valid workspace for management commands.
 func writeManifest(t *testing.T) string {
 	t.Helper()
@@ -22,8 +20,6 @@ func writeManifest(t *testing.T) string {
 	}
 	return path
 }
-
-// -------------------------------------------------------------------------------------
 
 // TestExecuteAndRender verifies valid and unavailable statuses without exposing
 // private-key material.

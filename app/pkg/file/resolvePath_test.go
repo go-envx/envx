@@ -5,8 +5,6 @@ import (
 	"testing"
 )
 
-// -------------------------------------------------------------------------------------
-
 // TestResolvePath verifies relative paths resolve against the base and absolute
 // paths remain rooted at their own location.
 func TestResolvePath(t *testing.T) {

@@ -2,8 +2,6 @@ package schema
 
 import "testing"
 
-// -------------------------------------------------------------------------------------
-
 // TestSpecHelpText verifies that HelpText appends the ENVX_* hint only when the
 // setting declares an env-var fallback.
 func TestSpecHelpText(t *testing.T) {
@@ -35,8 +33,6 @@ func TestSpecHelpText(t *testing.T) {
 		})
 	}
 }
-
-// -------------------------------------------------------------------------------------
 
 // TestCatalogEnvVarsUnique guards against two settings accidentally sharing an
 // ENVX_* fallback, which would make env-driven config ambiguous.

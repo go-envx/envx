@@ -8,8 +8,6 @@ import (
 	"testing"
 )
 
-// -------------------------------------------------------------------------------------
-
 // TestReaderReadsTerminalPlaintext verifies hidden confirmation, prompt routing,
 // and input failures without requiring a real terminal in the test process.
 func TestReaderReadsTerminalPlaintext(t *testing.T) {
@@ -134,8 +132,6 @@ func TestReaderReadsTerminalPlaintext(t *testing.T) {
 	}
 }
 
-// -------------------------------------------------------------------------------------
-
 // TestParseConfirmation verifies the accepted interactive yes-or-no responses.
 func TestParseConfirmation(t *testing.T) {
 	t.Parallel()
@@ -170,8 +166,6 @@ func TestParseConfirmation(t *testing.T) {
 	}
 }
 
-// -------------------------------------------------------------------------------------
-
 // TestReadConfirmationInputRejectsEmptyEOF verifies end of input cannot act as
 // the default yes response.
 func TestReadConfirmationInputRejectsEmptyEOF(t *testing.T) {
@@ -194,8 +188,6 @@ func TestReadConfirmationInputRejectsEmptyEOF(t *testing.T) {
 		t.Fatalf("readConfirmationInput() error = %v, want EOF error", err)
 	}
 }
-
-// -------------------------------------------------------------------------------------
 
 // TestReadPlaintext verifies stdin input removes only the shell's final line
 // ending and rejects an empty value.

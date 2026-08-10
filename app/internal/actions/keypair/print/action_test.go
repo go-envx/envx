@@ -12,8 +12,6 @@ import (
 	"github.com/go-envx/envx/app/pkg/file"
 )
 
-// -------------------------------------------------------------------------------------
-
 // TestExecuteUsesConfiguredCipher verifies print uses the manifest algorithm
 // and does not change managed workspace files.
 func TestExecuteUsesConfiguredCipher(t *testing.T) {
@@ -68,8 +66,6 @@ func TestExecuteUsesConfiguredCipher(t *testing.T) {
 	}
 }
 
-// -------------------------------------------------------------------------------------
-
 // TestExecuteUsesEmptyCipherAsFallback verifies an explicit empty cipher value
 // follows the same manifest fallback as an omitted value.
 func TestExecuteUsesEmptyCipherAsFallback(t *testing.T) {
@@ -95,8 +91,6 @@ func TestExecuteUsesEmptyCipherAsFallback(t *testing.T) {
 	}
 }
 
-// -------------------------------------------------------------------------------------
-
 // TestExecuteUsesExplicitCipher verifies an explicit cipher skips manifest
 // lookup and constructs the requested implementation directly.
 func TestExecuteUsesExplicitCipher(t *testing.T) {
@@ -115,8 +109,6 @@ func TestExecuteUsesExplicitCipher(t *testing.T) {
 		t.Errorf("public key = %q, want NaCl Box key", result.Keypair.PublicKey)
 	}
 }
-
-// -------------------------------------------------------------------------------------
 
 // TestExecuteUsesDefaultCipherWithoutManifest verifies the fallback remains
 // Age when no explicit cipher or workspace configuration is available.

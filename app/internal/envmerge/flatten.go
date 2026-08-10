@@ -5,8 +5,6 @@ import (
 	"strings"
 )
 
-// -------------------------------------------------------------------------------------
-
 // leafValue preserves whether a YAML leaf was a scalar or list while
 // base, overlay, and namespace winners are selected. Its items remain unresolved
 // until the merge is complete.
@@ -16,8 +14,6 @@ type leafValue struct {
 	// list distinguishes a YAML list from a scalar, including an empty list.
 	list bool
 }
-
-// -------------------------------------------------------------------------------------
 
 // flatten converts a nested map to flat KEY=VALUE pairs while preserving scalar
 // and list structure. Key paths are joined with "_" and uppercased
@@ -70,8 +66,6 @@ func flatten(m map[string]any) (map[string]leafValue, error) {
 	return result, nil
 }
 
-// -------------------------------------------------------------------------------------
-
 // leafValueFromYAML converts one YAML scalar or list leaf into its mergeable form. A
 // list item must be scalar because nested lists and mappings have no flat env-var
 // representation.
@@ -94,8 +88,6 @@ func leafValueFromYAML(v any, path string) (leafValue, error) {
 	return leafValue{items: items, list: true}, nil
 }
 
-// -------------------------------------------------------------------------------------
-
 // renderLeafValue converts one resolved winning value to its final env-var
 // string. Lists are joined with delimiter; an item containing that delimiter is
 // rejected without including the potentially secret value in the error.
@@ -116,8 +108,6 @@ func renderLeafValue(
 	return strings.Join(value.items, delimiter), nil
 }
 
-// -------------------------------------------------------------------------------------
-
 // scalarString renders a scalar leaf value to its string form, mapping a nil
 // leaf (a bare "key:") to "" rather than the "<nil>" fmt would produce.
 func scalarString(v any) string {
@@ -126,8 +116,6 @@ func scalarString(v any) string {
 	}
 	return fmt.Sprintf("%v", v)
 }
-
-// -------------------------------------------------------------------------------------
 
 // isScalar reports whether v is a YAML scalar leaf — neither a mapping nor a
 // sequence — and so can be rendered directly into an env-var value.
@@ -140,8 +128,6 @@ func isScalar(v any) bool {
 	}
 }
 
-// -------------------------------------------------------------------------------------
-
 // toEnvKey converts a dotted nested path (postgres.username) to its env-var
 // name (POSTGRES_USERNAME). Dots and hyphens become underscores.
 func toEnvKey(path string) string {
@@ -149,8 +135,6 @@ func toEnvKey(path string) string {
 	s = strings.ReplaceAll(s, "-", "_")
 	return strings.ToUpper(s)
 }
-
-// -------------------------------------------------------------------------------------
 
 // flattenKeys returns a lookup mapping each flat env key back to its original
 // dotted path, used for origin tracking.
@@ -176,8 +160,6 @@ func flattenKeys(m map[string]any) map[string]string {
 	walk("", m)
 	return result
 }
-
-// -------------------------------------------------------------------------------------
 
 // transformKey applies the prefix and suffix to a single key.
 func transformKey(key, prefix, suffix string) string {

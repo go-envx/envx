@@ -7,8 +7,6 @@ import (
 	"github.com/go-envx/envx/app/internal/secrets/internal/store"
 )
 
-// -------------------------------------------------------------------------------------
-
 // Resolver dereferences secret references against a secrets store. It recognizes
 // values of the form "secret://<group>/<key>"; every other value passes through
 // unchanged.
@@ -16,8 +14,6 @@ type Resolver struct {
 	// values holds secret values keyed by their resolver reference.
 	values map[reference]string
 }
-
-// -------------------------------------------------------------------------------------
 
 // Resolver opens the current secrets store and returns a resolver bound to it.
 // A missing store yields an empty resolver, so a reference against it fails
@@ -30,8 +26,6 @@ func (m *Manager) Resolver() (*Resolver, error) {
 	}
 	return newResolver(document), nil
 }
-
-// -------------------------------------------------------------------------------------
 
 // newResolver builds a resolver from a validated secrets document.
 func newResolver(document *store.Document) *Resolver {
@@ -47,8 +41,6 @@ func newResolver(document *store.Document) *Resolver {
 		values: values,
 	}
 }
-
-// -------------------------------------------------------------------------------------
 
 // Resolve dereferences value against the store. A plain value is returned
 // unchanged. A value beginning with the reserved scheme is parsed and looked up

@@ -2,8 +2,6 @@ package arg
 
 import "testing"
 
-// -------------------------------------------------------------------------------------
-
 // TestOptional verifies in-range access returns the argument while out-of-range
 // and negative indices return the empty string.
 func TestOptional(t *testing.T) {

@@ -10,17 +10,11 @@ import (
 	"github.com/go-envx/envx/app/internal/schema"
 )
 
-// -------------------------------------------------------------------------------------
-
 // strPtr returns a pointer to s, for building optional Input values in tests.
 func strPtr(s string) *string { return &s }
 
-// -------------------------------------------------------------------------------------
-
 // boolPtr returns a pointer to b, for building optional Input values in tests.
 func boolPtr(b bool) *bool { return &b }
-
-// -------------------------------------------------------------------------------------
 
 // testManifest builds an in-memory manifest with global and project-level env
 // settings for exercising the precedence chain.
@@ -37,8 +31,6 @@ func testManifest() *schema.Manifest {
 		},
 	}
 }
-
-// -------------------------------------------------------------------------------------
 
 // TestResolveManifest verifies project lookup, the env precedence (explicit >
 // project > global), setting layering, and pass-through of includes/environments
@@ -144,8 +136,6 @@ func TestResolveManifest(t *testing.T) {
 	})
 }
 
-// -------------------------------------------------------------------------------------
-
 // TestOverloadResolution verifies overload now layers through the manifest
 // (explicit > project > global), the precedence that was previously dropped.
 func TestOverloadResolution(t *testing.T) {
@@ -205,8 +195,6 @@ func TestOverloadResolution(t *testing.T) {
 	})
 }
 
-// -------------------------------------------------------------------------------------
-
 // TestResolveProject verifies ResolveProject loads the manifest from the input's
 // config path and resolves a known fixture project end to end.
 func TestResolveProject(t *testing.T) {
@@ -221,8 +209,6 @@ func TestResolveProject(t *testing.T) {
 		t.Error("expected includes from the fixture project")
 	}
 }
-
-// -------------------------------------------------------------------------------------
 
 // TestResolveWorkspace verifies ResolveWorkspace surfaces the resolved secrets
 // store location as data, resolves no project, and never wires a value resolver —
@@ -327,8 +313,6 @@ func TestResolveWorkspace(t *testing.T) {
 	}
 }
 
-// -------------------------------------------------------------------------------------
-
 // TestResolveProjectResolvesSecretReference verifies ResolveProject wires the
 // resolver so secret references dereference end to end: explicit environment and
 // shared groups both resolve against the store.
@@ -368,8 +352,6 @@ func TestResolveWorkspaceIgnoresSecretsStore(t *testing.T) {
 	}
 }
 
-// -------------------------------------------------------------------------------------
-
 // TestResolveProjectDanglingSecretReference verifies a reference with no matching
 // store entry fails loudly at Build rather than leaking the raw reference string.
 func TestResolveProjectDanglingSecretReference(t *testing.T) {
@@ -384,8 +366,6 @@ func TestResolveProjectDanglingSecretReference(t *testing.T) {
 		t.Fatal("expected dangling reference error")
 	}
 }
-
-// -------------------------------------------------------------------------------------
 
 // TestManifestPath verifies the manifest-location precedence: --config flag wins,
 // then ENVX_CONFIG, then empty (which defers to the manifest walk-up).

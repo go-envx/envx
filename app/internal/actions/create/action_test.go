@@ -9,8 +9,6 @@ import (
 	"github.com/go-envx/envx/app/internal/envmerge"
 )
 
-// -------------------------------------------------------------------------------------
-
 // TestExecuteScaffoldsFiles verifies each template writes its envx.yaml and nested
 // namespace files into the target directory.
 func TestExecuteScaffoldsFiles(t *testing.T) {
@@ -38,8 +36,6 @@ func TestExecuteScaffoldsFiles(t *testing.T) {
 	}
 }
 
-// -------------------------------------------------------------------------------------
-
 // TestExecuteRefusesOverwrite verifies a second scaffold over existing files fails
 // without --force and succeeds with it.
 func TestExecuteRefusesOverwrite(t *testing.T) {
@@ -57,8 +53,6 @@ func TestExecuteRefusesOverwrite(t *testing.T) {
 		t.Fatalf("force scaffold: %v", err)
 	}
 }
-
-// -------------------------------------------------------------------------------------
 
 // TestQuickStartResolves scaffolds the quick-start workspace and resolves it,
 // guarding that the scaffolded files load and that api-service resolves the

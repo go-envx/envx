@@ -6,8 +6,6 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-// -------------------------------------------------------------------------------------
-
 // TestOpenAndRead verifies public keys, plaintext values, ciphertext values,
 // case-insensitive groups, and document ordering.
 func TestOpenAndRead(t *testing.T) {
@@ -47,8 +45,6 @@ func TestOpenAndRead(t *testing.T) {
 		}
 	}
 }
-
-// -------------------------------------------------------------------------------------
 
 // TestPublicKeyRejectsNonStringScalar verifies public-key reads enforce the
 // same string-node invariant as the rest of the document API.

@@ -6,8 +6,6 @@ import (
 	"testing"
 )
 
-// -------------------------------------------------------------------------------------
-
 // sampleResult is a small diff covering all three change kinds, used by the
 // render tests.
 func sampleResult() actionResult {
@@ -17,8 +15,6 @@ func sampleResult() actionResult {
 		Changed: []actionResultChange{{Key: "MOD", EnvA: "before", EnvB: "after"}},
 	}
 }
-
-// -------------------------------------------------------------------------------------
 
 // TestRenderJSON verifies the JSON format emits added, removed, and changed
 // sections with their values.
@@ -62,8 +58,6 @@ func TestRenderJSON(t *testing.T) {
 	}
 }
 
-// -------------------------------------------------------------------------------------
-
 // TestRenderTable verifies the table format prints sign-prefixed rows with the
 // arrow notation for changed keys.
 func TestRenderTable(t *testing.T) {
@@ -90,8 +84,6 @@ func TestRenderTable(t *testing.T) {
 		}
 	}
 }
-
-// -------------------------------------------------------------------------------------
 
 // TestRenderInvalidFormat verifies an unrecognized output format is rejected
 // rather than silently falling back to the table.

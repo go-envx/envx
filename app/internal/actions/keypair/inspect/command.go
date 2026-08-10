@@ -19,8 +19,6 @@ const (
 	`
 )
 
-// -------------------------------------------------------------------------------------
-
 // NewCommand builds the keypair inspection command.
 func NewCommand() *cobra.Command {
 	return &cobra.Command{

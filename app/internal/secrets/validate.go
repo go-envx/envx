@@ -7,8 +7,6 @@ import (
 	"unicode"
 )
 
-// -------------------------------------------------------------------------------------
-
 // normalizeGroupName validates a key-group name and returns its canonical form.
 func normalizeGroupName(group string) (string, error) {
 	if strings.TrimSpace(group) == "" {
@@ -20,8 +18,6 @@ func normalizeGroupName(group string) (string, error) {
 	}
 	return strings.ToLower(group), nil
 }
-
-// -------------------------------------------------------------------------------------
 
 // validateSecretKey validates the exact key identifier accepted by references
 // and the document store.

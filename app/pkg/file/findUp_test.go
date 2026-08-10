@@ -7,8 +7,6 @@ import (
 	"testing"
 )
 
-// -------------------------------------------------------------------------------------
-
 // mkdirAll creates a nested directory under root and returns its absolute path.
 func mkdirAll(t *testing.T, root string, parts ...string) string {
 	t.Helper()
@@ -19,8 +17,6 @@ func mkdirAll(t *testing.T, root string, parts ...string) string {
 	return dir
 }
 
-// -------------------------------------------------------------------------------------
-
 // touch writes an empty file at the join of dir and name.
 func touch(t *testing.T, dir, name string) string {
 	t.Helper()
@@ -30,8 +26,6 @@ func touch(t *testing.T, dir, name string) string {
 	}
 	return path
 }
-
-// -------------------------------------------------------------------------------------
 
 // TestFindUpInStartDir verifies a file present in the start directory is
 // returned.
@@ -50,8 +44,6 @@ func TestFindUpInStartDir(t *testing.T) {
 	}
 }
 
-// -------------------------------------------------------------------------------------
-
 // TestFindUpInAncestor verifies the search ascends parents to find the file.
 func TestFindUpInAncestor(t *testing.T) {
 	t.Parallel()
@@ -68,8 +60,6 @@ func TestFindUpInAncestor(t *testing.T) {
 		t.Errorf("FindUp() = %q, want %q", got, want)
 	}
 }
-
-// -------------------------------------------------------------------------------------
 
 // TestFindUpReturnsAbsolute verifies a relative start directory yields an
 // absolute result path.
@@ -88,8 +78,6 @@ func TestFindUpReturnsAbsolute(t *testing.T) {
 	}
 }
 
-// -------------------------------------------------------------------------------------
-
 // TestFindUpStopsAtBoundary verifies the walk halts at a boundary marker and
 // does not reach a file living above it.
 func TestFindUpStopsAtBoundary(t *testing.T) {
@@ -106,8 +94,6 @@ func TestFindUpStopsAtBoundary(t *testing.T) {
 		t.Errorf("err = %v, want ErrNotFound", err)
 	}
 }
-
-// -------------------------------------------------------------------------------------
 
 // TestFindUpBoundaryInclusive verifies the directory holding the boundary marker
 // is still searched before the walk halts.
@@ -128,8 +114,6 @@ func TestFindUpBoundaryInclusive(t *testing.T) {
 		t.Errorf("FindUp() = %q, want %q", got, want)
 	}
 }
-
-// -------------------------------------------------------------------------------------
 
 // TestFindUpNotFound verifies ErrNotFound is returned when no match exists.
 func TestFindUpNotFound(t *testing.T) {

@@ -2,8 +2,6 @@ package envmerge
 
 import "testing"
 
-// -------------------------------------------------------------------------------------
-
 // TestResultAllIsCopy verifies All returns a defensive copy.
 func TestResultAllIsCopy(t *testing.T) {
 	t.Parallel()

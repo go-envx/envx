@@ -2,8 +2,6 @@ package store
 
 import "testing"
 
-// -------------------------------------------------------------------------------------
-
 // TestOpenRejectsMalformedCiphertext verifies plaintext remains accepted while
 // values using the encrypted marker must contain a valid envelope.
 func TestOpenRejectsMalformedCiphertext(t *testing.T) {

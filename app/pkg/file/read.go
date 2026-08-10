@@ -5,8 +5,6 @@ import (
 	"path/filepath"
 )
 
-// -------------------------------------------------------------------------------------
-
 // Read returns the contents of the file at path. The path is cleaned before
 // access; callers must supply paths derived from validated configuration rather
 // than untrusted input.

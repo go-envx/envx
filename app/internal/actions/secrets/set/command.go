@@ -23,8 +23,6 @@ const (
 	`
 )
 
-// -------------------------------------------------------------------------------------
-
 // NewCommand builds the command that securely enters one secret value.
 func NewCommand() *cobra.Command {
 	var noConfirm bool

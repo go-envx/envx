@@ -5,8 +5,6 @@ import (
 	"path/filepath"
 )
 
-// -------------------------------------------------------------------------------------
-
 // AbsExisting returns the cleaned, absolute form of path. It returns an error if
 // the path does not exist or its absolute form cannot be resolved.
 func AbsExisting(path string) (string, error) {

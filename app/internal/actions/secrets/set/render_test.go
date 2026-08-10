@@ -5,8 +5,6 @@ import (
 	"testing"
 )
 
-// -------------------------------------------------------------------------------------
-
 // TestRenderReportsStorePath verifies safe metadata uses a dedicated path line.
 func TestRenderReportsStorePath(t *testing.T) {
 	t.Parallel()
@@ -29,8 +27,6 @@ func TestRenderReportsStorePath(t *testing.T) {
 		t.Errorf("rendered output = %q, want %q", output.String(), want)
 	}
 }
-
-// -------------------------------------------------------------------------------------
 
 // TestRenderQuotesStorePathWithSpaces verifies paths with spaces remain
 // unambiguous on their dedicated output line.

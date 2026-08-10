@@ -2,8 +2,6 @@ package envmerge
 
 import "testing"
 
-// -------------------------------------------------------------------------------------
-
 // TestNormalizeParamsDefaultsEnv verifies an empty target environment falls back
 // to the first declared environment.
 func TestNormalizeParamsDefaultsEnv(t *testing.T) {
@@ -17,8 +15,6 @@ func TestNormalizeParamsDefaultsEnv(t *testing.T) {
 		t.Errorf("Env = %q, want development", p.Settings.Env)
 	}
 }
-
-// -------------------------------------------------------------------------------------
 
 // TestNormalizeParamsKeepsExplicitEnv verifies an explicitly set environment is
 // left untouched.
@@ -36,8 +32,6 @@ func TestNormalizeParamsKeepsExplicitEnv(t *testing.T) {
 		t.Errorf("Env = %q, want production", p.Settings.Env)
 	}
 }
-
-// -------------------------------------------------------------------------------------
 
 // TestNormalizeParamsDefaultsDelimiter verifies an empty delimiter falls back to
 // the default comma while an explicit delimiter is left untouched.
@@ -63,8 +57,6 @@ func TestNormalizeParamsDefaultsDelimiter(t *testing.T) {
 		t.Errorf("Delimiter = %q, want : (explicit)", custom.Settings.Delimiter)
 	}
 }
-
-// -------------------------------------------------------------------------------------
 
 // TestNormalizeParamsUndeclaredEnv verifies an environment outside the declared
 // set is rejected.

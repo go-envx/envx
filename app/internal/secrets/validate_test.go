@@ -5,8 +5,6 @@ import (
 	"testing"
 )
 
-// -------------------------------------------------------------------------------------
-
 // TestNormalizeGroupName verifies canonicalization and group-name validation.
 func TestNormalizeGroupName(t *testing.T) {
 	t.Parallel()
@@ -71,8 +69,6 @@ func TestNormalizeGroupName(t *testing.T) {
 		})
 	}
 }
-
-// -------------------------------------------------------------------------------------
 
 // TestValidateSecretKey verifies key acceptance and storage-delimiter rejection.
 func TestValidateSecretKey(t *testing.T) {

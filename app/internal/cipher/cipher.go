@@ -2,8 +2,6 @@ package cipher
 
 import "fmt"
 
-// -------------------------------------------------------------------------------------
-
 // Algorithm identifies an encryption algorithm supported by the cipher factory.
 type Algorithm string
 
@@ -14,15 +12,11 @@ const (
 	NaClBox Algorithm = "nacl-box"
 )
 
-// -------------------------------------------------------------------------------------
-
 // AlgorithmOptions is the closed set of algorithm-specific options accepted
 // by New. Each supported algorithm provides its own concrete options type.
 type AlgorithmOptions interface {
 	algorithmOptions()
 }
-
-// -------------------------------------------------------------------------------------
 
 // Params selects a cipher implementation and supplies its algorithm-specific options.
 type Params struct {
@@ -33,8 +27,6 @@ type Params struct {
 	Options AlgorithmOptions
 }
 
-// -------------------------------------------------------------------------------------
-
 // Keypair contains the opaque public and private key strings produced by a
 // cipher. PrivateKey is transient material and must not be included in status
 // or mutation results.
@@ -44,8 +36,6 @@ type Keypair struct {
 	// PrivateKey is the key used to decrypt values.
 	PrivateKey string
 }
-
-// -------------------------------------------------------------------------------------
 
 // Cipher is the contract for key generation, secret encryption, and envelope
 // algorithm metadata. Key and ciphertext formats are implementation details,
@@ -63,8 +53,6 @@ type Cipher interface {
 	// Decrypt decrypts native ciphertext bytes with privateKey.
 	Decrypt(ciphertext []byte, privateKey string) (string, error)
 }
-
-// -------------------------------------------------------------------------------------
 
 // New constructs the cipher implementation selected by params. The selector is
 // explicit so each algorithm can own its option type.

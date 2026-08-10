@@ -6,8 +6,6 @@ import (
 	"github.com/go-envx/envx/app/internal/config"
 )
 
-// -------------------------------------------------------------------------------------
-
 // actionParams identifies the one secret being written.
 type actionParams struct {
 	// Group identifies the case-insensitive key group.
@@ -20,8 +18,6 @@ type actionParams struct {
 	NoConfirm bool
 }
 
-// -------------------------------------------------------------------------------------
-
 // actionResult carries only safe mutation metadata to the renderer.
 type actionResult struct {
 	// Group is the normalized key group.
@@ -31,8 +27,6 @@ type actionResult struct {
 	// StorePath is the workspace store that received the ciphertext.
 	StorePath string
 }
-
-// -------------------------------------------------------------------------------------
 
 // execute reads one secret value and delegates encryption and storage to the
 // root secrets manager.
@@ -64,8 +58,6 @@ func execute(
 		StorePath: c.Secrets.SecretsPath,
 	}, nil
 }
-
-// -------------------------------------------------------------------------------------
 
 // plaintextSource returns the explicit value or reads one value from the
 // command's selected input stream.

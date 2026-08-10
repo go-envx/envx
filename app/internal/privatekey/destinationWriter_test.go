@@ -6,22 +6,16 @@ import (
 	"testing"
 )
 
-// -------------------------------------------------------------------------------------
-
 // destinationErrorWriter returns one configured error for every write.
 type destinationErrorWriter struct {
 	// err is returned from Write.
 	err error
 }
 
-// -------------------------------------------------------------------------------------
-
 // Write returns the configured destination error.
 func (w destinationErrorWriter) Write([]byte) (int, error) {
 	return 0, w.err
 }
-
-// -------------------------------------------------------------------------------------
 
 // TestWriterDestinationWritesNormalizedEntry verifies the exact handoff format.
 func TestWriterDestinationWritesNormalizedEntry(t *testing.T) {
@@ -38,8 +32,6 @@ func TestWriterDestinationWritesNormalizedEntry(t *testing.T) {
 	}
 }
 
-// -------------------------------------------------------------------------------------
-
 // TestWriterDestinationRejectsNilWriter verifies a missing writer fails clearly.
 func TestWriterDestinationRejectsNilWriter(t *testing.T) {
 	t.Parallel()
@@ -52,8 +44,6 @@ func TestWriterDestinationRejectsNilWriter(t *testing.T) {
 		t.Errorf("Write() error = %q, want nil-writer error", got)
 	}
 }
-
-// -------------------------------------------------------------------------------------
 
 // TestWriterDestinationWrapsWriterError verifies errors from the handoff writer
 // remain discoverable by callers.

@@ -5,8 +5,6 @@ import (
 	"testing"
 )
 
-// -------------------------------------------------------------------------------------
-
 // TestErrorMessage verifies the formatted message carries the code.
 func TestErrorMessage(t *testing.T) {
 	t.Parallel()
@@ -16,8 +14,6 @@ func TestErrorMessage(t *testing.T) {
 		t.Errorf("Error() = %q, want %q", got, want)
 	}
 }
-
-// -------------------------------------------------------------------------------------
 
 // TestErrorAsType verifies the type is recoverable via errors.AsType so main
 // can extract the code from a wrapped error — mirroring the consumer path.

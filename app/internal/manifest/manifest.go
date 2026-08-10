@@ -14,8 +14,6 @@ import (
 // defaultFilename is the conventional name for the workspace manifest.
 const defaultFilename = "envx.yaml"
 
-// -------------------------------------------------------------------------------------
-
 // Load discovers the manifest (an explicit path, else a walk-up search), then
 // reads, parses, and validates it. It returns the manifest struct and the
 // absolute path it was loaded from.
@@ -28,8 +26,6 @@ func Load(path string) (m *schema.Manifest, manifestPath string, err error) {
 	m, err = load(found)
 	return m, found, err
 }
-
-// -------------------------------------------------------------------------------------
 
 // LoadOptional loads the manifest when one is available. It returns a nil
 // manifest when the explicit or discovered path does not exist, allowing callers
@@ -50,8 +46,6 @@ func LoadOptional(path string) (m *schema.Manifest, manifestPath string, err err
 	return m, manifestPath, nil
 }
 
-// -------------------------------------------------------------------------------------
-
 // load reads and validates a manifest at a path already discovered by the
 // loader's discovery step.
 func load(found string) (*schema.Manifest, error) {
@@ -71,8 +65,6 @@ func load(found string) (*schema.Manifest, error) {
 	return m, nil
 }
 
-// -------------------------------------------------------------------------------------
-
 // parse unmarshals raw YAML into a schema.Manifest and runs structural
 // validation. The on-disk location is recorded separately by Load.
 func parse(data []byte) (*schema.Manifest, error) {
@@ -91,8 +83,6 @@ func parse(data []byte) (*schema.Manifest, error) {
 	// Return the manifest struct.
 	return &m, nil
 }
-
-// -------------------------------------------------------------------------------------
 
 // discover locates the manifest file using a two-tier strategy:
 //

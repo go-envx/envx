@@ -6,8 +6,6 @@ import (
 	"github.com/spf13/pflag"
 )
 
-// -------------------------------------------------------------------------------------
-
 // GetInput extracts the explicitly-set setting flags from fs into a *config.Input
 // for resolution, including the --config flag. A setting is present only when the
 // user changed its flag; a flag never registered is never changed, so it resolves
@@ -25,8 +23,6 @@ func GetInput(fs *pflag.FlagSet) *config.Input {
 	}
 }
 
-// -------------------------------------------------------------------------------------
-
 // optString returns a pointer to the flag's value when the user explicitly set it,
 // and nil otherwise (including when the flag was never registered).
 func optString(fs *pflag.FlagSet, s *schema.FlagSpec) *string {
@@ -36,8 +32,6 @@ func optString(fs *pflag.FlagSet, s *schema.FlagSpec) *string {
 	v, _ := fs.GetString(s.Name)
 	return &v
 }
-
-// -------------------------------------------------------------------------------------
 
 // optBool returns a pointer to the flag's value when the user explicitly set it,
 // and nil otherwise (including when the flag was never registered).

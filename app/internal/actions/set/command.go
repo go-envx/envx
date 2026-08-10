@@ -28,8 +28,6 @@ const (
 	`
 )
 
-// -------------------------------------------------------------------------------------
-
 // NewCommand builds the "set" command, which parses args into the action's
 // params/config and executes the action.
 func NewCommand() *cobra.Command {

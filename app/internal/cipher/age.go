@@ -14,38 +14,26 @@ const (
 	agePrivateKeyPrefix = "age-private-key:"
 )
 
-// -------------------------------------------------------------------------------------
-
 // AgeOptions reserves a construction-time options type for age-specific
 // behavior. The zero value is currently the complete configuration.
 type AgeOptions struct{}
 
-// -------------------------------------------------------------------------------------
-
 // algorithmOptions marks AgeOptions as valid input to New.
 func (AgeOptions) algorithmOptions() {}
-
-// -------------------------------------------------------------------------------------
 
 // newAgeCipher constructs an age cipher with the supplied options.
 func newAgeCipher(AgeOptions) (Cipher, error) {
 	return ageCipher{}, nil
 }
 
-// -------------------------------------------------------------------------------------
-
 // ageCipher implements Cipher with age X25519 identities and native age
 // ciphertext bytes.
 type ageCipher struct{}
-
-// -------------------------------------------------------------------------------------
 
 // Algorithm identifies the envelope algorithm produced by the age cipher.
 func (ageCipher) Algorithm() Algorithm {
 	return Age
 }
-
-// -------------------------------------------------------------------------------------
 
 // Keypair creates an age X25519 identity and returns its textual key forms.
 func (ageCipher) Keypair() (Keypair, error) {
@@ -59,8 +47,6 @@ func (ageCipher) Keypair() (Keypair, error) {
 		PrivateKey: agePrivateKeyPrefix + identity.String(),
 	}, nil
 }
-
-// -------------------------------------------------------------------------------------
 
 // ValidateKeypair checks that both age keys are valid and represent one identity.
 func (ageCipher) ValidateKeypair(publicKey, privateKey string) error {
@@ -87,8 +73,6 @@ func (ageCipher) ValidateKeypair(publicKey, privateKey string) error {
 	}
 	return nil
 }
-
-// -------------------------------------------------------------------------------------
 
 // Encrypt encrypts plaintext for an age X25519 recipient and returns native
 // age ciphertext bytes.
@@ -118,8 +102,6 @@ func (ageCipher) Encrypt(plaintext, publicKey string) ([]byte, error) {
 
 	return append([]byte(nil), ciphertext.Bytes()...), nil
 }
-
-// -------------------------------------------------------------------------------------
 
 // Decrypt decrypts native age ciphertext bytes with an age X25519 identity.
 func (ageCipher) Decrypt(ciphertext []byte, privateKey string) (string, error) {

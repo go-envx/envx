@@ -5,8 +5,6 @@ import (
 	"runtime"
 )
 
-// -------------------------------------------------------------------------------------
-
 // root returns the absolute path to app
 func root() string {
 	_, thisFile, _, ok := runtime.Caller(0)
@@ -16,8 +14,6 @@ func root() string {
 	return filepath.Join(filepath.Dir(thisFile), "..", "..")
 }
 
-// -------------------------------------------------------------------------------------
-
 // Testdata returns the absolute path to the testdata directory, optionally
 // joined with a subpath within it.
 //   - Testdata() -> "<root>/testdata"
@@ -26,8 +22,6 @@ func root() string {
 func Testdata(path ...string) string {
 	return filepath.Join(append([]string{root(), "testdata"}, path...)...)
 }
-
-// -------------------------------------------------------------------------------------
 
 // Manifest returns the absolute path to a fixture project's envx.yaml, e.g.
 //   - Manifest("basic") -> "<root>/testdata/basic/envx.yaml"

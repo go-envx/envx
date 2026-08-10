@@ -14,8 +14,6 @@ const (
 	secretsField    = "secrets"
 )
 
-// -------------------------------------------------------------------------------------
-
 // validate checks the known document fields without discarding unknown fields.
 func (d *Document) validate() error {
 	root, err := d.topLevel()
@@ -51,8 +49,6 @@ func (d *Document) validate() error {
 	return nil
 }
 
-// -------------------------------------------------------------------------------------
-
 // validatePublicKeys checks the public_keys mapping and its scalar values.
 func validatePublicKeys(node *yaml.Node) error {
 	if node.Kind != yaml.MappingNode {
@@ -86,8 +82,6 @@ func validatePublicKeys(node *yaml.Node) error {
 	}
 	return nil
 }
-
-// -------------------------------------------------------------------------------------
 
 // validateSecrets checks groups, entry keys, scalar values, and ciphertext
 // envelopes while allowing plaintext values for migration workflows.
@@ -146,8 +140,6 @@ func validateSecrets(node *yaml.Node) error {
 	return nil
 }
 
-// -------------------------------------------------------------------------------------
-
 // validateIdentifier rejects empty YAML identifiers used by document methods.
 func validateIdentifier(kind, value string) error {
 	if value == "" {
@@ -155,8 +147,6 @@ func validateIdentifier(kind, value string) error {
 	}
 	return nil
 }
-
-// -------------------------------------------------------------------------------------
 
 // validateSecretValue accepts plaintext and checks values that claim the
 // encrypted envelope format.

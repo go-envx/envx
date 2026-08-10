@@ -8,12 +8,8 @@ import (
 	"github.com/go-envx/envx/app/internal/secrets/internal/store"
 )
 
-// -------------------------------------------------------------------------------------
-
 // PlaintextResolver lazily supplies one secret plaintext value.
 type PlaintextResolver func() (string, error)
-
-// -------------------------------------------------------------------------------------
 
 // Set obtains one plaintext value lazily, encrypts it, and stores its
 // algorithm-tagged ciphertext. The group must already have a public key;

@@ -5,15 +5,11 @@ import (
 	"github.com/go-envx/envx/app/internal/secrets"
 )
 
-// -------------------------------------------------------------------------------------
-
 // actionParams are the inputs to the keypair inspection workflow.
 type actionParams struct {
 	// Group identifies the secret group to inspect.
 	Group string
 }
-
-// -------------------------------------------------------------------------------------
 
 // execute runs the manager's non-mutating keypair inspection workflow.
 func execute(p actionParams, in *config.Input) (secrets.KeypairMetadata, error) {

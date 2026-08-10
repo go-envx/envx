@@ -5,8 +5,6 @@ import (
 	"testing"
 )
 
-// -------------------------------------------------------------------------------------
-
 // TestValidateGroup verifies accepted group names and rejected file-format
 // delimiters or whitespace.
 func TestValidateGroup(t *testing.T) {
@@ -35,8 +33,6 @@ func TestValidateGroup(t *testing.T) {
 		})
 	}
 }
-
-// -------------------------------------------------------------------------------------
 
 // TestValidateEntry verifies private-key values cannot escape one-line format.
 func TestValidateEntry(t *testing.T) {

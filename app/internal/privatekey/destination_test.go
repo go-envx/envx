@@ -8,8 +8,6 @@ import (
 	"testing"
 )
 
-// -------------------------------------------------------------------------------------
-
 // TestDestinationsWriteWithoutReturningMaterial verifies file mode, file format,
 // and explicit writer handoff behavior.
 func TestDestinationsWriteWithoutReturningMaterial(t *testing.T) {
@@ -44,8 +42,6 @@ func TestDestinationsWriteWithoutReturningMaterial(t *testing.T) {
 		t.Errorf("writer output = %q", output.String())
 	}
 }
-
-// -------------------------------------------------------------------------------------
 
 // TestFilePath reports paths only for destinations that expose one.
 func TestFilePath(t *testing.T) {

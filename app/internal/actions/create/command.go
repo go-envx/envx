@@ -25,8 +25,6 @@ const (
 	`
 )
 
-// -------------------------------------------------------------------------------------
-
 // NewCommand builds the "create" command and its per-template subcommands. create
 // itself takes no action; each subcommand scaffolds one named template.
 func NewCommand() *cobra.Command {
@@ -43,8 +41,6 @@ func NewCommand() *cobra.Command {
 	)
 	return cmd
 }
-
-// -------------------------------------------------------------------------------------
 
 // newTemplateCmd builds one "create <template>" subcommand. Each scaffolds its
 // named template into --target-dir (defaulting to a directory of the same name),
@@ -78,8 +74,6 @@ func newTemplateCmd(name, short, long string) *cobra.Command {
 	cmd.Flags().BoolVar(&force, "force", false, "overwrite existing files")
 	return cmd
 }
-
-// -------------------------------------------------------------------------------------
 
 // summary reports the scaffolded files and the first command to try, so the user
 // can start exploring immediately.

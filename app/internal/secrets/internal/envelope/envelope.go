@@ -12,8 +12,6 @@ import (
 
 const ciphertextPrefix = "encrypted-"
 
-// -------------------------------------------------------------------------------------
-
 // Encode wraps native cipher bytes in the algorithm-tagged storage format.
 func Encode(algorithm cipher.Algorithm, payload []byte) (string, error) {
 	if err := validateAlgorithm(algorithm); err != nil {
@@ -28,8 +26,6 @@ func Encode(algorithm cipher.Algorithm, payload []byte) (string, error) {
 		"%s%s:%s", ciphertextPrefix, algorithm, encoded,
 	), nil
 }
-
-// -------------------------------------------------------------------------------------
 
 // Decode unwraps a stored value into its algorithm and native cipher bytes. It
 // accepts only the canonical two-part, unpadded base64url format.
@@ -62,22 +58,16 @@ func Decode(value string) (cipher.Algorithm, []byte, error) {
 	return algorithm, payload, nil
 }
 
-// -------------------------------------------------------------------------------------
-
 // Validate checks whether value is a valid algorithm-tagged ciphertext envelope.
 func Validate(value string) error {
 	_, _, err := Decode(value)
 	return err
 }
 
-// -------------------------------------------------------------------------------------
-
 // IsCiphertext reports whether value claims the ciphertext envelope format.
 func IsCiphertext(value string) bool {
 	return strings.HasPrefix(value, ciphertextPrefix)
 }
-
-// -------------------------------------------------------------------------------------
 
 // validateAlgorithm ensures an algorithm identifier cannot change the envelope
 // grammar or introduce whitespace into a stored scalar.
@@ -91,8 +81,6 @@ func validateAlgorithm(algorithm cipher.Algorithm) error {
 	}
 	return nil
 }
-
-// -------------------------------------------------------------------------------------
 
 // invalidEnvelopeError returns the stable malformed-envelope error shared by
 // all callers that parse stored ciphertext values.

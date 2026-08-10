@@ -5,8 +5,6 @@ import (
 	"testing"
 )
 
-// -------------------------------------------------------------------------------------
-
 // TestSplitRef verifies explicit group/key parsing and canonical group names.
 func TestSplitRef(t *testing.T) {
 	t.Parallel()

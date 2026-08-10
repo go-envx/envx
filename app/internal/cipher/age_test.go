@@ -6,8 +6,6 @@ import (
 	"testing"
 )
 
-// -------------------------------------------------------------------------------------
-
 // TestAgeRoundTrip verifies key generation, native encryption, and decryption
 // through the public Cipher interface.
 func TestAgeRoundTrip(t *testing.T) {
@@ -42,8 +40,6 @@ func TestAgeRoundTrip(t *testing.T) {
 	}
 }
 
-// -------------------------------------------------------------------------------------
-
 // TestAgeRejectsWrongKey ensures a ciphertext cannot be opened with another
 // age identity.
 func TestAgeRejectsWrongKey(t *testing.T) {
@@ -70,8 +66,6 @@ func TestAgeRejectsWrongKey(t *testing.T) {
 		t.Fatal("Decrypt() with the wrong key succeeded")
 	}
 }
-
-// -------------------------------------------------------------------------------------
 
 // TestAgeValidatesKeypair checks age key format and public/private matching.
 func TestAgeValidatesKeypair(t *testing.T) {
@@ -125,8 +119,6 @@ func TestAgeValidatesKeypair(t *testing.T) {
 	}
 }
 
-// -------------------------------------------------------------------------------------
-
 // TestAgeRejectsMalformedInputs keeps algorithm-specific parsing errors behind
 // the Cipher boundary.
 func TestAgeRejectsMalformedInputs(t *testing.T) {
@@ -145,8 +137,6 @@ func TestAgeRejectsMalformedInputs(t *testing.T) {
 		t.Fatal("Decrypt() accepted malformed ciphertext")
 	}
 }
-
-// -------------------------------------------------------------------------------------
 
 // TestAgeReturnsNativeCiphertext verifies age output is native protocol bytes,
 // leaving single-line storage encoding to the secrets package.

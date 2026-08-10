@@ -8,8 +8,6 @@ import (
 	"testing"
 )
 
-// -------------------------------------------------------------------------------------
-
 // setupWorkspace creates a temp directory with one namespace (env/postgres) and
 // returns its path. envmerge reads only the namespace overlays, so no other
 // files are needed.
@@ -35,8 +33,6 @@ func setupWorkspace(t *testing.T) string {
 	return dir
 }
 
-// -------------------------------------------------------------------------------------
-
 // baseParams builds envmerge.Params for the temp workspace declaring the
 // development and production environments.
 func baseParams(dir string) Params {
@@ -45,8 +41,6 @@ func baseParams(dir string) Params {
 		Environments: []string{"development", "production"},
 	}
 }
-
-// -------------------------------------------------------------------------------------
 
 // TestResolveSuccess verifies params resolve to the merged environment.
 func TestResolveSuccess(t *testing.T) {
@@ -62,8 +56,6 @@ func TestResolveSuccess(t *testing.T) {
 		t.Errorf("HOST = %q, want localhost (development overlay absent)", v)
 	}
 }
-
-// -------------------------------------------------------------------------------------
 
 // TestResolveDefaultEnv verifies an empty Settings.Env falls back to the first
 // declared environment.
@@ -81,8 +73,6 @@ func TestResolveDefaultEnv(t *testing.T) {
 	}
 }
 
-// -------------------------------------------------------------------------------------
-
 // TestResolveOverride verifies Settings.Env selects that environment's overlay
 // (as diff relies on, passing each side).
 func TestResolveOverride(t *testing.T) {
@@ -99,8 +89,6 @@ func TestResolveOverride(t *testing.T) {
 	}
 }
 
-// -------------------------------------------------------------------------------------
-
 // TestResolveErrors verifies an undeclared environment fails.
 func TestResolveErrors(t *testing.T) {
 	t.Parallel()
@@ -112,8 +100,6 @@ func TestResolveErrors(t *testing.T) {
 	}
 }
 
-// -------------------------------------------------------------------------------------
-
 // writeYAML writes a YAML file into dir.
 func writeYAML(t *testing.T, dir, name, body string) {
 	t.Helper()
@@ -121,8 +107,6 @@ func writeYAML(t *testing.T, dir, name, body string) {
 		t.Fatal(err)
 	}
 }
-
-// -------------------------------------------------------------------------------------
 
 // TestMergeNamespacesOverlay verifies an overlay overrides the base and origin
 // tracking attributes the value to the overlay file.
@@ -154,8 +138,6 @@ func TestMergeNamespacesOverlay(t *testing.T) {
 		t.Errorf("HOST winner = %q, want overlay", origin.Winner.File)
 	}
 }
-
-// -------------------------------------------------------------------------------------
 
 // TestMergeNamespacesShadowTracksBase verifies that when an environment overlay
 // overrides a base value, origin tracking records the base file as shadowed by
@@ -201,8 +183,6 @@ func TestMergeNamespacesShadowTracksBase(t *testing.T) {
 	}
 }
 
-// -------------------------------------------------------------------------------------
-
 // TestMergeNamespacesRequireOverlaysMissingOverlay verifies require_overlays mode
 // errors when an overlay file is absent, while lax mode tolerates it.
 func TestMergeNamespacesRequireOverlaysMissingOverlay(t *testing.T) {
@@ -220,8 +200,6 @@ func TestMergeNamespacesRequireOverlaysMissingOverlay(t *testing.T) {
 		t.Errorf("lax mode should tolerate missing overlay, got %v", err)
 	}
 }
-
-// -------------------------------------------------------------------------------------
 
 // TestMergeNamespacesNestedFlatEquivalence verifies an overlay may override a
 // base value written in the other spelling: a nested log.level in the base is
@@ -260,8 +238,6 @@ func TestMergeNamespacesNestedFlatEquivalence(t *testing.T) {
 	}
 }
 
-// -------------------------------------------------------------------------------------
-
 // TestMergeNamespacesNestedPartialOverride verifies layered flattening preserves
 // deep-merge semantics for nested maps: an overlay that sets one leaf under a
 // mapping overrides only that leaf, leaving the base's sibling leaves intact.
@@ -287,8 +263,6 @@ func TestMergeNamespacesNestedPartialOverride(t *testing.T) {
 	}
 }
 
-// -------------------------------------------------------------------------------------
-
 // TestMergeNamespacesSingleFileCollision verifies two spellings that collapse to
 // the same env key within a single file still error, since the value would
 // otherwise be ambiguous.
@@ -305,8 +279,6 @@ func TestMergeNamespacesSingleFileCollision(t *testing.T) {
 		t.Fatal("expected collision error for two spellings in one file")
 	}
 }
-
-// -------------------------------------------------------------------------------------
 
 // TestMergeNamespacesPrefixSuffix verifies global prefix/suffix and namespace
 // prefixing apply to every key.
@@ -329,8 +301,6 @@ func TestMergeNamespacesPrefixSuffix(t *testing.T) {
 	}
 }
 
-// -------------------------------------------------------------------------------------
-
 // TestMergeNamespacesJoinsList verifies a list-valued leaf is joined into a
 // single env var using the configured delimiter.
 func TestMergeNamespacesJoinsList(t *testing.T) {
@@ -352,8 +322,6 @@ func TestMergeNamespacesJoinsList(t *testing.T) {
 	}
 }
 
-// -------------------------------------------------------------------------------------
-
 // TestBuildJoinsListWithDefaultDelimiter verifies Build applies the default comma
 // delimiter to a list leaf when none is configured.
 func TestBuildJoinsListWithDefaultDelimiter(t *testing.T) {
@@ -374,8 +342,6 @@ func TestBuildJoinsListWithDefaultDelimiter(t *testing.T) {
 	}
 }
 
-// -------------------------------------------------------------------------------------
-
 // fakeResolver implements Resolver for testing the reference-resolution step: it
 // maps known reference values to results, fails a designated value, and passes
 // everything else through unchanged.
@@ -383,8 +349,6 @@ type fakeResolver struct {
 	values map[string]string
 	fail   string
 }
-
-// -------------------------------------------------------------------------------------
 
 // Resolve maps value to its result, erroring on the designated failure value and
 // returning unknown values unchanged.
@@ -397,8 +361,6 @@ func (f fakeResolver) Resolve(value, _ string) (string, error) {
 	}
 	return value, nil
 }
-
-// -------------------------------------------------------------------------------------
 
 // TestBuildResolvesReferences verifies Build routes each merged value through the
 // resolver, dereferencing references while leaving plain values untouched.
@@ -424,8 +386,6 @@ func TestBuildResolvesReferences(t *testing.T) {
 	}
 }
 
-// -------------------------------------------------------------------------------------
-
 // TestBuildResolverError verifies a resolver failure surfaces from Build.
 func TestBuildResolverError(t *testing.T) {
 	t.Parallel()
@@ -442,8 +402,6 @@ func TestBuildResolverError(t *testing.T) {
 		t.Fatal("expected error from resolver")
 	}
 }
-
-// -------------------------------------------------------------------------------------
 
 // TestBuildSkipsShadowedReferences verifies references discarded by overlay or
 // namespace precedence never reach the resolver.
@@ -494,8 +452,6 @@ func TestBuildSkipsShadowedReferences(t *testing.T) {
 	})
 }
 
-// -------------------------------------------------------------------------------------
-
 // TestBuildResolvesListReferences verifies references inside a list are
 // dereferenced per item after winner selection and before the list is joined.
 func TestBuildResolvesListReferences(t *testing.T) {
@@ -519,8 +475,6 @@ func TestBuildResolvesListReferences(t *testing.T) {
 		t.Errorf("TOKENS = %q, want tok-a,tok-b (list items resolved)", v)
 	}
 }
-
-// -------------------------------------------------------------------------------------
 
 // TestBuildRedactsResolvedListItemErrors verifies rendering errors identify a
 // list item's location without exposing its resolved plaintext.

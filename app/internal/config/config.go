@@ -23,8 +23,6 @@ const (
 	defaultCipherAlgorithm = cipher.Age
 )
 
-// -------------------------------------------------------------------------------------
-
 // Input is the raw user input one action gathers at the frontend edge (a cobra
 // command today, an HTTP handler tomorrow). Each setting is optional: a non-nil
 // value means the user provided it explicitly and it wins the precedence chain,
@@ -50,8 +48,6 @@ type Input struct {
 	Overload *bool
 }
 
-// -------------------------------------------------------------------------------------
-
 // manifestContext bundles the loaded manifest, the directory it was loaded from,
 // and the project being resolved: the shared input resolveManifest and
 // resolveProjectLayer both read, and which Result retains so OverlayPath can
@@ -65,8 +61,6 @@ type manifestContext struct {
 	project string
 }
 
-// -------------------------------------------------------------------------------------
-
 // projectLayer is the project's contribution to resolution: its setting overrides
 // and its includes resolved to absolute paths. The zero value is the global-only
 // context — no overrides and no includes.
@@ -76,8 +70,6 @@ type projectLayer struct {
 	// includes are the project's namespaces resolved to absolute paths.
 	includes []string
 }
-
-// -------------------------------------------------------------------------------------
 
 // ResolveProject resolves a project's build-ready configuration: it loads the
 // manifest, meshes it with the input and ENVX_* vars, then constructs the
@@ -106,8 +98,6 @@ func ResolveProject(in *Input, project string) (*Result, error) {
 	return res, nil
 }
 
-// -------------------------------------------------------------------------------------
-
 // ResolveWorkspace resolves manifest-level configuration without selecting a
 // project or opening the secrets store, leaving the value resolver nil. The set
 // action calls it to locate and edit a single overlay file, which needs no
@@ -115,8 +105,6 @@ func ResolveProject(in *Input, project string) (*Result, error) {
 func ResolveWorkspace(in *Input) (*Result, error) {
 	return resolve(in, "")
 }
-
-// -------------------------------------------------------------------------------------
 
 // resolve is the shared core of ResolveProject and ResolveWorkspace: it loads the
 // manifest (honoring --config, then ENVX_CONFIG, then a walk-up search) and
@@ -148,8 +136,6 @@ func resolve(in *Input, project string) (*Result, error) {
 	return resolveManifest(mc, in)
 }
 
-// -------------------------------------------------------------------------------------
-
 // resolveManifestPath resolves where the manifest lives, honoring the precedence
 // --config flag > ENVX_CONFIG env var > "" (an empty result lets the manifest
 // package walk up from the working directory).
@@ -162,8 +148,6 @@ func resolveManifestPath(in *Input) string {
 	}
 	return ""
 }
-
-// -------------------------------------------------------------------------------------
 
 // resolveManifest assembles a *Result from an already-loaded manifest: it computes
 // the project layer, then delegates to the envmerge and runner param builders that
@@ -185,8 +169,6 @@ func resolveManifest(mc manifestContext, in *Input) (*Result, error) {
 		manifestContext: mc,
 	}, nil
 }
-
-// -------------------------------------------------------------------------------------
 
 // resolveProjectLayer computes the project layer from the manifest context. An
 // empty project yields the zero layer (the global-only context); a named project
@@ -217,8 +199,6 @@ func resolveProjectLayer(mc manifestContext) (projectLayer, error) {
 		includes: includes,
 	}, nil
 }
-
-// -------------------------------------------------------------------------------------
 
 // resolveEnvmergeParams builds the envmerge input: the project's includes, the
 // declared environments, and every setting layered through the precedence chain
@@ -268,8 +248,6 @@ func resolveEnvmergeParams(
 	}
 }
 
-// -------------------------------------------------------------------------------------
-
 // resolveRunnerParams builds the runner input: the overload knob layered through
 // the precedence chain explicit (input) > ENVX_OVERLOAD > project > global.
 func resolveRunnerParams(
@@ -285,8 +263,6 @@ func resolveRunnerParams(
 		),
 	}
 }
-
-// -------------------------------------------------------------------------------------
 
 // resolveSecretsParams builds the secrets input: the resolved workspace store
 // and private-key paths. Secrets are workspace-level — not project- or
@@ -316,8 +292,6 @@ func resolveSecretsParams(mc manifestContext) secrets.Params {
 		KeysPath:    keysPath,
 	}
 }
-
-// -------------------------------------------------------------------------------------
 
 // resolveCipherParams resolves the configured algorithm and its construction
 // options while keeping cipher selection outside the secrets package.

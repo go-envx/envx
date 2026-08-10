@@ -5,8 +5,6 @@ import (
 	"runtime"
 )
 
-// -------------------------------------------------------------------------------------
-
 // BuildInfo carries the build metadata injected at link time (see main's
 // -ldflags). It is passed to NewRootCmd and rendered by the --version flag so a
 // released binary can be traced back to the exact revision it was built from.
@@ -18,8 +16,6 @@ type BuildInfo struct {
 	// Date is the build timestamp.
 	Date string
 }
-
-// -------------------------------------------------------------------------------------
 
 // formatVersion renders BuildInfo into the string Cobra prints for --version,
 // appending the Go toolchain version and target platform so a bug report carries

@@ -8,8 +8,6 @@ import (
 	"github.com/go-envx/envx/app/internal/runner"
 )
 
-// -------------------------------------------------------------------------------------
-
 // actionParams are the positional inputs to the run action.
 type actionParams struct {
 	// Project is the project name to resolve.
@@ -18,8 +16,6 @@ type actionParams struct {
 	ExecArgs []string
 }
 
-// -------------------------------------------------------------------------------------
-
 // streams bundles the output sinks the run action wires the child process to.
 type streams struct {
 	// Stdout is the sink for the child process's standard output.
@@ -27,8 +23,6 @@ type streams struct {
 	// Stderr is the sink for the child process's standard error.
 	Stderr io.Writer
 }
-
-// -------------------------------------------------------------------------------------
 
 // execute is the imperative shell: resolve the input into an envmerge.Params, build
 // the merged environment, then run the child process with the merged environment

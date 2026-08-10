@@ -12,8 +12,6 @@ import (
 	"golang.org/x/term"
 )
 
-// -------------------------------------------------------------------------------------
-
 // readerParams supplies the input, output, and terminal dependencies for a
 // secret reader.
 type readerParams struct {
@@ -31,15 +29,11 @@ type readerParams struct {
 	NoConfirm bool
 }
 
-// -------------------------------------------------------------------------------------
-
 // reader owns secret input selection and interactive terminal reading.
 type reader struct {
 	// params holds the reader's input and terminal dependencies.
 	params readerParams
 }
-
-// -------------------------------------------------------------------------------------
 
 // newReader constructs a secret reader and fills in the production terminal
 // dependencies when tests have not supplied replacements.
@@ -56,8 +50,6 @@ func newReader(params readerParams) *reader {
 	return &reader{params: params}
 }
 
-// -------------------------------------------------------------------------------------
-
 // readSecret reads piped plaintext or confirmed hidden terminal input.
 func (r *reader) readSecret() (string, error) {
 	file, ok := r.params.Stdin.(*os.File)
@@ -66,8 +58,6 @@ func (r *reader) readSecret() (string, error) {
 	}
 	return r.readTerminalPlaintext(file)
 }
-
-// -------------------------------------------------------------------------------------
 
 // readPlaintext reads a piped value and removes one line ending supplied by the
 // shell while preserving all other plaintext bytes.
@@ -83,8 +73,6 @@ func readPlaintext(input io.Reader) (string, error) {
 	}
 	return plaintext, nil
 }
-
-// -------------------------------------------------------------------------------------
 
 // readTerminalPlaintext reads one hidden value and asks for confirmation before
 // returning it.
@@ -116,8 +104,6 @@ func (r *reader) readTerminalPlaintext(input *os.File) (string, error) {
 	return secret, nil
 }
 
-// -------------------------------------------------------------------------------------
-
 // readTerminalValue writes one prompt and reads one hidden terminal value.
 func (r *reader) readTerminalValue(input *os.File, label string) (string, error) {
 	if _, err := fmt.Fprintf(r.params.Stderr, "%s: ", label); err != nil {
@@ -133,8 +119,6 @@ func (r *reader) readTerminalValue(input *os.File, label string) (string, error)
 	return string(data), nil
 }
 
-// -------------------------------------------------------------------------------------
-
 // readConfirmationInput reads and parses the interactive yes-or-no response.
 func readConfirmationInput(input *os.File) (bool, error) {
 	response, err := bufio.NewReader(input).ReadString('\n')
@@ -146,8 +130,6 @@ func readConfirmationInput(input *os.File) (bool, error) {
 	}
 	return parseConfirmation(response)
 }
-
-// -------------------------------------------------------------------------------------
 
 // parseConfirmation maps an interactive response to a confirmation decision.
 func parseConfirmation(response string) (bool, error) {

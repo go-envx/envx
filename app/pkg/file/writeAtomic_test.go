@@ -7,8 +7,6 @@ import (
 	"testing"
 )
 
-// -------------------------------------------------------------------------------------
-
 // TestWriteAtomicCreates verifies a new file is created with 0644 permissions
 // and the exact contents.
 func TestWriteAtomicCreates(t *testing.T) {
@@ -38,8 +36,6 @@ func TestWriteAtomicCreates(t *testing.T) {
 		t.Errorf("permissions = %o, want 644", perm)
 	}
 }
-
-// -------------------------------------------------------------------------------------
 
 // TestWriteAtomicOverwrites verifies an existing file is fully replaced and no
 // temp artifacts are left behind in the directory.
@@ -84,8 +80,6 @@ func TestWriteAtomicOverwrites(t *testing.T) {
 	}
 }
 
-// -------------------------------------------------------------------------------------
-
 // TestWriteAtomicPrivateCreates verifies a new private file is created with
 // 0600 permissions.
 func TestWriteAtomicPrivateCreates(t *testing.T) {
@@ -106,8 +100,6 @@ func TestWriteAtomicPrivateCreates(t *testing.T) {
 		t.Errorf("permissions = %o, want 600", perm)
 	}
 }
-
-// -------------------------------------------------------------------------------------
 
 // TestWriteAtomicPrivateOverwrites verifies private mode is applied when an
 // existing file has wider permissions.
