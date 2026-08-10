@@ -9,6 +9,7 @@ import (
 
 	"github.com/go-envx/envx/app/internal/config"
 	"github.com/go-envx/envx/app/pkg/file"
+	"github.com/go-envx/envx/app/pkg/yamlx"
 	"gopkg.in/yaml.v3"
 )
 
@@ -126,7 +127,7 @@ func documentRoot(doc *yaml.Node) (*yaml.Node, error) {
 // position survive; a missing key is appended after the existing entries.
 func setNestedKey(node *yaml.Node, parts []string, value string) error {
 	for i, part := range parts[:len(parts)-1] {
-		child := mappingValue(node, part)
+		child, _ := yamlx.MappingEntry(node, part, false)
 		switch {
 		case child == nil:
 			child = &yaml.Node{Kind: yaml.MappingNode}
@@ -147,7 +148,7 @@ func setNestedKey(node *yaml.Node, parts []string, value string) error {
 	}
 
 	last := parts[len(parts)-1]
-	if v := mappingValue(node, last); v != nil {
+	if v, _ := yamlx.MappingEntry(node, last, false); v != nil {
 		if v.Kind == yaml.SequenceNode || v.Kind == yaml.MappingNode {
 			kind := "a mapping"
 			if v.Kind == yaml.SequenceNode {
@@ -157,24 +158,12 @@ func setNestedKey(node *yaml.Node, parts []string, value string) error {
 				"%q is %s; refusing to overwrite it", strings.Join(parts, "."), kind,
 			)
 		}
-		setScalar(v, value)
+		yamlx.SetStringScalar(v, value)
 		return nil
 	}
 	leaf := new(yaml.Node)
-	setScalar(leaf, value)
+	yamlx.SetStringScalar(leaf, value)
 	appendPair(node, last, leaf)
-	return nil
-}
-
-// mappingValue returns the value node paired with key in a mapping node, or nil
-// when the key is absent. A mapping stores its entries as alternating key/value
-// nodes in Content.
-func mappingValue(node *yaml.Node, key string) *yaml.Node {
-	for i := 0; i+1 < len(node.Content); i += 2 {
-		if node.Content[i].Value == key {
-			return node.Content[i+1]
-		}
-	}
 	return nil
 }
 
@@ -183,18 +172,6 @@ func mappingValue(node *yaml.Node, key string) *yaml.Node {
 func appendPair(node *yaml.Node, key string, value *yaml.Node) {
 	keyNode := &yaml.Node{Kind: yaml.ScalarNode, Tag: "!!str", Value: key}
 	node.Content = append(node.Content, keyNode, value)
-}
-
-// setScalar writes value into node as a string scalar, clearing any prior style
-// and children so the encoder can re-quote as needed. It mutates only the value
-// fields, so an existing node keeps its comments and position; env values are
-// always strings, matching envx's flattened output.
-func setScalar(node *yaml.Node, value string) {
-	node.Kind = yaml.ScalarNode
-	node.Tag = "!!str"
-	node.Style = 0
-	node.Value = value
-	node.Content = nil
 }
 
 // marshalDoc encodes the document node using indent spaces per level, matching
@@ -217,44 +194,11 @@ func marshalDoc(doc *yaml.Node, indent int) ([]byte, error) {
 const defaultIndent = 2
 
 // detectIndent infers the per-level indentation width from the document's first
-// nested mapping, measuring the column gap between a key and its child. It reads
-// the parsed node positions rather than scanning text, so comments and blank
-// lines never skew it. It falls back to defaultIndent for a flat/empty document
-// or a width outside YAML's supported 2..9 range, so the encoder always receives
-// a valid, non-reflowing setting.
+// nested mapping via yamlx.IndentLevel, falling back to defaultIndent when the
+// document has no block indentation to measure.
 func detectIndent(doc *yaml.Node) int {
-	if len(doc.Content) == 0 {
-		return defaultIndent
-	}
-	if n, ok := firstNestedIndent(doc.Content[0]); ok && n >= 2 && n <= 9 {
+	if n, ok := yamlx.IndentLevel(doc); ok {
 		return n
 	}
 	return defaultIndent
-}
-
-// firstNestedIndent walks node depth-first and returns the column gap between the
-// first block-mapping key that has a nested block-mapping child and that child,
-// i.e. the document's indentation step. Flow-style mappings ("{a: 1}") are
-// skipped: they carry no block indentation and their column gap is an artifact of
-// the inline layout, not a step to imitate. It reports false when node holds no
-// block mapping to measure.
-func firstNestedIndent(node *yaml.Node) (int, bool) {
-	if node.Kind != yaml.MappingNode || node.Style&yaml.FlowStyle != 0 {
-		return 0, false
-	}
-	for i := 0; i+1 < len(node.Content); i += 2 {
-		key, val := node.Content[i], node.Content[i+1]
-		if val.Kind != yaml.MappingNode || val.Style&yaml.FlowStyle != 0 {
-			continue
-		}
-		if len(val.Content) > 0 {
-			if gap := val.Content[0].Column - key.Column; gap > 0 {
-				return gap, true
-			}
-		}
-		if gap, ok := firstNestedIndent(val); ok {
-			return gap, true
-		}
-	}
-	return 0, false
 }

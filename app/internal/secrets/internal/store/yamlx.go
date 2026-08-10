@@ -75,12 +75,3 @@ func appendMappingEntry(mapping *yaml.Node, key, value string) {
 func appendMappingNode(mapping *yaml.Node, key string, value *yaml.Node) {
 	mapping.Content = append(mapping.Content, newStringNode(key), value)
 }
-
-// removeMappingEntry removes a key/value pair beginning at index.
-func removeMappingEntry(mapping *yaml.Node, index int) {
-	last := len(mapping.Content) - 2
-	copy(mapping.Content[index:], mapping.Content[index+2:])
-	mapping.Content[last] = nil
-	mapping.Content[last+1] = nil
-	mapping.Content = mapping.Content[:last]
-}

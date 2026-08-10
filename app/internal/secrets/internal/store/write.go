@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/go-envx/envx/app/pkg/yamlx"
 	"gopkg.in/yaml.v3"
 )
 
@@ -119,7 +120,7 @@ func (d *Document) DeleteSecret(group, key string) (bool, error) {
 	if err != nil || !keyEntry.found {
 		return false, err
 	}
-	removeMappingEntry(groupNode, keyEntry.index)
+	yamlx.RemoveMappingEntry(groupNode, keyEntry.index)
 	return true, nil
 }
 

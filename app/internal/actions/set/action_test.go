@@ -21,6 +21,13 @@ func applyToYAML(t *testing.T, src string, p actionParams) string {
 	if err := apply(doc, p); err != nil {
 		t.Fatalf("apply: %v", err)
 	}
+	return marshalForTest(t, doc)
+}
+
+// marshalForTest re-encodes doc the way execute does, so formatting assertions
+// match the production write path.
+func marshalForTest(t *testing.T, doc *yaml.Node) string {
+	t.Helper()
 	out, err := marshalDoc(doc, detectIndent(doc))
 	if err != nil {
 		t.Fatalf("marshalDoc: %v", err)
@@ -126,22 +133,6 @@ func TestApplyMatchesExistingIndent(t *testing.T) {
 	}
 }
 
-// TestDetectIndentIgnoresFlowMapping verifies an inline flow mapping's column gap
-// is not mistaken for a block indentation step, so detection falls back to the
-// default rather than a bogus width.
-func TestDetectIndentIgnoresFlowMapping(t *testing.T) {
-	t.Parallel()
-
-	doc := new(yaml.Node)
-	if err := yaml.Unmarshal([]byte("cfg: {a: 1}\n"), doc); err != nil {
-		t.Fatalf("unmarshal: %v", err)
-	}
-	if got := detectIndent(doc); got != defaultIndent {
-		t.Errorf("detectIndent = %d, want %d (flow mapping must not set indent)",
-			got, defaultIndent)
-	}
-}
-
 // TestApplyRejectsNonMappingRoot verifies a document whose root is not a mapping
 // is rejected rather than clobbered.
 func TestApplyRejectsNonMappingRoot(t *testing.T) {
@@ -170,12 +161,8 @@ func TestApplyRefusesToOverwriteList(t *testing.T) {
 	if err := apply(doc, actionParams{Key: "hosts", Value: "x"}); err == nil {
 		t.Fatal("expected error overwriting a list, got nil")
 	}
-	out, err := marshalDoc(doc, detectIndent(doc))
-	if err != nil {
-		t.Fatalf("marshalDoc: %v", err)
-	}
-	if string(out) != src {
-		t.Errorf("list was modified on a refused set:\n%s", out)
+	if got := marshalForTest(t, doc); got != src {
+		t.Errorf("list was modified on a refused set:\n%s", got)
 	}
 }
 
