@@ -2,8 +2,6 @@ package schema
 
 import "fmt"
 
-// -------------------------------------------------------------------------------------
-
 // FlagSpec is one setting's CLI identity. Flag registration and config resolution
 // read the SAME FlagSpec, so a setting's flag name and its ENVX_* env-var fallback
 // are defined exactly once and can never drift apart.
@@ -24,7 +22,6 @@ type FlagSpec struct {
 	DefaultBool bool
 }
 
-// -------------------------------------------------------------------------------------
 // Catalog every envx setting and shared CLI flag identity in one block.
 var (
 	// Cipher selects the algorithm for ephemeral keypair generation.
@@ -105,8 +102,6 @@ var (
 		Usage: "suffix appended to every key",
 	}
 )
-
-// -------------------------------------------------------------------------------------
 
 // HelpText renders the usage string with the env-var hint appended when the
 // setting has an ENVX_* fallback, e.g. "target environment (env: ENVX_ENV)". The

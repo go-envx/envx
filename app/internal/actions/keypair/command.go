@@ -19,8 +19,6 @@ const (
 	`
 )
 
-// -------------------------------------------------------------------------------------
-
 // NewCommand builds the "keypair" parent command and registers its subcommands.
 func NewCommand() *cobra.Command {
 	cmd := &cobra.Command{

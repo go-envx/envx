@@ -8,8 +8,6 @@ import (
 	"testing"
 )
 
-// -------------------------------------------------------------------------------------
-
 // TestReadReturnsContents verifies the file contents are returned verbatim.
 func TestReadReturnsContents(t *testing.T) {
 	t.Parallel()
@@ -29,8 +27,6 @@ func TestReadReturnsContents(t *testing.T) {
 		t.Errorf("contents = %q, want %q", got, want)
 	}
 }
-
-// -------------------------------------------------------------------------------------
 
 // TestReadMissing verifies a missing file yields a wrapped os.ErrNotExist.
 func TestReadMissing(t *testing.T) {

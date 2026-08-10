@@ -6,8 +6,6 @@ import (
 	"github.com/go-envx/envx/app/internal/schema"
 )
 
-// -------------------------------------------------------------------------------------
-
 // TestGetInputUnregisteredStaysNil verifies an option the flag set never registered
 // stays nil even though GetInput probes for it.
 func TestGetInputUnregisteredStaysNil(t *testing.T) {
@@ -25,8 +23,6 @@ func TestGetInputUnregisteredStaysNil(t *testing.T) {
 		t.Errorf("Env = %v, want nil", in.Env)
 	}
 }
-
-// -------------------------------------------------------------------------------------
 
 // TestGetInputCapturesEveryOption is the guard that locks the field-to-GetInput
 // mirror: registering every flag (including --config) and setting each must surface
@@ -54,8 +50,6 @@ func TestGetInputCapturesEveryOption(t *testing.T) {
 		t.Fatalf("a flag was not captured by GetInput: %+v", in)
 	}
 }
-
-// -------------------------------------------------------------------------------------
 
 // TestGetInputConfigPath verifies GetInput reads the --config flag, leaving
 // ConfigPath nil when it is unset.

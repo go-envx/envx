@@ -22,13 +22,11 @@ var (
 	date = "unknown"
 )
 
-// -------------------------------------------------------------------------------------
 // main delegates to run and exits with the resulting code.
 func main() {
 	os.Exit(run())
 }
 
-// -------------------------------------------------------------------------------------
 // run executes the root command and maps the outcome to a process exit code: a
 // child process's own code is propagated verbatim via *exitcode.Error, a usage or
 // validation error (rejected before the command ran) maps to exitcode.Usage, and

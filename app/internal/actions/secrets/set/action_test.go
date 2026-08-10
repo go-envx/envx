@@ -11,8 +11,6 @@ import (
 	"github.com/go-envx/envx/app/pkg/file"
 )
 
-// -------------------------------------------------------------------------------------
-
 // writeManifest creates a valid workspace manifest for set action tests.
 func writeManifest(t *testing.T) string {
 	t.Helper()
@@ -24,8 +22,6 @@ func writeManifest(t *testing.T) string {
 	}
 	return path
 }
-
-// -------------------------------------------------------------------------------------
 
 // TestExecuteEncryptsAndStoresSafeMetadata verifies the action stores an
 // encrypted envelope without persisting the supplied plaintext.

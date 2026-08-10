@@ -7,8 +7,6 @@ import (
 	"github.com/go-envx/envx/app/internal/secrets"
 )
 
-// -------------------------------------------------------------------------------------
-
 // TestRender verifies render writes safe generation metadata and paths.
 func TestRender(t *testing.T) {
 	t.Parallel()

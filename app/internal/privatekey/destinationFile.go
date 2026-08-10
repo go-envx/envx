@@ -9,29 +9,21 @@ import (
 	"github.com/go-envx/envx/app/pkg/file"
 )
 
-// -------------------------------------------------------------------------------------
-
 // fileDestination stores private keys in a local NAME=value file.
 type fileDestination struct {
 	// path is the private key file to update.
 	path string
 }
 
-// -------------------------------------------------------------------------------------
-
 // NewFileDestination creates a private local-file destination.
 func NewFileDestination(path string) Destination {
 	return fileDestination{path: path}
 }
 
-// -------------------------------------------------------------------------------------
-
 // Path reports the private key file this destination updates.
 func (d fileDestination) Path() string {
 	return d.path
 }
-
-// -------------------------------------------------------------------------------------
 
 // Write adds or updates group in the private key file and keeps existing entries.
 func (d fileDestination) Write(group, privateKey string) error {

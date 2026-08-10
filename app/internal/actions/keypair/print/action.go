@@ -7,15 +7,11 @@ import (
 	"github.com/go-envx/envx/app/internal/config"
 )
 
-// -------------------------------------------------------------------------------------
-
 // actionResult contains the explicitly requested ephemeral keypair.
 type actionResult struct {
 	// Keypair contains the public and private values for manual handoff.
 	Keypair cipher.Keypair
 }
-
-// -------------------------------------------------------------------------------------
 
 // execute generates a keypair through the selected cipher without opening or
 // mutating the workspace store or private-key file.
@@ -30,8 +26,6 @@ func execute(in *config.Input, cipherName string) (actionResult, error) {
 	}
 	return actionResult{Keypair: pair}, nil
 }
-
-// -------------------------------------------------------------------------------------
 
 // resolveCipher prefers the explicit command flag, then uses workspace
 // configuration and finally the application's default through config.

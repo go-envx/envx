@@ -6,14 +6,10 @@ import (
 	"github.com/spf13/pflag"
 )
 
-// -------------------------------------------------------------------------------------
-
 // newFlags returns an empty flag set suitable for registering onto in tests.
 func newFlags() *pflag.FlagSet {
 	return pflag.NewFlagSet("test", pflag.ContinueOnError)
 }
-
-// -------------------------------------------------------------------------------------
 
 // TestRegisterAndGetInput verifies Register + GetInput round-trip the explicitly-set
 // option flags into a *config.Input, leaving unset and unregistered flags nil.

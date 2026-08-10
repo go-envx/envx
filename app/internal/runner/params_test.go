@@ -6,8 +6,6 @@ import (
 	"testing"
 )
 
-// -------------------------------------------------------------------------------------
-
 // TestNormalizeParamsDefaultsStreams verifies that nil Stdout/Stderr fall back to
 // the process's standard streams.
 func TestNormalizeParamsDefaultsStreams(t *testing.T) {
@@ -23,8 +21,6 @@ func TestNormalizeParamsDefaultsStreams(t *testing.T) {
 		t.Errorf("Stderr = %v, want os.Stderr", p.Stderr)
 	}
 }
-
-// -------------------------------------------------------------------------------------
 
 // TestNormalizeParamsPreservesStreams verifies that explicit Stdout/Stderr writers
 // are left untouched.

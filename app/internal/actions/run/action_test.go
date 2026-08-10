@@ -9,8 +9,6 @@ import (
 	"github.com/go-envx/envx/app/internal/fixtures"
 )
 
-// -------------------------------------------------------------------------------------
-
 // TestExecuteInjectsEnv verifies the resolved environment reaches the child
 // process under the default (no-overload) settings.
 func TestExecuteInjectsEnv(t *testing.T) {
@@ -30,8 +28,6 @@ func TestExecuteInjectsEnv(t *testing.T) {
 		t.Errorf("child APP_NAME = %q, want api-core", got)
 	}
 }
-
-// -------------------------------------------------------------------------------------
 
 // TestExecuteOverloadFromEnv verifies ENVX_OVERLOAD lets file values win over an
 // OS env var even without the --overload flag.

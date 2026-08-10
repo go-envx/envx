@@ -7,8 +7,6 @@ import (
 	"github.com/go-envx/envx/app/internal/cipher"
 )
 
-// -------------------------------------------------------------------------------------
-
 // TestRender verifies render writes self-identifying key values with display
 // spacing after their type prefixes.
 func TestRender(t *testing.T) {

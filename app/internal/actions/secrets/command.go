@@ -14,8 +14,6 @@ const (
 	`
 )
 
-// -------------------------------------------------------------------------------------
-
 // NewCommand builds the "secrets" command and its management subcommands.
 func NewCommand() *cobra.Command {
 	cmd := &cobra.Command{

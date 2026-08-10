@@ -5,8 +5,6 @@ import (
 	"testing"
 )
 
-// -------------------------------------------------------------------------------------
-
 // TestRender verifies render writes the resolved value followed by a newline.
 func TestRender(t *testing.T) {
 	t.Parallel()
@@ -23,8 +21,6 @@ func TestRender(t *testing.T) {
 		t.Errorf("render = %q, want %q", got, "dev-db.local\n")
 	}
 }
-
-// -------------------------------------------------------------------------------------
 
 // TestRenderEmptyValue verifies an empty value still emits a trailing newline.
 func TestRenderEmptyValue(t *testing.T) {

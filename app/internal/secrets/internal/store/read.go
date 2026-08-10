@@ -2,8 +2,6 @@ package store
 
 import "gopkg.in/yaml.v3"
 
-// -------------------------------------------------------------------------------------
-
 // PublicKey returns a group's stored public key and whether the group exists.
 func (d *Document) PublicKey(group string) (string, bool) {
 	if group == "" {
@@ -28,8 +26,6 @@ func (d *Document) PublicKey(group string) (string, bool) {
 	}
 	return value, true
 }
-
-// -------------------------------------------------------------------------------------
 
 // Secret returns one stored value and whether the entry exists.
 func (d *Document) Secret(group, key string) (Secret, bool) {
@@ -60,8 +56,6 @@ func (d *Document) Secret(group, key string) (Secret, bool) {
 		Value: keyEntry.value.Value,
 	}, true
 }
-
-// -------------------------------------------------------------------------------------
 
 // Secrets returns stored values in group and entry document order.
 func (d *Document) Secrets() []Secret {

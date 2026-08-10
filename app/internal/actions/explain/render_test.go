@@ -6,8 +6,6 @@ import (
 	"testing"
 )
 
-// -------------------------------------------------------------------------------------
-
 // sampleResult is a single explain row used by the render tests.
 func sampleResult() actionResult {
 	return actionResult{Entries: []actionResultEntry{
@@ -20,8 +18,6 @@ func sampleResult() actionResult {
 		},
 	}}
 }
-
-// -------------------------------------------------------------------------------------
 
 // TestRenderJSON verifies the JSON format emits a tagged entry array with the
 // entry's value.
@@ -55,8 +51,6 @@ func TestRenderJSON(t *testing.T) {
 	}
 }
 
-// -------------------------------------------------------------------------------------
-
 // TestRenderTable verifies the table format prints the KEY/VALUE/SOURCE header
 // and a row for each entry.
 func TestRenderTable(t *testing.T) {
@@ -82,8 +76,6 @@ func TestRenderTable(t *testing.T) {
 		}
 	}
 }
-
-// -------------------------------------------------------------------------------------
 
 // TestRenderInvalidFormat verifies an unrecognized output format is rejected
 // rather than silently falling back to the table.

@@ -9,8 +9,6 @@ import (
 	"github.com/go-envx/envx/app/internal/secrets"
 )
 
-// -------------------------------------------------------------------------------------
-
 // NewConfiguredCipher resolves the workspace cipher when a manifest is present,
 // or constructs the application's default cipher without a workspace.
 func NewConfiguredCipher(in *Input) (cipher.Cipher, error) {
@@ -33,8 +31,6 @@ func NewConfiguredCipher(in *Input) (cipher.Cipher, error) {
 	}
 	return selectedCipher, nil
 }
-
-// -------------------------------------------------------------------------------------
 
 // NewSecretsManager composes the configured cipher and private-key ports into
 // a secrets manager for one resolved workspace.

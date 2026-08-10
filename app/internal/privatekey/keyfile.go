@@ -5,8 +5,6 @@ import (
 	"strings"
 )
 
-// -------------------------------------------------------------------------------------
-
 // keyEntry is one significant NAME=value line in a private-key file.
 type keyEntry struct {
 	// name is the uppercased group name.
@@ -16,8 +14,6 @@ type keyEntry struct {
 	// line is the entry's index into keyFile.lines.
 	line int
 }
-
-// -------------------------------------------------------------------------------------
 
 // keyFile is a parsed NAME=value private-key file that preserves original line
 // order and comments so read and write paths share one grammar.
@@ -29,8 +25,6 @@ type keyFile struct {
 	// byName maps an uppercased group name to its index into entries.
 	byName map[string]int
 }
-
-// -------------------------------------------------------------------------------------
 
 // parseKeyFile parses NAME=value content, rejecting malformed, duplicate, and
 // empty entries so a present-but-broken input fails closed.
@@ -70,8 +64,6 @@ func parseKeyFile(content, inputName string) (keyFile, error) {
 	return parsed, nil
 }
 
-// -------------------------------------------------------------------------------------
-
 // lookup returns the raw private key for group, matched case-insensitively.
 func (f keyFile) lookup(group string) (string, bool) {
 	index, ok := f.byName[strings.ToUpper(group)]
@@ -80,8 +72,6 @@ func (f keyFile) lookup(group string) (string, bool) {
 	}
 	return f.entries[index].value, true
 }
-
-// -------------------------------------------------------------------------------------
 
 // upsert sets group's private key, updating an existing entry in place or
 // appending a new one, and renders the file with a single trailing newline.

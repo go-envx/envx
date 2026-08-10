@@ -6,14 +6,10 @@ import (
 	"strings"
 )
 
-// -------------------------------------------------------------------------------------
-
 // scheme is the reference prefix envx reserves for its local secrets store. Only
 // values beginning with it (or its backslash-escaped form) are treated as
 // references; arbitrary URL-like values such as "postgres://" pass through.
 const scheme = "secret://"
-
-// -------------------------------------------------------------------------------------
 
 // reference identifies one secret by its group and key. It is resolver
 // identity, not document storage, so the document store owns no reference type.
@@ -23,8 +19,6 @@ type reference struct {
 	// key is the entry's name within the group.
 	key string
 }
-
-// -------------------------------------------------------------------------------------
 
 // splitRef parses the portion of a reference after the scheme into a reference.
 // References must name both the group and key explicitly. Keys may not contain

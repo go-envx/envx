@@ -5,15 +5,11 @@ import (
 	"github.com/go-envx/envx/app/internal/secrets"
 )
 
-// -------------------------------------------------------------------------------------
-
 // actionParams are the inputs to the keypair generation workflow.
 type actionParams struct {
 	// Group identifies the secret group receiving the generated keypair.
 	Group string
 }
-
-// -------------------------------------------------------------------------------------
 
 // actionResult contains safe metadata from a generated keypair.
 type actionResult struct {
@@ -24,8 +20,6 @@ type actionResult struct {
 	// KeysPath is the private-key path receiving the private key.
 	KeysPath string
 }
-
-// -------------------------------------------------------------------------------------
 
 // execute runs the manager's safe missing-identity workflow.
 func execute(p actionParams, in *config.Input) (actionResult, error) {

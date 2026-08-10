@@ -7,8 +7,6 @@ import (
 	"github.com/go-envx/envx/app/internal/schema"
 )
 
-// -------------------------------------------------------------------------------------
-
 // unsetEnv removes key for the duration of the test, restoring the original value
 // when the test finishes. It lets a precedence test exercise the "env var absent"
 // branch deterministically.
@@ -19,8 +17,6 @@ func unsetEnv(t *testing.T, key string) {
 		t.Fatalf("unset %s: %v", key, err)
 	}
 }
-
-// -------------------------------------------------------------------------------------
 
 // TestPrecedenceString verifies the string precedence chain: explicit input wins,
 // then the ENVX_* var, then the first non-empty layer.
@@ -47,8 +43,6 @@ func TestPrecedenceString(t *testing.T) {
 		}
 	})
 }
-
-// -------------------------------------------------------------------------------------
 
 // TestPrecedenceBool verifies the boolean precedence chain including pointer
 // layers.

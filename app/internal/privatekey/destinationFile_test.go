@@ -7,8 +7,6 @@ import (
 	"testing"
 )
 
-// -------------------------------------------------------------------------------------
-
 // TestFileDestinationUpdatesExistingEntry verifies an update preserves the rest
 // of the private-key file.
 func TestFileDestinationUpdatesExistingEntry(t *testing.T) {
@@ -33,8 +31,6 @@ func TestFileDestinationUpdatesExistingEntry(t *testing.T) {
 	}
 }
 
-// -------------------------------------------------------------------------------------
-
 // TestFileDestinationRejectsEmptyPath verifies a missing destination path fails
 // before any file operation is attempted.
 func TestFileDestinationRejectsEmptyPath(t *testing.T) {
@@ -48,8 +44,6 @@ func TestFileDestinationRejectsEmptyPath(t *testing.T) {
 		t.Errorf("Write() error = %q, want empty-path error", got)
 	}
 }
-
-// -------------------------------------------------------------------------------------
 
 // TestFileDestinationRejectsMalformedExistingFile verifies existing malformed
 // content is not replaced by a new private-key entry.

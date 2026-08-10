@@ -5,8 +5,6 @@ import (
 	"io"
 )
 
-// -------------------------------------------------------------------------------------
-
 // renderParams bundles everything render needs: the output sink and the
 // structured result.
 type renderParams struct {
@@ -15,8 +13,6 @@ type renderParams struct {
 	// Result is the structured data to render.
 	Result actionResult
 }
-
-// -------------------------------------------------------------------------------------
 
 // render writes the resolved value to p.Writer.
 func render(p *renderParams) error {

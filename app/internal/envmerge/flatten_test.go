@@ -5,8 +5,6 @@ import (
 	"testing"
 )
 
-// -------------------------------------------------------------------------------------
-
 // TestFlatten verifies nested-to-env flattening and key normalization.
 func TestFlatten(t *testing.T) {
 	t.Parallel()
@@ -37,8 +35,6 @@ func TestFlatten(t *testing.T) {
 	}
 }
 
-// -------------------------------------------------------------------------------------
-
 // TestFlattenCollision verifies two paths collapsing to the same key error out.
 func TestFlattenCollision(t *testing.T) {
 	t.Parallel()
@@ -59,8 +55,6 @@ func TestFlattenCollision(t *testing.T) {
 		t.Errorf("collision message not in stable order: %v", err)
 	}
 }
-
-// -------------------------------------------------------------------------------------
 
 // TestFlattenList verifies a list leaf is joined into a single delimiter-
 // separated string, with an empty list and a nil item rendering as empty
@@ -97,8 +91,6 @@ func TestFlattenList(t *testing.T) {
 	}
 }
 
-// -------------------------------------------------------------------------------------
-
 // TestFlattenListCustomDelimiter verifies the join delimiter is configurable.
 func TestFlattenListCustomDelimiter(t *testing.T) {
 	t.Parallel()
@@ -116,8 +108,6 @@ func TestFlattenListCustomDelimiter(t *testing.T) {
 		t.Errorf("PATH = %q, want /bin:/usr/bin", value)
 	}
 }
-
-// -------------------------------------------------------------------------------------
 
 // TestFlattenListErrors verifies a list is rejected when an item contains the
 // delimiter (ambiguous to split back) or is itself a non-scalar (no flat form).
@@ -139,8 +129,6 @@ func TestFlattenListErrors(t *testing.T) {
 		}
 	})
 }
-
-// -------------------------------------------------------------------------------------
 
 // TestToEnvKey verifies dotted/hyphenated paths normalize to upper-snake.
 func TestToEnvKey(t *testing.T) {

@@ -8,8 +8,6 @@ import (
 	"github.com/go-envx/envx/app/internal/fixtures"
 )
 
-// -------------------------------------------------------------------------------------
-
 // TestBuildEnvDoesNotMutateConfig verifies buildEnv resolves a side from a
 // copy of the shared config, leaving the caller's Settings untouched so both diff
 // sides resolve from identical settings save for the overridden environment.
@@ -33,8 +31,6 @@ func TestBuildEnvDoesNotMutateConfig(t *testing.T) {
 	}
 }
 
-// -------------------------------------------------------------------------------------
-
 // TestUnionKeys verifies the sorted union of two key sets.
 func TestUnionKeys(t *testing.T) {
 	t.Parallel()
@@ -53,8 +49,6 @@ func TestUnionKeys(t *testing.T) {
 		}
 	}
 }
-
-// -------------------------------------------------------------------------------------
 
 // TestRunActionChangedValue verifies the pure core reports a key whose value
 // differs between the two environments as a change carrying both sides' values.
@@ -76,8 +70,6 @@ func TestRunActionChangedValue(t *testing.T) {
 	}
 }
 
-// -------------------------------------------------------------------------------------
-
 // TestRunActionIdenticalEnvs verifies diffing an environment against itself
 // yields no differences.
 func TestRunActionIdenticalEnvs(t *testing.T) {
@@ -90,8 +82,6 @@ func TestRunActionIdenticalEnvs(t *testing.T) {
 		t.Errorf("expected empty diff, got %+v", res)
 	}
 }
-
-// -------------------------------------------------------------------------------------
 
 // diffSides resolves the api-core project from the shared "basic" fixture and
 // builds it under two environments, returning both merged results.
@@ -112,8 +102,6 @@ func diffSides(t *testing.T, envA, envB string) (a, b *envmerge.Result) {
 	}
 	return a, b
 }
-
-// -------------------------------------------------------------------------------------
 
 // findChange returns the change with the given key from a slice, and whether it
 // was present.

@@ -31,8 +31,6 @@ const (
 	`
 )
 
-// -------------------------------------------------------------------------------------
-
 // NewCommand builds the "run" command, which parses args into the action's
 // params/config, executes the action, and runs the specified command with the
 // merged environment for a project.
@@ -71,8 +69,6 @@ func NewCommand() *cobra.Command {
 	)
 	return cmd
 }
-
-// -------------------------------------------------------------------------------------
 
 // validateArgs enforces run's positional layout: exactly one project name, a
 // "--" separator, then at least one command word. Validating here (rather than in

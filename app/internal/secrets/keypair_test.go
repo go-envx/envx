@@ -13,8 +13,6 @@ import (
 	"github.com/go-envx/envx/app/internal/secrets/internal/store"
 )
 
-// -------------------------------------------------------------------------------------
-
 // keypairTestCipher is a deterministic cipher double for keypair workflow tests.
 type keypairTestCipher struct {
 	// pair is returned by Keypair.
@@ -23,21 +21,15 @@ type keypairTestCipher struct {
 	validPrivate string
 }
 
-// -------------------------------------------------------------------------------------
-
 // Algorithm identifies the algorithm metadata used by the test cipher.
 func (keypairTestCipher) Algorithm() cipher.Algorithm {
 	return cipher.Age
 }
 
-// -------------------------------------------------------------------------------------
-
 // Keypair returns the deterministic test keypair.
 func (c keypairTestCipher) Keypair() (cipher.Keypair, error) {
 	return c.pair, nil
 }
-
-// -------------------------------------------------------------------------------------
 
 // ValidateKeypair validates the deterministic test keypair.
 func (c keypairTestCipher) ValidateKeypair(publicKey, privateKey string) error {
@@ -47,21 +39,15 @@ func (c keypairTestCipher) ValidateKeypair(publicKey, privateKey string) error {
 	return nil
 }
 
-// -------------------------------------------------------------------------------------
-
 // Encrypt is unused by keypair workflow tests.
 func (keypairTestCipher) Encrypt(string, string) ([]byte, error) {
 	return nil, errors.New("test cipher encryption is unused")
 }
 
-// -------------------------------------------------------------------------------------
-
 // Decrypt is unused by keypair workflow tests.
 func (keypairTestCipher) Decrypt([]byte, string) (string, error) {
 	return "", errors.New("test cipher decryption is unused")
 }
-
-// -------------------------------------------------------------------------------------
 
 // keypairTestDestination records the write point for a generated private key.
 type keypairTestDestination struct {
@@ -69,14 +55,10 @@ type keypairTestDestination struct {
 	write func(group, privateKey string) error
 }
 
-// -------------------------------------------------------------------------------------
-
 // Write records a generated private-key handoff without storing the key.
 func (d keypairTestDestination) Write(group, privateKey string) error {
 	return d.write(group, privateKey)
 }
-
-// -------------------------------------------------------------------------------------
 
 // keypairTestResolver returns one configured private-key resolver result.
 type keypairTestResolver struct {
@@ -86,14 +68,10 @@ type keypairTestResolver struct {
 	err error
 }
 
-// -------------------------------------------------------------------------------------
-
 // Resolve returns the configured test source result.
 func (r keypairTestResolver) Resolve(string) (privatekey.PrivateKey, error) {
 	return r.key, r.err
 }
-
-// -------------------------------------------------------------------------------------
 
 // TestGenerateKeypairCommitsPublicStateAfterPrivateHandoff verifies the safe
 // write order and that the result does not carry private material.
@@ -158,8 +136,6 @@ func TestGenerateKeypairCommitsPublicStateAfterPrivateHandoff(t *testing.T) {
 	}
 }
 
-// -------------------------------------------------------------------------------------
-
 // TestGenerateKeypairRefusesExistingIdentity verifies generation never replaces
 // a group's existing public identity.
 func TestGenerateKeypairRefusesExistingIdentity(t *testing.T) {
@@ -192,8 +168,6 @@ func TestGenerateKeypairRefusesExistingIdentity(t *testing.T) {
 		t.Fatal("destination was called for an existing identity")
 	}
 }
-
-// -------------------------------------------------------------------------------------
 
 // TestInspectKeypairStatuses verifies unavailable, valid, and invalid private
 // key states without returning private material.
@@ -263,8 +237,6 @@ func TestInspectKeypairStatuses(t *testing.T) {
 	}
 }
 
-// -------------------------------------------------------------------------------------
-
 // TestGenerateKeypairReportsRecoverableStoreFailure verifies a private-key
 // handoff failure after validation never exposes private material in its error.
 func TestGenerateKeypairReportsRecoverableStoreFailure(t *testing.T) {
@@ -304,8 +276,6 @@ func TestGenerateKeypairReportsRecoverableStoreFailure(t *testing.T) {
 	}
 }
 
-// -------------------------------------------------------------------------------------
-
 // TestEnsureGitIgnoredSkipsWhenGitIsUnavailable verifies no ignore file is
 // created when the Git executable cannot be found.
 func TestEnsureGitIgnoredSkipsWhenGitIsUnavailable(t *testing.T) {
@@ -321,8 +291,6 @@ func TestEnsureGitIgnoredSkipsWhenGitIsUnavailable(t *testing.T) {
 		t.Fatalf(".gitignore stat error = %v, want file not to exist", err)
 	}
 }
-
-// -------------------------------------------------------------------------------------
 
 // TestGenerateDefaultKeypairRoundTrip verifies the default age cipher, local
 // key-file destination, private permissions, and local Git ignore protection.

@@ -12,8 +12,6 @@ import (
 	"github.com/go-envx/envx/app/pkg/file"
 )
 
-// -------------------------------------------------------------------------------------
-
 // templatesFS embeds the create templates. Each subdirectory of templates/ is one
 // named workspace ("quick-start") laid out exactly as it should appear on disk.
 //
@@ -26,8 +24,6 @@ const (
 	quickStart = "quick-start"
 )
 
-// -------------------------------------------------------------------------------------
-
 // actionParams are the inputs to the create action.
 type actionParams struct {
 	// Template is the template to scaffold (a subdirectory of templates/).
@@ -38,15 +34,11 @@ type actionParams struct {
 	Force bool
 }
 
-// -------------------------------------------------------------------------------------
-
 // actionResult is the data the create action returns.
 type actionResult struct {
 	// Written lists the destination paths written, in sorted order.
 	Written []string
 }
-
-// -------------------------------------------------------------------------------------
 
 // execute scaffolds p.Template into p.TargetDir. Without Force it refuses to
 // overwrite any existing file, reporting every conflict at once so the caller can
@@ -88,8 +80,6 @@ func execute(p actionParams) (actionResult, error) {
 	return actionResult{Written: written}, nil
 }
 
-// -------------------------------------------------------------------------------------
-
 // collectFiles returns every file path under src, relative to src and slash-separated,
 // in sorted order for deterministic output.
 func collectFiles(src fs.FS) ([]string, error) {
@@ -109,8 +99,6 @@ func collectFiles(src fs.FS) ([]string, error) {
 	sort.Strings(files)
 	return files, nil
 }
-
-// -------------------------------------------------------------------------------------
 
 // checkConflicts returns an error naming every destination file that already
 // exists, so create never clobbers a user's files unless --force is given.

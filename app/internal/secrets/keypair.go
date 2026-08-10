@@ -14,8 +14,6 @@ import (
 	"github.com/go-envx/envx/app/pkg/file"
 )
 
-// -------------------------------------------------------------------------------------
-
 // GenerateKeypair creates a missing group identity and commits its public key
 // only after the private-key destination has accepted the new private key.
 func (m *Manager) GenerateKeypair(group string) (KeypairMetadata, error) {
@@ -90,8 +88,6 @@ func (m *Manager) GenerateKeypair(group string) (KeypairMetadata, error) {
 	}, nil
 }
 
-// -------------------------------------------------------------------------------------
-
 // InspectKeypair reports the safe status of a group's public and private keys
 // without writing, prompting, or returning private-key material.
 func (m *Manager) InspectKeypair(group string) (KeypairMetadata, error) {
@@ -142,8 +138,6 @@ func (m *Manager) InspectKeypair(group string) (KeypairMetadata, error) {
 	return metadata, nil
 }
 
-// -------------------------------------------------------------------------------------
-
 // ensureGitIgnored verifies a file is ignored by Git or adds a local rule before
 // any private-key bytes are written. It leaves ignore files untouched when Git
 // is unavailable. A repository ancestor's rule is sufficient.
@@ -192,8 +186,6 @@ func ensureGitIgnored(keysPath string) error {
 	return nil
 }
 
-// -------------------------------------------------------------------------------------
-
 // gitIgnores asks Git's effective matcher whether name is ignored from dir.
 // The second result reports whether Git was available to answer the query.
 func gitIgnores(dir, name string) (ignored, available bool, err error) {
@@ -218,8 +210,6 @@ func gitIgnores(dir, name string) (ignored, available bool, err error) {
 		)
 	}
 }
-
-// -------------------------------------------------------------------------------------
 
 // hasIgnoreRule reports whether a local ignore file already contains an exact
 // rule for the private-key basename.

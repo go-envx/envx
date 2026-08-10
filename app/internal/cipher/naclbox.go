@@ -15,37 +15,25 @@ const (
 	naclBoxKeySize          = 32
 )
 
-// -------------------------------------------------------------------------------------
-
 // NaClBoxOptions reserves a construction-time options type for NaCl Box
 // behavior. The zero value is currently the complete configuration.
 type NaClBoxOptions struct{}
 
-// -------------------------------------------------------------------------------------
-
 // algorithmOptions marks NaClBoxOptions as valid input to New.
 func (NaClBoxOptions) algorithmOptions() {}
-
-// -------------------------------------------------------------------------------------
 
 // newNaClBoxCipher constructs a NaCl Box cipher with the supplied options.
 func newNaClBoxCipher(NaClBoxOptions) (Cipher, error) {
 	return naclBoxCipher{}, nil
 }
 
-// -------------------------------------------------------------------------------------
-
 // naclBoxCipher implements Cipher with anonymous NaCl sealed boxes.
 type naclBoxCipher struct{}
-
-// -------------------------------------------------------------------------------------
 
 // Algorithm identifies the envelope algorithm produced by the NaCl Box cipher.
 func (naclBoxCipher) Algorithm() Algorithm {
 	return NaClBox
 }
-
-// -------------------------------------------------------------------------------------
 
 // Keypair creates a NaCl Box keypair and returns self-identifying textual keys.
 func (naclBoxCipher) Keypair() (Keypair, error) {
@@ -59,8 +47,6 @@ func (naclBoxCipher) Keypair() (Keypair, error) {
 		PrivateKey: encodeNaClBoxPrivateKey(publicKey, privateKey),
 	}, nil
 }
-
-// -------------------------------------------------------------------------------------
 
 // ValidateKeypair checks that both NaCl Box keys are valid and correspond.
 func (naclBoxCipher) ValidateKeypair(publicKey, privateKey string) error {
@@ -79,8 +65,6 @@ func (naclBoxCipher) ValidateKeypair(publicKey, privateKey string) error {
 	return nil
 }
 
-// -------------------------------------------------------------------------------------
-
 // Encrypt encrypts plaintext for a NaCl Box recipient and returns native sealed
 // box bytes.
 func (naclBoxCipher) Encrypt(plaintext, publicKey string) ([]byte, error) {
@@ -96,8 +80,6 @@ func (naclBoxCipher) Encrypt(plaintext, publicKey string) ([]byte, error) {
 	return ciphertext, nil
 }
 
-// -------------------------------------------------------------------------------------
-
 // Decrypt decrypts native NaCl sealed-box bytes with a private key bundle.
 func (naclBoxCipher) Decrypt(ciphertext []byte, privateKey string) (string, error) {
 	publicKey, privateKeyBytes, err := decodeNaClBoxPrivateKey(privateKey)
@@ -112,14 +94,10 @@ func (naclBoxCipher) Decrypt(ciphertext []byte, privateKey string) (string, erro
 	return string(plaintext), nil
 }
 
-// -------------------------------------------------------------------------------------
-
 // encodeNaClBoxPublicKey encodes a public key with its key-type marker.
 func encodeNaClBoxPublicKey(publicKey *[naclBoxKeySize]byte) string {
 	return naclBoxPublicKeyPrefix + base64.RawURLEncoding.EncodeToString(publicKey[:])
 }
-
-// -------------------------------------------------------------------------------------
 
 // encodeNaClBoxPrivateKey encodes the private key with its public counterpart
 // because anonymous-box decryption requires both values.
@@ -132,8 +110,6 @@ func encodeNaClBoxPrivateKey(
 	return naclBoxPrivateKeyPrefix + base64.RawURLEncoding.EncodeToString(keyMaterial)
 }
 
-// -------------------------------------------------------------------------------------
-
 // decodeNaClBoxPublicKey decodes and validates a marked public key.
 func decodeNaClBoxPublicKey(value string) (*[naclBoxKeySize]byte, error) {
 	keyMaterial, err := decodeNaClBoxKey(value, naclBoxPublicKeyPrefix, "public")
@@ -145,8 +121,6 @@ func decodeNaClBoxPublicKey(value string) (*[naclBoxKeySize]byte, error) {
 	copy(publicKey[:], keyMaterial)
 	return &publicKey, nil
 }
-
-// -------------------------------------------------------------------------------------
 
 // decodeNaClBoxPrivateKey decodes a private key bundle into its public and
 // private components.
@@ -165,8 +139,6 @@ func decodeNaClBoxPrivateKey(
 	return publicKey, privateKey, nil
 }
 
-// -------------------------------------------------------------------------------------
-
 // decodeNaClBoxKey decodes a marked key and validates its exact byte length.
 func decodeNaClBoxKey(value, prefix, kind string) ([]byte, error) {
 	encoded, found := strings.CutPrefix(value, prefix)
@@ -180,8 +152,6 @@ func decodeNaClBoxKey(value, prefix, kind string) ([]byte, error) {
 	}
 	return keyMaterial, nil
 }
-
-// -------------------------------------------------------------------------------------
 
 // lenForNaClBoxKey returns the encoded byte length required for a key kind.
 func lenForNaClBoxKey(kind string) int {

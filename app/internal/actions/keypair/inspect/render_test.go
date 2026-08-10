@@ -7,8 +7,6 @@ import (
 	"github.com/go-envx/envx/app/internal/secrets"
 )
 
-// -------------------------------------------------------------------------------------
-
 // TestRender verifies render writes public metadata and private-key status.
 func TestRender(t *testing.T) {
 	t.Parallel()

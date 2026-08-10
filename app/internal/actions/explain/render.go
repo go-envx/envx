@@ -7,8 +7,6 @@ import (
 	"text/tabwriter"
 )
 
-// -------------------------------------------------------------------------------------
-
 // jsonEntry is the exported, tagged view of an entry used for JSON output
 // (entry's own fields are unexported).
 type jsonEntry struct {
@@ -24,8 +22,6 @@ type jsonEntry struct {
 	Shadowed []string `json:"shadowed,omitempty"`
 }
 
-// -------------------------------------------------------------------------------------
-
 // renderParams bundles everything render needs: the output sink, the structured
 // result, and the chosen output format.
 type renderParams struct {
@@ -36,8 +32,6 @@ type renderParams struct {
 	// Format selects the output format ("json" or the default table).
 	Format string
 }
-
-// -------------------------------------------------------------------------------------
 
 // render writes the result to p.Writer in the requested format ("json" or the
 // default aligned table). An unrecognized format is rejected so a typo like
@@ -53,8 +47,6 @@ func render(p *renderParams) error {
 	}
 }
 
-// -------------------------------------------------------------------------------------
-
 // renderJSON writes the entries as a JSON array.
 func renderJSON(w io.Writer, res actionResult) error {
 	out := make([]jsonEntry, 0, len(res.Entries))
@@ -65,8 +57,6 @@ func renderJSON(w io.Writer, res actionResult) error {
 	enc.SetIndent("", "  ")
 	return enc.Encode(out)
 }
-
-// -------------------------------------------------------------------------------------
 
 // renderTable writes the entries as an aligned KEY/VALUE/SOURCE table.
 func renderTable(w io.Writer, res actionResult) error {

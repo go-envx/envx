@@ -13,8 +13,6 @@ const (
 	privateKeyEnv = "ENVX_PRIVATE_KEY"
 )
 
-// -------------------------------------------------------------------------------------
-
 // PrivateKey contains transient private-key material and its lookup provenance.
 type PrivateKey struct {
 	// Value is the private key used for one operation.
@@ -23,20 +21,14 @@ type PrivateKey struct {
 	Origin string
 }
 
-// -------------------------------------------------------------------------------------
-
 // ErrNotAvailable indicates that no private key is available for a group.
 var ErrNotAvailable = errors.New("private key not available")
-
-// -------------------------------------------------------------------------------------
 
 // Resolver resolves private-key material for one group.
 type Resolver interface {
 	// Resolve returns a private key and its lookup provenance.
 	Resolve(group string) (PrivateKey, error)
 }
-
-// -------------------------------------------------------------------------------------
 
 // ResolverOptions configures automatic environment-then-file lookup.
 type ResolverOptions struct {
@@ -45,8 +37,6 @@ type ResolverOptions struct {
 	// LookupEnv reads an environment variable and reports whether it is present.
 	LookupEnv func(string) (string, bool)
 }
-
-// -------------------------------------------------------------------------------------
 
 // resolver implements Resolver with deterministic environment and file precedence.
 type resolver struct {
@@ -57,8 +47,6 @@ type resolver struct {
 	lookupEnv func(string) (string, bool)
 }
 
-// -------------------------------------------------------------------------------------
-
 // NewResolver creates an automatic environment-then-file private-key resolver.
 func NewResolver(options ResolverOptions) Resolver {
 	lookupEnv := options.LookupEnv
@@ -67,8 +55,6 @@ func NewResolver(options ResolverOptions) Resolver {
 	}
 	return resolver{keysPath: options.KeysPath, lookupEnv: lookupEnv}
 }
-
-// -------------------------------------------------------------------------------------
 
 // Resolve returns the first available private key for group. A present but empty
 // or malformed higher-priority input is an error and does not fall through.
@@ -119,8 +105,6 @@ func (r resolver) Resolve(group string) (PrivateKey, error) {
 	}
 	return PrivateKey{Value: key, Origin: r.keysPath}, nil
 }
-
-// -------------------------------------------------------------------------------------
 
 // unavailable returns a typed error for a missing group key.
 func unavailable(group string) error {

@@ -8,8 +8,6 @@ import (
 	"github.com/go-envx/envx/app/internal/envmerge"
 )
 
-// -------------------------------------------------------------------------------------
-
 // actionParams are the positional inputs to the get action.
 type actionParams struct {
 	// Project is the project name to resolve.
@@ -18,8 +16,6 @@ type actionParams struct {
 	Key string
 }
 
-// -------------------------------------------------------------------------------------
-
 // actionResult is the data the get action returns.
 type actionResult struct {
 	// Value is the resolved value of the requested key.
@@ -27,8 +23,6 @@ type actionResult struct {
 	// Source is the file that provided the resolved value.
 	Source string
 }
-
-// -------------------------------------------------------------------------------------
 
 // execute is the imperative shell: resolve the input into an envmerge.Params, build
 // the merged environment, and hand the result to the pure core.
@@ -48,8 +42,6 @@ func execute(p actionParams, in *config.Input) (actionResult, error) {
 	// look up the requested key
 	return runAction(env, p)
 }
-
-// -------------------------------------------------------------------------------------
 
 // runAction performs a case-insensitive lookup against the specified environment,
 // returning a single value for the given key.

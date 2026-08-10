@@ -10,8 +10,6 @@ import (
 	"github.com/go-envx/envx/app/internal/secrets"
 )
 
-// -------------------------------------------------------------------------------------
-
 // TestNewConfiguredCipherUsesConfiguredAlgorithm verifies the config composer
 // selects the manifest cipher and retains the age default without a manifest.
 func TestNewConfiguredCipherUsesConfiguredAlgorithm(t *testing.T) {
@@ -55,8 +53,6 @@ func TestNewConfiguredCipherUsesConfiguredAlgorithm(t *testing.T) {
 	}
 }
 
-// -------------------------------------------------------------------------------------
-
 // writeCipherManifest creates a minimal manifest selecting algorithm.
 func writeCipherManifest(t *testing.T, algorithm string) string {
 	t.Helper()
@@ -69,8 +65,6 @@ func writeCipherManifest(t *testing.T, algorithm string) string {
 	}
 	return path
 }
-
-// -------------------------------------------------------------------------------------
 
 // TestNewSecretsManagerUsesConfiguredAlgorithm verifies manager composition
 // passes the selected cipher into the root secrets workflow.

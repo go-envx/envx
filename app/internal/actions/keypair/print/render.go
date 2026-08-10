@@ -6,8 +6,6 @@ import (
 	"strings"
 )
 
-// -------------------------------------------------------------------------------------
-
 // renderParams bundles the output sink and structured keypair result.
 type renderParams struct {
 	// Writer is the output sink to render to.
@@ -15,8 +13,6 @@ type renderParams struct {
 	// Result is the ephemeral keypair to render.
 	Result actionResult
 }
-
-// -------------------------------------------------------------------------------------
 
 // render writes both halves of the ephemeral keypair to p.Writer.
 func render(p *renderParams) error {
@@ -28,8 +24,6 @@ func render(p *renderParams) error {
 	)
 	return err
 }
-
-// -------------------------------------------------------------------------------------
 
 // formatKey adds display spacing after the key type's first colon while keeping
 // the cipher-provided key label and material unchanged.

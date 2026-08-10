@@ -9,8 +9,6 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-// -------------------------------------------------------------------------------------
-
 // Secret identifies one stored value by its group and key.
 type Secret struct {
 	// Group is the stored key-group name.
@@ -21,8 +19,6 @@ type Secret struct {
 	Value string
 }
 
-// -------------------------------------------------------------------------------------
-
 // Document is a validated mutable secrets document bound to one file path.
 type Document struct {
 	// path is the file this document will save to.
@@ -30,8 +26,6 @@ type Document struct {
 	// root is the YAML node tree retained for comments and ordering.
 	root yaml.Node
 }
-
-// -------------------------------------------------------------------------------------
 
 // Open reads a secrets document and binds it to path. A missing file produces
 // an empty document; malformed YAML or an invalid known document field fails.
@@ -57,8 +51,6 @@ func Open(path string) (*Document, error) {
 	return document, nil
 }
 
-// -------------------------------------------------------------------------------------
-
 // Save validates and atomically writes the document to its bound path.
 func (d *Document) Save() error {
 	if d.path == "" {
@@ -78,8 +70,6 @@ func (d *Document) Save() error {
 	return nil
 }
 
-// -------------------------------------------------------------------------------------
-
 // newEmptyDocument creates the canonical empty YAML document.
 func newEmptyDocument(path string) *Document {
 	return &Document{
@@ -93,8 +83,6 @@ func newEmptyDocument(path string) *Document {
 	}
 }
 
-// -------------------------------------------------------------------------------------
-
 // normalizeEmptyRoot turns an empty YAML stream into an editable mapping.
 func (d *Document) normalizeEmptyRoot() {
 	if d.root.Kind == 0 ||
@@ -102,8 +90,6 @@ func (d *Document) normalizeEmptyRoot() {
 		d.root = newEmptyDocument(d.path).root
 	}
 }
-
-// -------------------------------------------------------------------------------------
 
 // topLevel returns the document's top-level mapping.
 func (d *Document) topLevel() (*yaml.Node, error) {

@@ -23,8 +23,6 @@ const (
 	`
 )
 
-// -------------------------------------------------------------------------------------
-
 // NewCommand builds the "get" command, which parses args into the action's
 // params/config, executes the action, and writes the value to stdout.
 func NewCommand() *cobra.Command {

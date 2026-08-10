@@ -2,8 +2,6 @@ package privatekey
 
 import "testing"
 
-// -------------------------------------------------------------------------------------
-
 // TestParseKeyFileValid verifies comments, blank lines, CRLF endings, and
 // case-insensitive lookup across a well-formed key file.
 func TestParseKeyFileValid(t *testing.T) {
@@ -35,8 +33,6 @@ func TestParseKeyFileValid(t *testing.T) {
 	}
 }
 
-// -------------------------------------------------------------------------------------
-
 // TestParseKeyFileRejectsMalformed verifies the parser fails closed on malformed,
 // empty, and duplicate entries instead of silently skipping them.
 func TestParseKeyFileRejectsMalformed(t *testing.T) {
@@ -63,8 +59,6 @@ func TestParseKeyFileRejectsMalformed(t *testing.T) {
 	}
 }
 
-// -------------------------------------------------------------------------------------
-
 // TestKeyFileUpsertUpdatesInPlace verifies updating an existing group preserves
 // comments, blank lines, and the order of surrounding entries.
 func TestKeyFileUpsertUpdatesInPlace(t *testing.T) {
@@ -82,8 +76,6 @@ func TestKeyFileUpsertUpdatesInPlace(t *testing.T) {
 	}
 }
 
-// -------------------------------------------------------------------------------------
-
 // TestKeyFileUpsertAppendsNewGroup verifies a new group is appended after the
 // existing entries with a single trailing newline.
 func TestKeyFileUpsertAppendsNewGroup(t *testing.T) {
@@ -100,8 +92,6 @@ func TestKeyFileUpsertAppendsNewGroup(t *testing.T) {
 	}
 }
 
-// -------------------------------------------------------------------------------------
-
 // TestKeyFileUpsertWritesEmptyFile verifies upserting into empty content yields a
 // single entry rather than a leading blank line.
 func TestKeyFileUpsertWritesEmptyFile(t *testing.T) {
@@ -116,8 +106,6 @@ func TestKeyFileUpsertWritesEmptyFile(t *testing.T) {
 		t.Errorf("upsert() = %q, want single entry", got)
 	}
 }
-
-// -------------------------------------------------------------------------------------
 
 // TestKeyFileUpsertPreservesUntouchedLineEndings verifies a case-insensitive
 // update rewrites only the matched entry and leaves other lines, including their

@@ -2,8 +2,6 @@ package file
 
 import "path/filepath"
 
-// -------------------------------------------------------------------------------------
-
 // ResolvePath resolves path against base when path is relative. Absolute paths
 // are returned cleaned and unchanged; this function does not access the filesystem.
 func ResolvePath(base, path string) string {

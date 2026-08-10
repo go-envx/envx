@@ -10,8 +10,6 @@ import (
 	"github.com/go-envx/envx/app/internal/secrets"
 )
 
-// -------------------------------------------------------------------------------------
-
 // Result is the aggregate config produces from one manifest load and one
 // resolution pass. Actions read the fields they need and ignore the rest;
 // OverlayPath derives the set action's target file from the same result.
@@ -38,8 +36,6 @@ type Result struct {
 	// can validate and join a target without re-loading.
 	manifestContext
 }
-
-// -------------------------------------------------------------------------------------
 
 // OverlayPath resolves the absolute path of the overlay file the set action
 // writes: <dir>/<include>.<env>.yaml. The environment is the resolved Env with

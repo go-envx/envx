@@ -8,8 +8,6 @@ import (
 	"github.com/go-envx/envx/app/internal/cipher"
 )
 
-// -------------------------------------------------------------------------------------
-
 // TestRoundTrip verifies algorithm metadata and native bytes survive the
 // single-line storage encoding unchanged.
 func TestRoundTrip(t *testing.T) {
@@ -38,8 +36,6 @@ func TestRoundTrip(t *testing.T) {
 		t.Fatalf("Decode() payload = %x, want %x", decoded, payload)
 	}
 }
-
-// -------------------------------------------------------------------------------------
 
 // TestComposesWithAge verifies the storage envelope can carry and restore a
 // real age ciphertext without involving armor.
@@ -85,8 +81,6 @@ func TestComposesWithAge(t *testing.T) {
 		t.Fatalf("Decrypt() = %q, want %q", plaintext, "composed-secret")
 	}
 }
-
-// -------------------------------------------------------------------------------------
 
 // TestComposesWithNaClBox verifies a second algorithm uses the same envelope
 // without special-case parsing.
@@ -136,8 +130,6 @@ func TestComposesWithNaClBox(t *testing.T) {
 	}
 }
 
-// -------------------------------------------------------------------------------------
-
 // TestDecodeRejectsMalformedEnvelopes verifies malformed structure, algorithms,
 // and payloads are rejected.
 func TestDecodeRejectsMalformedEnvelopes(t *testing.T) {
@@ -163,8 +155,6 @@ func TestDecodeRejectsMalformedEnvelopes(t *testing.T) {
 	}
 }
 
-// -------------------------------------------------------------------------------------
-
 // TestEncodeRejectsInvalidInputs verifies invalid algorithm names and empty
 // native payloads cannot enter the store format.
 func TestEncodeRejectsInvalidInputs(t *testing.T) {
@@ -185,8 +175,6 @@ func TestEncodeRejectsInvalidInputs(t *testing.T) {
 		t.Fatal("Encode() accepted an empty payload")
 	}
 }
-
-// -------------------------------------------------------------------------------------
 
 // TestIsCiphertext verifies the marker check distinguishes claimed envelopes
 // from ordinary plaintext values.

@@ -6,8 +6,6 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-// -------------------------------------------------------------------------------------
-
 // TestMappingEntry verifies exact and case-insensitive node lookup and reports
 // absence without changing the mapping.
 func TestMappingEntry(t *testing.T) {
@@ -71,8 +69,6 @@ func TestMappingEntry(t *testing.T) {
 		})
 	}
 }
-
-// -------------------------------------------------------------------------------------
 
 // TestMappingEntryRejectsNonMapping verifies node lookup rejects an invalid
 // YAML node instead of treating it as an empty mapping.

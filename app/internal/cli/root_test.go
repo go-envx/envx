@@ -12,8 +12,6 @@ import (
 	"github.com/go-envx/envx/app/pkg/file"
 )
 
-// -------------------------------------------------------------------------------------
-
 // execCmd builds a root command wired to fresh stdout/stderr buffers, sets the
 // given args, and executes it. It returns the captured buffers and any error.
 func execCmd(args ...string) (stdout, stderr *bytes.Buffer, err error) {
@@ -26,8 +24,6 @@ func execCmd(args ...string) (stdout, stderr *bytes.Buffer, err error) {
 	err = cmd.Execute()
 	return stdout, stderr, err
 }
-
-// -------------------------------------------------------------------------------------
 
 // copyTree recursively copies the directory tree at src into dst.
 func copyTree(t *testing.T, src, dst string) {
@@ -56,8 +52,6 @@ func copyTree(t *testing.T, src, dst string) {
 	}
 }
 
-// -------------------------------------------------------------------------------------
-
 // TestRootShowsHelp verifies bare invocation prints help and does not require a
 // manifest.
 func TestRootShowsHelp(t *testing.T) {
@@ -71,8 +65,6 @@ func TestRootShowsHelp(t *testing.T) {
 		t.Errorf("expected help output, got %q", stdout.String())
 	}
 }
-
-// -------------------------------------------------------------------------------------
 
 // TestKeypairCommandTree verifies keypair management is registered at the root
 // and no longer appears under the secrets command.
@@ -106,8 +98,6 @@ func TestKeypairCommandTree(t *testing.T) {
 		}
 	}
 }
-
-// -------------------------------------------------------------------------------------
 
 // TestKeypairPrintUsesConfiguredCipher verifies print honors the manifest
 // cipher, leaves stderr empty, and does not create managed files.
@@ -146,8 +136,6 @@ func TestKeypairPrintUsesConfiguredCipher(t *testing.T) {
 	}
 }
 
-// -------------------------------------------------------------------------------------
-
 // TestKeypairPrintCipherFlagOverridesManifest verifies an explicit cipher flag
 // wins over the algorithm configured in envx.yaml.
 func TestKeypairPrintCipherFlagOverridesManifest(t *testing.T) {
@@ -174,8 +162,6 @@ func TestKeypairPrintCipherFlagOverridesManifest(t *testing.T) {
 	}
 }
 
-// -------------------------------------------------------------------------------------
-
 // TestKeypairGenerateRequiresGroup verifies persisted generation rejects a
 // missing group before trying to resolve a workspace.
 func TestKeypairGenerateRequiresGroup(t *testing.T) {
@@ -186,8 +172,6 @@ func TestKeypairGenerateRequiresGroup(t *testing.T) {
 		t.Fatalf("error = %v, want missing-group validation error", err)
 	}
 }
-
-// -------------------------------------------------------------------------------------
 
 // TestVersionFlag verifies --version prints the injected version.
 func TestVersionFlag(t *testing.T) {
@@ -205,8 +189,6 @@ func TestVersionFlag(t *testing.T) {
 		t.Errorf("version output %q missing commit metadata", out)
 	}
 }
-
-// -------------------------------------------------------------------------------------
 
 // TestGet verifies get prints a resolved value and reports missing keys.
 func TestGet(t *testing.T) {
@@ -269,8 +251,6 @@ func TestGet(t *testing.T) {
 	}
 }
 
-// -------------------------------------------------------------------------------------
-
 // TestRun verifies run injects the merged environment into the child process.
 func TestRun(t *testing.T) {
 	t.Parallel()
@@ -288,8 +268,6 @@ func TestRun(t *testing.T) {
 	}
 }
 
-// -------------------------------------------------------------------------------------
-
 // TestRunRequiresCommand verifies run rejects a missing "-- command".
 func TestRunRequiresCommand(t *testing.T) {
 	t.Parallel()
@@ -299,8 +277,6 @@ func TestRunRequiresCommand(t *testing.T) {
 		t.Fatal("expected error when no command follows --")
 	}
 }
-
-// -------------------------------------------------------------------------------------
 
 // TestSetRoundTrip verifies set writes a value that get can read back.
 func TestSetRoundTrip(t *testing.T) {
@@ -328,8 +304,6 @@ func TestSetRoundTrip(t *testing.T) {
 		t.Errorf("FEATURE_ENABLED = %q, want true", got)
 	}
 }
-
-// -------------------------------------------------------------------------------------
 
 // TestExplain verifies explain prints values by default and supports JSON output.
 func TestExplain(t *testing.T) {
@@ -372,8 +346,6 @@ func TestExplain(t *testing.T) {
 		}
 	})
 }
-
-// -------------------------------------------------------------------------------------
 
 // TestDiff verifies diff reports changed keys across two environments and prints
 // their values by default — locking that diff both registers and reads the

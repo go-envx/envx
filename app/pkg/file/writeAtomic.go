@@ -8,8 +8,6 @@ import (
 	"path/filepath"
 )
 
-// -------------------------------------------------------------------------------------
-
 // WriteAtomic writes data to path durably, preserving an existing file's
 // permission bits or using 0644 for a new file. It writes to a temporary file in
 // the same directory, then renames it over the target. The temp+rename dance
@@ -23,15 +21,11 @@ func WriteAtomic(path string, data []byte) error {
 	return writeAtomic(path, data, perm)
 }
 
-// -------------------------------------------------------------------------------------
-
 // WriteAtomicPrivate writes data to path durably with 0600 permission bits. It
 // always applies the private mode, including when replacing an existing file.
 func WriteAtomicPrivate(path string, data []byte) error {
 	return writeAtomic(path, data, 0o600)
 }
-
-// -------------------------------------------------------------------------------------
 
 // fileMode returns the existing permission bits for path, or the deterministic
 // default for a path that does not exist yet.
@@ -46,8 +40,6 @@ func fileMode(path string) (os.FileMode, error) {
 		return 0, fmt.Errorf("checking permissions on %s: %w", path, err)
 	}
 }
-
-// -------------------------------------------------------------------------------------
 
 // writeAtomic writes data to a temporary file with perm and renames it over
 // path after the write is complete.

@@ -6,8 +6,6 @@ import (
 	"testing"
 )
 
-// -------------------------------------------------------------------------------------
-
 // TestWrites verifies additions, updates, deletion, and retention of an
 // empty group after its last secret is removed.
 func TestWrites(t *testing.T) {
@@ -67,8 +65,6 @@ func TestWrites(t *testing.T) {
 		t.Error("new group secret is absent")
 	}
 }
-
-// -------------------------------------------------------------------------------------
 
 // TestCommentAndOrderPreservation verifies node mutation keeps comments and
 // leaves existing entries in their original order.

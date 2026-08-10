@@ -9,8 +9,6 @@ import (
 	"github.com/go-envx/envx/app/internal/fixtures"
 )
 
-// -------------------------------------------------------------------------------------
-
 // resolveBasic loads the shared "basic" fixture and resolves the api-core
 // project for the default environment (the first declared).
 func resolveBasic(t *testing.T) *envmerge.Result {
@@ -26,8 +24,6 @@ func resolveBasic(t *testing.T) *envmerge.Result {
 	}
 	return env
 }
-
-// -------------------------------------------------------------------------------------
 
 // TestRunActionFound verifies a case-insensitive hit returns the value and its
 // source file.
@@ -46,8 +42,6 @@ func TestRunActionFound(t *testing.T) {
 		t.Errorf("Source = %q, want postgres.development.yaml", res.Source)
 	}
 }
-
-// -------------------------------------------------------------------------------------
 
 // TestRunActionMissing verifies an unknown key is an error.
 func TestRunActionMissing(t *testing.T) {

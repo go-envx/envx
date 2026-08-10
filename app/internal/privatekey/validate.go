@@ -7,8 +7,6 @@ import (
 	"unicode"
 )
 
-// -------------------------------------------------------------------------------------
-
 // validateGroup rejects empty, whitespace, or line-breaking group names so
 // lookups match normalized file entries and cannot corrupt env-var names.
 func validateGroup(group string) error {
@@ -20,8 +18,6 @@ func validateGroup(group string) error {
 	}
 	return nil
 }
-
-// -------------------------------------------------------------------------------------
 
 // validateEntry rejects values that could escape the one-entry key-file format.
 func validateEntry(group, privateKey string) error {

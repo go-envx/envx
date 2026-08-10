@@ -12,8 +12,6 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-// -------------------------------------------------------------------------------------
-
 // actionParams are the positional inputs to the set action.
 type actionParams struct {
 	// IncludePath identifies the target overlay from a project's includes list.
@@ -23,8 +21,6 @@ type actionParams struct {
 	// Value is the value to write at the key path.
 	Value string
 }
-
-// -------------------------------------------------------------------------------------
 
 // execute is the imperative shell: it resolves the target overlay (environment +
 // include path) via config, reads the current document into a YAML node tree,
@@ -64,8 +60,6 @@ func execute(p actionParams, in *config.Input) error {
 	return file.WriteAtomic(target, out)
 }
 
-// -------------------------------------------------------------------------------------
-
 // readDoc parses the overlay at path into a YAML document node, preserving its
 // comments, key order, and structure for a surgical edit. A missing file yields
 // an empty document so the first set creates it.
@@ -84,8 +78,6 @@ func readDoc(path string) (*yaml.Node, error) {
 	return doc, nil
 }
 
-// -------------------------------------------------------------------------------------
-
 // apply is the pure kernel: it sets the key path on the document's root mapping,
 // creating the root and any intermediate mappings as needed. It edits value
 // nodes in place so surrounding keys, comments, and formatting are left
@@ -97,8 +89,6 @@ func apply(doc *yaml.Node, p actionParams) error {
 	}
 	return setNestedKey(root, strings.Split(p.Key, "."), p.Value)
 }
-
-// -------------------------------------------------------------------------------------
 
 // documentRoot returns the mapping node the keys live under, seeding an empty
 // mapping for a fresh or empty document. A document whose root is an explicit
@@ -125,8 +115,6 @@ func documentRoot(doc *yaml.Node) (*yaml.Node, error) {
 		return nil, errors.New("document root is not a mapping")
 	}
 }
-
-// -------------------------------------------------------------------------------------
 
 // setNestedKey walks parts through node's nested mappings, creating intermediate
 // mappings as needed, and writes value at the final part. A scalar blocking an
@@ -178,8 +166,6 @@ func setNestedKey(node *yaml.Node, parts []string, value string) error {
 	return nil
 }
 
-// -------------------------------------------------------------------------------------
-
 // mappingValue returns the value node paired with key in a mapping node, or nil
 // when the key is absent. A mapping stores its entries as alternating key/value
 // nodes in Content.
@@ -192,16 +178,12 @@ func mappingValue(node *yaml.Node, key string) *yaml.Node {
 	return nil
 }
 
-// -------------------------------------------------------------------------------------
-
 // appendPair adds a new key/value entry to the end of a mapping node, leaving the
 // order and comments of the existing entries untouched.
 func appendPair(node *yaml.Node, key string, value *yaml.Node) {
 	keyNode := &yaml.Node{Kind: yaml.ScalarNode, Tag: "!!str", Value: key}
 	node.Content = append(node.Content, keyNode, value)
 }
-
-// -------------------------------------------------------------------------------------
 
 // setScalar writes value into node as a string scalar, clearing any prior style
 // and children so the encoder can re-quote as needed. It mutates only the value
@@ -214,8 +196,6 @@ func setScalar(node *yaml.Node, value string) {
 	node.Value = value
 	node.Content = nil
 }
-
-// -------------------------------------------------------------------------------------
 
 // marshalDoc encodes the document node using indent spaces per level, matching
 // the file's existing indentation so an edit never reflows the untouched parts.
@@ -232,13 +212,9 @@ func marshalDoc(doc *yaml.Node, indent int) ([]byte, error) {
 	return buf.Bytes(), nil
 }
 
-// -------------------------------------------------------------------------------------
-
 // defaultIndent is the indentation width used when a document has no nested
 // mapping to infer one from (a flat, empty, or brand-new file).
 const defaultIndent = 2
-
-// -------------------------------------------------------------------------------------
 
 // detectIndent infers the per-level indentation width from the document's first
 // nested mapping, measuring the column gap between a key and its child. It reads
@@ -255,8 +231,6 @@ func detectIndent(doc *yaml.Node) int {
 	}
 	return defaultIndent
 }
-
-// -------------------------------------------------------------------------------------
 
 // firstNestedIndent walks node depth-first and returns the column gap between the
 // first block-mapping key that has a nested block-mapping child and that child,

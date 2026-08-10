@@ -7,8 +7,6 @@ import (
 	"strings"
 )
 
-// -------------------------------------------------------------------------------------
-
 // renderParams are the inputs to the set action renderer.
 type renderParams struct {
 	// Writer receives the safe mutation summary.
@@ -16,8 +14,6 @@ type renderParams struct {
 	// Result contains the stored secret identity and location.
 	Result actionResult
 }
-
-// -------------------------------------------------------------------------------------
 
 // render reports the stored identity without printing plaintext or ciphertext.
 func render(p *renderParams) error {
@@ -30,8 +26,6 @@ func render(p *renderParams) error {
 	)
 	return err
 }
-
-// -------------------------------------------------------------------------------------
 
 // renderStorePath quotes a path only when a space would make its boundary
 // ambiguous in terminal output.

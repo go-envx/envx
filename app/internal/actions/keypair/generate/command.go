@@ -20,8 +20,6 @@ const (
 	`
 )
 
-// -------------------------------------------------------------------------------------
-
 // NewCommand builds the keypair generation command.
 func NewCommand() *cobra.Command {
 	cmd := &cobra.Command{

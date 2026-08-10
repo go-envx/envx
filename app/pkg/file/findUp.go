@@ -7,14 +7,10 @@ import (
 	"path/filepath"
 )
 
-// -------------------------------------------------------------------------------------
-
 // ErrNotFound reports that filename was not located in the start directory or
 // any of its ancestors within the search boundary. Callers can branch on it
 // with errors.Is to supply their own context-specific message.
 var ErrNotFound = errors.New("file not found in directory tree")
-
-// -------------------------------------------------------------------------------------
 
 // FindUp walks up from startDir looking for filename in each directory,
 // returning the absolute path to the first match. The search begins at startDir
@@ -46,8 +42,6 @@ func FindUp(startDir, filename string, boundaries ...string) (string, error) {
 
 	return "", ErrNotFound
 }
-
-// -------------------------------------------------------------------------------------
 
 // hasBoundary reports whether dir contains any of the named boundary markers,
 // each of which halts the upward search at the current directory.

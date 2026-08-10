@@ -6,8 +6,6 @@ import (
 	"slices"
 )
 
-// -------------------------------------------------------------------------------------
-
 // Manifest is the parsed, validated content of envx.yaml: the declared
 // environments, project definitions, and global settings.
 type Manifest struct {
@@ -26,8 +24,6 @@ type Manifest struct {
 	Secrets SecretsConfig `yaml:"secrets"`
 }
 
-// -------------------------------------------------------------------------------------
-
 // SecretsConfig configures the workspace-level secrets store. Its zero value
 // discovers secrets.yaml beside the manifest.
 type SecretsConfig struct {
@@ -41,8 +37,6 @@ type SecretsConfig struct {
 	Cipher string `yaml:"cipher"`
 }
 
-// -------------------------------------------------------------------------------------
-
 // Project defines one project's environment configuration.
 type Project struct {
 	// Includes lists the ordered namespaces to load and merge.
@@ -52,8 +46,6 @@ type Project struct {
 	// Project settings override the global settings.
 	Settings Settings `yaml:"settings"`
 }
-
-// -------------------------------------------------------------------------------------
 
 // Settings control how envx loads and merges the environment files. Settings can be
 // configured globally and overridden at the project level. Settings can also be
@@ -78,8 +70,6 @@ type Settings struct {
 	Suffix string `yaml:"suffix"`
 }
 
-// -------------------------------------------------------------------------------------
-
 // DefaultEnvironment is the environment used when none is selected via flag,
 // ENVX_ENV, or a manifest env setting: the first declared environment. Every other
 // setting defaults to its Go zero value (boolean => false, string => ""). An empty
@@ -91,14 +81,10 @@ func (m *Manifest) DefaultEnvironment() string {
 	return m.Environments[0]
 }
 
-// -------------------------------------------------------------------------------------
-
 // HasEnvironment reports whether env is declared in the manifest's environments list.
 func (m *Manifest) HasEnvironment(env string) bool {
 	return slices.Contains(m.Environments, env)
 }
-
-// -------------------------------------------------------------------------------------
 
 // HasInclude reports whether any project declares includePath in its include
 // list. It is the pure schema predicate config uses to validate a set target
@@ -112,15 +98,11 @@ func (m *Manifest) HasInclude(includePath string) bool {
 	return false
 }
 
-// -------------------------------------------------------------------------------------
-
 // LookupProject finds a project by name, returning its definition and if one was found.
 func (m *Manifest) LookupProject(name string) (Project, bool) {
 	p, ok := m.Projects[name]
 	return p, ok
 }
-
-// -------------------------------------------------------------------------------------
 
 // Validate enforces the manifest's structural constraints: at least one
 // environment and one project must be declared, every project must have at least

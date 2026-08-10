@@ -5,12 +5,8 @@ import (
 	"slices"
 )
 
-// -------------------------------------------------------------------------------------
-
 // defaultDelimiter joins list-valued leaves when no delimiter is configured.
 const defaultDelimiter = ","
-
-// -------------------------------------------------------------------------------------
 
 // Params is envmerge's input contract. The caller supplies namespace paths,
 // settings, and optional value-resolution behavior without exposing where they
@@ -28,8 +24,6 @@ type Params struct {
 	ValueResolver ValueResolver
 }
 
-// -------------------------------------------------------------------------------------
-
 // ValueResolver dereferences one winning scalar value and returns unrecognized
 // values unchanged. env is the active environment, used by implementations that
 // support environment-implicit references.
@@ -38,8 +32,6 @@ type ValueResolver interface {
 	// unchanged when it is not a reference.
 	Resolve(value, env string) (string, error)
 }
-
-// -------------------------------------------------------------------------------------
 
 // Settings holds the fully-resolved env-resolution knobs envmerge consumes — a
 // plain value struct with no knowledge of how its values were sourced. Zero values
@@ -61,8 +53,6 @@ type Settings struct {
 	// NamespacePrefix prefixes each resolved key with its namespace name.
 	NamespacePrefix bool
 }
-
-// -------------------------------------------------------------------------------------
 
 // normalizeParams applies envmerge's terminal defaults to Params and validates the
 // result. It mutates Params in place so Build can read the effective settings directly.

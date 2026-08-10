@@ -6,8 +6,6 @@ import (
 	"testing"
 )
 
-// -------------------------------------------------------------------------------------
-
 // TestNaClBoxRoundTrip verifies key generation, anonymous encryption, and
 // decryption through the public Cipher interface.
 func TestNaClBoxRoundTrip(t *testing.T) {
@@ -46,8 +44,6 @@ func TestNaClBoxRoundTrip(t *testing.T) {
 	}
 }
 
-// -------------------------------------------------------------------------------------
-
 // TestNaClBoxRejectsWrongKey ensures a ciphertext cannot be opened with
 // another NaCl Box identity.
 func TestNaClBoxRejectsWrongKey(t *testing.T) {
@@ -74,8 +70,6 @@ func TestNaClBoxRejectsWrongKey(t *testing.T) {
 		t.Fatal("Decrypt() with the wrong key succeeded")
 	}
 }
-
-// -------------------------------------------------------------------------------------
 
 // TestNaClBoxValidatesKeypair checks key format and public/private matching.
 func TestNaClBoxValidatesKeypair(t *testing.T) {
@@ -129,8 +123,6 @@ func TestNaClBoxValidatesKeypair(t *testing.T) {
 	}
 }
 
-// -------------------------------------------------------------------------------------
-
 // TestNaClBoxRejectsTampering ensures authenticated ciphertext modification is
 // rejected.
 func TestNaClBoxRejectsTampering(t *testing.T) {
@@ -155,8 +147,6 @@ func TestNaClBoxRejectsTampering(t *testing.T) {
 		t.Fatal("Decrypt() accepted tampered ciphertext")
 	}
 }
-
-// -------------------------------------------------------------------------------------
 
 // TestNaClBoxRejectsMalformedKeys ensures key markers and lengths are checked
 // before cryptographic operations.

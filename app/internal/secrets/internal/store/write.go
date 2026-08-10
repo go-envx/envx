@@ -7,8 +7,6 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-// -------------------------------------------------------------------------------------
-
 // SetPublicKey adds or updates a group's public key in memory.
 func (d *Document) SetPublicKey(group, publicKey string) error {
 	if err := validateIdentifier("secret group", group); err != nil {
@@ -38,8 +36,6 @@ func (d *Document) SetPublicKey(group, publicKey string) error {
 	appendMappingEntry(publicKeys, group, publicKey)
 	return nil
 }
-
-// -------------------------------------------------------------------------------------
 
 // SetSecret adds or updates one stored value in memory.
 func (d *Document) SetSecret(group, key, value string) error {
@@ -87,8 +83,6 @@ func (d *Document) SetSecret(group, key, value string) error {
 	return nil
 }
 
-// -------------------------------------------------------------------------------------
-
 // DeleteSecret removes one stored value and reports whether it existed. The
 // containing group remains in the document when its last value is removed.
 func (d *Document) DeleteSecret(group, key string) (bool, error) {
@@ -128,8 +122,6 @@ func (d *Document) DeleteSecret(group, key string) (bool, error) {
 	removeMappingEntry(groupNode, keyEntry.index)
 	return true, nil
 }
-
-// -------------------------------------------------------------------------------------
 
 // ensureFieldMapping returns a known top-level mapping, creating it when absent.
 func (d *Document) ensureFieldMapping(field string) (*yaml.Node, error) {

@@ -8,8 +8,6 @@ import (
 	"github.com/go-envx/envx/app/internal/privatekey"
 )
 
-// -------------------------------------------------------------------------------------
-
 // Params supplies paths and dependencies for a Manager.
 type Params struct {
 	// SecretsPath is the absolute path of the secrets store.
@@ -24,15 +22,11 @@ type Params struct {
 	PrivateKeyDestination privatekey.Destination
 }
 
-// -------------------------------------------------------------------------------------
-
 // Manager coordinates secret workflows over the store and key-material ports.
 type Manager struct {
 	// params holds the validated construction input privately.
 	params Params
 }
-
-// -------------------------------------------------------------------------------------
 
 // New binds paths and dependencies into a manager. All paths and operational
 // dependencies must be supplied by the composition layer.

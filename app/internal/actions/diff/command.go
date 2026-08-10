@@ -22,8 +22,6 @@ const (
 	`
 )
 
-// -------------------------------------------------------------------------------------
-
 // NewCommand builds the "diff" command, which parses args into the action's
 // params/config, executes the action, and renders the structured diff in the
 // specified format.

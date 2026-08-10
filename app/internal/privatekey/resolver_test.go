@@ -7,8 +7,6 @@ import (
 	"testing"
 )
 
-// -------------------------------------------------------------------------------------
-
 // lookup builds a deterministic environment lookup for source tests.
 func lookup(values map[string]string) func(string) (string, bool) {
 	return func(name string) (string, bool) {
@@ -16,8 +14,6 @@ func lookup(values map[string]string) func(string) (string, bool) {
 		return value, ok
 	}
 }
-
-// -------------------------------------------------------------------------------------
 
 // TestResolverPrecedence verifies specific environment, combined environment,
 // and file inputs are consulted in order.
@@ -79,8 +75,6 @@ func TestResolverPrecedence(t *testing.T) {
 	}
 }
 
-// -------------------------------------------------------------------------------------
-
 // TestResolverFailsClosed verifies malformed, empty, and duplicate entries stop
 // resolution instead of falling through to a lower-priority input.
 func TestResolverFailsClosed(t *testing.T) {
@@ -122,8 +116,6 @@ func TestResolverFailsClosed(t *testing.T) {
 		})
 	}
 }
-
-// -------------------------------------------------------------------------------------
 
 // TestResolverNotAvailableIsDistinct verifies a missing key can be distinguished
 // from malformed resolver input.
