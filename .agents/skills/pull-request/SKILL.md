@@ -39,8 +39,9 @@ Brief description of what this PR accomplishes.
 - Grouped by logical area
 
 ## Testing
-- How the changes were tested
+- What tests were created for changes
 - Any manual testing steps needed
+- DO NOT reference specific CI/CD pipelines or internal tools
 
 ## Related Issues
 Closes #123

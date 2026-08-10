@@ -15,6 +15,8 @@ import (
 )
 
 const (
+	// defaultManifestFilename is the conventional workspace manifest filename.
+	defaultManifestFilename = "envx.yaml"
 	// defaultSecretsFilename is the default workspace secrets store filename.
 	defaultSecretsFilename = "secrets.yaml"
 	// defaultKeysFilename is the default workspace private-key filename.
@@ -114,10 +116,17 @@ func ResolveWorkspace(in *Input) (*Result, error) {
 // "project not found" error). Terminal fallbacks (e.g. the default environment)
 // are applied downstream, so an unset env stays empty here.
 func resolve(in *Input, project string) (*Result, error) {
-	manifestPath := resolveManifestPath(in)
+	// Bind the resolved manifest path and conventional filename into a manager.
+	manifestManager, err := manifest.New(manifest.Params{
+		Path:     resolveManifestPath(in),
+		Filename: defaultManifestFilename,
+	})
+	if err != nil {
+		return nil, err
+	}
 
 	// Load the manifest from the resolved manifest path.
-	m, manifestFile, err := manifest.Load(manifestPath)
+	m, manifestFile, err := manifestManager.Load()
 	if err != nil {
 		return nil, err
 	}
