@@ -15,8 +15,6 @@ func IndentLevel(document *yaml.Node) (int, bool) {
 	return 0, false
 }
 
-// -------------------------------------------------------------------------------------
-
 // firstNestedIndent walks mappings depth-first and returns the column gap
 // between a block-mapping key and its first nested block-mapping key.
 func firstNestedIndent(node *yaml.Node) (int, bool) {

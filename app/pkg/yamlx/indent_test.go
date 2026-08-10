@@ -6,8 +6,6 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-// -------------------------------------------------------------------------------------
-
 // TestIndentLevel verifies indentation is inferred from nested block mappings.
 func TestIndentLevel(t *testing.T) {
 	t.Parallel()
@@ -57,8 +55,6 @@ func TestIndentLevel(t *testing.T) {
 		})
 	}
 }
-
-// -------------------------------------------------------------------------------------
 
 // TestIndentLevelReturnsNoMatchForEmptyAndNil verifies missing node content is
 // reported as undetectable rather than assigned a package-level default.
