@@ -21,11 +21,11 @@ func boolPtr(b bool) *bool { return &b }
 func testManifest() *schema.Manifest {
 	return &schema.Manifest{
 		Environments: []string{"development", "staging", "production"},
-		Settings:     schema.Settings{Env: "staging"},
+		Settings:     schema.Settings{Env: strPtr("staging")},
 		Projects: map[string]schema.Project{
 			"api": {
 				Includes: []string{"env/x"},
-				Settings: schema.Settings{Env: "production"},
+				Settings: schema.Settings{Env: strPtr("production")},
 			},
 			"web": {Includes: []string{"env/y"}},
 		},

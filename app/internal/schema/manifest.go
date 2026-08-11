@@ -50,29 +50,28 @@ type Project struct {
 // Settings control how envx loads and merges the environment files. Settings can be
 // configured globally and overridden at the project level. Settings can also be
 // overridden by ENVX_* env vars and CLI flags, which take precedence over the manifest
-// values. Booleans are pointers so an explicitly-set false is distinguishable from
-// "unset", which the resolution precedence chain relies on when layering project over
-// global over CLI input.
+// values. Optional scalar values are pointers so the parsed manifest preserves whether
+// a setting was omitted; config resolution currently treats omitted and empty strings
+// the same while retaining the distinction for future precedence changes.
 type Settings struct {
 	// Delimiter joins a list-valued leaf into a single env var.
-	Delimiter string `yaml:"delimiter"`
+	Delimiter *string `yaml:"delimiter"`
 	// Env is the target environment to load.
-	Env string `yaml:"env"`
+	Env *string `yaml:"env"`
 	// NamespacePrefix prefixes each key with its namespace name, if true.
 	NamespacePrefix *bool `yaml:"namespace_prefix"`
 	// Overload lets file values override existing OS env vars, if true.
 	Overload *bool `yaml:"overload"`
 	// Prefix is prepended to every resolved env-var key.
-	Prefix string `yaml:"prefix"`
+	Prefix *string `yaml:"prefix"`
 	// RequireOverlays requires every environment overlay file in the namespace to exist.
 	RequireOverlays *bool `yaml:"require_overlays"`
 	// Suffix is appended to every resolved env-var key.
-	Suffix string `yaml:"suffix"`
+	Suffix *string `yaml:"suffix"`
 }
 
 // DefaultEnvironment is the environment used when none is selected via flag,
-// ENVX_ENV, or a manifest env setting: the first declared environment. Every other
-// setting defaults to its Go zero value (boolean => false, string => ""). An empty
+// ENVX_ENV, or a manifest env setting: the first declared environment. An empty
 // string is returned when no environments are declared.
 func (m *Manifest) DefaultEnvironment() string {
 	if len(m.Environments) == 0 {

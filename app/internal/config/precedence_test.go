@@ -25,20 +25,21 @@ func TestPrecedenceString(t *testing.T) {
 
 	t.Run("explicit wins", func(t *testing.T) {
 		t.Setenv(spec.Env, "from-env")
-		got := precedenceString(&spec, strPtr("from-flag"), "layer")
+		got := precedenceString(&spec, strPtr("from-flag"), strPtr("layer"))
 		if got != "from-flag" {
 			t.Errorf("got %q, want from-flag", got)
 		}
 	})
 	t.Run("env wins over layers", func(t *testing.T) {
 		t.Setenv(spec.Env, "from-env")
-		if got := precedenceString(&spec, nil, "layer"); got != "from-env" {
+		if got := precedenceString(&spec, nil, strPtr("layer")); got != "from-env" {
 			t.Errorf("got %q, want from-env", got)
 		}
 	})
 	t.Run("first non-empty layer", func(t *testing.T) {
 		unsetEnv(t, spec.Env)
-		if got := precedenceString(&spec, nil, "", "layer2"); got != "layer2" {
+		got := precedenceString(&spec, nil, strPtr(""), strPtr("layer2"))
+		if got != "layer2" {
 			t.Errorf("got %q, want layer2", got)
 		}
 	})
