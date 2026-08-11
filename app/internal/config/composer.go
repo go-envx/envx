@@ -30,11 +30,13 @@ func NewConfiguredCipher(in *Input) (cipher.Cipher, error) {
 	// Replace the default with the manifest's algorithm when a workspace exists.
 	cipherParams := cipher.Params{Algorithm: defaultCipherAlgorithm}
 	if manifestExists {
-		m, _, err := manifestManager.Load()
+		manifestDocument, err := manifestManager.Load()
 		if err != nil {
 			return nil, err
 		}
-		cipherParams = resolveCipherParams(manifestContext{manifest: m})
+		cipherParams = resolveCipherParams(manifestContext{
+			manifest: manifestDocument.Content,
+		})
 	}
 
 	// Construct the selected implementation and add context if construction fails.
