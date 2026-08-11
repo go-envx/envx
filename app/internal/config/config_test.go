@@ -311,6 +311,17 @@ func TestResolveWorkspace(t *testing.T) {
 			absoluteKeysPath,
 		)
 	}
+
+	// The manifest's detected indent flows through as the secrets fallback indent.
+	r5, err := resolveManifest(
+		manifestContext{manifest: m, dir: dir, indent: 4}, &Input{},
+	)
+	if err != nil {
+		t.Fatalf("resolveManifest indent: %v", err)
+	}
+	if r5.Secrets.DefaultIndent != 4 {
+		t.Errorf("Secrets.DefaultIndent = %d, want 4", r5.Secrets.DefaultIndent)
+	}
 }
 
 // TestResolveProjectResolvesSecretReference verifies ResolveProject wires the

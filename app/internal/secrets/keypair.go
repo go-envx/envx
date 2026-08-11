@@ -73,7 +73,7 @@ func (m *Manager) GenerateKeypair(group string) (KeypairMetadata, error) {
 		)
 	}
 	// Commit the staged public key after the private key was accepted.
-	if err := document.Save(); err != nil {
+	if err := document.Save(m.params.DefaultIndent); err != nil {
 		return KeypairMetadata{}, fmt.Errorf(
 			"private key for group %q was written, but secrets store %s was not "+
 				"committed: %w; keep the private key and retry the operation",

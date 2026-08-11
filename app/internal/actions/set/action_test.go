@@ -4,6 +4,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/go-envx/envx/app/pkg/yamlx"
 	"gopkg.in/yaml.v3"
 )
 
@@ -28,9 +29,9 @@ func applyToYAML(t *testing.T, src string, p actionParams) string {
 // match the production write path.
 func marshalForTest(t *testing.T, doc *yaml.Node) string {
 	t.Helper()
-	out, err := marshalDoc(doc, detectIndent(doc))
+	out, err := yamlx.Marshal(doc, detectIndent(doc))
 	if err != nil {
-		t.Fatalf("marshalDoc: %v", err)
+		t.Fatalf("Marshal: %v", err)
 	}
 	return string(out)
 }

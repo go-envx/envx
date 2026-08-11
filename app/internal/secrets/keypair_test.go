@@ -108,6 +108,7 @@ func TestGenerateKeypairCommitsPublicStateAfterPrivateHandoff(t *testing.T) {
 	manager, err := New(Params{
 		SecretsPath:           storePath,
 		KeysPath:              keysPath,
+		DefaultIndent:         2,
 		Cipher:                cipherDouble,
 		PrivateKeyResolver:    newPrivateKeyTestResolver(),
 		PrivateKeyDestination: destination,
@@ -136,6 +137,48 @@ func TestGenerateKeypairCommitsPublicStateAfterPrivateHandoff(t *testing.T) {
 	}
 }
 
+// TestGenerateKeypairUsesDefaultIndent verifies a newly created store adopts the
+// configured default indentation when it has none of its own.
+func TestGenerateKeypairUsesDefaultIndent(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+	storePath := filepath.Join(dir, "secrets.yaml")
+
+	const privateValue = "private-test-value"
+	manager, err := New(Params{
+		SecretsPath:   storePath,
+		KeysPath:      filepath.Join(dir, "envx.keys"),
+		DefaultIndent: 4,
+		Cipher: keypairTestCipher{
+			pair: cipher.Keypair{
+				PublicKey:  "public-test-value",
+				PrivateKey: privateValue,
+			},
+			validPrivate: privateValue,
+		},
+		PrivateKeyResolver: newPrivateKeyTestResolver(),
+		PrivateKeyDestination: keypairTestDestination{
+			write: func(string, string) error { return nil },
+		},
+	})
+	if err != nil {
+		t.Fatalf("New(): %v", err)
+	}
+	if _, err := manager.GenerateKeypair("production"); err != nil {
+		t.Fatalf("GenerateKeypair(): %v", err)
+	}
+
+	//nolint:gosec // G304: path is created inside this test's temporary directory.
+	data, err := os.ReadFile(storePath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(data), "\n    production:") {
+		t.Fatalf("store did not adopt 4-space default indent:\n%s", data)
+	}
+}
+
 // TestGenerateKeypairRefusesExistingIdentity verifies generation never replaces
 // a group's existing public identity.
 func TestGenerateKeypairRefusesExistingIdentity(t *testing.T) {
@@ -144,8 +187,9 @@ func TestGenerateKeypairRefusesExistingIdentity(t *testing.T) {
 	storePath := writeStore(t, "public_keys:\n  production: existing-public\n")
 	called := false
 	manager, err := New(Params{
-		SecretsPath: storePath,
-		KeysPath:    filepath.Join(filepath.Dir(storePath), "envx.keys"),
+		SecretsPath:   storePath,
+		KeysPath:      filepath.Join(filepath.Dir(storePath), "envx.keys"),
+		DefaultIndent: 2,
 		Cipher: keypairTestCipher{
 			pair:         cipher.Keypair{PublicKey: "new-public", PrivateKey: "new-private"},
 			validPrivate: "new-private",
@@ -215,6 +259,7 @@ func TestInspectKeypairStatuses(t *testing.T) {
 			manager, err := New(Params{
 				SecretsPath:           storePath,
 				KeysPath:              filepath.Join(t.TempDir(), "envx.keys"),
+				DefaultIndent:         2,
 				Cipher:                cipherDouble,
 				PrivateKeyResolver:    tt.resolver,
 				PrivateKeyDestination: newPrivateKeyTestDestination(),
@@ -247,8 +292,9 @@ func TestGenerateKeypairReportsRecoverableStoreFailure(t *testing.T) {
 	keysPath := filepath.Join(dir, "envx.keys")
 	const privateValue = "private-test-value"
 	manager, err := New(Params{
-		SecretsPath: storePath,
-		KeysPath:    keysPath,
+		SecretsPath:   storePath,
+		KeysPath:      keysPath,
+		DefaultIndent: 2,
 		Cipher: keypairTestCipher{
 			pair: cipher.Keypair{
 				PublicKey:  "public-test-value",
@@ -301,9 +347,10 @@ func TestGenerateDefaultKeypairRoundTrip(t *testing.T) {
 	storePath := filepath.Join(dir, "secrets.yaml")
 	keysPath := filepath.Join(dir, "envx.keys")
 	manager, err := New(Params{
-		SecretsPath: storePath,
-		KeysPath:    keysPath,
-		Cipher:      newTestCipher(t),
+		SecretsPath:   storePath,
+		KeysPath:      keysPath,
+		DefaultIndent: 2,
+		Cipher:        newTestCipher(t),
 		PrivateKeyResolver: privatekey.NewResolver(privatekey.ResolverOptions{
 			KeysPath: keysPath,
 		}),
