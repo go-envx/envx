@@ -8,12 +8,11 @@ import (
 )
 
 // precedenceString resolves a string setting: the explicit value wins when present,
-// then the ENVX_* var, then the first non-empty layer (e.g. project then global
-// default), and finally "". It reads the setting's ENVX_* fallback straight from its
-// schema.FlagSpec, so registration and resolution can never disagree about a name.
-func precedenceString(
-	s *schema.FlagSpec, explicit *string, layers ...string,
-) string {
+// then the ENVX_* var, then the first non-empty manifest layer (e.g. project then
+// global default), and finally "". Nil and empty manifest layers are both skipped.
+// It reads the setting's ENVX_* fallback straight from its schema.FlagSpec, so
+// registration and resolution can never disagree about a name.
+func precedenceString(s *schema.FlagSpec, explicit *string, layers ...*string) string {
 	if explicit != nil {
 		return *explicit
 	}
@@ -23,8 +22,8 @@ func precedenceString(
 		}
 	}
 	for _, layer := range layers {
-		if layer != "" {
-			return layer
+		if layer != nil && *layer != "" {
+			return *layer
 		}
 	}
 	return ""
@@ -33,9 +32,7 @@ func precedenceString(
 // precedenceBool resolves a boolean setting: the explicit value wins when present,
 // then the ENVX_* var (parsed), then the first non-nil layer (e.g. project then
 // global setting), and finally false.
-func precedenceBool(
-	s *schema.FlagSpec, explicit *bool, layers ...*bool,
-) bool {
+func precedenceBool(s *schema.FlagSpec, explicit *bool, layers ...*bool) bool {
 	if explicit != nil {
 		return *explicit
 	}
