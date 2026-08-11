@@ -24,6 +24,7 @@ func TestSetEncryptsAndStoresSecret(t *testing.T) {
 	manager, err := New(Params{
 		SecretsPath:           storePath,
 		KeysPath:              filepath.Join(filepath.Dir(storePath), "envx.keys"),
+		DefaultIndent:         2,
 		Cipher:                selected,
 		PrivateKeyResolver:    newPrivateKeyTestResolver(),
 		PrivateKeyDestination: newPrivateKeyTestDestination(),
@@ -83,6 +84,7 @@ func TestSetUsesCipherAlgorithm(t *testing.T) {
 	manager, err := New(Params{
 		SecretsPath:           storePath,
 		KeysPath:              filepath.Join(filepath.Dir(storePath), "envx.keys"),
+		DefaultIndent:         2,
 		Cipher:                selected,
 		PrivateKeyResolver:    newPrivateKeyTestResolver(),
 		PrivateKeyDestination: newPrivateKeyTestDestination(),
@@ -131,6 +133,7 @@ func TestSetValidatesBeforeEncryption(t *testing.T) {
 	manager, err := New(Params{
 		SecretsPath:           storePath,
 		KeysPath:              filepath.Join(filepath.Dir(storePath), "envx.keys"),
+		DefaultIndent:         2,
 		Cipher:                cipherDouble,
 		PrivateKeyResolver:    newPrivateKeyTestResolver(),
 		PrivateKeyDestination: newPrivateKeyTestDestination(),
@@ -207,6 +210,7 @@ func TestSetValidatesGeneratedPlaintext(t *testing.T) {
 	manager, err := New(Params{
 		SecretsPath:           storePath,
 		KeysPath:              filepath.Join(filepath.Dir(storePath), "envx.keys"),
+		DefaultIndent:         2,
 		Cipher:                cipherDouble,
 		PrivateKeyResolver:    newPrivateKeyTestResolver(),
 		PrivateKeyDestination: newPrivateKeyTestDestination(),

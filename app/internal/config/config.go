@@ -23,6 +23,8 @@ const (
 	defaultKeysFilename = "envx.keys"
 	// defaultCipherAlgorithm is the application's default encryption algorithm.
 	defaultCipherAlgorithm = cipher.Age
+	// defaultIndent is the block indentation used for yaml files.
+	defaultIndent = 2
 )
 
 // Input is the raw user input one action gathers at the frontend edge (a cobra
@@ -59,6 +61,8 @@ type manifestContext struct {
 	manifest *schema.Manifest
 	// dir is the absolute directory the manifest was loaded from.
 	dir string
+	// indent is the block indentation detected in the manifest source document.
+	indent int
 	// project is the project name being resolved ("" resolves the global context).
 	project string
 }
@@ -138,6 +142,7 @@ func resolve(in *Input, project string) (*Result, error) {
 	mc := manifestContext{
 		manifest: manifestDocument.Content,
 		dir:      dir,
+		indent:   manifestDocument.Indent,
 		project:  project,
 	}
 
@@ -295,10 +300,19 @@ func resolveSecretsParams(mc manifestContext) secrets.Params {
 		keysPath = file.ResolvePath(mc.dir, keysPath)
 	}
 
-	// Return the secrets parameters.
+	// Resolve the secrets default indent from the manifest's own detected
+	// indentation, applying the workspace default when the manifest has none.
+	indent := mc.indent
+	if indent < 2 || indent > 9 {
+		indent = defaultIndent
+	}
+
+	// Return the secrets parameters. DefaultIndent is applied only when the
+	// secrets store has no block indentation of its own.
 	return secrets.Params{
-		SecretsPath: resolvedSecretsPath,
-		KeysPath:    keysPath,
+		SecretsPath:   resolvedSecretsPath,
+		KeysPath:      keysPath,
+		DefaultIndent: indent,
 	}
 }
 

@@ -1,7 +1,6 @@
 package set
 
 import (
-	"bytes"
 	"errors"
 	"fmt"
 	"os"
@@ -54,7 +53,7 @@ func execute(p actionParams, in *config.Input) error {
 	}
 
 	// re-encode and write the result back atomically
-	out, err := marshalDoc(doc, indent)
+	out, err := yamlx.Marshal(doc, indent)
 	if err != nil {
 		return fmt.Errorf("marshaling %s: %w", target, err)
 	}
@@ -172,21 +171,6 @@ func setNestedKey(node *yaml.Node, parts []string, value string) error {
 func appendPair(node *yaml.Node, key string, value *yaml.Node) {
 	keyNode := &yaml.Node{Kind: yaml.ScalarNode, Tag: "!!str", Value: key}
 	node.Content = append(node.Content, keyNode, value)
-}
-
-// marshalDoc encodes the document node using indent spaces per level, matching
-// the file's existing indentation so an edit never reflows the untouched parts.
-func marshalDoc(doc *yaml.Node, indent int) ([]byte, error) {
-	var buf bytes.Buffer
-	enc := yaml.NewEncoder(&buf)
-	enc.SetIndent(indent)
-	if err := enc.Encode(doc); err != nil {
-		return nil, err
-	}
-	if err := enc.Close(); err != nil {
-		return nil, err
-	}
-	return buf.Bytes(), nil
 }
 
 // defaultIndent is the indentation width used when a document has no nested

@@ -133,6 +133,24 @@ func TestNewRejectsNilPrivateKeyDestination(t *testing.T) {
 	}
 }
 
+// TestNewRejectsInvalidDefaultIndent verifies Manager construction requires a
+// usable default indentation from the configuration layer.
+func TestNewRejectsInvalidDefaultIndent(t *testing.T) {
+	t.Parallel()
+
+	params := Params{
+		SecretsPath:           filepath.Join(t.TempDir(), "secrets.yaml"),
+		KeysPath:              filepath.Join(t.TempDir(), "envx.keys"),
+		Cipher:                newTestCipher(t),
+		PrivateKeyResolver:    newPrivateKeyTestResolver(),
+		PrivateKeyDestination: newPrivateKeyTestDestination(),
+	}
+	if _, err := New(params); err == nil ||
+		err.Error() != "default indent must be at least 2 spaces" {
+		t.Fatalf("New() error = %v, want default indent error", err)
+	}
+}
+
 // TestNewPreservesConfiguredKeysPath verifies an explicit private-key path is
 // retained.
 func TestNewPreservesConfiguredKeysPath(t *testing.T) {
@@ -143,6 +161,7 @@ func TestNewPreservesConfiguredKeysPath(t *testing.T) {
 	manager, err := New(Params{
 		SecretsPath:           secretsPath,
 		KeysPath:              keysPath,
+		DefaultIndent:         2,
 		Cipher:                newTestCipher(t),
 		PrivateKeyResolver:    newPrivateKeyTestResolver(),
 		PrivateKeyDestination: newPrivateKeyTestDestination(),

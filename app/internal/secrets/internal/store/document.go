@@ -6,6 +6,7 @@ import (
 	"os"
 
 	"github.com/go-envx/envx/app/pkg/file"
+	"github.com/go-envx/envx/app/pkg/yamlx"
 	"gopkg.in/yaml.v3"
 )
 
@@ -51,8 +52,10 @@ func Open(path string) (*Document, error) {
 	return document, nil
 }
 
-// Save validates and atomically writes the document to its bound path.
-func (d *Document) Save() error {
+// Save validates and atomically writes the document to its bound path. It
+// preserves the document's own block indentation, applying defaultIndent only
+// when the document has none of its own.
+func (d *Document) Save(defaultIndent int) error {
 	if d.path == "" {
 		return errors.New("secrets document path is empty")
 	}
@@ -60,7 +63,12 @@ func (d *Document) Save() error {
 		return fmt.Errorf("validating secrets: %w", err)
 	}
 
-	data, err := yaml.Marshal(&d.root)
+	indent := defaultIndent
+	if own, ok := yamlx.IndentLevel(&d.root); ok {
+		indent = own
+	}
+
+	data, err := yamlx.Marshal(&d.root, indent)
 	if err != nil {
 		return fmt.Errorf("encoding secrets %s: %w", d.path, err)
 	}

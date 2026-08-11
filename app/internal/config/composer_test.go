@@ -71,8 +71,9 @@ func writeCipherManifest(t *testing.T, algorithm string) string {
 func TestNewSecretsManagerUsesConfiguredAlgorithm(t *testing.T) {
 	dir := t.TempDir()
 	manager, err := NewSecretsManager(secrets.Params{
-		SecretsPath: filepath.Join(dir, "secrets.yaml"),
-		KeysPath:    filepath.Join(dir, "envx.keys"),
+		SecretsPath:   filepath.Join(dir, "secrets.yaml"),
+		KeysPath:      filepath.Join(dir, "envx.keys"),
+		DefaultIndent: 2,
 	}, cipher.Params{
 		Algorithm: cipher.NaClBox,
 	})

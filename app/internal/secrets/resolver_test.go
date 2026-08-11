@@ -27,6 +27,7 @@ func TestManagerResolverLoadsSecrets(t *testing.T) {
 	manager, err := New(Params{
 		SecretsPath:           storePath,
 		KeysPath:              filepath.Join(filepath.Dir(storePath), "envx.keys"),
+		DefaultIndent:         2,
 		Cipher:                newTestCipher(t),
 		PrivateKeyResolver:    newPrivateKeyTestResolver(),
 		PrivateKeyDestination: newPrivateKeyTestDestination(),
@@ -56,6 +57,7 @@ func TestManagerResolverMissingFileIsEmpty(t *testing.T) {
 	manager, err := New(Params{
 		SecretsPath:           filepath.Join(t.TempDir(), "nope.yaml"),
 		KeysPath:              filepath.Join(t.TempDir(), "envx.keys"),
+		DefaultIndent:         2,
 		Cipher:                newTestCipher(t),
 		PrivateKeyResolver:    newPrivateKeyTestResolver(),
 		PrivateKeyDestination: newPrivateKeyTestDestination(),
@@ -80,6 +82,7 @@ func TestManagerResolverMalformed(t *testing.T) {
 	manager, err := New(Params{
 		SecretsPath:           storePath,
 		KeysPath:              filepath.Join(filepath.Dir(storePath), "envx.keys"),
+		DefaultIndent:         2,
 		Cipher:                newTestCipher(t),
 		PrivateKeyResolver:    newPrivateKeyTestResolver(),
 		PrivateKeyDestination: newPrivateKeyTestDestination(),
@@ -130,6 +133,7 @@ func TestResolveGroupCaseInsensitive(t *testing.T) {
 	manager, err := New(Params{
 		SecretsPath:           path,
 		KeysPath:              filepath.Join(filepath.Dir(path), "envx.keys"),
+		DefaultIndent:         2,
 		Cipher:                newTestCipher(t),
 		PrivateKeyResolver:    newPrivateKeyTestResolver(),
 		PrivateKeyDestination: newPrivateKeyTestDestination(),

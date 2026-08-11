@@ -67,7 +67,7 @@ func (m *Manager) Set(group, key string, plaintextSource PlaintextResolver) erro
 	if err := document.SetSecret(group, key, ciphertext); err != nil {
 		return err
 	}
-	if err := document.Save(); err != nil {
+	if err := document.Save(m.params.DefaultIndent); err != nil {
 		return fmt.Errorf("saving secret %q in group %q: %w", key, group, err)
 	}
 	return nil
