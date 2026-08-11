@@ -45,13 +45,14 @@ func TestLoadValid(t *testing.T) {
 	t.Parallel()
 
 	path := fixtures.Manifest("manifest/valid-secrets")
-	m, got, err := newManager(t, path).Load()
+	loaded, err := newManager(t, path).Load()
 	if err != nil {
 		t.Fatalf("Load: %v", err)
 	}
-	if got != path {
-		t.Errorf("path = %q, want %q", got, path)
+	if loaded.Path != path {
+		t.Errorf("path = %q, want %q", loaded.Path, path)
 	}
+	m := loaded.Content
 	if !m.HasEnvironment("production") {
 		t.Error("expected production environment to be present")
 	}
@@ -66,6 +67,45 @@ func TestLoadValid(t *testing.T) {
 	}
 	if _, ok := m.LookupProject("api"); !ok {
 		t.Error("expected project api to be present")
+	}
+}
+
+// TestLoadDetectsIndent verifies Load reports the source document's block
+// indentation and defaults to two spaces when none is detectable.
+func TestLoadDetectsIndent(t *testing.T) {
+	t.Parallel()
+
+	tests := map[string]struct {
+		body string
+		want int
+	}{
+		"two spaces": {
+			body: "environments:\n  - development\n" +
+				"projects:\n  api:\n    includes:\n      - env/x\n",
+			want: 2,
+		},
+		"four spaces": {
+			body: "environments:\n    - development\n" +
+				"projects:\n    api:\n        includes:\n            - env/x\n",
+			want: 4,
+		},
+		"flow style defaults to two": {
+			body: "environments: [development]\n" +
+				"projects: {api: {includes: [env/x]}}\n",
+			want: 2,
+		},
+	}
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			loaded, err := newManager(t, writeManifest(t, tc.body)).Load()
+			if err != nil {
+				t.Fatalf("Load: %v", err)
+			}
+			if loaded.Indent != tc.want {
+				t.Errorf("Indent = %d, want %d", loaded.Indent, tc.want)
+			}
+		})
 	}
 }
 
@@ -112,7 +152,7 @@ func TestLoadInvalid(t *testing.T) {
 	for name, body := range tests {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
-			if _, _, err := newManager(t, writeManifest(t, body)).Load(); err == nil {
+			if _, err := newManager(t, writeManifest(t, body)).Load(); err == nil {
 				t.Error("expected validation error")
 			}
 		})
@@ -123,11 +163,11 @@ func TestLoadInvalid(t *testing.T) {
 func TestLoadDiscovers(t *testing.T) {
 	t.Parallel()
 
-	m, _, err := newManager(t, fixtures.Manifest("basic")).Load()
+	loaded, err := newManager(t, fixtures.Manifest("basic")).Load()
 	if err != nil {
 		t.Fatalf("Load: %v", err)
 	}
-	if _, ok := m.LookupProject("api-core"); !ok {
+	if _, ok := loaded.Content.LookupProject("api-core"); !ok {
 		t.Error("expected project api-core to be present")
 	}
 }

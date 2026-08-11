@@ -126,17 +126,17 @@ func resolve(in *Input, project string) (*Result, error) {
 	}
 
 	// Load the manifest from the resolved manifest path.
-	m, manifestFile, err := manifestManager.Load()
+	manifestDocument, err := manifestManager.Load()
 	if err != nil {
 		return nil, err
 	}
 
 	// Get the absolute directory of the manifest so project includes can be joined.
-	dir := filepath.Dir(manifestFile)
+	dir := filepath.Dir(manifestDocument.Path)
 
 	// Construct the manifest context.
 	mc := manifestContext{
-		manifest: m,
+		manifest: manifestDocument.Content,
 		dir:      dir,
 		project:  project,
 	}

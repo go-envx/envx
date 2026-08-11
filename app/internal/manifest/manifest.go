@@ -10,7 +10,12 @@ import (
 
 	"github.com/go-envx/envx/app/internal/schema"
 	"github.com/go-envx/envx/app/pkg/file"
+	"github.com/go-envx/envx/app/pkg/yamlx"
 )
+
+// defaultIndent is the block indentation applied when a manifest document has no
+// detectable nested indentation.
+const defaultIndent = 2
 
 // Params supplies the path and discovery filename for a Manager.
 type Params struct {
@@ -25,6 +30,18 @@ type Params struct {
 type Manager struct {
 	// params holds the validated construction input privately.
 	params Params
+}
+
+// Manifest is a parsed, validated manifest together with the location it
+// was read from and the block indentation detected in the source document.
+type Manifest struct {
+	// Content is the parsed, validated manifest content.
+	Content *schema.Manifest
+	// Path is the absolute path the manifest was read from.
+	Path string
+	// Indent is the detected block indentation width, defaulting to two spaces
+	// when the source document has none to detect.
+	Indent int
 }
 
 // New binds a path and discovery filename into a manager. The filename must be
@@ -56,39 +73,47 @@ func (m *Manager) Exists() (bool, error) {
 }
 
 // Load discovers the manifest (an explicit path, else a walk-up search), then
-// reads, parses, and validates it. It returns the manifest struct and the
-// absolute path it was loaded from.
-func (m *Manager) Load() (manifest *schema.Manifest, path string, err error) {
+// reads, parses, and validates it. It returns the parsed manifest, the absolute
+// path it was loaded from, and the block indentation detected in the source.
+func (m *Manager) Load() (*Manifest, error) {
 	// Discover the manifest path (explicit path, else walk-up search).
-	found, err := m.discover()
+	path, err := m.discover()
 	if err != nil {
-		return nil, "", err
+		return nil, err
 	}
-	manifest, err = m.load(found)
-	return manifest, found, err
-}
 
-// load reads and validates a manifest at a path already located by the discovery
-// step.
-func (m *Manager) load(path string) (*schema.Manifest, error) {
 	// Read the manifest file from disk.
 	data, err := file.Read(path)
 	if err != nil {
 		return nil, fmt.Errorf("reading manifest: %w", err)
 	}
 
-	// Parse and validate the manifest file into a schema.Manifest.
-	return m.parse(data)
+	// Parse and validate the manifest file.
+	manifest, err := m.parse(data)
+	if err != nil {
+		return nil, err
+	}
+	manifest.Path = path
+	return manifest, nil
 }
 
-// parse unmarshals raw YAML into a schema.Manifest and runs structural
-// validation. The on-disk location is recorded separately by Load.
-func (m *Manager) parse(data []byte) (*schema.Manifest, error) {
-	var manifest schema.Manifest
-
-	// Unmarshal the YAML into the schema.Manifest struct.
-	if err := yaml.Unmarshal(data, &manifest); err != nil {
+// parse decodes raw YAML into a schema.Manifest, runs structural validation, and
+// detects the document's block indentation before the struct discards
+// formatting. The on-disk location is recorded separately by Load.
+func (m *Manager) parse(data []byte) (*Manifest, error) {
+	// Decode into a node first so the indentation survives struct decoding.
+	var node yaml.Node
+	if err := yaml.Unmarshal(data, &node); err != nil {
 		return nil, fmt.Errorf("parsing manifest: %w", err)
+	}
+
+	// Decode the node into the struct, leaving an empty document to fail
+	// validation with a domain error rather than a decode error.
+	var manifest schema.Manifest
+	if node.Kind != 0 {
+		if err := node.Decode(&manifest); err != nil {
+			return nil, fmt.Errorf("parsing manifest: %w", err)
+		}
 	}
 
 	// Validate the manifest's structural constraints.
@@ -96,8 +121,16 @@ func (m *Manager) parse(data []byte) (*schema.Manifest, error) {
 		return nil, err
 	}
 
-	// Return the parsed manifest.
-	return &manifest, nil
+	// Detect the block indentation, defaulting when the document has none.
+	indent := defaultIndent
+	if detected, ok := yamlx.IndentLevel(&node); ok {
+		indent = detected
+	}
+
+	return &Manifest{
+		Content: &manifest,
+		Indent:  indent,
+	}, nil
 }
 
 // discover locates the manifest file using a two-tier strategy:
