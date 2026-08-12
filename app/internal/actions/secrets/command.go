@@ -1,6 +1,7 @@
 package secrets
 
 import (
+	"github.com/go-envx/envx/app/internal/actions/secrets/get"
 	"github.com/go-envx/envx/app/internal/actions/secrets/set"
 	"github.com/go-envx/envx/app/pkg/str"
 	"github.com/spf13/cobra"
@@ -25,6 +26,7 @@ func NewCommand() *cobra.Command {
 			return cmd.Help()
 		},
 	}
+	cmd.AddCommand(get.NewCommand())
 	cmd.AddCommand(set.NewCommand())
 	return cmd
 }
