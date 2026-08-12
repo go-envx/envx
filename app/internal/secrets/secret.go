@@ -149,3 +149,39 @@ func (m *Manager) Has(group, key string) (bool, error) {
 	_, exists := document.Secret(group, key)
 	return exists, nil
 }
+
+// Delete removes one stored secret value and persists the store. The group's
+// public key and its remaining values are preserved, since tearing down a group
+// identity has its own retention semantics and is a separate operation. A
+// missing entry is a dangling reference and an error.
+func (m *Manager) Delete(group, key string) error {
+	// Normalize names and reject invalid input before loading the store.
+	group, err := normalizeGroupName(group)
+	if err != nil {
+		return err
+	}
+	if err := validateSecretKey(key); err != nil {
+		return err
+	}
+
+	// Remove the located value, failing when the entry is absent.
+	document, err := store.Open(m.params.SecretsPath)
+	if err != nil {
+		return err
+	}
+	deleted, err := document.DeleteSecret(group, key)
+	if err != nil {
+		return err
+	}
+	if !deleted {
+		return fmt.Errorf("secret %q not found in group %q", key, group)
+	}
+
+	// Persist the store only after the removal has been applied in memory.
+	if err := document.Save(m.params.DefaultIndent); err != nil {
+		return fmt.Errorf(
+			"saving deletion of secret %q in group %q: %w", key, group, err,
+		)
+	}
+	return nil
+}
