@@ -7,8 +7,8 @@ import (
 	"testing"
 )
 
-// TestWrites verifies additions, updates, deletion, and retention of an
-// empty group after its last secret is removed.
+// TestWrites verifies additions, updates, and deletion of stored secrets and
+// public keys across a save and reload.
 func TestWrites(t *testing.T) {
 	t.Parallel()
 
@@ -64,6 +64,85 @@ func TestWrites(t *testing.T) {
 	}
 	if _, ok := reloaded.Secret("shared", "token"); !ok {
 		t.Error("new group secret is absent")
+	}
+}
+
+// TestDeleteRemovesEmptiedGroup verifies deleting a group's last secret drops
+// the empty group mapping while leaving other groups and the public key intact.
+func TestDeleteRemovesEmptiedGroup(t *testing.T) {
+	t.Parallel()
+
+	path := writeDocument(t,
+		"public_keys:\n  dev: age-public-key:age1dev\n"+
+			"secrets:\n  dev:\n    only: value\n  shared:\n    token: kept\n",
+	)
+	document, err := Open(path)
+	if err != nil {
+		t.Fatalf("Open() error = %v", err)
+	}
+	if deleted, err := document.DeleteSecret("dev", "only"); err != nil || !deleted {
+		t.Fatalf("DeleteSecret() = %v, %v; want true, nil", deleted, err)
+	}
+	if err := document.Save(0); err != nil {
+		t.Fatalf("Save() error = %v", err)
+	}
+
+	//nolint:gosec // G304: path is created inside this test's temporary directory.
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if output := string(data); strings.Contains(output, "dev: {}") {
+		t.Fatalf("emptied group left as an empty mapping:\n%s", output)
+	}
+
+	reloaded, err := Open(path)
+	if err != nil {
+		t.Fatalf("Open() after Save error = %v", err)
+	}
+	if got, ok := reloaded.PublicKey("dev"); !ok || got != "age-public-key:age1dev" {
+		t.Errorf("PublicKey(dev) after delete = %q, %v; want kept", got, ok)
+	}
+	if _, ok := reloaded.Secret("shared", "token"); !ok {
+		t.Error("unrelated group secret was removed")
+	}
+}
+
+// TestDeleteRemovesEmptiedSecretsBlock verifies deleting the last secret across
+// all groups drops the whole secrets block while leaving public keys intact.
+func TestDeleteRemovesEmptiedSecretsBlock(t *testing.T) {
+	t.Parallel()
+
+	path := writeDocument(t,
+		"public_keys:\n  dev: age-public-key:age1dev\n"+
+			"secrets:\n  dev:\n    only: value\n",
+	)
+	document, err := Open(path)
+	if err != nil {
+		t.Fatalf("Open() error = %v", err)
+	}
+	if deleted, err := document.DeleteSecret("dev", "only"); err != nil || !deleted {
+		t.Fatalf("DeleteSecret() = %v, %v; want true, nil", deleted, err)
+	}
+	if err := document.Save(0); err != nil {
+		t.Fatalf("Save() error = %v", err)
+	}
+
+	//nolint:gosec // G304: path is created inside this test's temporary directory.
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if output := string(data); strings.Contains(output, "secrets:") {
+		t.Fatalf("emptied secrets block was not removed:\n%s", output)
+	}
+
+	reloaded, err := Open(path)
+	if err != nil {
+		t.Fatalf("Open() after Save error = %v", err)
+	}
+	if got, ok := reloaded.PublicKey("dev"); !ok || got != "age-public-key:age1dev" {
+		t.Errorf("PublicKey(dev) after delete = %q, %v; want kept", got, ok)
 	}
 }
 

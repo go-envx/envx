@@ -26,6 +26,9 @@ type Document struct {
 	path string
 	// root is the YAML node tree retained for comments and ordering.
 	root yaml.Node
+	// source is the original file content, retained to restore blank lines that
+	// the node tree does not model.
+	source []byte
 }
 
 // Open reads a secrets document and binds it to path. A missing file produces
@@ -44,7 +47,7 @@ func Open(path string) (*Document, error) {
 		return nil, fmt.Errorf("parsing secrets %s: %w", path, err)
 	}
 
-	document := &Document{path: path, root: root}
+	document := &Document{path: path, root: root, source: data}
 	document.normalizeEmptyRoot()
 	if err := document.validate(); err != nil {
 		return nil, fmt.Errorf("validating secrets %s: %w", path, err)
@@ -72,6 +75,7 @@ func (d *Document) Save(defaultIndent int) error {
 	if err != nil {
 		return fmt.Errorf("encoding secrets %s: %w", d.path, err)
 	}
+	data = yamlx.PreserveBlankLines(d.source, data)
 	if err := file.WriteAtomic(d.path, data); err != nil {
 		return fmt.Errorf("writing secrets %s: %w", d.path, err)
 	}
