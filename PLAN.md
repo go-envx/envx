@@ -6,7 +6,7 @@ This document defines the target architecture for encrypted secrets in envx and 
 
 ### Status
 
-`main` resolves explicit `secret://group/key` references from a workspace `secrets.yaml` file. It also contains algorithm-neutral cipher implementations and the secrets feature's nested `envelope`, `privatekey`, and `store` implementation packages. The store still permits plaintext migration entries, and `envx secrets keypair generate|inspect` is now registered as the first management command surface.
+`main` resolves explicit `secret://group/key` references from a workspace `secrets.yaml` file. It also contains algorithm-neutral cipher implementations in a top-level `internal/cipher` package, the top-level `internal/privatekey` boundary, and the secrets feature's nested `envelope` and `store` implementation packages. The store still permits plaintext migration entries, and the top-level `envx keypair generate|inspect|print` tree is registered as the first management command surface.
 
 ### Target behavior
 
@@ -15,7 +15,7 @@ This document defines the target architecture for encrypted secrets in envx and 
 - A group is a trust boundary with one public key and any number of encrypted values. Group names commonly match environments, but they are an independent namespace and may include groups such as `shared`.
 - Automatic private-key lookup is deterministic: `ENVX_PRIVATE_KEY_<GROUP>`, then the combined `ENVX_PRIVATE_KEY`, then the local file at `secrets.keys_path`.
 - Automatic lookup never prompts. A no-echo prompt or stdin is an explicit source selected for one operation, so scripts and `envx run` never block unexpectedly.
-- Commands that promise plaintext, including `run`, revealing `secrets get`, `secrets decrypt`, and `secrets rotate`, fail when a required key is unavailable. `secrets keypair inspect` instead reports `not_available` as a valid status.
+- Commands that promise plaintext, including `run`, revealing `secrets get`, `secrets decrypt`, and `secrets rotate`, fail when a required key is unavailable. `keypair inspect` instead reports `not_available` as a valid status.
 - Private keys are transient capabilities. They are never included in status objects, mutation reports, logs, errors, or normal command output.
 - Secret mutation is exposed through an immutable `Manager` whose intent-level methods own validation, read-modify-write behavior, and cross-file ordering. CLI actions remain thin adapters.
 - Dangling references fail loudly. Diagnostic commands may later render a dangling state instead of aborting, but they must never pass an unresolved reference to a child process as plaintext.
@@ -71,31 +71,33 @@ type Keypair struct {
 
 // Cipher performs algorithm-specific key and value operations.
 type Cipher interface {
+	Algorithm() Algorithm
 	Keypair() (Keypair, error)
+	ValidateKeypair(publicKey, privateKey string) error
 	Encrypt(plaintext, publicKey string) ([]byte, error)
 	Decrypt(ciphertext []byte, privateKey string) (string, error)
-	ValidateKeypair(publicKey, privateKey string) error
 }
 
-// New constructs the requested algorithm implementation.
-func New(algorithm Algorithm, options AlgorithmOptions) (Cipher, error)
+// Params selects a cipher implementation and supplies its algorithm-specific options.
+type Params struct {
+	Algorithm Algorithm
+	Options   AlgorithmOptions
+}
+
+// New constructs the cipher implementation selected by params.
+func New(params Params) (Cipher, error)
 ```
 
-Age is the default algorithm and NaCl sealed boxes are also implemented. `ValidateKeypair` is the remaining operation needed for inspection and rotation; it validates format and correspondence without exposing private material.
+Age is the default algorithm and NaCl sealed boxes are also implemented. `ValidateKeypair` validates key format and public/private correspondence without exposing private material, backing inspection and rotation.
 
-The secrets feature keeps representation-specific implementation packages beneath the root `internal/secrets` boundary:
+The secrets feature keeps representation-specific implementation packages beneath the root `internal/secrets` boundary. Cipher and private-key material live in the sibling top-level `internal/cipher` and `internal/privatekey` packages rather than under `internal/secrets`. The root package's own file layout is described in `internal/secrets` below.
 
 ```text
+internal/cipher/
+internal/privatekey/
 internal/secrets/
-	params.go
-	manager.go
-	resolver.go
-	reference.go
-	results.go
-	keypair.go
 	internal/
 		envelope/
-		privatekey/
 		store/
 ```
 
@@ -103,22 +105,22 @@ internal/secrets/
 
 `envelope` owns the algorithm-tagged ciphertext format used in `secrets.yaml`. It encodes and decodes `encrypted-{algorithm}:{base64url-payload}` values and validates their grammar without reading files or selecting a cipher implementation.
 
-### `internal/secrets/internal/privatekey`
+### `internal/privatekey`
 
-`privatekey` owns key-source and key-destination mechanisms plus source provenance. It is the `envx.keys` counterpart to the store boundary: it handles transient private-key material and local key-file persistence, but does not generate keypairs, inspect public keys, edit `secrets.yaml`, choose command policy, or prompt automatically.
+`privatekey` owns key-resolution and key-destination mechanisms plus lookup provenance. It is a top-level sibling of the secrets boundary and the `envx.keys` counterpart to the store: it handles transient private-key material and local key-file persistence, but does not generate keypairs, inspect public keys, edit `secrets.yaml`, choose command policy, or prompt automatically.
 
 ```go
 // PrivateKey holds transient material and its provenance.
 type PrivateKey struct {
 	Value  string
-	Source string
+	Origin string
 }
 
-// ErrNotAvailable indicates that a source has no key for the group.
+// ErrNotAvailable indicates that no source has a key for the group.
 var ErrNotAvailable error
 
-// Source resolves one group's private key.
-type Source interface {
+// Resolver resolves one group's private key.
+type Resolver interface {
 	Resolve(group string) (PrivateKey, error)
 }
 
@@ -127,20 +129,23 @@ type Destination interface {
 	Write(group, privateKey string) error
 }
 
-// SourceOptions configures automatic environment-then-file lookup.
-type SourceOptions struct {
+// ResolverOptions configures automatic environment-then-file lookup.
+type ResolverOptions struct {
 	KeysPath  string
 	LookupEnv func(string) (string, bool)
 }
 
-// NewSource creates the automatic source.
-func NewSource(options SourceOptions) Source
+// NewResolver creates the automatic environment-then-file resolver.
+func NewResolver(options ResolverOptions) Resolver
 
 // NewFileDestination creates a private NAME=value key-file destination.
 func NewFileDestination(path string) Destination
 
 // NewWriterDestination performs an explicit one-operation handoff.
 func NewWriterDestination(writer io.Writer) Destination
+
+// FilePath reports a destination's key-file path when it exposes one.
+func FilePath(destination Destination) (string, bool)
 ```
 
 Only `ErrNotAvailable` means another source may be attempted. An explicitly present empty value, malformed combined environment variable, unreadable file, or duplicate group stops resolution with an error. Environment variables are read-only sources and never implicit destinations.
@@ -190,17 +195,37 @@ The package is internal machinery: actions and unrelated features use the root `
 
 The root package is the feature boundary. It combines the store, private-key access, and cipher implementations; owns cross-resource invariants; and exposes an immutable `Manager` plus a read resolver. `Manager` binds workspace paths and injected dependencies once, so operation call sites do not repeat ambiguous `Settings` and private-key option arguments. It does not cache a mutable store document: each method opens, validates, performs its workflow, and persists atomically.
 
+The package stays a single Go package organized by concept, one file per cohesive operation group rather than one file per method. Files are named by verb or concept with no `manager_` prefix, since every operation attaches to `Manager` and the prefix would only restate the package. `manager.go` holds construction only (`Params`, `Manager`, `New`); `types.go` holds result DTOs. When a method grows real algorithm or I/O weight, that logic moves into an `internal/` subpackage instead of enlarging the method file.
+
+```text
+internal/secrets/
+	manager.go    # Params + Manager + New
+	types.go      # result DTOs
+	reference.go  # secret:// grammar
+	resolver.go   # Resolver() + Resolve
+	validate.go   # name validation
+	keypair.go    # GenerateKeypair, InspectKeypair, RotateKeypair
+	secret.go     # Set, Get, Has, Delete (single-secret CRUD)
+	encrypt.go    # Encrypt, Decrypt (bulk)
+	internal/
+		envelope/
+		store/
+```
+
 ```go
 // Params supplies workspace paths and dependencies once at construction.
 type Params struct {
 	// SecretsPath is the secrets.yaml store location.
 	SecretsPath string
-	// KeysPath is the optional local private-key file location.
-	KeysPath    string
+	// KeysPath is the local private-key file location.
+	KeysPath string
+	// DefaultIndent is the block indentation applied when the store has none of
+	// its own; the configuration layer supplies it.
+	DefaultIndent int
 	// Cipher performs key generation and encryption operations.
 	Cipher cipher.Cipher
-	// PrivateKeySource resolves private-key material for read operations.
-	PrivateKeySource privatekey.Source
+	// PrivateKeyResolver resolves private-key material for read operations.
+	PrivateKeyResolver privatekey.Resolver
 	// PrivateKeyDestination receives newly generated private-key material.
 	PrivateKeyDestination privatekey.Destination
 }
@@ -248,8 +273,11 @@ func (r *Resolver) Resolve(value, environment string) (string, error)
 // Get decrypts and returns one value.
 func (m *Manager) Get(group, key string) (string, error)
 
-// Set securely encrypts and stores one plaintext value.
-func (m *Manager) Set(group, key, plaintext string) error
+// PlaintextResolver lazily supplies one secret plaintext value.
+type PlaintextResolver func() (string, error)
+
+// Set lazily obtains, encrypts, and stores one plaintext value.
+func (m *Manager) Set(group, key string, plaintext PlaintextResolver) error
 
 // Has reports presence without loading a private key.
 func (m *Manager) Has(group, key string) (bool, error)
@@ -276,7 +304,7 @@ func (m *Manager) Decrypt(group, key string) (UpdateResult, error)
 
 ```
 
-Nil source and destination fields select safe local defaults only where the operation permits them. Automatic reads use environment-then-file lookup. New key material defaults to the configured file destination for ordinary local generation, but rotation rejects that implicit destination when provenance shows the active old key came from an environment variable or explicit one-operation source. Exact operations require non-empty group and key arguments; `SecretReference` remains the value object for identity-bearing results and internal reference handling. Bulk encryption and decryption use inline empty-string filters rather than overloading exact-identity arguments with wildcard semantics.
+The composition layer supplies concrete cipher, resolver, and destination dependencies; `New` rejects missing paths or dependencies. Automatic reads use environment-then-file lookup. New key material defaults to the configured file destination for ordinary local generation, but rotation rejects that implicit destination when provenance shows the active old key came from an environment variable or explicit one-operation source. Exact operations require non-empty group and key arguments; `SecretReference` remains the value object for identity-bearing results and internal reference handling. Bulk encryption and decryption use inline empty-string filters rather than overloading exact-identity arguments with wildcard semantics.
 
 Typical action wiring constructs the manager once, then passes only operation data at each call site:
 
@@ -307,9 +335,9 @@ func ResolveWorkspace(input *Input) (*Result, error)
 
 An empty `path` defaults to `secrets.yaml` beside `envx.yaml`. An empty `keys_path` defaults to `envx.keys` beside the resolved secrets file; an explicit relative value is resolved from the manifest directory. Config builds `Params` and chooses resolver policy, but does not prompt or implement secret workflows.
 
-### `internal/actions/secrets`
+### `internal/actions/keypair` and `internal/actions/secrets`
 
-Actions provide the `envx secrets` command tree and are limited to Cobra concerns: arguments, flags, terminal capability, explicit input selection, calls into `secrets`, and safe rendering. The intended commands are `keypair generate`, `keypair inspect`, `rotate`, `set`, `get`, `encrypt`, and `decrypt`. Prompt and stdin adapters are constructed only when explicitly requested; normal automatic execution never reads the terminal.
+Actions are limited to Cobra concerns: arguments, flags, terminal capability, explicit input selection, calls into `secrets`, and safe rendering. Keypair management is a top-level command tree: `envx keypair generate`, `envx keypair inspect`, and `envx keypair print` (an ephemeral pair written only to stdout). The `envx secrets` tree currently provides `set`, with `get`, `encrypt`, `decrypt`, and `rotate` intended to follow. Prompt and stdin adapters are constructed only when explicitly requested; normal automatic execution never reads the terminal.
 
 `envx run` remains outside this command tree and always requests revealed resolution because a child process needs plaintext. It completes all resolution before starting the process, so a missing or invalid private key cannot produce a partially configured child.
 
@@ -323,8 +351,8 @@ Each item is one logical PR based on the preceding item after it merges to `main
 4. ✅ **Keypair validation:** Implement `ValidateKeypair` for the cipher backends and add focused validation tests.
 5. ✅ **Key-path configuration:** Add scalar `secrets.keys_path`, default it beside the resolved store, expose it through `secrets.Params`, and test default, relative, and absolute paths.
 6. ✅ **Store document boundary:** Extract `internal/secrets/internal/store`, add `public_keys` and ciphertext-aware validation, preserve comments and order during mutation, and keep its API inaccessible to actions.
-7. ✅ **Private-key package:** Create `internal/secrets/internal/privatekey` as the `envx.keys` implementation boundary. Provide provenance-aware environment/file sources, file/writer destinations, fail-closed parsing, private atomic writes, and focused tests without coupling the package to store mutation, keypair workflows, or CLI policy.
-8. ✅ **Keypair generation and inspection:** Implemented `GenerateKeypair` and `InspectKeypair` in the root manager with Git-ignore and write-order safety, private-material-free metadata, and thin `envx secrets keypair generate|inspect` adapters.
+7. ✅ **Private-key package:** Create `internal/privatekey` as the top-level `envx.keys` implementation boundary. Provide provenance-aware environment/file resolvers, file/writer destinations, fail-closed parsing, private atomic writes, and focused tests without coupling the package to store mutation, keypair workflows, or CLI policy.
+8. ✅ **Keypair generation and inspection:** Implemented `GenerateKeypair` and `InspectKeypair` in the root manager with Git-ignore and write-order safety, private-material-free metadata, and thin top-level `envx keypair generate|inspect|print` adapters (`print` emits an ephemeral pair to stdout without touching workspace files).
 9. ✅ **Secure single-secret entry:** Implement `Manager.Set` and `envx secrets set` with explicit stdin or no-echo terminal input, up-front validation, and no plaintext argument or output.
 10. ⬜ **Read and presence verbs:** Implement `Manager.Get` and `Manager.Has`, then expose `envx secrets get` with plaintext available only through its deliberate reveal contract.
 11. ⬜ **Runtime reveal:** Decrypt ciphertext references lazily by required group, add masked/reveal policy for read commands, make `run` always reveal, and prove a decryption failure prevents child-process startup. This is the local-secrets MVP.
