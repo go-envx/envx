@@ -414,3 +414,90 @@ func (c *setTestCipher) Encrypt(string, string) ([]byte, error) {
 func (setTestCipher) Decrypt([]byte, string) (string, error) {
 	return "plaintext", nil
 }
+
+// TestDeleteRemovesStoredSecret verifies Delete removes one value matched by a
+// case-insensitive group and leaves other values in place.
+func TestDeleteRemovesStoredSecret(t *testing.T) {
+	t.Parallel()
+
+	manager := newGetManager(t, newPrivateKeyTestResolver())
+
+	set := func(key string) {
+		if err := manager.Set("production", key, func() (string, error) {
+			return "value", nil
+		}); err != nil {
+			t.Fatalf("Set(%q): %v", key, err)
+		}
+	}
+	set("database_password")
+	set("service_token")
+
+	if err := manager.Delete("Production", "database_password"); err != nil {
+		t.Fatalf("Delete(): %v", err)
+	}
+
+	exists, err := manager.Has("production", "database_password")
+	if err != nil {
+		t.Fatalf("Has() deleted: %v", err)
+	}
+	if exists {
+		t.Error("Delete() left the removed secret in the store")
+	}
+	exists, err = manager.Has("production", "service_token")
+	if err != nil {
+		t.Fatalf("Has() sibling: %v", err)
+	}
+	if !exists {
+		t.Error("Delete() removed an unrelated secret")
+	}
+}
+
+// TestDeletePreservesGroupIdentity verifies removing a group's last value keeps
+// its public key so the identity is not torn down implicitly.
+func TestDeletePreservesGroupIdentity(t *testing.T) {
+	t.Parallel()
+
+	manager := newGetManager(t, newPrivateKeyTestResolver())
+
+	if err := manager.Set("production", "only", func() (string, error) {
+		return "value", nil
+	}); err != nil {
+		t.Fatalf("Set(): %v", err)
+	}
+	if err := manager.Delete("production", "only"); err != nil {
+		t.Fatalf("Delete(): %v", err)
+	}
+
+	document, err := store.Open(manager.params.SecretsPath)
+	if err != nil {
+		t.Fatalf("Open(): %v", err)
+	}
+	if _, exists := document.PublicKey("production"); !exists {
+		t.Error("Delete() removed the group's public key")
+	}
+}
+
+// TestDeleteMissingSecretFails verifies deleting an absent entry is an error.
+func TestDeleteMissingSecretFails(t *testing.T) {
+	t.Parallel()
+
+	manager := newGetManager(t, newPrivateKeyTestResolver())
+
+	if err := manager.Delete("production", "missing"); err == nil {
+		t.Fatal("Delete() succeeded for a missing secret")
+	}
+}
+
+// TestDeleteRejectsInvalidInput verifies Delete validates its group and key.
+func TestDeleteRejectsInvalidInput(t *testing.T) {
+	t.Parallel()
+
+	manager := newGetManager(t, newPrivateKeyTestResolver())
+
+	if err := manager.Delete("", "key"); err == nil {
+		t.Error("Delete() accepted an empty group")
+	}
+	if err := manager.Delete("production", ""); err == nil {
+		t.Error("Delete() accepted an empty key")
+	}
+}
