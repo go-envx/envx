@@ -38,31 +38,25 @@ Brief description of what this PR accomplishes.
 - Derived from commit messages
 - Grouped by logical area
 
-## Testing
-- What tests were created for changes
-- Any manual testing steps needed
-- DO NOT reference specific CI/CD pipelines or internal tools
-
 ## Related Issues
 Closes #123
 ```
 
-## Squash Merge Message
+## Testing Section (Optional)
+Include a `## Testing` section only when it provides meaningful information beyond automated CI checks and the changed files.
 
-When the PR will be squash-merged, generate a comprehensive commit message:
+When included:
+- Use a concise Markdown bullet list.
+- Describe significant coverage, manual verification, or known gaps.
+- Focus on behavior and reviewer-relevant outcomes.
+- Do not report routine CI status.
+- Do not include commands, task names, tool names, or test transcripts.
 
-```
-feat(auth): add user authentication system (#45)
-
-- Add login and registration forms
-- Implement JWT token handling
-- Add password reset flow
-- Include rate limiting middleware
-
-Co-authored-by: Name <email@example.com>
-```
+If none of these apply, omit the Testing section entirely.
 
 ## Output Format
+
+All PRs are squash-merged. Treat the generated PR title and description as the squash commit subject and body. Do not generate a separate squash merge message unless explicitly requested.
 
 Present the generated PR with a ready-to-run command:
 
@@ -81,13 +75,16 @@ Implements complete user authentication flow including login, registration, and 
 - Add password reset via email link
 
 ## Testing
-- Unit tests added for auth utilities
-- E2E tests cover login/logout flow
-- Manual testing completed on Chrome and Firefox
+- Manually verified the login button disables immediately upon click to prevent double submission.
+- Added unit tests in auth.spec.ts for edge cases with expired tokens.
+- Updated existing integration tests to handle the new user_id payload field.
 
 Closes #42
+```
 
 **Run this command to create the PR:**
+
+```
 gh pr create --title "feat(auth): add user authentication" --body "## Summary
 Implements complete user authentication flow including login, registration, and password reset.
 
@@ -98,8 +95,9 @@ Implements complete user authentication flow including login, registration, and 
 - Add password reset via email link
 
 ## Testing
-- Unit tests added for auth utilities
-- E2E tests cover login/logout flow
+- Manually verified the login button disables immediately upon click to prevent double submission.
+- Added unit tests in auth.spec.ts for edge cases with expired tokens.
+- Updated existing integration tests to handle the new user_id payload field.
 
 Closes #42"
 ```
