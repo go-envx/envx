@@ -68,7 +68,7 @@ func TestQuickStartResolves(t *testing.T) {
 
 	manifestPath := filepath.Join(dir, "envx.yaml")
 	in := &config.Input{ConfigPath: &manifestPath}
-	resolved, err := config.ResolveProject(in, "api-service")
+	resolved, err := config.ResolveProject(in, "api-service", false)
 	if err != nil {
 		t.Fatalf("resolve: %v", err)
 	}

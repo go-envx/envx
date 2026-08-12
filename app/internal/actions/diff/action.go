@@ -7,7 +7,7 @@ import (
 	"github.com/go-envx/envx/app/internal/envmerge"
 )
 
-// actionParams are the positional inputs to the diff action.
+// actionParams are the inputs to the diff action.
 type actionParams struct {
 	// Project is the project name to resolve under both environments.
 	Project string
@@ -15,6 +15,8 @@ type actionParams struct {
 	EnvA string
 	// EnvB is the second ("after") environment to resolve.
 	EnvB string
+	// Reveal controls whether secret references are resolved to plaintext.
+	Reveal bool
 }
 
 // actionResult is the data the diff action returns.
@@ -39,10 +41,10 @@ type actionResultChange struct {
 
 // execute is the imperative shell: resolve the input into a single envmerge.Params,
 // build the merged environment for each specified environment, and hand both results
-// to the pure core.
+// to the pure core. Secret references are masked unless p.Reveal is set.
 func execute(p actionParams, in *config.Input) (actionResult, error) {
 	// resolve the shared config
-	resolved, err := config.ResolveProject(in, p.Project)
+	resolved, err := config.ResolveProject(in, p.Project, p.Reveal)
 	if err != nil {
 		return actionResult{}, err
 	}
@@ -64,10 +66,18 @@ func execute(p actionParams, in *config.Input) (actionResult, error) {
 // buildEnv overrides only the Env on its own copy of the resolved config and
 // builds the environment for one diff side. Taking Params by value leaves the
 // shared config un-mutated so both sides resolve from identical settings except
-// the environment.
+// the environment. A dangling reference on either side is a failure, since diff
+// compares whole environments.
 func buildEnv(ec envmerge.Params, env string) (*envmerge.Result, error) {
 	ec.Settings.Env = env
-	return envmerge.Build(ec)
+	result, err := envmerge.Build(ec)
+	if err != nil {
+		return nil, err
+	}
+	if err := result.Verify(); err != nil {
+		return nil, err
+	}
+	return result, nil
 }
 
 // runAction is the pure core: a set comparison of two resolved environments.

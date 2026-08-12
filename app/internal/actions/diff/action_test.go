@@ -88,7 +88,7 @@ func TestRunActionIdenticalEnvs(t *testing.T) {
 func diffSides(t *testing.T, envA, envB string) (a, b *envmerge.Result) {
 	t.Helper()
 	path := fixtures.Manifest("basic")
-	r, err := config.ResolveProject(&config.Input{ConfigPath: &path}, "api-core")
+	r, err := config.ResolveProject(&config.Input{ConfigPath: &path}, "api-core", false)
 	if err != nil {
 		t.Fatalf("resolve fixture: %v", err)
 	}

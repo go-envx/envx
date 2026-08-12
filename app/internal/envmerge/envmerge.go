@@ -102,10 +102,7 @@ func mergeNamespaces(
 		}
 	}
 
-	resolved, err := resolveMergedValues(acc, settings, resolver)
-	if err != nil {
-		return nil, err
-	}
+	resolved := resolveMergedValues(acc, settings, resolver)
 	if settings.Prefix != "" || settings.Suffix != "" {
 		applyPrefixSuffix(resolved, settings.Prefix, settings.Suffix)
 	}
@@ -113,29 +110,35 @@ func mergeNamespaces(
 	return &Result{resolved: *resolved}, nil
 }
 
-// resolveMergedValues dereferences and renders every winning value. Shadowed
-// values are absent from mergeState.values and therefore never reach the
-// resolver. Errors identify the winning env-var key without exposing its value.
+// resolveMergedValues dereferences and renders every winning value. A per-key
+// resolution or render failure is recorded on the result instead of aborting,
+// so a single-key consumer can ignore failures in unrelated keys while whole-
+// environment consumers fail loudly via Result.Verify. Shadowed values are
+// absent from mergeState.values and therefore never reach the resolver. Errors
+// identify the winning env-var key without exposing its value.
 func resolveMergedValues(
 	acc *mergeState, settings Settings, resolver ValueResolver,
-) (*resolved, error) {
+) *resolved {
 	result := &resolved{
 		values:  make(map[string]string, len(acc.values)),
 		origins: acc.origins,
+		errs:    make(map[string]error),
 	}
 	for key, value := range acc.values {
 		resolvedValue, err := resolveLeafValue(value, resolver, settings.Env)
 		if err != nil {
-			return nil, fmt.Errorf("resolving %s: %w", key, err)
+			result.errs[key] = err
+			continue
 		}
 		path := acc.origins[key].Winner.Key
 		rendered, err := renderLeafValue(resolvedValue, path, settings.Delimiter)
 		if err != nil {
-			return nil, err
+			result.errs[key] = err
+			continue
 		}
 		result.values[key] = rendered
 	}
-	return result, nil
+	return result
 }
 
 // loadNamespace loads one namespace's base and optional overlay file, flattens
@@ -253,6 +256,12 @@ func applyPrefixSuffix(acc *resolved, prefix, suffix string) {
 		origins[transformKey(key, prefix, suffix)] = origin
 	}
 
+	errs := make(map[string]error, len(acc.errs))
+	for key, err := range acc.errs {
+		errs[transformKey(key, prefix, suffix)] = err
+	}
+
 	acc.values = values
 	acc.origins = origins
+	acc.errs = errs
 }

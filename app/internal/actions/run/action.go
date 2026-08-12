@@ -28,8 +28,9 @@ type streams struct {
 // the merged environment, then run the child process with the merged environment
 // using the resolved overload setting.
 func execute(p actionParams, in *config.Input, s streams) error {
-	// resolve the input config
-	resolved, err := config.ResolveProject(in, p.Project)
+	// resolve the input config, always revealing secrets because a child process
+	// needs plaintext; a decryption failure fails here before the process starts.
+	resolved, err := config.ResolveProject(in, p.Project, true)
 	if err != nil {
 		return err
 	}
@@ -37,6 +38,12 @@ func execute(p actionParams, in *config.Input, s streams) error {
 	// build the merged environment
 	env, err := envmerge.Build(resolved.Envmerge)
 	if err != nil {
+		return err
+	}
+
+	// fail before starting the child if any reference is unresolved; a child
+	// process must never receive an unresolved reference as plaintext.
+	if err := env.Verify(); err != nil {
 		return err
 	}
 

@@ -8,13 +8,15 @@ import (
 	"github.com/go-envx/envx/app/internal/envmerge"
 )
 
-// actionParams are the positional inputs to the explain action.
+// actionParams are the inputs to the explain action.
 type actionParams struct {
 	// Project is the project name to resolve.
 	Project string
 	// Key is the env-var key to look up (case-insensitive).
 	// An empty string means "explain all keys".
 	Key string
+	// Reveal controls whether secret references are resolved to plaintext.
+	Reveal bool
 }
 
 // actionResult is the data the explain action returns.
@@ -38,10 +40,11 @@ type actionResultEntry struct {
 }
 
 // execute is the imperative shell: resolve the input into an envmerge.Params, build
-// the merged environment, and hand the result to the pure core.
+// the merged environment, and hand the result to the pure core. Secret references
+// are masked unless p.Reveal is set.
 func execute(p actionParams, in *config.Input) (actionResult, error) {
 	// resolve the input config
-	resolved, err := config.ResolveProject(in, p.Project)
+	resolved, err := config.ResolveProject(in, p.Project, p.Reveal)
 	if err != nil {
 		return actionResult{}, err
 	}
@@ -49,6 +52,12 @@ func execute(p actionParams, in *config.Input) (actionResult, error) {
 	// build the merged environment
 	env, err := envmerge.Build(resolved.Envmerge)
 	if err != nil {
+		return actionResult{}, err
+	}
+
+	// explain reports the whole environment, so a dangling reference anywhere is
+	// a failure rather than a per-key omission.
+	if err := env.Verify(); err != nil {
 		return actionResult{}, err
 	}
 

@@ -95,6 +95,12 @@ var (
 		Usage: "require all environment overlay files to exist",
 	}
 
+	// Reveal decrypts referenced secret values instead of masking them.
+	Reveal = FlagSpec{
+		Name:  "reveal",
+		Usage: "decrypt secret references instead of masking them",
+	}
+
 	// Suffix is appended to every resolved env-var key.
 	Suffix = FlagSpec{
 		Name:  "suffix",
