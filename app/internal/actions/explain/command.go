@@ -16,11 +16,14 @@ const (
 		value and the file it was resolved from. With no key it explains every
 		key; with a key it explains just that one.
 
-		Use --output=json for machine-readable output.
+		Secret references are masked as "secret://group/key" by default; pass
+		--reveal to decrypt and show their plaintext. Use --output=json for
+		machine-readable output.
 	`
 	example = `
 		envx explain api-service
 		envx explain api-service DATABASE_HOST
+		envx explain api-service --reveal
 		envx explain api-service --output=json
 	`
 )
@@ -31,6 +34,7 @@ const (
 // that key. If the key is absent it explains all keys.
 func NewCommand() *cobra.Command {
 	var output string
+	var reveal bool
 
 	cmd := &cobra.Command{
 		Use:     usage,
@@ -43,11 +47,15 @@ func NewCommand() *cobra.Command {
 			p := actionParams{
 				Project: args[0],
 				Key:     arg.Optional(args, 1),
+				Reveal:  reveal,
 			}
 
+			// get the flag inputs
+			flagset := cmd.Flags()
+			input := flags.GetInput(flagset)
+
 			// execute the action
-			in := flags.GetInput(cmd.Flags())
-			res, err := execute(p, in)
+			res, err := execute(p, input)
 			if err != nil {
 				return err
 			}
@@ -69,6 +77,9 @@ func NewCommand() *cobra.Command {
 		flags.WithDelimiter,
 		flags.WithNamespacePrefix,
 	)
+
 	flags.BindString(cmd.Flags(), &output, &schema.Output)
+	flags.BindBool(cmd.Flags(), &reveal, &schema.Reveal)
+
 	return cmd
 }

@@ -386,20 +386,72 @@ func TestBuildResolvesReferences(t *testing.T) {
 	}
 }
 
-// TestBuildResolverError verifies a resolver failure surfaces from Build.
+// TestBuildResolverError verifies a resolver failure is deferred per key: Build
+// still succeeds, but Verify and the failing key's Err surface the error while
+// unrelated keys resolve normally.
 func TestBuildResolverError(t *testing.T) {
 	t.Parallel()
 
 	dir := t.TempDir()
-	writeYAML(t, dir, "app.yaml", "password: secret://boom\n")
+	writeYAML(t, dir, "app.yaml", "password: secret://boom\nplain: keep\n")
 
-	_, err := Build(Params{
+	res, err := Build(Params{
 		Includes:      []string{filepath.Join(dir, "app")},
 		Environments:  []string{"development"},
 		ValueResolver: fakeResolver{fail: "secret://boom"},
 	})
-	if err == nil {
-		t.Fatal("expected error from resolver")
+	if err != nil {
+		t.Fatalf("Build: %v", err)
+	}
+	if err := res.Err("PASSWORD"); err == nil {
+		t.Error("expected a deferred error for the failing key")
+	}
+	if err := res.Verify(); err == nil {
+		t.Error("expected Verify to surface the deferred resolver failure")
+	}
+	if _, ok := res.Get("PASSWORD"); ok {
+		t.Error("a failed key should not report a resolved value")
+	}
+	if v, _ := res.Get("PLAIN"); v != "keep" {
+		t.Errorf("PLAIN = %q, want keep (unrelated key still resolves)", v)
+	}
+}
+
+// TestBuildToleratesUnrelatedDanglingReferences verifies a dangling reference
+// behind one key never blocks another key: the resolved key is available, the
+// failed key carries its own error, and Verify names the failing key.
+func TestBuildToleratesUnrelatedDanglingReferences(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+	writeYAML(t, dir, "app.yaml", "good: secret://ok\nbad: secret://missing\n")
+
+	res, err := Build(Params{
+		Includes:     []string{filepath.Join(dir, "app")},
+		Environments: []string{"development"},
+		ValueResolver: fakeResolver{
+			values: map[string]string{"secret://ok": "resolved"},
+			fail:   "secret://missing",
+		},
+	})
+	if err != nil {
+		t.Fatalf("Build: %v", err)
+	}
+	if v, ok := res.Get("GOOD"); !ok || v != "resolved" {
+		t.Errorf("GOOD = %q (ok=%v), want resolved", v, ok)
+	}
+	if res.Err("GOOD") != nil {
+		t.Errorf("GOOD carries an unexpected error: %v", res.Err("GOOD"))
+	}
+	if res.Err("BAD") == nil {
+		t.Error("BAD should carry its own resolution error")
+	}
+	verifyErr := res.Verify()
+	if verifyErr == nil {
+		t.Fatal("expected Verify to fail on the dangling reference")
+	}
+	if !strings.Contains(verifyErr.Error(), "BAD") {
+		t.Errorf("Verify error = %v, want it to name the failing key BAD", verifyErr)
 	}
 }
 
@@ -484,13 +536,17 @@ func TestBuildRedactsResolvedListItemErrors(t *testing.T) {
 	dir := t.TempDir()
 	writeYAML(t, dir, "app.yaml", "tokens:\n  - secret://sensitive\n")
 
-	_, err := Build(Params{
+	res, err := Build(Params{
 		Includes:     []string{filepath.Join(dir, "app")},
 		Environments: []string{"development"},
 		ValueResolver: fakeResolver{values: map[string]string{
 			"secret://sensitive": "plaintext,secret",
 		}},
 	})
+	if err != nil {
+		t.Fatalf("Build: %v", err)
+	}
+	err = res.Verify()
 	if err == nil {
 		t.Fatal("expected delimiter error")
 	}

@@ -49,9 +49,12 @@ func NewCommand() *cobra.Command {
 				ExecArgs: args[1:],
 			}
 
+			// get the flag inputs
+			flagset := cmd.Flags()
+			input := flags.GetInput(flagset)
+
 			// execute the action
-			in := flags.GetInput(cmd.Flags())
-			return execute(p, in, streams{
+			return execute(p, input, streams{
 				Stdout: cmd.OutOrStdout(),
 				Stderr: cmd.ErrOrStderr(),
 			})
@@ -67,6 +70,7 @@ func NewCommand() *cobra.Command {
 		flags.WithNamespacePrefix,
 		flags.WithOverload,
 	)
+
 	return cmd
 }
 

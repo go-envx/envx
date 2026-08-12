@@ -1,6 +1,7 @@
 package envmerge
 
 import (
+	"fmt"
 	"maps"
 	"sort"
 )
@@ -13,6 +14,9 @@ type resolved struct {
 	values map[string]string
 	// origins records, per key, the winning source and any it shadowed.
 	origins map[string]Origin
+	// errs records, per key, a deferred resolution or render failure so a
+	// single-key consumer can ignore failures in unrelated keys.
+	errs map[string]error
 }
 
 // Result is the immutable outcome of resolution. Its maps are unexported;
@@ -59,6 +63,31 @@ func (r *Result) All() map[string]string {
 func (r *Result) Origin(key string) (Origin, bool) {
 	o, ok := r.origins[key]
 	return o, ok
+}
+
+// Err returns the deferred resolution error recorded for key during the merge,
+// or nil when the key resolved successfully or is absent. A single-key command
+// uses it to surface only its own key's failure while ignoring unrelated
+// dangling references.
+func (r *Result) Err(key string) error {
+	return r.errs[key]
+}
+
+// Verify returns the first deferred resolution failure in sorted key order,
+// wrapped with the failing key, or nil when every key resolved. Whole-
+// environment consumers call it to fail loudly on any dangling reference before
+// exposing a partial environment (for example, before starting a child process).
+func (r *Result) Verify() error {
+	if len(r.errs) == 0 {
+		return nil
+	}
+	keys := make([]string, 0, len(r.errs))
+	for key := range r.errs {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	first := keys[0]
+	return fmt.Errorf("resolving %s: %w", first, r.errs[first])
 }
 
 // Keys returns the resolved keys in sorted order.

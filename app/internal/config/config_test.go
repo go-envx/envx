@@ -201,7 +201,7 @@ func TestResolveProject(t *testing.T) {
 	t.Parallel()
 
 	path := fixtures.Manifest("basic")
-	r, err := ResolveProject(&Input{ConfigPath: &path}, "api-core")
+	r, err := ResolveProject(&Input{ConfigPath: &path}, "api-core", false)
 	if err != nil {
 		t.Fatalf("ResolveProject: %v", err)
 	}
@@ -324,14 +324,15 @@ func TestResolveWorkspace(t *testing.T) {
 	}
 }
 
-// TestResolveProjectResolvesSecretReference verifies ResolveProject wires the
-// resolver so secret references dereference end to end: explicit environment and
-// shared groups both resolve against the store.
-func TestResolveProjectResolvesSecretReference(t *testing.T) {
+// TestResolveProjectMasksSecretReference verifies read commands mask secret
+// references by default: ResolveProject wires a masking resolver so each
+// reference dereferences to its canonical form without decrypting or requiring a
+// private key.
+func TestResolveProjectMasksSecretReference(t *testing.T) {
 	t.Parallel()
 
 	path := fixtures.Manifest("resolve/secret-reference")
-	res, err := ResolveProject(&Input{ConfigPath: &path}, "api")
+	res, err := ResolveProject(&Input{ConfigPath: &path}, "api", false)
 	if err != nil {
 		t.Fatalf("ResolveProject: %v", err)
 	}
@@ -339,11 +340,11 @@ func TestResolveProjectResolvesSecretReference(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Build: %v", err)
 	}
-	if v, _ := env.Get("PASSWORD"); v != "dev-secret" {
-		t.Errorf("PASSWORD = %q, want dev-secret (development group)", v)
+	if v, _ := env.Get("PASSWORD"); v != "secret://development/api_key" {
+		t.Errorf("PASSWORD = %q, want masked development reference", v)
 	}
-	if v, _ := env.Get("TOKEN"); v != "t0k" {
-		t.Errorf("TOKEN = %q, want t0k (shared group)", v)
+	if v, _ := env.Get("TOKEN"); v != "secret://shared/token" {
+		t.Errorf("TOKEN = %q, want masked shared reference", v)
 	}
 }
 
@@ -364,17 +365,40 @@ func TestResolveWorkspaceIgnoresSecretsStore(t *testing.T) {
 }
 
 // TestResolveProjectDanglingSecretReference verifies a reference with no matching
-// store entry fails loudly at Build rather than leaking the raw reference string.
+// store entry masks to its canonical form for a default read but fails loudly
+// once revealed, rather than leaking or silently dropping the reference.
 func TestResolveProjectDanglingSecretReference(t *testing.T) {
 	t.Parallel()
 
 	path := fixtures.Manifest("resolve/dangling-reference")
-	res, err := ResolveProject(&Input{ConfigPath: &path}, "api")
+
+	// Masked: the dangling reference resolves to its own text and verifies clean.
+	masked, err := ResolveProject(&Input{ConfigPath: &path}, "api", false)
 	if err != nil {
-		t.Fatalf("ResolveProject: %v", err)
+		t.Fatalf("ResolveProject masked: %v", err)
 	}
-	if _, err := envmerge.Build(res.Envmerge); err == nil {
-		t.Fatal("expected dangling reference error")
+	maskedEnv, err := envmerge.Build(masked.Envmerge)
+	if err != nil {
+		t.Fatalf("Build masked: %v", err)
+	}
+	if err := maskedEnv.Verify(); err != nil {
+		t.Errorf("masked dangling reference should not fail: %v", err)
+	}
+	if v, _ := maskedEnv.Get("PASSWORD"); v != "secret://development/missing" {
+		t.Errorf("PASSWORD = %q, want the masked reference", v)
+	}
+
+	// Revealed: the dangling reference fails loudly.
+	revealed, err := ResolveProject(&Input{ConfigPath: &path}, "api", true)
+	if err != nil {
+		t.Fatalf("ResolveProject revealed: %v", err)
+	}
+	revealedEnv, err := envmerge.Build(revealed.Envmerge)
+	if err != nil {
+		t.Fatalf("Build revealed: %v", err)
+	}
+	if err := revealedEnv.Verify(); err == nil {
+		t.Fatal("expected dangling reference error when revealed")
 	}
 }
 

@@ -81,10 +81,12 @@ type projectLayer struct {
 // manifest, meshes it with the input and ENVX_* vars, then constructs the
 // workspace secrets manager and wires its resolver so envmerge can dereference
 // secret:// references. The environment-building actions (get, run, explain,
-// diff) call it. A missing store yields an empty resolver, so a reference with no
-// matching entry fails loudly as a dangling reference rather than leaking the raw
-// reference string.
-func ResolveProject(in *Input, project string) (*Result, error) {
+// diff) call it. The reveal flag selects the resolver's materialization policy:
+// run always reveals because a child process needs plaintext, while the read
+// commands mask by default and reveal only on request. A missing store yields an
+// empty resolver, so a reference with no matching entry fails loudly as a
+// dangling reference rather than leaking the raw reference string.
+func ResolveProject(in *Input, project string, reveal bool) (*Result, error) {
 	res, err := resolve(in, project)
 	if err != nil {
 		return nil, err
@@ -96,7 +98,11 @@ func ResolveProject(in *Input, project string) (*Result, error) {
 	if err != nil {
 		return nil, err
 	}
-	secretsResolver, err := secretsManager.Resolver()
+	secretsResolver, err := secretsManager.Resolver(
+		secrets.ResolverParams{
+			Reveal: reveal,
+		},
+	)
 	if err != nil {
 		return nil, err
 	}
