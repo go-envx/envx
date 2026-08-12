@@ -84,8 +84,10 @@ func (d *Document) SetSecret(group, key, value string) error {
 	return nil
 }
 
-// DeleteSecret removes one stored value and reports whether it existed. The
-// containing group remains in the document when its last value is removed.
+// DeleteSecret removes one stored value and reports whether it existed. When the
+// removed value was the group's last, the now-empty group mapping is dropped from
+// the secrets block, and an emptied secrets block is dropped from the document;
+// the group's public key is left untouched so its identity is not torn down.
 func (d *Document) DeleteSecret(group, key string) (bool, error) {
 	if err := validateIdentifier("secret group", group); err != nil {
 		return false, err
@@ -121,6 +123,15 @@ func (d *Document) DeleteSecret(group, key string) (bool, error) {
 		return false, err
 	}
 	yamlx.RemoveMappingEntry(groupNode, keyEntry.index)
+
+	// Drop the group mapping once its last value is removed; its public key stays.
+	if len(groupNode.Content) == 0 {
+		yamlx.RemoveMappingEntry(secrets, groupEntry.index)
+	}
+	// Drop the whole secrets block once its last group is removed.
+	if len(secrets.Content) == 0 {
+		yamlx.RemoveMappingEntry(root, secretsEntry.index)
+	}
 	return true, nil
 }
 

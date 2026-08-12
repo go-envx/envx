@@ -39,7 +39,7 @@ func execute(p actionParams, in *config.Input) error {
 	}
 
 	// read the current document, preserving comments, key order, and formatting
-	doc, err := readDoc(target)
+	doc, source, err := readDoc(target)
 	if err != nil {
 		return err
 	}
@@ -57,25 +57,27 @@ func execute(p actionParams, in *config.Input) error {
 	if err != nil {
 		return fmt.Errorf("marshaling %s: %w", target, err)
 	}
+	out = yamlx.PreserveBlankLines(source, out)
 	return file.WriteAtomic(target, out)
 }
 
 // readDoc parses the overlay at path into a YAML document node, preserving its
-// comments, key order, and structure for a surgical edit. A missing file yields
-// an empty document so the first set creates it.
-func readDoc(path string) (*yaml.Node, error) {
+// comments, key order, and structure for a surgical edit. It also returns the
+// original file content so blank lines can be restored after re-encoding. A
+// missing file yields an empty document so the first set creates it.
+func readDoc(path string) (*yaml.Node, []byte, error) {
 	doc := new(yaml.Node)
 	data, err := file.Read(path)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
-			return doc, nil
+			return doc, nil, nil
 		}
-		return nil, fmt.Errorf("reading %s: %w", path, err)
+		return nil, nil, fmt.Errorf("reading %s: %w", path, err)
 	}
 	if err := yaml.Unmarshal(data, doc); err != nil {
-		return nil, fmt.Errorf("parsing %s: %w", path, err)
+		return nil, nil, fmt.Errorf("parsing %s: %w", path, err)
 	}
-	return doc, nil
+	return doc, data, nil
 }
 
 // apply is the pure kernel: it sets the key path on the document's root mapping,
