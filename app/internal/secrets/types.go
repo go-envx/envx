@@ -36,4 +36,7 @@ type UpdateResult struct {
 	Keypairs []KeypairMetadata
 	// Secrets lists changed secret identities.
 	Secrets []SecretReference
+	// Unavailable lists groups skipped because no private key was available. It
+	// applies to decryption; operations that need no private key leave it empty.
+	Unavailable []string
 }
