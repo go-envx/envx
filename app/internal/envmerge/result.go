@@ -1,6 +1,7 @@
 package envmerge
 
 import (
+	"errors"
 	"fmt"
 	"maps"
 	"sort"
@@ -73,10 +74,12 @@ func (r *Result) Err(key string) error {
 	return r.errs[key]
 }
 
-// Verify returns the first deferred resolution failure in sorted key order,
-// wrapped with the failing key, or nil when every key resolved. Whole-
-// environment consumers call it to fail loudly on any dangling reference before
-// exposing a partial environment (for example, before starting a child process).
+// Verify returns every deferred resolution failure, one per key in sorted key
+// order and each wrapped with its failing key, or nil when every key resolved.
+// Whole-environment consumers call it to fail loudly on any dangling reference
+// before exposing a partial environment (for example, before starting a child
+// process); reporting every unresolved key at once lets the user fix them
+// together instead of one at a time.
 func (r *Result) Verify() error {
 	if len(r.errs) == 0 {
 		return nil
@@ -86,8 +89,11 @@ func (r *Result) Verify() error {
 		keys = append(keys, key)
 	}
 	sort.Strings(keys)
-	first := keys[0]
-	return fmt.Errorf("resolving %s: %w", first, r.errs[first])
+	failures := make([]error, 0, len(keys))
+	for _, key := range keys {
+		failures = append(failures, fmt.Errorf("resolving %s: %w", key, r.errs[key]))
+	}
+	return errors.Join(failures...)
 }
 
 // Keys returns the resolved keys in sorted order.
