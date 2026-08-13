@@ -343,21 +343,24 @@ func TestBuildJoinsListWithDefaultDelimiter(t *testing.T) {
 }
 
 // fakeResolver implements Resolver for testing the reference-resolution step: it
-// maps known reference values to results, fails a designated value, and passes
+// maps known reference values to results, fails designated values, and passes
 // everything else through unchanged.
 type fakeResolver struct {
 	values map[string]string
 	fail   string
+	// failAll fails every value not present in values, so a test can dangle
+	// several references at once.
+	failAll bool
 }
 
 // Resolve maps value to its result, erroring on the designated failure value and
 // returning unknown values unchanged.
 func (f fakeResolver) Resolve(value, _ string) (string, error) {
-	if f.fail != "" && value == f.fail {
-		return "", errors.New("resolve failed")
-	}
 	if v, ok := f.values[value]; ok {
 		return v, nil
+	}
+	if f.failAll || (f.fail != "" && value == f.fail) {
+		return "", errors.New("resolve failed")
 	}
 	return value, nil
 }
@@ -452,6 +455,38 @@ func TestBuildToleratesUnrelatedDanglingReferences(t *testing.T) {
 	}
 	if !strings.Contains(verifyErr.Error(), "BAD") {
 		t.Errorf("Verify error = %v, want it to name the failing key BAD", verifyErr)
+	}
+}
+
+// TestVerifyReportsEveryUnresolvedKey verifies Verify aggregates all failing
+// keys rather than stopping at the first, so a user can fix every unresolved
+// reference in one pass.
+func TestVerifyReportsEveryUnresolvedKey(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+	writeYAML(
+		t, dir, "app.yaml",
+		"alpha: secret://a\nbeta: secret://b\ngamma: secret://c\n",
+	)
+
+	res, err := Build(Params{
+		Includes:      []string{filepath.Join(dir, "app")},
+		Environments:  []string{"development"},
+		ValueResolver: fakeResolver{failAll: true},
+	})
+	if err != nil {
+		t.Fatalf("Build: %v", err)
+	}
+
+	verifyErr := res.Verify()
+	if verifyErr == nil {
+		t.Fatal("expected Verify to fail on the dangling references")
+	}
+	for _, key := range []string{"ALPHA", "BETA", "GAMMA"} {
+		if !strings.Contains(verifyErr.Error(), key) {
+			t.Errorf("Verify error = %v, want it to name failing key %s", verifyErr, key)
+		}
 	}
 }
 
