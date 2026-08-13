@@ -4,6 +4,7 @@ import (
 	"github.com/go-envx/envx/app/internal/actions/keypair/generate"
 	"github.com/go-envx/envx/app/internal/actions/keypair/inspect"
 	"github.com/go-envx/envx/app/internal/actions/keypair/print"
+	"github.com/go-envx/envx/app/internal/actions/keypair/rotate"
 	"github.com/go-envx/envx/app/pkg/str"
 	"github.com/spf13/cobra"
 )
@@ -12,8 +13,8 @@ const (
 	usage = "keypair [command]"
 	short = "Manage a secret group's keypair"
 	long  = `
-		Generate or inspect the asymmetric keypair for one secret group, or print an
-		unassigned pair without storing it. Managed public keys are stored in
+		Generate, inspect, or rotate the asymmetric keypair for one secret group, or
+		print an unassigned pair without storing it. Managed public keys are stored in
 		secrets.yaml; private keys are stored in the configured git-ignored envx.keys
 		file.
 	`
@@ -34,6 +35,7 @@ func NewCommand() *cobra.Command {
 		generate.NewCommand(),
 		inspect.NewCommand(),
 		print.NewCommand(),
+		rotate.NewCommand(),
 	)
 	return cmd
 }

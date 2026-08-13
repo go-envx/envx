@@ -1,4 +1,4 @@
-package generate
+package rotate
 
 import (
 	"github.com/go-envx/envx/app/internal/flags"
@@ -7,20 +7,23 @@ import (
 )
 
 const (
-	usage = "generate <group>"
-	short = "Generate a missing secret-group keypair"
+	usage = "rotate <group>"
+	short = "Rotate a secret-group keypair"
 	long  = `
-		Generate a keypair for GROUP and write its public key to secrets.yaml and
-		its private key to the configured private-key file. Existing groups are
-		rejected; use 'envx keypair rotate' to replace an existing keypair.
+		Replace GROUP's keypair and re-encrypt every value in the group under the new
+		public key. The current private key must be available so existing values can
+		be decrypted and re-encrypted. The new public key is written to secrets.yaml
+		and the new private key to the configured private-key file; when the current
+		key comes from a higher-priority environment source, rotation into the local
+		key file is refused. Private-key material is never printed.
 	`
 	example = `
-		envx keypair generate production
-		envx keypair generate shared
+		envx keypair rotate production
+		envx keypair rotate shared
 	`
 )
 
-// NewCommand builds the keypair generation command.
+// NewCommand builds the keypair rotation command.
 func NewCommand() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     usage,

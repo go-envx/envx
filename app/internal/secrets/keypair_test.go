@@ -396,3 +396,220 @@ func TestGenerateDefaultKeypairRoundTrip(t *testing.T) {
 		)
 	}
 }
+
+// newLocalKeypairManager builds a manager over the default age cipher with a
+// local key-file resolver and destination in dir.
+func newLocalKeypairManager(t *testing.T, storePath, keysPath string) *Manager {
+	t.Helper()
+	manager, err := New(Params{
+		SecretsPath:   storePath,
+		KeysPath:      keysPath,
+		DefaultIndent: 2,
+		Cipher:        newTestCipher(t),
+		PrivateKeyResolver: privatekey.NewResolver(privatekey.ResolverOptions{
+			KeysPath: keysPath,
+		}),
+		PrivateKeyDestination: privatekey.NewFileDestination(keysPath),
+	})
+	if err != nil {
+		t.Fatalf("New(): %v", err)
+	}
+	return manager
+}
+
+// TestRotateKeypairReencryptsGroupWithNewIdentity verifies rotation replaces the
+// public key, re-encrypts every value under the new key, reports the change, and
+// leaves no rollback material or private material behind.
+func TestRotateKeypairReencryptsGroupWithNewIdentity(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+	storePath := filepath.Join(dir, "secrets.yaml")
+	keysPath := filepath.Join(dir, "envx.keys")
+	manager := newLocalKeypairManager(t, storePath, keysPath)
+
+	if _, err := manager.GenerateKeypair("production"); err != nil {
+		t.Fatalf("GenerateKeypair(): %v", err)
+	}
+	before, err := manager.InspectKeypair("production")
+	if err != nil {
+		t.Fatalf("InspectKeypair() before: %v", err)
+	}
+	if err := manager.Set("production", "api_key", func() (string, error) {
+		return "plain-api", nil
+	}); err != nil {
+		t.Fatalf("Set(): %v", err)
+	}
+
+	result, err := manager.RotateKeypair("production")
+	if err != nil {
+		t.Fatalf("RotateKeypair(): %v", err)
+	}
+
+	if len(result.Keypairs) != 1 {
+		t.Fatalf("Keypairs = %v, want one rotated keypair", result.Keypairs)
+	}
+	rotated := result.Keypairs[0]
+	if rotated.PublicKey == before.PublicKey {
+		t.Error("rotated public key is unchanged")
+	}
+	if rotated.PrivateKeyStatus != PrivateKeyValid {
+		t.Errorf("PrivateKeyStatus = %q, want %q", rotated.PrivateKeyStatus, PrivateKeyValid)
+	}
+	got := referenceSet(result)
+	if _, ok := got[SecretReference{Group: "production", Key: "api_key"}]; !ok {
+		t.Errorf("Secrets = %v, want production/api_key", result.Secrets)
+	}
+
+	// The stored value must decrypt with the freshly written private key.
+	value, err := manager.Get("production", "api_key")
+	if err != nil {
+		t.Fatalf("Get() after rotation: %v", err)
+	}
+	if value != "plain-api" {
+		t.Errorf("Get() = %q, want %q", value, "plain-api")
+	}
+
+	// Rollback material must be removed after a successful rotation.
+	if _, err := os.Stat(keysPath + backupSuffix); !errors.Is(err, os.ErrNotExist) {
+		t.Errorf("rollback file stat error = %v, want it removed", err)
+	}
+}
+
+// TestRotateKeypairRejectsHigherPriorityKeyOrigin verifies rotation refuses the
+// implicit local key file when the current key came from an environment variable.
+func TestRotateKeypairRejectsHigherPriorityKeyOrigin(t *testing.T) {
+	t.Parallel()
+
+	selected := newTestCipher(t)
+	pair, err := selected.Keypair()
+	if err != nil {
+		t.Fatalf("Keypair(): %v", err)
+	}
+	storePath := writeStore(t, "public_keys:\n  production: "+pair.PublicKey+"\n")
+	keysPath := filepath.Join(filepath.Dir(storePath), "envx.keys")
+	lookupEnv := func(name string) (string, bool) {
+		if name == "ENVX_PRIVATE_KEY_PRODUCTION" {
+			return pair.PrivateKey, true
+		}
+		return "", false
+	}
+	manager, err := New(Params{
+		SecretsPath:   storePath,
+		KeysPath:      keysPath,
+		DefaultIndent: 2,
+		Cipher:        selected,
+		PrivateKeyResolver: privatekey.NewResolver(privatekey.ResolverOptions{
+			KeysPath: keysPath, LookupEnv: lookupEnv,
+		}),
+		PrivateKeyDestination: privatekey.NewFileDestination(keysPath),
+	})
+	if err != nil {
+		t.Fatalf("New(): %v", err)
+	}
+
+	_, err = manager.RotateKeypair("production")
+	if err == nil {
+		t.Fatal("RotateKeypair() succeeded for an environment-backed key")
+	}
+	if !strings.Contains(err.Error(), "explicit private-key destination") {
+		t.Errorf("error = %q, want explicit-destination guidance", err)
+	}
+	if strings.Contains(err.Error(), pair.PrivateKey) {
+		t.Fatal("rotation error contains private material")
+	}
+}
+
+// TestRotateKeypairFailsWhenKeyUnavailable verifies rotation fails closed when
+// the current private key cannot be resolved.
+func TestRotateKeypairFailsWhenKeyUnavailable(t *testing.T) {
+	t.Parallel()
+
+	manager, _ := newBulkManager(
+		t,
+		"public_keys:\n  production: public-test-value\n",
+		keypairTestResolver{
+			err: fmt.Errorf("%w for group production", privatekey.ErrNotAvailable),
+		},
+	)
+
+	_, err := manager.RotateKeypair("production")
+	if err == nil {
+		t.Fatal("RotateKeypair() succeeded without a private key")
+	}
+	if !strings.Contains(err.Error(), "not available") {
+		t.Errorf("error = %q, want unavailable-key guidance", err)
+	}
+}
+
+// TestRotateKeypairRequiresExistingIdentity verifies rotation refuses a group
+// that has no public key to replace.
+func TestRotateKeypairRequiresExistingIdentity(t *testing.T) {
+	t.Parallel()
+
+	manager, _ := newBulkManager(
+		t, "public_keys: {}\n", fixedPrivateKeyResolver{value: "unused"},
+	)
+
+	_, err := manager.RotateKeypair("production")
+	if err == nil {
+		t.Fatal("RotateKeypair() succeeded for a missing identity")
+	}
+	if !strings.Contains(err.Error(), "no public key") {
+		t.Errorf("error = %q, want missing-identity guidance", err)
+	}
+}
+
+// TestRotateKeypairReportsRecoverableCommitFailure verifies a store-commit
+// failure after the private-key handoff returns recovery guidance, preserves the
+// previous key as rollback material, and never exposes private material.
+func TestRotateKeypairReportsRecoverableCommitFailure(t *testing.T) {
+	if os.Geteuid() == 0 {
+		t.Skip("read-only directory permissions are not enforced for root")
+	}
+	t.Parallel()
+
+	secretsDir := t.TempDir()
+	keysDir := t.TempDir()
+	storePath := filepath.Join(secretsDir, "secrets.yaml")
+	keysPath := filepath.Join(keysDir, "envx.keys")
+	manager := newLocalKeypairManager(t, storePath, keysPath)
+
+	if _, err := manager.GenerateKeypair("production"); err != nil {
+		t.Fatalf("GenerateKeypair(): %v", err)
+	}
+	if err := manager.Set("production", "api_key", func() (string, error) {
+		return "plain-api", nil
+	}); err != nil {
+		t.Fatalf("Set(): %v", err)
+	}
+
+	// Block the store commit while leaving the key directory writable.
+	//nolint:gosec // G302: a directory needs its execute bit to remain traversable.
+	if err := os.Chmod(secretsDir, 0o500); err != nil {
+		t.Fatalf("Chmod(): %v", err)
+	}
+	//nolint:gosec // G302: restore owner traversal and write access for cleanup.
+	t.Cleanup(func() { _ = os.Chmod(secretsDir, 0o700) })
+
+	_, err := manager.RotateKeypair("production")
+	if err == nil {
+		t.Fatal("RotateKeypair() succeeded with an unwritable store")
+	}
+	if !strings.Contains(err.Error(), "retry") ||
+		!strings.Contains(err.Error(), "preserved") {
+		t.Errorf("error = %q, want recovery guidance", err)
+	}
+	rotateErr := err.Error()
+
+	// The previous private key must survive as rollback material.
+	backupPath := keysPath + backupSuffix
+	//nolint:gosec // G304: path is created inside this test's temporary directory.
+	backup, err := os.ReadFile(backupPath)
+	if err != nil {
+		t.Fatalf("rollback material missing: %v", err)
+	}
+	if strings.Contains(rotateErr, string(backup)) {
+		t.Fatal("rotation error contains private material")
+	}
+}
