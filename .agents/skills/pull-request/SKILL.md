@@ -12,7 +12,8 @@ You are an expert at creating clear, comprehensive pull requests that facilitate
 3. Run `git diff main..HEAD --stat` to see files changed
 4. Optionally run `git diff main..HEAD` for detailed changes
 5. Generate PR title and description
-6. Present `gh pr create` command for user confirmation
+6. Run `gh pr create` command to create the PR
+7. Run `gh pr comment <pr-number> --body` command to add comments or request reviews
 
 ## PR Title Format
 
@@ -30,29 +31,15 @@ Derive from the branch name and commit history:
 ## PR Description Template
 
 ```markdown
-## Summary
 Brief description of what this PR accomplishes.
 
-## Changes
 - Bullet point list of key changes
-- Derived from commit messages
+- Derived from commit messages and diff stats
 - Grouped by logical area
+- Include key unit tests or integration tests added
 
-## Related Issues
-Closes #123
+Closes #123 (if applicable)
 ```
-
-## Testing Section (Optional)
-Include a `## Testing` section only when it provides meaningful information beyond automated CI checks and the changed files.
-
-When included:
-- Use a concise Markdown bullet list.
-- Describe significant coverage, manual verification, or known gaps.
-- Focus on behavior and reviewer-relevant outcomes.
-- Do not report routine CI status.
-- Do not include commands, task names, tool names, or test transcripts.
-
-If none of these apply, omit the Testing section entirely.
 
 ## Output Format
 
@@ -68,16 +55,10 @@ feat(auth): add user authentication
 ## Summary
 Implements complete user authentication flow including login, registration, and password reset.
 
-## Changes
 - Add login form with email/password validation
 - Add registration with email verification
 - Implement JWT token storage and refresh
 - Add password reset via email link
-
-## Testing
-- Manually verified the login button disables immediately upon click to prevent double submission.
-- Added unit tests in auth.spec.ts for edge cases with expired tokens.
-- Updated existing integration tests to handle the new user_id payload field.
 
 Closes #42
 ```
@@ -88,18 +69,33 @@ Closes #42
 gh pr create --title "feat(auth): add user authentication" --body "## Summary
 Implements complete user authentication flow including login, registration, and password reset.
 
-## Changes
 - Add login form with email/password validation
 - Add registration with email verification
 - Implement JWT token storage and refresh
 - Add password reset via email link
 
-## Testing
-- Manually verified the login button disables immediately upon click to prevent double submission.
-- Added unit tests in auth.spec.ts for edge cases with expired tokens.
-- Updated existing integration tests to handle the new user_id payload field.
-
 Closes #42"
+```
+
+## Additional Comments
+
+After generating the PR, it may be helpful to provide additional context or notes for reviewers that do not belong in the squash merge commit message. Use the following template:
+
+```markdown
+- Bullet point list of areas that may require special attention
+- List any manual testing steps completed or edge cases that were considered
+- Focus should be on improving the overall review process
+- Request specific reviewers if needed
+```
+
+**Run this command to add comments to the PR:**
+
+```
+gh pr comment <pr-number> --body "Review focus for the authentication change:
+- Manually tested registration, email verification, login, logout, token refresh, and password reset, including duplicate emails, invalid credentials, rate limiting, and expired or reused links
+- Found and fixed an edge case where password reset left existing sessions active; verified that old sessions and the old password were rejected afterward
+- Reviewed password hashing, credential logging, token expiry and revocation, authorization, and cross-user access checks
+- Did not manually verify CSRF behavior or cookie flags; automated tests covered those cases"
 ```
 
 ## Additional Options

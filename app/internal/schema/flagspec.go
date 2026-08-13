@@ -54,6 +54,20 @@ var (
 		Usage: "target environment (defaults to first declared environment in envx.yaml)",
 	}
 
+	// Group narrows a bulk secret operation to one key group (default: all groups).
+	Group = FlagSpec{
+		Name:  "group",
+		Short: "g",
+		Usage: "limit to one key group (default: all groups)",
+	}
+
+	// Key narrows a bulk secret operation to one secret key (default: all keys).
+	Key = FlagSpec{
+		Name:  "key",
+		Short: "k",
+		Usage: "limit to one secret key (default: all keys)",
+	}
+
 	// NamespacePrefix prefixes each key with its namespace name.
 	NamespacePrefix = FlagSpec{
 		Name:  "namespace-prefix",
@@ -106,6 +120,13 @@ var (
 		Name:  "suffix",
 		Env:   "ENVX_SUFFIX",
 		Usage: "suffix appended to every key",
+	}
+
+	// Verbose prints additional detail in command output.
+	Verbose = FlagSpec{
+		Name:  "verbose",
+		Short: "v",
+		Usage: "print detailed output",
 	}
 )
 
