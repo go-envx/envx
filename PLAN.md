@@ -438,21 +438,6 @@ Actions may define presentation-only DTOs where JSON tags or stable command outp
 
 ## Migration strategy
 
-### Starting workflow
-
-The refactor starts from clean `main`, not from the mixed diagnostic worktree. Before creating the refactor branch, preserve all current tracked, staged, unstaged, and untracked diagnostic work in one named stash. The ignored `.temp/` design files are not included by `-u` and remain available as implementation guidance. Record the resulting stash reference before changing branches.
-
-```sh
-git stash push -u -m "wip: diagnostics before envmerge manager refactor"
-git rev-parse stash@{0}
-```
-
-Record the full object ID printed by `git rev-parse` and use that immutable ID when restoring files or inspecting diffs. Do not rely on `stash@{0}` after this point because later stashes can change its ordinal.
-
-Do not `stash pop` or apply the complete stash onto the refactor branch. The stash contains three different categories that must land at different times: independent typed-error foundations, manager-incompatible transitional envmerge state, and explain output work that depends on the new manager API. Restore or manually port only the files or hunks assigned to the active task, run that task's focused tests, and leave the remaining stash intact until every reusable piece has either landed or been deliberately superseded.
-
-The current index boundary is not a desired commit boundary. Staged cipher/schema/CLI changes and unstaged envmerge/explain/config/secrets changes are grouped by their target responsibility below, not by whether they happen to be staged today.
-
 ### Current-work mapping
 
 | Current work | Migration treatment | Target task |
@@ -467,7 +452,7 @@ The current index boundary is not a desired commit boundary. Staged cipher/schem
 | `envmerge.applyPrefixSuffix` diagnostic-map handling | Do not restore directly. `applyAffixes` transforms unresolved merge state before operation-specific results are built, so diagnostic maps no longer need special handling. | Superseded by Task 1 |
 | `PLAN.md` diagnostics rewrite | Keep stashed while manager PRs are in flight. Reconcile it with the completed manager API after the refactor rather than restoring stale `Build`/`Diagnose` contracts. | Task 8 or a dedicated docs commit |
 
-After the final task, inspect the stash against the completed tree before deleting it. Every remaining hunk should be either already ported, explicitly superseded by the manager design, or intentionally deferred; do not drop the stash merely because the full test suite is green.
+After the final task, inspect the stash against the completed tree. Every remaining hunk should be either already ported, explicitly superseded by the manager design, or intentionally deferred.
 
 ### Keep from the current diagnostic work
 
@@ -583,6 +568,6 @@ Each task is one focused change that leaves the tree buildable and includes test
 
 7. ⬜ **Finalize config ownership and remove compatibility APIs:** Change `config.ResolveProject` to omit reveal, change `config.Result.Envmerge` from `envmerge.Params` to `*envmerge.Manager`, construct it with the default environment and resolver factory, update project-resolution and composition tests, remove the temporary `Build` wrapper and obsolete `Result` type, and verify actions contain only input mapping, cross-package composition, and rendering. Update package documentation to describe the manager lifecycle and lazy operation semantics.
 
-8. ⬜ **Reconcile the stash and run the full review:** Compare the preserved stash against the completed tree, port or explicitly supersede every remaining hunk, and reconcile `PLAN.md` with the final manager API before deleting the stash. Run `task envx:all`, smoke-test masked/revealed get, explain, literal-only diff, and run flows, verify no namespace or secret plaintext is cached across operations, and review the final exported surface for symbols used only by tests. Update diff documentation for the removed flag and literal semantics, then run `docs:check` because this task changes files under `docs/`.
+8. ⬜ **Reconcile the stash and run the full review:** Compare the preserved stash against the completed tree, port or explicitly supersede every remaining hunk, and reconcile `PLAN.md` with the final manager API. Run `task envx:all`, smoke-test masked/revealed get, explain, literal-only diff, and run flows, verify no namespace or secret plaintext is cached across operations, and review the final exported surface for symbols used only by tests.
 
 Deferred to a later plan: external resolver backends, context-aware/network resolution, workspace-wide validation, emit targets, and any persistent manager cache or file watcher. The manager API must allow those additions without making config parsing or presentation part of `envmerge`.
