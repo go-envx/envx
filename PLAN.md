@@ -115,9 +115,9 @@ type Manager struct {
 func New(params Params) (*Manager, error)
 ```
 
-`New` applies structural terminal defaults currently owned by `normalizeParams`, including an empty delimiter becoming `","`, and copies `Includes` and `Environments` so caller mutation cannot change manager behavior. It stores `DefaultEnvironment` without validating it because an explicit operation environment supersedes that default; this prevents an irrelevant `ENVX_ENV` value from blocking `Diff(environmentA, environmentB)`. `normalizeEnvironment` applies the first declared environment when both the call and configured default are empty, then validates the environment actually used by the operation. `New` permits a nil `ResolverFactory`, which remains the identity behavior for plain configuration workspaces. It does not require namespace or secrets files to exist; missing or malformed files are reported by the operation that needs them.
+`New` applies structural terminal defaults currently owned by `normalizeParams`, including an empty delimiter becoming `","`, and copies `Includes` and `Environments` so caller mutation cannot change manager behavior. It stores `DefaultEnvironment` without validating it because an explicit operation environment supersedes that default; this prevents an irrelevant `ENVX_ENV` value from blocking `Diff(environmentA, environmentB)`. `normalizeEnvironment` applies the first declared environment when both the call and configured default are empty, then validates the environment actually used by the operation. `New` permits a nil `ResolverFactory`, which remains identity behavior for direct envmerge callers that deliberately have no reference syntax. Production project resolution always supplies the config-owned factory, so `run` cannot materialize an unresolved `secret://` reference through the nil path. It does not require namespace or secrets files to exist; missing or malformed files are reported by the operation that needs them.
 
-The factory returns a fresh `ValueResolver` for one operation under the requested reveal policy. `Explain` checks whether that resolver also implements `ValueDiagnoser`; `Get` uses `Resolve`; `Materialize` always requests a revealing resolver; and `Diff` never calls the factory. Factory errors are operation-fatal and occur only after namespace loading has produced a valid winning set. Config owns the concrete adapter, which retains `secrets.Params` and `cipher.Params`, calls `NewSecretsManager` only when invoked, then calls `Manager.Resolver` with the reveal policy. This preserves the dependency direction: envmerge defines the consumed interface, while config composes the provider.
+The factory returns a fresh `ValueResolver` for one operation under the requested reveal policy. `Explain` requires a non-nil resolver returned by a configured factory to also implement `ValueDiagnoser` and returns an operation error when it does not; only a nil factory means plain identity behavior. `Get` uses `Resolve`; `Materialize` always requests a revealing resolver; and `Diff` never calls the factory. Factory errors are operation-fatal and occur only after namespace loading has produced a valid winning set. Config owns the concrete adapter, which retains `secrets.Params` and `cipher.Params`, calls `NewSecretsManager` only when invoked, then calls `Manager.Resolver` with the reveal policy. This preserves the dependency direction: envmerge defines the consumed interface, while config composes the provider.
 
 ### Shared provenance and resolution types
 
@@ -365,7 +365,7 @@ func renderLeaf(value leafValue, sourceKey, delimiter string) (string, error)
 // diagnoseLeaf aggregates non-fatal item outcomes without retaining masked plaintext.
 func diagnoseLeaf(value leafValue, diagnoser ValueDiagnoser, environment, delimiter string) Resolution
 
-// literalValue renders a winning leaf without invoking a resolver.
+// literalValue renders a winning leaf for diagnostics without delimiter validation.
 func literalValue(value leafValue, delimiter string) string
 
 // materialize resolves every winner and accumulates deterministic per-key failures.
@@ -374,7 +374,7 @@ func materialize(state *mergeState, settings Settings, resolver ValueResolver) *
 // materializationError returns all accumulated failures in sorted key order.
 func materializationError(errs map[string]error) error
 
-// renderLiterals renders every unresolved winner without invoking a resolver.
+// renderLiterals renders every unresolved winner with delimiter validation and no resolver.
 func renderLiterals(state *mergeState, delimiter string) (map[string]string, error)
 
 // compare classifies the sorted union of two rendered literal environments.
@@ -401,7 +401,7 @@ type Result struct {
 func ResolveProject(input *Input, project string) (*Result, error)
 ```
 
-`ResolveProject` resolves environment precedence into `envmerge.Params.DefaultEnvironment` but does not fix an operation's environment or reveal policy. A private config adapter holds `secrets.Params` and `cipher.Params` and implements `envmerge.ValueResolverFactory` by constructing a secrets manager and calling `Manager.Resolver(secrets.ResolverParams{Reveal: reveal})` for each resolving operation. Config then calls `envmerge.New`; neither config nor `New` constructs a cipher, opens `secrets.yaml`, or loads namespace files. `ResolveWorkspace` continues to support workspace-only actions without constructing an envmerge manager. `OverlayPath` and `WorkspaceDir` remain config concerns.
+`ResolveProject` resolves environment precedence into `envmerge.Params.DefaultEnvironment` but does not fix an operation's environment or reveal policy. A private config adapter holds `secrets.Params` and `cipher.Params` and implements `envmerge.ValueResolverFactory` by constructing a secrets manager and calling `Manager.Resolver(secrets.ResolverParams{Reveal: reveal})` for each resolving operation. Config then calls `envmerge.New`; neither config nor `New` constructs a cipher, opens `secrets.yaml`, or loads namespace files. `ResolveWorkspace` continues to support workspace-only actions without constructing an envmerge manager. `OverlayPath` remains a config concern and switches from `Envmerge.Settings.Env` to `Envmerge.DefaultEnvironment`, applying the manifest's first-declared fallback and validation exactly as today. `WorkspaceDir` also remains a config concern.
 
 Until the final config migration, `config.Result.Envmerge` remains `envmerge.Params` and each migrated action temporarily calls `envmerge.New(resolved.Envmerge)` before invoking its operation. This keeps one config field and avoids a dual params/manager state. The final config task moves that construction into `ResolveProject` and changes the field to `*envmerge.Manager`; after it lands, actions must not construct managers, reconstruct `Params`, override environment settings, or call compatibility wrappers.
 
@@ -444,8 +444,10 @@ The refactor starts from clean `main`, not from the mixed diagnostic worktree. B
 
 ```sh
 git stash push -u -m "wip: diagnostics before envmerge manager refactor"
-git stash list -1
+git rev-parse stash@{0}
 ```
+
+Record the full object ID printed by `git rev-parse` and use that immutable ID when restoring files or inspecting diffs. Do not rely on `stash@{0}` after this point because later stashes can change its ordinal.
 
 Do not `stash pop` or apply the complete stash onto the refactor branch. The stash contains three different categories that must land at different times: independent typed-error foundations, manager-incompatible transitional envmerge state, and explain output work that depends on the new manager API. Restore or manually port only the files or hunks assigned to the active task, run that task's focused tests, and leave the remaining stash intact until every reusable piece has either landed or been deliberately superseded.
 
@@ -489,16 +491,16 @@ After the final task, inspect the stash against the completed tree before deleti
 - Diff's `--reveal` flag and reveal field are removed; comparison uses literal winners and never constructs a resolver.
 - Explain's domain summary counting moves into `envmerge.Explain`; path conversion and rendering stay in the action.
 
-### Compatibility wrappers
+### Compatibility bridge
 
-A temporary wrapper may keep intermediate tasks green after starting from clean `main`:
+A temporary legacy entry point keeps intermediate tasks green after starting from clean `main`:
 
 ```go
-// Build constructs a temporary Manager and materializes its configured environment.
-func Build(params Params) (*Environment, error)
+// Build preserves the existing partial-result contract while actions migrate.
+func Build(params Params) (*Result, error)
 ```
 
-No equivalent compatibility wrapper is required for `Diagnose`; Task 4 ports its tests and behavior directly onto `Manager.Explain`. The `Build` wrapper must be deleted in the final cleanup after all production and test call sites use `Manager`; it is not part of the target API.
+Task 1 keeps the existing `Result`, `Err`, and `Verify` surface and adapts `Build` to `Params.DefaultEnvironment`, while sharing the new private merge and all-value resolution kernels where practical. `Build` may return a partial legacy result; `Manager.Materialize` consumes the same internal resolution state but returns either a complete `Environment` or an error. This preserves current get, explain, diff, and run call sites until their assigned migration tasks. No equivalent compatibility entry point is required for `Diagnose`; Task 4 ports its tests and behavior directly onto `Manager.Explain`. `Build`, `Result`, `Err`, and `Verify` are deleted only after Task 6 migrates the final production caller.
 
 ## Testing strategy
 
@@ -536,6 +538,7 @@ No equivalent compatibility wrapper is required for `Diagnose`; Task 4 ports its
 - Environment and reveal are selected per call without reconstructing the manager.
 - Literals, origins, shadow histories, kinds, statuses, and summary counts are complete.
 - Per-key failures do not abort the explanation.
+- A configured resolver that does not implement `ValueDiagnoser` is an operation error rather than silently treating references as config values.
 - Masked diagnostics never retain plaintext; reveal preserves a successfully resolved empty string distinctly from unresolved.
 - List outcomes aggregate kind and worst severity and resolve only when every item succeeds.
 - Paths outside the workspace remain absolute in the action renderer; `filepath.Rel` results beginning with `..` do not escape into displayed relative paths.
@@ -557,6 +560,7 @@ No equivalent compatibility wrapper is required for `Diagnose`; Task 4 ports its
 - Added, removed, and changed entries are sorted and carry the expected values.
 - Identical environments yield an empty result.
 - A namespace or literal-rendering failure on either side returns no partial comparison.
+- A list item containing the configured delimiter fails literal rendering without exposing the item value.
 - Different references are reported even when their current plaintext is equal; dangling references compare without error.
 - Implicit references and escaped reference literals compare exactly as declared, without resolver canonicalization.
 - The command no longer registers or documents `--reveal`.
@@ -565,9 +569,9 @@ No equivalent compatibility wrapper is required for `Diagnose`; Task 4 ports its
 
 Each task is one focused change that leaves the tree buildable and includes tests for its new contract. Tasks may be separate commits or PRs depending on review size; no task introduces unused exported APIs or leaves both old and new production paths indefinitely.
 
-1. ⬜ **Introduce the manager, resolver factory, and shared merge kernel:** Add `Manager`, `New`, and `ValueResolverFactory`; add the private config adapter that lazily constructs a fresh secrets manager and resolver for a requested reveal policy; move the precedence-resolved environment from `Settings.Env` to `Params.DefaultEnvironment`; make construction validate/copy params without namespace or secrets construction and defer environment validation to each operation; and consolidate namespace loading and winner selection behind `loadNamespaces`, `merge`, and `mergeLoaded`. Add constructor, freshness, resolver-lifetime, environment, merge, provenance, prefix/suffix, and shadowed-resolver tests. Implement `Materialize(environment)` and `Environment`, keeping `Build` only as a temporary wrapper so existing callers remain green.
+1. ⬜ **Introduce the manager, resolver factory, and shared merge kernel:** Add `Manager`, `New`, and `ValueResolverFactory`; add the private config adapter that lazily constructs a fresh secrets manager and resolver for a requested reveal policy; move the precedence-resolved environment from `Settings.Env` to `Params.DefaultEnvironment`; update `OverlayPath` to read the new field; make construction validate/copy params without namespace or secrets construction and defer environment validation to each operation; and consolidate namespace loading and winner selection behind `loadNamespaces`, `merge`, and `mergeLoaded`. Add constructor, freshness, resolver-lifetime, environment, merge, provenance, prefix/suffix, OverlayPath, and shadowed-resolver tests. Implement `Materialize(environment)` and `Environment`, while retaining the legacy `Build(Params) (*Result, error)` contract so existing callers remain green.
 
-2. ⬜ **Move single-key resolution into envmerge:** Add `Entry`, `GetParams`, and `Manager.Get`, resolve only the requested winning leaf under the call's environment and reveal policy, and migrate the get action by temporarily constructing a manager from `config.Result.Envmerge`. Move case normalization, not-found handling, requested-key errors, and provenance selection out of the action. Delete deferred per-key errors from the materialized result once no caller depends on them.
+2. ⬜ **Move single-key resolution into envmerge:** Add `Entry`, `GetParams`, and `Manager.Get`, resolve only the requested winning leaf under the call's environment and reveal policy, and migrate the get action by temporarily constructing a manager from `config.Result.Envmerge`. Move case normalization, not-found handling, requested-key errors, and provenance selection out of the action. Keep legacy deferred errors on `Result` for the remaining `Build` callers.
 
 3. ⬜ **Restore typed diagnostic foundations:** Selectively restore the cipher sentinel errors and tests, `privatekey.ErrInvalidKey`, `secrets.ErrSecretNotFound`, `Kind`, `Severity`, `Resolution`, and `ValueDiagnoser`. Adapt `secrets.Resolver.Diagnose` and its tests to the operation-scoped resolver factory while preserving status codes, typed classification, masked dry-run decryption, and plaintext redaction. Do not restore standalone `envmerge.Diagnose` or diagnostic fields on the old result. Run focused cipher, privatekey, secrets, and envmerge contract tests.
 
@@ -575,7 +579,7 @@ Each task is one focused change that leaves the tree buildable and includes test
 
 5. ⬜ **Make diff literal-only inside envmerge:** Add `Change`, `DiffResult`, `Manager.Diff`, operation-local base reuse, literal rendering, and private comparison. Migrate the diff action while preserving its table and JSON shapes, remove `--reveal` from the command and help, and test that references compare without secrets access. Delete the action's `buildEnv`, `runAction`, and `unionKeys` helpers and their action-level domain tests after equivalent envmerge tests exist.
 
-6. ⬜ **Make complete materialization the run contract:** Migrate run to `Manager.Materialize(environment)`, require a complete revealed environment before composing `runner.Params`, and retain the existing child-never-starts-on-resolution-failure test. Remove `Result.Verify`, partial-result exposure, and any remaining direct `Build` production calls.
+6. ⬜ **Make complete materialization the run contract:** Migrate run to `Manager.Materialize(environment)`, require a complete revealed environment before composing `runner.Params`, and retain the existing child-never-starts-on-resolution-failure test. Remove the final direct `Build` production call; after get, explain, diff, and run have all migrated, remove legacy `Result.Err`, `Result.Verify`, and partial-result exposure.
 
 7. ⬜ **Finalize config ownership and remove compatibility APIs:** Change `config.ResolveProject` to omit reveal, change `config.Result.Envmerge` from `envmerge.Params` to `*envmerge.Manager`, construct it with the default environment and resolver factory, update project-resolution and composition tests, remove the temporary `Build` wrapper and obsolete `Result` type, and verify actions contain only input mapping, cross-package composition, and rendering. Update package documentation to describe the manager lifecycle and lazy operation semantics.
 
