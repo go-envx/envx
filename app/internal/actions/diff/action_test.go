@@ -15,18 +15,19 @@ func TestBuildEnvDoesNotMutateConfig(t *testing.T) {
 	t.Parallel()
 
 	ec := &envmerge.Params{
-		Environments: []string{"development", "production"},
-		Settings:     envmerge.Settings{Env: "development", Prefix: "P_"},
+		Environments:       []string{"development", "production"},
+		DefaultEnvironment: "development",
+		Settings:           envmerge.Settings{Prefix: "P_"},
 	}
 
 	if _, err := buildEnv(*ec, "production"); err != nil {
 		t.Fatalf("buildEnv: %v", err)
 	}
 
-	if ec.Settings.Env != "development" {
+	if ec.DefaultEnvironment != "development" {
 		t.Errorf(
 			"shared config Env mutated: got %q, want %q",
-			ec.Settings.Env, "development",
+			ec.DefaultEnvironment, "development",
 		)
 	}
 }

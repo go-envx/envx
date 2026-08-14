@@ -69,7 +69,7 @@ func execute(p actionParams, in *config.Input) (actionResult, error) {
 // the environment. A dangling reference on either side is a failure, since diff
 // compares whole environments.
 func buildEnv(ec envmerge.Params, env string) (*envmerge.Result, error) {
-	ec.Settings.Env = env
+	ec.DefaultEnvironment = env
 	result, err := envmerge.Build(ec)
 	if err != nil {
 		return nil, err

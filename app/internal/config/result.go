@@ -44,7 +44,7 @@ type Result struct {
 // against the workspace directory. It targets a single overlay file without
 // merging an environment, so it never builds an envmerge result.
 func (r *Result) OverlayPath(includePath string) (string, error) {
-	env := r.Envmerge.Settings.Env
+	env := r.Envmerge.DefaultEnvironment
 	if env == "" {
 		env = r.manifest.DefaultEnvironment()
 	}

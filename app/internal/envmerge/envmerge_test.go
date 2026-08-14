@@ -47,7 +47,7 @@ func TestResolveSuccess(t *testing.T) {
 	t.Parallel()
 
 	p := baseParams(setupWorkspace(t))
-	p.Settings = Settings{Env: "development"}
+	p.DefaultEnvironment = "development"
 	res, err := Build(p)
 	if err != nil {
 		t.Fatalf("Resolve: %v", err)
@@ -57,8 +57,8 @@ func TestResolveSuccess(t *testing.T) {
 	}
 }
 
-// TestResolveDefaultEnv verifies an empty Settings.Env falls back to the first
-// declared environment.
+// TestResolveDefaultEnv verifies an empty DefaultEnvironment falls back to the
+// first declared environment.
 func TestResolveDefaultEnv(t *testing.T) {
 	t.Parallel()
 
@@ -73,13 +73,13 @@ func TestResolveDefaultEnv(t *testing.T) {
 	}
 }
 
-// TestResolveOverride verifies Settings.Env selects that environment's overlay
-// (as diff relies on, passing each side).
+// TestResolveOverride verifies DefaultEnvironment selects that environment's
+// overlay (as diff relies on, passing each side).
 func TestResolveOverride(t *testing.T) {
 	t.Parallel()
 
 	p := baseParams(setupWorkspace(t))
-	p.Settings = Settings{Env: "production"}
+	p.DefaultEnvironment = "production"
 	res, err := Build(p)
 	if err != nil {
 		t.Fatalf("Resolve: %v", err)
@@ -94,7 +94,7 @@ func TestResolveErrors(t *testing.T) {
 	t.Parallel()
 
 	p := baseParams(setupWorkspace(t))
-	p.Settings = Settings{Env: "nope"}
+	p.DefaultEnvironment = "nope"
 	if _, err := Build(p); err == nil {
 		t.Error("expected error for undeclared environment")
 	}
@@ -108,6 +108,21 @@ func writeYAML(t *testing.T, dir, name, body string) {
 	}
 }
 
+// buildNamespace merges a single namespace for one environment through the shared
+// kernel, declaring development and production so either environment validates. It
+// exercises the merge/provenance behavior a Manager operation relies on.
+func buildNamespace(
+	t *testing.T, dir, name, env string, settings Settings,
+) (*Result, error) {
+	t.Helper()
+	return Build(Params{
+		Includes:           []string{filepath.Join(dir, name)},
+		Environments:       []string{"development", "production"},
+		DefaultEnvironment: env,
+		Settings:           settings,
+	})
+}
+
 // TestMergeNamespacesOverlay verifies an overlay overrides the base and origin
 // tracking attributes the value to the overlay file.
 func TestMergeNamespacesOverlay(t *testing.T) {
@@ -117,9 +132,7 @@ func TestMergeNamespacesOverlay(t *testing.T) {
 	writeYAML(t, dir, "postgres.yaml", "host: localhost\nport: 5432\n")
 	writeYAML(t, dir, "postgres.development.yaml", "host: dev-db.local\n")
 
-	res, err := mergeNamespaces(
-		[]namespace{{dir: dir, name: "postgres"}}, Settings{Env: "development"}, nil,
-	)
+	res, err := buildNamespace(t, dir, "postgres", "development", Settings{})
 	if err != nil {
 		t.Fatalf("mergeNamespaces: %v", err)
 	}
@@ -150,9 +163,7 @@ func TestMergeNamespacesShadowTracksBase(t *testing.T) {
 	writeYAML(t, dir, "postgres.yaml", "host: localhost\nport: 5432\n")
 	writeYAML(t, dir, "postgres.production.yaml", "host: prod-db\n")
 
-	res, err := mergeNamespaces(
-		[]namespace{{dir: dir, name: "postgres"}}, Settings{Env: "production"}, nil,
-	)
+	res, err := buildNamespace(t, dir, "postgres", "production", Settings{})
 	if err != nil {
 		t.Fatalf("mergeNamespaces: %v", err)
 	}
@@ -191,12 +202,13 @@ func TestMergeNamespacesRequireOverlaysMissingOverlay(t *testing.T) {
 	dir := t.TempDir()
 	writeYAML(t, dir, "postgres.yaml", "host: localhost\n")
 
-	ns := []namespace{{dir: dir, name: "postgres"}}
-	_, err := mergeNamespaces(ns, Settings{Env: "production", RequireOverlays: true}, nil)
+	_, err := buildNamespace(
+		t, dir, "postgres", "production", Settings{RequireOverlays: true},
+	)
 	if err == nil {
 		t.Error("expected require_overlays error for missing overlay")
 	}
-	if _, err := mergeNamespaces(ns, Settings{Env: "production"}, nil); err != nil {
+	if _, err := buildNamespace(t, dir, "postgres", "production", Settings{}); err != nil {
 		t.Errorf("lax mode should tolerate missing overlay, got %v", err)
 	}
 }
@@ -213,9 +225,7 @@ func TestMergeNamespacesNestedFlatEquivalence(t *testing.T) {
 	writeYAML(t, dir, "app.yaml", "log:\n  level: info\n")
 	writeYAML(t, dir, "app.production.yaml", "log_level: warn\n")
 
-	res, err := mergeNamespaces(
-		[]namespace{{dir: dir, name: "app"}}, Settings{Env: "production"}, nil,
-	)
+	res, err := buildNamespace(t, dir, "app", "production", Settings{})
 	if err != nil {
 		t.Fatalf("mergeNamespaces: %v", err)
 	}
@@ -248,9 +258,7 @@ func TestMergeNamespacesNestedPartialOverride(t *testing.T) {
 	writeYAML(t, dir, "app.yaml", "log:\n  level: info\n  format: json\n")
 	writeYAML(t, dir, "app.production.yaml", "log:\n  level: warn\n")
 
-	res, err := mergeNamespaces(
-		[]namespace{{dir: dir, name: "app"}}, Settings{Env: "production"}, nil,
-	)
+	res, err := buildNamespace(t, dir, "app", "production", Settings{})
 	if err != nil {
 		t.Fatalf("mergeNamespaces: %v", err)
 	}
@@ -272,9 +280,7 @@ func TestMergeNamespacesSingleFileCollision(t *testing.T) {
 	dir := t.TempDir()
 	writeYAML(t, dir, "app.yaml", "log:\n  level: info\nlog_level: warn\n")
 
-	_, err := mergeNamespaces(
-		[]namespace{{dir: dir, name: "app"}}, Settings{Env: "development"}, nil,
-	)
+	_, err := buildNamespace(t, dir, "app", "development", Settings{})
 	if err == nil {
 		t.Fatal("expected collision error for two spellings in one file")
 	}
@@ -288,10 +294,9 @@ func TestMergeNamespacesPrefixSuffix(t *testing.T) {
 	dir := t.TempDir()
 	writeYAML(t, dir, "postgres.yaml", "host: localhost\n")
 
-	res, err := mergeNamespaces(
-		[]namespace{{dir: dir, name: "postgres"}},
-		Settings{Env: "development", Prefix: "app", Suffix: "v2", NamespacePrefix: true},
-		nil,
+	res, err := buildNamespace(
+		t, dir, "postgres", "development",
+		Settings{Prefix: "app", Suffix: "v2", NamespacePrefix: true},
 	)
 	if err != nil {
 		t.Fatalf("mergeNamespaces: %v", err)
@@ -309,10 +314,8 @@ func TestMergeNamespacesJoinsList(t *testing.T) {
 	dir := t.TempDir()
 	writeYAML(t, dir, "app.yaml", "hosts:\n  - a\n  - b\n  - c\n")
 
-	res, err := mergeNamespaces(
-		[]namespace{{dir: dir, name: "app"}},
-		Settings{Env: "development", Delimiter: "|"},
-		nil,
+	res, err := buildNamespace(
+		t, dir, "app", "development", Settings{Delimiter: "|"},
 	)
 	if err != nil {
 		t.Fatalf("mergeNamespaces: %v", err)
