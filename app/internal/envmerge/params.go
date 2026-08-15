@@ -1,26 +1,32 @@
 package envmerge
 
-import (
-	"fmt"
-	"slices"
-)
+import "slices"
 
 // defaultDelimiter joins list-valued leaves when no delimiter is configured.
 const defaultDelimiter = ","
 
-// Params is envmerge's input contract. The caller supplies namespace paths,
-// settings, and optional value-resolution behavior without exposing where they
-// came from. envmerge fills in terminal defaults itself.
+// Params is envmerge's input contract. The caller supplies namespace paths, the
+// precedence-resolved default environment, settings, and optional value-resolution
+// behavior without exposing where they came from. envmerge fills in terminal
+// defaults itself.
 type Params struct {
 	// Includes is an ordered chain of namespaces to merge, given as absolute paths
 	// the caller has already resolved.
 	Includes []string
 	// Environments lists the declared environments, used to validate the target.
 	Environments []string
+	// DefaultEnvironment is the precedence-resolved default an operation uses when
+	// it is given no explicit environment. It is not validated at construction
+	// because an explicit operation environment supersedes it.
+	DefaultEnvironment string
 	// Settings holds the fully-resolved env-resolution knobs the merge reads.
 	Settings Settings
-	// ValueResolver dereferences reference-valued leaves after winner selection.
-	// A nil resolver leaves every value untouched.
+	// ResolverFactory opens a fresh, operation-scoped value resolver on demand. A
+	// nil factory is identity behavior for callers with no reference syntax.
+	ResolverFactory ValueResolverFactory
+	// ValueResolver is the transitional resolver the legacy Build entry point uses
+	// to dereference reference-valued leaves. Manager operations obtain a resolver
+	// from ResolverFactory instead; a nil resolver leaves every value untouched.
 	ValueResolver ValueResolver
 }
 
@@ -33,14 +39,23 @@ type ValueResolver interface {
 	Resolve(value, env string) (string, error)
 }
 
+// ValueResolverFactory opens a fresh, operation-scoped value resolver under the
+// requested reveal policy. Each resolving operation asks for a new resolver after
+// namespace winner selection, so no store snapshot or private-key cache survives
+// the operation.
+type ValueResolverFactory interface {
+	// Resolver returns a fresh resolver materializing references under the reveal
+	// policy: a revealing resolver decrypts, a masking resolver returns canonical
+	// references.
+	Resolver(reveal bool) (ValueResolver, error)
+}
+
 // Settings holds the fully-resolved env-resolution knobs envmerge consumes — a
-// plain value struct with no knowledge of how its values were sourced. Zero values
-// are valid: an empty Env falls back to the first declared environment and the
-// bool/string knobs default to off.
+// plain value struct with no knowledge of how its values were sourced, and no
+// environment or reveal policy, which are per-operation concerns. Zero values are
+// valid: the bool/string knobs default to off and an empty delimiter falls back
+// to the default (",").
 type Settings struct {
-	// Env is the target environment to resolve; an empty value falls back to the
-	// first declared environment.
-	Env string
 	// RequireOverlays requires each namespace's environment overlay file to exist.
 	RequireOverlays bool
 	// Prefix is prepended to every resolved key.
@@ -54,27 +69,22 @@ type Settings struct {
 	NamespacePrefix bool
 }
 
-// normalizeParams applies envmerge's terminal defaults to Params and validates the
-// result. It mutates Params in place so Build can read the effective settings directly.
-func normalizeParams(p *Params) error {
-	// Apply the first declared environment as the default if the target is empty.
-	if p.Settings.Env == "" && len(p.Environments) > 0 {
-		p.Settings.Env = p.Environments[0]
-	}
-
+// normalizeParams applies envmerge's structural terminal defaults, copies the
+// caller-owned slices so later mutation cannot change manager behavior, and
+// returns the normalized params. It does not validate the environment: each
+// operation validates the environment it actually uses, so an irrelevant default
+// cannot block an operation that overrides it.
+func normalizeParams(params Params) (Params, error) {
 	// Apply the default list delimiter when none was configured.
-	if p.Settings.Delimiter == "" {
-		p.Settings.Delimiter = defaultDelimiter
+	if params.Settings.Delimiter == "" {
+		params.Settings.Delimiter = defaultDelimiter
 	}
 
-	// Validate the resolved environment against the declared set.
-	if !slices.Contains(p.Environments, p.Settings.Env) {
-		return fmt.Errorf(
-			"environment %q is not declared (available: %v)",
-			p.Settings.Env, p.Environments,
-		)
-	}
+	// Copy caller-owned slices so caller mutation cannot change manager behavior.
+	params.Includes = slices.Clone(params.Includes)
+	params.Environments = slices.Clone(params.Environments)
 
-	// No error means Params are normalized and valid.
-	return nil
+	// No structural defaults fail today; the error result keeps the contract
+	// stable for future validation.
+	return params, nil
 }

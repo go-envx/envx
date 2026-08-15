@@ -92,8 +92,17 @@ func ResolveProject(in *Input, project string, reveal bool) (*Result, error) {
 		return nil, err
 	}
 
+	// Bind a resolver factory so a Manager operation can open a fresh,
+	// operation-scoped resolver on demand without construction-time secrets I/O.
+	res.Envmerge.ResolverFactory = resolverFactory{
+		secrets: res.Secrets,
+		cipher:  res.Cipher,
+	}
+
 	// Construct the workspace secrets manager and wire its resolver onto the
-	// envmerge params so secret:// references dereference during Build.
+	// envmerge params so secret:// references dereference during Build. This
+	// eager wiring keeps the legacy Build callers working until they migrate to
+	// Manager operations.
 	secretsManager, err := NewSecretsManager(res.Secrets, res.Cipher)
 	if err != nil {
 		return nil, err
@@ -108,6 +117,35 @@ func ResolveProject(in *Input, project string, reveal bool) (*Result, error) {
 	}
 	res.Envmerge.ValueResolver = secretsResolver
 	return res, nil
+}
+
+// resolverFactory lazily constructs a fresh secrets manager and resolver for one
+// resolving envmerge operation under the requested reveal policy. It holds only
+// construction params, so no store I/O, cipher construction, or private-key
+// resolution happens until an operation asks for a resolver — keeping the store
+// snapshot and private-key cache operation-scoped. It is the config-owned adapter
+// that implements envmerge.ValueResolverFactory, preserving the dependency
+// direction in which envmerge defines the consumed interface and config composes
+// the provider.
+type resolverFactory struct {
+	// secrets locates the workspace secrets store and private-key file.
+	secrets secrets.Params
+	// cipher holds the configured cipher construction parameters.
+	cipher cipher.Params
+}
+
+// Resolver constructs a fresh secrets manager and opens an operation-scoped
+// resolver under the reveal policy.
+func (f resolverFactory) Resolver(reveal bool) (envmerge.ValueResolver, error) {
+	manager, err := NewSecretsManager(f.secrets, f.cipher)
+	if err != nil {
+		return nil, err
+	}
+	resolver, err := manager.Resolver(secrets.ResolverParams{Reveal: reveal})
+	if err != nil {
+		return nil, err
+	}
+	return resolver, nil
 }
 
 // ResolveWorkspace resolves manifest-level configuration without selecting a
@@ -233,12 +271,12 @@ func resolveEnvmergeParams(
 	return envmerge.Params{
 		Includes:     pl.includes,
 		Environments: mc.manifest.Environments,
+		DefaultEnvironment: precedenceString(&schema.Env,
+			in.Env,
+			proj.Env,
+			global.Env,
+		),
 		Settings: envmerge.Settings{
-			Env: precedenceString(&schema.Env,
-				in.Env,
-				proj.Env,
-				global.Env,
-			),
 			RequireOverlays: precedenceBool(&schema.RequireOverlays,
 				in.RequireOverlays,
 				proj.RequireOverlays,

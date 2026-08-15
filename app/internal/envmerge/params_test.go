@@ -1,56 +1,28 @@
 package envmerge
 
-import "testing"
-
-// TestNormalizeParamsDefaultsEnv verifies an empty target environment falls back
-// to the first declared environment.
-func TestNormalizeParamsDefaultsEnv(t *testing.T) {
-	t.Parallel()
-
-	p := &Params{Environments: []string{"development", "production"}}
-	if err := normalizeParams(p); err != nil {
-		t.Fatalf("normalizeParams: %v", err)
-	}
-	if p.Settings.Env != "development" {
-		t.Errorf("Env = %q, want development", p.Settings.Env)
-	}
-}
-
-// TestNormalizeParamsKeepsExplicitEnv verifies an explicitly set environment is
-// left untouched.
-func TestNormalizeParamsKeepsExplicitEnv(t *testing.T) {
-	t.Parallel()
-
-	p := &Params{
-		Environments: []string{"development", "production"},
-		Settings:     Settings{Env: "production"},
-	}
-	if err := normalizeParams(p); err != nil {
-		t.Fatalf("normalizeParams: %v", err)
-	}
-	if p.Settings.Env != "production" {
-		t.Errorf("Env = %q, want production", p.Settings.Env)
-	}
-}
+import (
+	"slices"
+	"testing"
+)
 
 // TestNormalizeParamsDefaultsDelimiter verifies an empty delimiter falls back to
 // the default comma while an explicit delimiter is left untouched.
 func TestNormalizeParamsDefaultsDelimiter(t *testing.T) {
 	t.Parallel()
 
-	def := &Params{Environments: []string{"development"}}
-	if err := normalizeParams(def); err != nil {
+	def, err := normalizeParams(Params{Environments: []string{"development"}})
+	if err != nil {
 		t.Fatalf("normalizeParams: %v", err)
 	}
 	if def.Settings.Delimiter != "," {
 		t.Errorf("Delimiter = %q, want , (default)", def.Settings.Delimiter)
 	}
 
-	custom := &Params{
+	custom, err := normalizeParams(Params{
 		Environments: []string{"development"},
 		Settings:     Settings{Delimiter: ":"},
-	}
-	if err := normalizeParams(custom); err != nil {
+	})
+	if err != nil {
 		t.Fatalf("normalizeParams: %v", err)
 	}
 	if custom.Settings.Delimiter != ":" {
@@ -58,16 +30,41 @@ func TestNormalizeParamsDefaultsDelimiter(t *testing.T) {
 	}
 }
 
-// TestNormalizeParamsUndeclaredEnv verifies an environment outside the declared
-// set is rejected.
-func TestNormalizeParamsUndeclaredEnv(t *testing.T) {
+// TestNormalizeParamsCopiesSlices verifies the caller's Includes and Environments
+// slices are copied, so later mutation cannot change manager behavior.
+func TestNormalizeParamsCopiesSlices(t *testing.T) {
 	t.Parallel()
 
-	p := &Params{
-		Environments: []string{"development"},
-		Settings:     Settings{Env: "nope"},
+	includes := []string{"a", "b"}
+	environments := []string{"development", "production"}
+	normalized, err := normalizeParams(Params{
+		Includes:     includes,
+		Environments: environments,
+	})
+	if err != nil {
+		t.Fatalf("normalizeParams: %v", err)
 	}
-	if err := normalizeParams(p); err == nil {
-		t.Error("expected error for undeclared environment")
+
+	includes[0] = "mutated"
+	environments[0] = "mutated"
+	if slices.Contains(normalized.Includes, "mutated") {
+		t.Errorf("Includes shares the caller's array: %v", normalized.Includes)
+	}
+	if slices.Contains(normalized.Environments, "mutated") {
+		t.Errorf("Environments shares the caller's array: %v", normalized.Environments)
+	}
+}
+
+// TestNormalizeParamsDoesNotValidateEnvironment verifies construction defers
+// environment validation: an undeclared default environment is accepted, since an
+// explicit operation environment supersedes it.
+func TestNormalizeParamsDoesNotValidateEnvironment(t *testing.T) {
+	t.Parallel()
+
+	if _, err := normalizeParams(Params{
+		Environments:       []string{"development"},
+		DefaultEnvironment: "undeclared",
+	}); err != nil {
+		t.Errorf("normalizeParams validated the environment: %v", err)
 	}
 }

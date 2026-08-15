@@ -48,8 +48,8 @@ func TestResolveManifest(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if r.Envmerge.Settings.Env != "from-flag" {
-			t.Errorf("Env = %q, want from-flag", r.Envmerge.Settings.Env)
+		if r.Envmerge.DefaultEnvironment != "from-flag" {
+			t.Errorf("Env = %q, want from-flag", r.Envmerge.DefaultEnvironment)
 		}
 	})
 	t.Run("project default", func(t *testing.T) {
@@ -57,8 +57,8 @@ func TestResolveManifest(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if r.Envmerge.Settings.Env != "production" {
-			t.Errorf("Env = %q, want production", r.Envmerge.Settings.Env)
+		if r.Envmerge.DefaultEnvironment != "production" {
+			t.Errorf("Env = %q, want production", r.Envmerge.DefaultEnvironment)
 		}
 	})
 	t.Run("global default", func(t *testing.T) {
@@ -66,8 +66,8 @@ func TestResolveManifest(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if r.Envmerge.Settings.Env != "staging" {
-			t.Errorf("Env = %q, want staging", r.Envmerge.Settings.Env)
+		if r.Envmerge.DefaultEnvironment != "staging" {
+			t.Errorf("Env = %q, want staging", r.Envmerge.DefaultEnvironment)
 		}
 	})
 	t.Run("env left empty for envmerge default", func(t *testing.T) {
@@ -81,10 +81,10 @@ func TestResolveManifest(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if r.Envmerge.Settings.Env != "" {
+		if r.Envmerge.DefaultEnvironment != "" {
 			t.Errorf(
 				"Env = %q, want empty (envmerge applies the default)",
-				r.Envmerge.Settings.Env,
+				r.Envmerge.DefaultEnvironment,
 			)
 		}
 	})
@@ -127,8 +127,8 @@ func TestResolveManifest(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if r.Envmerge.Settings.Env != "staging" {
-			t.Errorf("Env = %q, want staging (global)", r.Envmerge.Settings.Env)
+		if r.Envmerge.DefaultEnvironment != "staging" {
+			t.Errorf("Env = %q, want staging (global)", r.Envmerge.DefaultEnvironment)
 		}
 		if len(r.Envmerge.Includes) != 0 {
 			t.Errorf("Includes = %v, want empty for no project", r.Envmerge.Includes)
