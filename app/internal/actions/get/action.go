@@ -1,9 +1,6 @@
 package get
 
 import (
-	"fmt"
-	"strings"
-
 	"github.com/go-envx/envx/app/internal/config"
 	"github.com/go-envx/envx/app/internal/envmerge"
 )
@@ -26,9 +23,9 @@ type actionResult struct {
 	Source string
 }
 
-// execute is the imperative shell: resolve the input into an envmerge.Params, build
-// the merged environment, and hand the result to the pure core. Secret references
-// are masked unless p.Reveal is set.
+// execute is the imperative shell: resolve the project configuration, construct a
+// manager, and look up the single requested key. Secret references are masked
+// unless p.Reveal is set.
 func execute(p actionParams, in *config.Input) (actionResult, error) {
 	// resolve the input config
 	resolved, err := config.ResolveProject(in, p.Project, p.Reveal)
@@ -36,34 +33,24 @@ func execute(p actionParams, in *config.Input) (actionResult, error) {
 		return actionResult{}, err
 	}
 
-	// build the merged environment
-	env, err := envmerge.Build(resolved.Envmerge)
+	// construct the manager from the resolved params
+	manager, err := envmerge.New(resolved.Envmerge)
 	if err != nil {
 		return actionResult{}, err
 	}
 
-	// look up the requested key
-	return runAction(env, p)
-}
-
-// runAction performs a case-insensitive lookup against the specified environment,
-// returning a single value for the given key. A dangling reference behind a
-// different key is ignored; only the requested key's own resolution failure is
-// reported.
-func runAction(env *envmerge.Result, p actionParams) (actionResult, error) {
-	// look up the key case-insensitively
-	key := strings.ToUpper(p.Key)
-	val, ok := env.Get(key)
-	if !ok {
-		// surface the requested key's own resolution failure before reporting it
-		// as absent, so a dangling secret reports why it could not resolve.
-		if err := env.Err(key); err != nil {
-			return actionResult{}, err
-		}
-		return actionResult{}, fmt.Errorf("key %q not found", key)
+	// resolve only the requested key; the environment comes from the
+	// precedence-resolved default the manager already carries.
+	entry, err := manager.Get(envmerge.GetParams{
+		Key:    p.Key,
+		Reveal: p.Reveal,
+	})
+	if err != nil {
+		return actionResult{}, err
 	}
 
-	// report the value and its source file
-	origin, _ := env.Origin(key)
-	return actionResult{Value: val, Source: origin.Winner.File}, nil
+	return actionResult{
+		Value:  entry.Value,
+		Source: entry.Origin.Winner.File,
+	}, nil
 }
