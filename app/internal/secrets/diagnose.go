@@ -40,9 +40,10 @@ const (
 // reported through the Resolution's severity and code, and no private-key or
 // resolved-secret material appears in Code or Message.
 func (r *Resolver) Diagnose(value, _ string) envmerge.Resolution {
-	// Unescape a literal that starts with the reserved scheme; it is a plain value.
-	if after, found := strings.CutPrefix(value, `\`+scheme); found {
-		return r.configValueResolution(after)
+	// Unescape a literal that starts with the reserved scheme by dropping only the
+	// leading backslash, matching Resolve so its literal is "secret://...".
+	if strings.HasPrefix(value, `\`+scheme) {
+		return r.configValueResolution(value[1:])
 	}
 	// Ordinary values are plain configuration.
 	if !strings.HasPrefix(value, scheme) {

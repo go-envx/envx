@@ -73,18 +73,22 @@ func (r resolver) Resolve(group string) (PrivateKey, error) {
 	specificName := privateKeyEnv + "_" + strings.ToUpper(group)
 	if value, present := r.lookupEnv(specificName); present {
 		if value == "" {
-			return PrivateKey{}, fmt.Errorf("environment variable %s is empty", specificName)
+			return PrivateKey{}, fmt.Errorf(
+				"%w: environment variable %s is empty", ErrInvalidKey, specificName,
+			)
 		}
 		return PrivateKey{Value: value, Origin: specificName}, nil
 	}
 
 	if value, present := r.lookupEnv(privateKeyEnv); present {
 		if value == "" {
-			return PrivateKey{}, fmt.Errorf("environment variable %s is empty", privateKeyEnv)
+			return PrivateKey{}, fmt.Errorf(
+				"%w: environment variable %s is empty", ErrInvalidKey, privateKeyEnv,
+			)
 		}
 		parsed, err := parseKeyFile(value, privateKeyEnv)
 		if err != nil {
-			return PrivateKey{}, err
+			return PrivateKey{}, fmt.Errorf("%w: %w", ErrInvalidKey, err)
 		}
 		if key, found := parsed.lookup(group); found {
 			return PrivateKey{Value: key, Origin: privateKeyEnv}, nil
@@ -104,7 +108,7 @@ func (r resolver) Resolve(group string) (PrivateKey, error) {
 
 	parsed, err := parseKeyFile(string(data), r.keysPath)
 	if err != nil {
-		return PrivateKey{}, err
+		return PrivateKey{}, fmt.Errorf("%w: %w", ErrInvalidKey, err)
 	}
 	key, found := parsed.lookup(group)
 	if !found {

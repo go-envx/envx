@@ -76,7 +76,8 @@ func TestResolverPrecedence(t *testing.T) {
 }
 
 // TestResolverFailsClosed verifies malformed, empty, and duplicate entries stop
-// resolution instead of falling through to a lower-priority input.
+// resolution with ErrInvalidKey instead of falling through to a lower-priority
+// input.
 func TestResolverFailsClosed(t *testing.T) {
 	t.Parallel()
 
@@ -110,10 +111,30 @@ func TestResolverFailsClosed(t *testing.T) {
 				KeysPath:  keysPath,
 				LookupEnv: lookup(tt.env),
 			})
-			if _, err := resolver.Resolve("production"); err == nil {
-				t.Fatal("Resolve() accepted a malformed higher-priority source")
+			_, err := resolver.Resolve("production")
+			if !errors.Is(err, ErrInvalidKey) {
+				t.Fatalf("Resolve() error = %v, want ErrInvalidKey", err)
 			}
 		})
+	}
+}
+
+// TestResolverMalformedFileIsInvalidKey verifies a present but malformed local
+// key file classifies as ErrInvalidKey rather than an unavailable key.
+func TestResolverMalformedFileIsInvalidKey(t *testing.T) {
+	t.Parallel()
+
+	keysPath := filepath.Join(t.TempDir(), "envx.keys")
+	if err := os.WriteFile(keysPath, []byte("not-an-entry\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	resolver := NewResolver(ResolverOptions{
+		KeysPath:  keysPath,
+		LookupEnv: lookup(map[string]string{}),
+	})
+	_, err := resolver.Resolve("production")
+	if !errors.Is(err, ErrInvalidKey) {
+		t.Fatalf("Resolve() error = %v, want ErrInvalidKey", err)
 	}
 }
 
