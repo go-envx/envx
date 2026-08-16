@@ -52,24 +52,24 @@ func (ageCipher) Keypair() (Keypair, error) {
 func (ageCipher) ValidateKeypair(publicKey, privateKey string) error {
 	nativePublicKey, found := strings.CutPrefix(publicKey, agePublicKeyPrefix)
 	if !found {
-		return fmt.Errorf("invalid age public key")
+		return fmt.Errorf("%w: not an age public key", ErrInvalidKey)
 	}
 	recipient, err := age.ParseX25519Recipient(nativePublicKey)
 	if err != nil {
-		return fmt.Errorf("parse age public key: %w", err)
+		return fmt.Errorf("%w: parse age public key: %w", ErrInvalidKey, err)
 	}
 
 	nativePrivateKey, found := strings.CutPrefix(privateKey, agePrivateKeyPrefix)
 	if !found {
-		return fmt.Errorf("invalid age private key")
+		return fmt.Errorf("%w: not an age private key", ErrInvalidKey)
 	}
 	identity, err := age.ParseX25519Identity(nativePrivateKey)
 	if err != nil {
-		return fmt.Errorf("parse age private key: %w", err)
+		return fmt.Errorf("%w: parse age private key: %w", ErrInvalidKey, err)
 	}
 
 	if recipient.String() != identity.Recipient().String() {
-		return fmt.Errorf("age public and private keys do not match")
+		return fmt.Errorf("%w: age public and private keys do not match", ErrInvalidKey)
 	}
 	return nil
 }
@@ -79,11 +79,11 @@ func (ageCipher) ValidateKeypair(publicKey, privateKey string) error {
 func (ageCipher) Encrypt(plaintext, publicKey string) ([]byte, error) {
 	nativePublicKey, found := strings.CutPrefix(publicKey, agePublicKeyPrefix)
 	if !found {
-		return nil, fmt.Errorf("invalid age public key")
+		return nil, fmt.Errorf("%w: not an age public key", ErrInvalidKey)
 	}
 	recipient, err := age.ParseX25519Recipient(nativePublicKey)
 	if err != nil {
-		return nil, fmt.Errorf("parse age public key: %w", err)
+		return nil, fmt.Errorf("%w: parse age public key: %w", ErrInvalidKey, err)
 	}
 
 	var ciphertext bytes.Buffer
@@ -107,21 +107,21 @@ func (ageCipher) Encrypt(plaintext, publicKey string) ([]byte, error) {
 func (ageCipher) Decrypt(ciphertext []byte, privateKey string) (string, error) {
 	nativePrivateKey, found := strings.CutPrefix(privateKey, agePrivateKeyPrefix)
 	if !found {
-		return "", fmt.Errorf("invalid age private key")
+		return "", fmt.Errorf("%w: not an age private key", ErrInvalidKey)
 	}
 	identity, err := age.ParseX25519Identity(nativePrivateKey)
 	if err != nil {
-		return "", fmt.Errorf("parse age private key: %w", err)
+		return "", fmt.Errorf("%w: parse age private key: %w", ErrInvalidKey, err)
 	}
 
 	decryptedReader, err := age.Decrypt(bytes.NewReader(ciphertext), identity)
 	if err != nil {
-		return "", fmt.Errorf("decrypt age ciphertext: %w", err)
+		return "", fmt.Errorf("%w: %w", ErrDecrypt, err)
 	}
 
 	plaintext, err := io.ReadAll(decryptedReader)
 	if err != nil {
-		return "", fmt.Errorf("read age plaintext: %w", err)
+		return "", fmt.Errorf("%w: read age plaintext: %w", ErrDecrypt, err)
 	}
 	return string(plaintext), nil
 }

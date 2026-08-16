@@ -99,7 +99,9 @@ func (r *Resolver) Resolve(value, _ string) (string, error) {
 	// missing entry is a dangling reference and an error.
 	ciphertext, ok := r.values[ref]
 	if !ok {
-		return "", fmt.Errorf("secret %q not found in group %q", ref.key, ref.group)
+		return "", fmt.Errorf(
+			"%w: secret %q not found in group %q", ErrSecretNotFound, ref.key, ref.group,
+		)
 	}
 	return r.decrypt(ref, ciphertext)
 }

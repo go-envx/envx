@@ -60,7 +60,7 @@ func (naclBoxCipher) ValidateKeypair(publicKey, privateKey string) error {
 	}
 
 	if *nativePublicKey != *privatePublicKey {
-		return fmt.Errorf("NaCl Box public and private keys do not match")
+		return fmt.Errorf("%w: NaCl Box public and private keys do not match", ErrInvalidKey)
 	}
 	return nil
 }
@@ -89,7 +89,7 @@ func (naclBoxCipher) Decrypt(ciphertext []byte, privateKey string) (string, erro
 
 	plaintext, ok := box.OpenAnonymous(nil, ciphertext, publicKey, privateKeyBytes)
 	if !ok {
-		return "", fmt.Errorf("decrypt with NaCl Box: authentication failed")
+		return "", fmt.Errorf("%w: NaCl Box authentication failed", ErrDecrypt)
 	}
 	return string(plaintext), nil
 }
@@ -143,12 +143,12 @@ func decodeNaClBoxPrivateKey(
 func decodeNaClBoxKey(value, prefix, kind string) ([]byte, error) {
 	encoded, found := strings.CutPrefix(value, prefix)
 	if !found {
-		return nil, fmt.Errorf("invalid NaCl Box %s key", kind)
+		return nil, fmt.Errorf("%w: not a NaCl Box %s key", ErrInvalidKey, kind)
 	}
 
 	keyMaterial, err := base64.RawURLEncoding.DecodeString(encoded)
 	if err != nil || len(keyMaterial) != lenForNaClBoxKey(kind) {
-		return nil, fmt.Errorf("invalid NaCl Box %s key", kind)
+		return nil, fmt.Errorf("%w: malformed NaCl Box %s key", ErrInvalidKey, kind)
 	}
 	return keyMaterial, nil
 }

@@ -21,8 +21,15 @@ type PrivateKey struct {
 	Origin string
 }
 
-// ErrNotAvailable indicates that no private key is available for a group.
+// ErrNotAvailable indicates that no private key is available for a group. It is
+// a warning-level "try another source" outcome: the group's values simply
+// cannot be revealed in this context.
 var ErrNotAvailable = errors.New("private key not available")
+
+// ErrInvalidKey indicates a present but malformed private key. It is an
+// error-level outcome distinct from an absent key, so diagnostics can separate
+// "you lack the key here" from "the key you have is broken".
+var ErrInvalidKey = errors.New("invalid private key")
 
 // Resolver resolves private-key material for one group.
 type Resolver interface {
