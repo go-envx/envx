@@ -108,6 +108,15 @@ func renderLeafValue(
 	return strings.Join(value.items, delimiter), nil
 }
 
+// literalValue renders one winning leaf to its display string without resolving
+// references: a scalar is its single item and a list is joined with delimiter.
+func literalValue(value leafValue, delimiter string) string {
+	if !value.list {
+		return value.items[0]
+	}
+	return strings.Join(value.items, delimiter)
+}
+
 // scalarString renders a scalar leaf value to its string form, mapping a nil
 // leaf (a bare "key:") to "" rather than the "<nil>" fmt would produce.
 func scalarString(v any) string {

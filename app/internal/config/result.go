@@ -37,6 +37,12 @@ type Result struct {
 	manifestContext
 }
 
+// WorkspaceDir returns the absolute directory the manifest was loaded from. The
+// explain action uses it to render source paths relative to the workspace root.
+func (r *Result) WorkspaceDir() string {
+	return r.dir
+}
+
 // OverlayPath resolves the absolute path of the overlay file the set action
 // writes: <dir>/<include>.<env>.yaml. The environment is the resolved Env with
 // the terminal first-declared fallback applied, validated against the declared

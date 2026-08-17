@@ -24,6 +24,12 @@ type FlagSpec struct {
 
 // Catalog every envx setting and shared CLI flag identity in one block.
 var (
+	// Absolute renders source paths absolutely instead of relative to envx.yaml.
+	Absolute = FlagSpec{
+		Name:  "absolute",
+		Usage: "show absolute source paths instead of paths relative to envx.yaml",
+	}
+
 	// Cipher selects the algorithm for ephemeral keypair generation.
 	Cipher = FlagSpec{
 		Name:  "cipher",
