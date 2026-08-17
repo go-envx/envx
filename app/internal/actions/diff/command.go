@@ -14,9 +14,10 @@ const (
 		Diff resolves the same project under two environments and reports the
 		differences: keys added, removed, or changed between env-a and env-b.
 
-		Secret references are masked as "secret://group/key" by default; pass
-		--reveal to decrypt and compare their plaintext. Use --output=json for
-		machine-readable output.
+		Secret references are compared as declarations (e.g.
+		"secret://group/key") without decryption, so changing a reference is
+		visible even when both references currently decrypt to the same value.
+		Use --output=json for machine-readable output.
 	`
 	example = `
 		envx diff api-service development production
@@ -29,7 +30,6 @@ const (
 // specified format.
 func NewCommand() *cobra.Command {
 	var output string
-	var reveal bool
 
 	cmd := &cobra.Command{
 		Use:     usage,
@@ -43,7 +43,6 @@ func NewCommand() *cobra.Command {
 				Project: args[0],
 				EnvA:    args[1],
 				EnvB:    args[2],
-				Reveal:  reveal,
 			}
 
 			// get the flag inputs
@@ -74,7 +73,6 @@ func NewCommand() *cobra.Command {
 	)
 
 	flags.BindString(cmd.Flags(), &output, &schema.Output)
-	flags.BindBool(cmd.Flags(), &reveal, &schema.Reveal)
 
 	return cmd
 }

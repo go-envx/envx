@@ -4,108 +4,21 @@ import (
 	"testing"
 
 	"github.com/go-envx/envx/app/internal/config"
-	"github.com/go-envx/envx/app/internal/envmerge"
 	"github.com/go-envx/envx/app/internal/fixtures"
 )
 
-// TestBuildEnvDoesNotMutateConfig verifies buildEnv resolves a side from a
-// copy of the shared config, leaving the caller's Settings untouched so both diff
-// sides resolve from identical settings save for the overridden environment.
-func TestBuildEnvDoesNotMutateConfig(t *testing.T) {
-	t.Parallel()
-
-	ec := &envmerge.Params{
-		Environments:       []string{"development", "production"},
-		DefaultEnvironment: "development",
-		Settings:           envmerge.Settings{Prefix: "P_"},
-	}
-
-	if _, err := buildEnv(*ec, "production"); err != nil {
-		t.Fatalf("buildEnv: %v", err)
-	}
-
-	if ec.DefaultEnvironment != "development" {
-		t.Errorf(
-			"shared config Env mutated: got %q, want %q",
-			ec.DefaultEnvironment, "development",
-		)
-	}
-}
-
-// TestUnionKeys verifies the sorted union of two key sets.
-func TestUnionKeys(t *testing.T) {
-	t.Parallel()
-
-	a := map[string]string{"B": "1", "A": "2"}
-	b := map[string]string{"C": "3", "A": "9"}
-
-	got := unionKeys(a, b)
-	want := []string{"A", "B", "C"}
-	if len(got) != len(want) {
-		t.Fatalf("unionKeys len = %d, want %d (%v)", len(got), len(want), got)
-	}
-	for i := range want {
-		if got[i] != want[i] {
-			t.Errorf("unionKeys[%d] = %q, want %q", i, got[i], want[i])
-		}
-	}
-}
-
-// TestRunActionChangedValue verifies the pure core reports a key whose value
-// differs between the two environments as a change carrying both sides' values.
-func TestRunActionChangedValue(t *testing.T) {
-	t.Parallel()
-
-	a, b := diffSides(t, "development", "production")
-	res := runAction(a, b)
-
-	got, ok := findChange(res.Changed, "HOST")
-	if !ok {
-		t.Fatalf("HOST missing from changed set: %+v", res.Changed)
-	}
-	if got.EnvA != "dev-db.local" || got.EnvB != "prod-db.internal" {
-		t.Errorf(
-			"HOST change = %q -> %q, want dev-db.local -> prod-db.internal",
-			got.EnvA, got.EnvB,
-		)
-	}
-}
-
-// TestRunActionIdenticalEnvs verifies diffing an environment against itself
-// yields no differences.
-func TestRunActionIdenticalEnvs(t *testing.T) {
-	t.Parallel()
-
-	a, _ := diffSides(t, "development", "development")
-	res := runAction(a, a)
-
-	if len(res.Added) != 0 || len(res.Removed) != 0 || len(res.Changed) != 0 {
-		t.Errorf("expected empty diff, got %+v", res)
-	}
-}
-
-// diffSides resolves the api-core project from the shared "basic" fixture and
-// builds it under two environments, returning both merged results.
-func diffSides(t *testing.T, envA, envB string) (a, b *envmerge.Result) {
+// executeBasic runs the diff action against the shared "basic" fixture for the
+// api-core project between two environments.
+func executeBasic(t *testing.T, envA, envB string) (actionResult, error) {
 	t.Helper()
 	path := fixtures.Manifest("basic")
-	r, err := config.ResolveProject(&config.Input{ConfigPath: &path}, "api-core", false)
-	if err != nil {
-		t.Fatalf("resolve fixture: %v", err)
-	}
-	a, err = buildEnv(r.Envmerge, envA)
-	if err != nil {
-		t.Fatalf("buildEnv %s: %v", envA, err)
-	}
-	b, err = buildEnv(r.Envmerge, envB)
-	if err != nil {
-		t.Fatalf("buildEnv %s: %v", envB, err)
-	}
-	return a, b
+	return execute(
+		actionParams{Project: "api-core", EnvA: envA, EnvB: envB},
+		&config.Input{ConfigPath: &path},
+	)
 }
 
-// findChange returns the change with the given key from a slice, and whether it
-// was present.
+// findChange returns the change with the given key and whether it was present.
 func findChange(changes []actionResultChange, key string) (actionResultChange, bool) {
 	for _, c := range changes {
 		if c.Key == key {
@@ -113,4 +26,50 @@ func findChange(changes []actionResultChange, key string) (actionResultChange, b
 		}
 	}
 	return actionResultChange{}, false
+}
+
+// TestExecuteMapsChange verifies the action wires config resolution through the
+// manager and maps a DiffResult change into the env-a/env-b presentation shape.
+func TestExecuteMapsChange(t *testing.T) {
+	t.Parallel()
+
+	res, err := executeBasic(t, "development", "production")
+	if err != nil {
+		t.Fatalf("execute: %v", err)
+	}
+
+	c, ok := findChange(res.Changed, "HOST")
+	if !ok {
+		t.Fatalf("HOST missing from changed set: %+v", res.Changed)
+	}
+	if c.EnvA != "dev-db.local" || c.EnvB != "prod-db.internal" {
+		t.Errorf(
+			"HOST change = %q -> %q, want dev-db.local -> prod-db.internal",
+			c.EnvA, c.EnvB,
+		)
+	}
+}
+
+// TestExecuteIdenticalEnvironments verifies diffing an environment against itself
+// returns an empty result through the action.
+func TestExecuteIdenticalEnvironments(t *testing.T) {
+	t.Parallel()
+
+	res, err := executeBasic(t, "development", "development")
+	if err != nil {
+		t.Fatalf("execute: %v", err)
+	}
+	if len(res.Added) != 0 || len(res.Removed) != 0 || len(res.Changed) != 0 {
+		t.Errorf("expected empty diff, got %+v", res)
+	}
+}
+
+// TestExecuteUndeclaredEnvironment verifies an undeclared environment surfaces as
+// an error from the action.
+func TestExecuteUndeclaredEnvironment(t *testing.T) {
+	t.Parallel()
+
+	if _, err := executeBasic(t, "development", "ghost"); err == nil {
+		t.Fatal("expected error for undeclared environment")
+	}
 }
