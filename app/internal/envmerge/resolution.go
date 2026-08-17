@@ -5,9 +5,9 @@ type Kind string
 
 const (
 	// KindConfigValue is a plain configuration value with no dereferencing.
-	KindConfigValue Kind = "config_value"
+	KindConfigValue Kind = "config"
 	// KindSecretReference is a reference resolved from the secrets store.
-	KindSecretReference Kind = "secret_reference"
+	KindSecretReference Kind = "secret"
 	// KindCommandSubstitution is reserved for command substitution; it is
 	// defined but not yet produced.
 	KindCommandSubstitution Kind = "command_substitution"

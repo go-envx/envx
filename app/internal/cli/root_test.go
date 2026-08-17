@@ -337,12 +337,14 @@ func TestExplain(t *testing.T) {
 		if err != nil {
 			t.Fatalf("explain --output json: %v", err)
 		}
-		var entries []map[string]any
-		if err := json.Unmarshal(stdout.Bytes(), &entries); err != nil {
+		var result struct {
+			Entries []map[string]any `json:"entries"`
+		}
+		if err := json.Unmarshal(stdout.Bytes(), &result); err != nil {
 			t.Fatalf("invalid json: %v\n%s", err, stdout.String())
 		}
-		if len(entries) != 1 || entries[0]["key"] != "HOST" {
-			t.Errorf("unexpected json entries: %v", entries)
+		if len(result.Entries) != 1 || result.Entries[0]["key"] != "HOST" {
+			t.Errorf("unexpected json entries: %v", result.Entries)
 		}
 	})
 }

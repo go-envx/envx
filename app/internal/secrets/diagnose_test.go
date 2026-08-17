@@ -69,7 +69,7 @@ func TestDiagnoseConfigValue(t *testing.T) {
 	r := diagnoseResolver(t, false, fixedPrivateKeyResolver{})
 	res := r.Diagnose("plain-value", "")
 	if res.Kind != envmerge.KindConfigValue {
-		t.Errorf("Kind = %q, want config_value", res.Kind)
+		t.Errorf("Kind = %q, want config", res.Kind)
 	}
 	if res.Severity != envmerge.SeverityOK || res.Code != CodeOK {
 		t.Errorf("status = %s/%s, want ok/OK", res.Severity, res.Code)
@@ -93,7 +93,7 @@ func TestDiagnoseSecretReference(t *testing.T) {
 	masked := diagnoseResolver(t, false, fixedPrivateKeyResolver{})
 	res := masked.Diagnose("secret://production/database_password", "")
 	if res.Kind != envmerge.KindSecretReference {
-		t.Errorf("Kind = %q, want secret_reference", res.Kind)
+		t.Errorf("Kind = %q, want secret", res.Kind)
 	}
 	if res.Severity != envmerge.SeverityOK || res.Code != CodeOK {
 		t.Errorf("status = %s/%s, want ok/OK", res.Severity, res.Code)
@@ -147,7 +147,7 @@ func TestDiagnoseEscapedReference(t *testing.T) {
 	masked := diagnoseResolver(t, false, fixedPrivateKeyResolver{})
 	res := masked.Diagnose(escaped, "")
 	if res.Kind != envmerge.KindConfigValue || res.Severity != envmerge.SeverityOK {
-		t.Errorf("status = %s/%s, want config_value/ok", res.Kind, res.Severity)
+		t.Errorf("status = %s/%s, want config/ok", res.Kind, res.Severity)
 	}
 	if res.HasResolved {
 		t.Error("masked escaped reference should not materialize plaintext")
@@ -168,7 +168,7 @@ func TestDiagnoseInvalidReference(t *testing.T) {
 	r := diagnoseResolver(t, false, fixedPrivateKeyResolver{})
 	res := r.Diagnose("secret://database_password", "")
 	if res.Kind != envmerge.KindSecretReference {
-		t.Errorf("Kind = %q, want secret_reference", res.Kind)
+		t.Errorf("Kind = %q, want secret", res.Kind)
 	}
 	if res.Severity != envmerge.SeverityError || res.Code != CodeInvalidReference {
 		t.Errorf("status = %s/%s, want error/INVALID_REFERENCE", res.Severity, res.Code)

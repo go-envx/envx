@@ -12,18 +12,22 @@ const (
 	usage = "explain <project> [key]"
 	short = "Show where each resolved value came from"
 	long  = `
-		Explain resolves a project's environment and reports, for each key, the
-		value and the file it was resolved from. With no key it explains every
-		key; with a key it explains just that one.
+		Explain resolves a project's environment and reports, for each key, its
+		type, literal value, the file it was resolved from, and a resolution
+		status. It never aborts on a failed value: an unresolved key is reported
+		through its status and the command still exits 0. With no key it explains
+		every key; with a key it explains just that one.
 
-		Secret references are masked as "secret://group/key" by default; pass
-		--reveal to decrypt and show their plaintext. Use --output=json for
-		machine-readable output.
+		Secret references are classified without materializing plaintext by
+		default; pass --reveal to add a RESOLVED column with their decrypted
+		values. Source paths are shown relative to envx.yaml unless --absolute is
+		set. Use --output=json for machine-readable output.
 	`
 	example = `
 		envx explain api-service
 		envx explain api-service DATABASE_HOST
 		envx explain api-service --reveal
+		envx explain api-service --absolute
 		envx explain api-service --output=json
 	`
 )
@@ -35,6 +39,7 @@ const (
 func NewCommand() *cobra.Command {
 	var output string
 	var reveal bool
+	var absolute bool
 
 	cmd := &cobra.Command{
 		Use:     usage,
@@ -45,9 +50,10 @@ func NewCommand() *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// map args to action params
 			p := actionParams{
-				Project: args[0],
-				Key:     arg.Optional(args, 1),
-				Reveal:  reveal,
+				Project:  args[0],
+				Key:      arg.Optional(args, 1),
+				Reveal:   reveal,
+				Absolute: absolute,
 			}
 
 			// get the flag inputs
@@ -65,6 +71,7 @@ func NewCommand() *cobra.Command {
 				Writer: cmd.OutOrStdout(),
 				Result: res,
 				Format: output,
+				Reveal: reveal,
 			})
 		},
 	}
@@ -80,6 +87,7 @@ func NewCommand() *cobra.Command {
 
 	flags.BindString(cmd.Flags(), &output, &schema.Output)
 	flags.BindBool(cmd.Flags(), &reveal, &schema.Reveal)
+	flags.BindBool(cmd.Flags(), &absolute, &schema.Absolute)
 
 	return cmd
 }
