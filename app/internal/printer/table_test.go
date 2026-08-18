@@ -122,3 +122,65 @@ func TestWriteTableUnicodeWidth(t *testing.T) {
 		t.Errorf("table =\n%q\nwant\n%q", got, want)
 	}
 }
+
+// TestWriteTableNoHeaders verifies a table with no headers skips the header row
+// entirely rather than emitting a leading blank line.
+func TestWriteTableNoHeaders(t *testing.T) {
+	t.Parallel()
+
+	var out, errStream bytes.Buffer
+	p := newTestPrinter(&out, &errStream, false)
+	table := Table{
+		Rows: [][]Cell{
+			{{Text: "+"}, {Text: "NEW"}, {Text: "value"}},
+		},
+	}
+	if err := p.WriteTable(table); err != nil {
+		t.Fatalf("WriteTable() error = %v", err)
+	}
+
+	want := "+  NEW  value\n"
+	if got := out.String(); got != want {
+		t.Errorf("table =\n%q\nwant\n%q", got, want)
+	}
+}
+
+// TestWriteTableEmpty verifies a table with neither headers nor rows writes
+// nothing at all.
+func TestWriteTableEmpty(t *testing.T) {
+	t.Parallel()
+
+	var out, errStream bytes.Buffer
+	p := newTestPrinter(&out, &errStream, false)
+	if err := p.WriteTable(Table{}); err != nil {
+		t.Fatalf("WriteTable() error = %v", err)
+	}
+	if out.Len() != 0 {
+		t.Errorf("empty table wrote %q, want nothing", out.String())
+	}
+}
+
+// TestWriteTableCellColor verifies an explicit Cell.Color is applied and takes
+// precedence over Severity.
+func TestWriteTableCellColor(t *testing.T) {
+	t.Parallel()
+
+	var out, errStream bytes.Buffer
+	p := newTestPrinter(&out, &errStream, true)
+	table := Table{
+		Rows: [][]Cell{
+			{{Text: "+", Color: style.ColorGreen, Severity: style.SeverityError}},
+		},
+	}
+	if err := p.WriteTable(table); err != nil {
+		t.Fatalf("WriteTable() error = %v", err)
+	}
+
+	got := out.String()
+	if !strings.Contains(got, "\033[32m+\033[0m") {
+		t.Errorf("table %q missing green cell", got)
+	}
+	if strings.Contains(got, "\033[31m") {
+		t.Errorf("table %q applied severity red over explicit color", got)
+	}
+}

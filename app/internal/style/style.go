@@ -16,6 +16,26 @@ const (
 	codeGray   = "90"
 )
 
+// Color names an explicit foreground color for content whose meaning is not a
+// resolution severity, such as diff signs. The zero value, ColorNone, leaves
+// text unstyled.
+type Color int
+
+const (
+	// ColorNone applies no color.
+	ColorNone Color = iota
+	// ColorRed renders text in red.
+	ColorRed
+	// ColorGreen renders text in green.
+	ColorGreen
+	// ColorYellow renders text in yellow.
+	ColorYellow
+	// ColorCyan renders text in cyan.
+	ColorCyan
+	// ColorMuted renders text in a dim gray.
+	ColorMuted
+)
+
 // Severity classifies a value's resolution outcome so it can be colored
 // consistently. The zero value, SeverityNone, leaves text unstyled.
 type Severity int
@@ -86,6 +106,26 @@ func (s Styler) Yellow(text string) string {
 // Muted renders text in a dim gray for secondary information.
 func (s Styler) Muted(text string) string {
 	return s.wrap(codeGray, text)
+}
+
+// Color renders text in the named color. ColorNone leaves it unstyled.
+func (s Styler) Color(c Color, text string) string {
+	switch c {
+	case ColorRed:
+		return s.Red(text)
+	case ColorGreen:
+		return s.Green(text)
+	case ColorYellow:
+		return s.Yellow(text)
+	case ColorCyan:
+		return s.Cyan(text)
+	case ColorMuted:
+		return s.Muted(text)
+	case ColorNone:
+		return text
+	default:
+		return text
+	}
 }
 
 // Severity colors text according to sev. SeverityNone leaves it unstyled.

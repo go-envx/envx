@@ -1,10 +1,10 @@
 package diff
 
 import (
-	"encoding/json"
 	"fmt"
-	"io"
-	"text/tabwriter"
+
+	"github.com/go-envx/envx/app/internal/printer"
+	"github.com/go-envx/envx/app/internal/style"
 )
 
 // jsonChange is the exported, tagged view of a change used for JSON output.
@@ -28,40 +28,37 @@ type jsonResult struct {
 	Changed []jsonChange `json:"changed,omitempty"`
 }
 
-// renderParams bundles everything render needs: the output sink, the structured
+// renderParams bundles everything render needs: the printer, the structured
 // diff, and the chosen output format.
 type renderParams struct {
-	// Writer is the output sink to render to.
-	Writer io.Writer
+	// Printer is the styled output layer for the table and JSON.
+	Printer *printer.Printer
 	// Result is the structured diff to render.
 	Result actionResult
 	// Format selects the output format ("json" or the default table).
 	Format string
 }
 
-// render writes the diff to p.Writer in the requested format. An unrecognized
-// format is rejected so a typo like --output=jsonn fails loudly.
+// render writes the diff in the requested format. An unrecognized format is
+// rejected so a typo like --output=jsonn fails loudly.
 func render(p *renderParams) error {
 	switch p.Format {
 	case "", "table":
-		return renderTable(p.Writer, p.Result)
+		return renderTable(p.Printer, p.Result)
 	case "json":
-		return renderJSON(p.Writer, p.Result)
+		return renderJSON(p.Printer, p.Result)
 	default:
 		return fmt.Errorf("invalid output format %q (want table or json)", p.Format)
 	}
 }
 
 // renderJSON writes the diff as an indented JSON object.
-func renderJSON(w io.Writer, res actionResult) error {
-	view := jsonResult{
+func renderJSON(p *printer.Printer, res actionResult) error {
+	return p.WriteJSON(jsonResult{
 		Added:   toJSONChanges(res.Added),
 		Removed: toJSONChanges(res.Removed),
 		Changed: toJSONChanges(res.Changed),
-	}
-	enc := json.NewEncoder(w)
-	enc.SetIndent("", "  ")
-	return enc.Encode(view)
+	})
 }
 
 // toJSONChanges converts internal changes to their tagged JSON view.
@@ -73,26 +70,29 @@ func toJSONChanges(in []actionResultChange) []jsonChange {
 	return out
 }
 
-// renderTable writes the diff as aligned, sign-prefixed rows:
-// (+ added, - removed, ~ changed)
-func renderTable(w io.Writer, res actionResult) error {
-	tw := tabwriter.NewWriter(w, 0, 4, 2, ' ', 0)
+// renderTable writes the diff as a headerless, sign-prefixed table following the
+// conventional diff palette: additions green (+), removals red (-), and changes
+// yellow (~). A run with no differences prints nothing.
+func renderTable(p *printer.Printer, res actionResult) error {
+	rows := make([][]printer.Cell, 0, len(res.Added)+len(res.Removed)+len(res.Changed))
 	for _, c := range res.Added {
-		if _, err := fmt.Fprintf(tw, "+\t%s\t%s\n", c.Key, c.EnvB); err != nil {
-			return err
-		}
+		rows = append(rows, changeRow(style.ColorGreen, "+", c.Key, c.EnvB))
 	}
 	for _, c := range res.Removed {
-		if _, err := fmt.Fprintf(tw, "-\t%s\t%s\n", c.Key, c.EnvA); err != nil {
-			return err
-		}
+		rows = append(rows, changeRow(style.ColorRed, "-", c.Key, c.EnvA))
 	}
 	for _, c := range res.Changed {
-		if _, err := fmt.Fprintf(
-			tw, "~\t%s\t%s -> %s\n", c.Key, c.EnvA, c.EnvB,
-		); err != nil {
-			return err
-		}
+		rows = append(rows, changeRow(style.ColorYellow, "~", c.Key, c.EnvA+" -> "+c.EnvB))
 	}
-	return tw.Flush()
+	return p.WriteTable(printer.Table{Rows: rows})
+}
+
+// changeRow builds a sign/key/value row whose cells all carry color so the whole
+// line reads in the diff palette.
+func changeRow(color style.Color, sign, key, value string) []printer.Cell {
+	return []printer.Cell{
+		{Text: sign, Color: color},
+		{Text: key, Color: color},
+		{Text: value, Color: color},
+	}
 }

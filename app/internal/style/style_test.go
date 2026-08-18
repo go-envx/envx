@@ -95,3 +95,39 @@ func TestStylerSeverityDisabled(t *testing.T) {
 		t.Error("disabled Severity emitted an escape code")
 	}
 }
+
+// TestStylerColor verifies each named color maps to the expected style and that
+// ColorNone leaves text unstyled even when enabled.
+func TestStylerColor(t *testing.T) {
+	t.Parallel()
+
+	s := New(true)
+	tests := []struct {
+		name  string
+		color Color
+		want  string
+	}{
+		{"red", ColorRed, s.Red("v")},
+		{"green", ColorGreen, s.Green("v")},
+		{"yellow", ColorYellow, s.Yellow("v")},
+		{"cyan", ColorCyan, s.Cyan("v")},
+		{"muted", ColorMuted, s.Muted("v")},
+		{"none", ColorNone, "v"},
+	}
+	for _, tt := range tests {
+		if got := s.Color(tt.color, "v"); got != tt.want {
+			t.Errorf("Color(%s) = %q, want %q", tt.name, got, tt.want)
+		}
+	}
+}
+
+// TestStylerColorDisabled verifies named coloring is suppressed when the Styler
+// is disabled.
+func TestStylerColorDisabled(t *testing.T) {
+	t.Parallel()
+
+	s := New(false)
+	if got := s.Color(ColorGreen, "v"); got != "v" {
+		t.Errorf("Color(green) = %q, want %q", got, "v")
+	}
+}
