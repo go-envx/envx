@@ -1,14 +1,11 @@
 package decrypt
 
 import (
-	"io"
-	"os"
-
 	"github.com/go-envx/envx/app/internal/flags"
+	"github.com/go-envx/envx/app/internal/printer"
 	"github.com/go-envx/envx/app/internal/schema"
 	"github.com/go-envx/envx/app/pkg/str"
 	"github.com/spf13/cobra"
-	"golang.org/x/term"
 )
 
 const (
@@ -60,13 +57,15 @@ func NewCommand() *cobra.Command {
 				return err
 			}
 
-			// render the result
+			// render the result through the shared printer
+			pr := printer.New(printer.Options{
+				Out: cmd.OutOrStdout(),
+				Err: cmd.ErrOrStderr(),
+			})
 			return render(&renderParams{
-				Writer:    cmd.OutOrStdout(),
-				ErrWriter: cmd.ErrOrStderr(),
-				Result:    result,
-				Verbose:   verbose,
-				Color:     isTerminal(cmd.ErrOrStderr()),
+				Printer: pr,
+				Result:  result,
+				Verbose: verbose,
 			})
 		},
 	}
@@ -76,11 +75,4 @@ func NewCommand() *cobra.Command {
 	flags.BindBool(cmd.Flags(), &verbose, &schema.Verbose)
 
 	return cmd
-}
-
-// isTerminal reports whether the writer is an interactive terminal, so warnings
-// are colorized only when a human is watching.
-func isTerminal(w io.Writer) bool {
-	file, ok := w.(*os.File)
-	return ok && term.IsTerminal(int(file.Fd()))
 }

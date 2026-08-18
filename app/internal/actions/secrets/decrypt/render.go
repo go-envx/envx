@@ -2,77 +2,71 @@ package decrypt
 
 import (
 	"fmt"
-	"io"
 	"strconv"
 	"strings"
-)
 
-// ANSI codes used to highlight a warning when standard error is a terminal.
-const (
-	ansiYellow = "\033[33m"
-	ansiReset  = "\033[0m"
+	"github.com/go-envx/envx/app/internal/printer"
+	"github.com/go-envx/envx/app/pkg/str"
 )
 
 // renderParams are the inputs to the decrypt action renderer.
 type renderParams struct {
-	// Writer receives the safe mutation summary on standard output.
-	Writer io.Writer
-	// ErrWriter receives skipped-group warnings on standard error.
-	ErrWriter io.Writer
+	// Printer is the styled output layer for the summary and skipped-group warnings.
+	Printer *printer.Printer
 	// Result contains the changed identities, skipped groups, and store location.
 	Result actionResult
 	// Verbose lists each changed identity in addition to the summary count.
 	Verbose bool
-	// Color highlights warnings when standard error is a terminal.
-	Color bool
 }
 
-// render reports the decrypted identities on stdout and any skipped-group
-// warnings on stderr, never a secret value.
+// render reports any skipped-group warnings on stderr first, then the decrypted
+// identities on stdout, never a secret value. Leading with the warnings surfaces
+// the attention-worthy signal before the routine summary; a blank line separates
+// the two when both are present and share a terminal.
 func render(p *renderParams) error {
-	if err := renderSummary(p.Writer, p.Result, p.Verbose); err != nil {
+	if err := renderWarnings(p.Printer, p.Result.Unavailable); err != nil {
 		return err
 	}
-	return renderWarnings(p.ErrWriter, p.Result.Unavailable, p.Color)
+	if len(p.Result.Unavailable) > 0 && len(p.Result.Changed) > 0 {
+		if err := p.Printer.LogBlank(); err != nil {
+			return err
+		}
+	}
+	return renderSummary(p.Printer, p.Result, p.Verbose)
 }
 
 // renderSummary reports how many values were decrypted and where, listing each
 // changed identity only when verbose. It stays silent when nothing was decrypted
 // but a group was skipped, since the stderr warning already explains the outcome.
-func renderSummary(w io.Writer, result actionResult, verbose bool) error {
+func renderSummary(p *printer.Printer, result actionResult, verbose bool) error {
 	if len(result.Changed) == 0 {
 		if len(result.Unavailable) > 0 {
 			return nil
 		}
-		_, err := fmt.Fprintln(w, "No encrypted values to decrypt.")
-		return err
+		return p.LogMessage("No encrypted values to decrypt.")
 	}
 
 	var b strings.Builder
 	fmt.Fprintf(
-		&b, "Decrypted %d secret(s) in:\n%s\n",
-		len(result.Changed), renderStorePath(result.StorePath),
+		&b, "Decrypted %s in:\n%s",
+		str.Pluralize(len(result.Changed), "secret", "secrets"),
+		renderStorePath(result.StorePath),
 	)
 	if verbose {
 		for _, secret := range result.Changed {
-			fmt.Fprintf(&b, "  %s/%s\n", secret.Group, secret.Key)
+			fmt.Fprintf(&b, "\n  %s/%s", secret.Group, secret.Key)
 		}
 	}
-	_, err := io.WriteString(w, b.String())
-	return err
+	return p.LogMessage(b.String())
 }
 
 // renderWarnings reports each group skipped because no private key was available.
-func renderWarnings(w io.Writer, groups []string, color bool) error {
-	label := "warning:"
-	if color {
-		label = ansiYellow + label + ansiReset
-	}
+func renderWarnings(p *printer.Printer, groups []string) error {
 	for _, group := range groups {
-		if _, err := fmt.Fprintf(
-			w, "%s no private key available for group %q; its secrets were left encrypted\n",
-			label, group,
-		); err != nil {
+		if err := p.LogWarning(fmt.Sprintf(
+			"no private key available for group %q; its secrets were left encrypted",
+			group,
+		)); err != nil {
 			return err
 		}
 	}
