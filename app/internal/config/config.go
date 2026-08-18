@@ -78,44 +78,34 @@ type projectLayer struct {
 }
 
 // ResolveProject resolves a project's build-ready configuration: it loads the
-// manifest, meshes it with the input and ENVX_* vars, then constructs the
-// workspace secrets manager and wires its resolver so envmerge can dereference
-// secret:// references. The environment-building actions (get, run, explain,
-// diff) call it. The reveal flag selects the resolver's materialization policy:
-// run always reveals because a child process needs plaintext, while the read
-// commands mask by default and reveal only on request. A missing store yields an
-// empty resolver, so a reference with no matching entry fails loudly as a
-// dangling reference rather than leaking the raw reference string.
-func ResolveProject(in *Input, project string, reveal bool) (*Result, error) {
-	res, err := resolve(in, project)
+// manifest, meshes it with the input and ENVX_* vars, binds a resolver factory,
+// and constructs the envmerge Manager the environment-building actions (get, run,
+// explain, diff) operate through. Construction performs no namespace or secrets
+// I/O: each Manager operation opens a fresh, operation-scoped resolver from the
+// factory and selects its own environment and reveal policy, so run reveals while
+// the read commands mask by default. A missing store yields an empty resolver, so
+// a reference with no matching entry fails loudly as a dangling reference rather
+// than leaking the raw reference string.
+func ResolveProject(in *Input, project string) (*Result, error) {
+	res, params, err := resolve(in, project)
 	if err != nil {
 		return nil, err
 	}
 
 	// Bind a resolver factory so a Manager operation can open a fresh,
 	// operation-scoped resolver on demand without construction-time secrets I/O.
-	res.Envmerge.ResolverFactory = resolverFactory{
+	params.ResolverFactory = resolverFactory{
 		secrets: res.Secrets,
 		cipher:  res.Cipher,
 	}
 
-	// Construct the workspace secrets manager and wire its resolver onto the
-	// envmerge params so secret:// references dereference during Build. This
-	// eager wiring keeps the legacy Build callers working until they migrate to
-	// Manager operations.
-	secretsManager, err := NewSecretsManager(res.Secrets, res.Cipher)
+	// Construct the Manager from the resolved params. New validates and copies the
+	// params without reading namespace files or opening the store.
+	manager, err := envmerge.New(params)
 	if err != nil {
 		return nil, err
 	}
-	secretsResolver, err := secretsManager.Resolver(
-		secrets.ResolverParams{
-			Reveal: reveal,
-		},
-	)
-	if err != nil {
-		return nil, err
-	}
-	res.Envmerge.ValueResolver = secretsResolver
+	res.Envmerge = manager
 	return res, nil
 }
 
@@ -149,11 +139,12 @@ func (f resolverFactory) Resolver(reveal bool) (envmerge.ValueResolver, error) {
 }
 
 // ResolveWorkspace resolves manifest-level configuration without selecting a
-// project or opening the secrets store, leaving the value resolver nil. The set
-// action calls it to locate and edit a single overlay file, which needs no
-// project merge and no secrets I/O.
+// project, opening the secrets store, or constructing an envmerge Manager,
+// leaving Result.Envmerge nil. The set action calls it to locate and edit a
+// single overlay file, which needs no project merge and no secrets I/O.
 func ResolveWorkspace(in *Input) (*Result, error) {
-	return resolve(in, "")
+	res, _, err := resolve(in, "")
+	return res, err
 }
 
 // resolve is the shared core of ResolveProject and ResolveWorkspace: it loads the
@@ -163,20 +154,20 @@ func ResolveWorkspace(in *Input) (*Result, error) {
 // resolves the global context only (no project layer, no includes, and no
 // "project not found" error). Terminal fallbacks (e.g. the default environment)
 // are applied downstream, so an unset env stays empty here.
-func resolve(in *Input, project string) (*Result, error) {
+func resolve(in *Input, project string) (*Result, envmerge.Params, error) {
 	// Bind the resolved manifest path and conventional filename into a manager.
 	manifestManager, err := manifest.New(manifest.Params{
 		Path:     resolveManifestPath(in),
 		Filename: defaultManifestFilename,
 	})
 	if err != nil {
-		return nil, err
+		return nil, envmerge.Params{}, err
 	}
 
 	// Load the manifest from the resolved manifest path.
 	manifestDocument, err := manifestManager.Load()
 	if err != nil {
-		return nil, err
+		return nil, envmerge.Params{}, err
 	}
 
 	// Get the absolute directory of the manifest so project includes can be joined.
@@ -209,23 +200,29 @@ func resolveManifestPath(in *Input) string {
 
 // resolveManifest assembles a *Result from an already-loaded manifest: it computes
 // the project layer, then delegates to the envmerge and runner param builders that
-// layer each setting through the precedence chain. It is split from resolve so the
+// layer each setting through the precedence chain. It returns the resolved
+// envmerge params alongside the Result so ResolveProject can construct the
+// Manager while ResolveWorkspace discards them. It is split from resolve so the
 // precedence stays unit-testable with an in-memory manifest.
-func resolveManifest(mc manifestContext, in *Input) (*Result, error) {
+func resolveManifest(mc manifestContext, in *Input) (*Result, envmerge.Params, error) {
 	// Compute the project layer (settings + includes) from the manifest context.
 	pl, err := resolveProjectLayer(mc)
 	if err != nil {
-		return nil, err
+		return nil, envmerge.Params{}, err
 	}
 
+	// Resolve the envmerge params; ResolveProject builds a Manager from them.
+	params := resolveEnvmergeParams(mc, in, pl)
+
 	// Build the config Result from the manifest context, Input, and project layer.
+	// Envmerge is left nil here; ResolveProject constructs and assigns the Manager.
 	return &Result{
-		Envmerge:        resolveEnvmergeParams(mc, in, pl),
-		Runner:          resolveRunnerParams(mc, in, pl),
-		Secrets:         resolveSecretsParams(mc),
-		Cipher:          resolveCipherParams(mc),
-		manifestContext: mc,
-	}, nil
+		Runner:             resolveRunnerParams(mc, in, pl),
+		Secrets:            resolveSecretsParams(mc),
+		Cipher:             resolveCipherParams(mc),
+		defaultEnvironment: params.DefaultEnvironment,
+		manifestContext:    mc,
+	}, params, nil
 }
 
 // resolveProjectLayer computes the project layer from the manifest context. An

@@ -35,24 +35,19 @@ type actionResultChange struct {
 	EnvB string
 }
 
-// execute is the imperative shell: resolve the project configuration, construct a
-// manager, and compare the two declared environments. Diff is literal-only, so
-// secret references are compared as declarations and never decrypted.
+// execute is the imperative shell: resolve the project configuration and compare
+// the two declared environments through the constructed manager. Diff is
+// literal-only, so secret references are compared as declarations and never
+// decrypted.
 func execute(p actionParams, in *config.Input) (actionResult, error) {
-	// resolve the shared config; diff never opens a resolver, so reveal is unused.
-	resolved, err := config.ResolveProject(in, p.Project, false)
-	if err != nil {
-		return actionResult{}, err
-	}
-
-	// construct the manager from the resolved params
-	manager, err := envmerge.New(resolved.Envmerge)
+	// resolve the shared config; diff never opens a resolver.
+	resolved, err := config.ResolveProject(in, p.Project)
 	if err != nil {
 		return actionResult{}, err
 	}
 
 	// compare the two environments using their literal winners
-	difference, err := manager.Diff(p.EnvA, p.EnvB)
+	difference, err := resolved.Envmerge.Diff(p.EnvA, p.EnvB)
 	if err != nil {
 		return actionResult{}, err
 	}

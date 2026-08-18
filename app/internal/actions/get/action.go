@@ -23,25 +23,19 @@ type actionResult struct {
 	Source string
 }
 
-// execute is the imperative shell: resolve the project configuration, construct a
-// manager, and look up the single requested key. Secret references are masked
-// unless p.Reveal is set.
+// execute is the imperative shell: resolve the project configuration and look up
+// the single requested key through the constructed manager. Secret references are
+// masked unless p.Reveal is set.
 func execute(p actionParams, in *config.Input) (actionResult, error) {
 	// resolve the input config
-	resolved, err := config.ResolveProject(in, p.Project, p.Reveal)
-	if err != nil {
-		return actionResult{}, err
-	}
-
-	// construct the manager from the resolved params
-	manager, err := envmerge.New(resolved.Envmerge)
+	resolved, err := config.ResolveProject(in, p.Project)
 	if err != nil {
 		return actionResult{}, err
 	}
 
 	// resolve only the requested key; the environment comes from the
 	// precedence-resolved default the manager already carries.
-	entry, err := manager.Get(envmerge.GetParams{
+	entry, err := resolved.Envmerge.Get(envmerge.GetParams{
 		Key:    p.Key,
 		Reveal: p.Reveal,
 	})
