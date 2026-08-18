@@ -1,12 +1,12 @@
 package explain
 
 import (
-	"encoding/json"
 	"fmt"
-	"io"
-	"text/tabwriter"
 
 	"github.com/go-envx/envx/app/internal/envmerge"
+	"github.com/go-envx/envx/app/internal/printer"
+	"github.com/go-envx/envx/app/internal/style"
+	"github.com/go-envx/envx/app/pkg/str"
 )
 
 // jsonStatus is the tagged view of a resolution outcome for JSON output.
@@ -59,11 +59,11 @@ type jsonResult struct {
 	Entries []jsonEntry `json:"entries"`
 }
 
-// renderParams bundles everything render needs: the output sink, the structured
+// renderParams bundles everything render needs: the printer, the structured
 // result, the chosen output format, and whether resolved plaintext is shown.
 type renderParams struct {
-	// Writer is the output sink to render to.
-	Writer io.Writer
+	// Printer is the styled output layer for the table, banner, and JSON.
+	Printer *printer.Printer
 	// Result is the structured data to render.
 	Result actionResult
 	// Format selects the output format ("json" or the default table).
@@ -72,22 +72,22 @@ type renderParams struct {
 	Reveal bool
 }
 
-// render writes the result to p.Writer in the requested format ("json" or the
-// default aligned table). An unrecognized format is rejected so a typo like
+// render writes the result in the requested format ("json" or the default
+// aligned table). An unrecognized format is rejected so a typo like
 // --output=jsonn fails loudly.
 func render(p *renderParams) error {
 	switch p.Format {
 	case "", "table":
-		return renderTable(p.Writer, p.Result, p.Reveal)
+		return renderTable(p.Printer, p.Result, p.Reveal)
 	case "json":
-		return renderJSON(p.Writer, p.Result)
+		return renderJSON(p.Printer, p.Result)
 	default:
 		return fmt.Errorf("invalid output format %q (want table or json)", p.Format)
 	}
 }
 
 // renderJSON writes the summary and entries as a symbol-free, classifiable object.
-func renderJSON(w io.Writer, res actionResult) error {
+func renderJSON(p *printer.Printer, res actionResult) error {
 	entries := make([]jsonEntry, 0, len(res.Entries))
 	for i := range res.Entries {
 		e := &res.Entries[i]
@@ -115,9 +115,7 @@ func renderJSON(w io.Writer, res actionResult) error {
 		},
 		Entries: entries,
 	}
-	enc := json.NewEncoder(w)
-	enc.SetIndent("", "  ")
-	return enc.Encode(out)
+	return p.WriteJSON(out)
 }
 
 // resolvedPointer returns a pointer to the entry's resolved value when it was
@@ -133,49 +131,75 @@ func resolvedPointer(e *actionResultEntry) *string {
 
 // renderTable writes an aligned table led by a severity banner when resolution
 // is incomplete. The RESOLVED column is added only when reveal is requested.
-func renderTable(w io.Writer, res actionResult, reveal bool) error {
-	if banner := bannerLine(res.Summary); banner != "" {
-		if _, err := fmt.Fprintln(w, banner); err != nil {
-			return err
-		}
-	}
-
-	tw := tabwriter.NewWriter(w, 0, 4, 2, ' ', 0)
-	header := "KEY\tTYPE\tVALUE\tSOURCE\tSTATUS"
-	if reveal {
-		header += "\tRESOLVED"
-	}
-	if _, err := fmt.Fprintln(tw, header); err != nil {
+func renderTable(p *printer.Printer, res actionResult, reveal bool) error {
+	if err := renderBanner(p, res.Summary); err != nil {
 		return err
 	}
 
+	headers := []string{"KEY", "TYPE", "VALUE", "SOURCE", "STATUS"}
+	if reveal {
+		headers = append(headers, "RESOLVED")
+	}
+
+	rows := make([][]printer.Cell, 0, len(res.Entries))
 	for i := range res.Entries {
 		e := &res.Entries[i]
-		row := fmt.Sprintf(
-			"%s\t%s\t%s\t%s\t%s",
-			e.Key, string(e.Resolution.Kind), e.Literal, e.Source, e.Resolution.Code,
-		)
-		if reveal {
-			row += "\t" + e.Resolution.Resolved
+		row := []printer.Cell{
+			{Text: e.Key},
+			{Text: string(e.Resolution.Kind)},
+			{Text: e.Literal},
+			{Text: e.Source},
+			{
+				Text:     e.Resolution.Code,
+				Severity: toStyleSeverity(e.Resolution.Severity),
+			},
 		}
-		if _, err := fmt.Fprintln(tw, row); err != nil {
+		if reveal {
+			row = append(row, printer.Cell{Text: e.Resolution.Resolved})
+		}
+		rows = append(rows, row)
+	}
+
+	return p.WriteTable(printer.Table{Headers: headers, Rows: rows})
+}
+
+// renderBanner writes leading severity lines to standard error when resolution
+// is incomplete: an error line and a warning line, each shown independently so
+// stdout carries only the table. The printer owns the ERROR/WARNING label, so
+// only the message body is supplied here. A trailing blank line separates the
+// banner from the table that follows.
+func renderBanner(p *printer.Printer, s envmerge.ExplanationSummary) error {
+	if s.Errors == 0 && s.Warnings == 0 {
+		return nil
+	}
+	if s.Errors > 0 {
+		if err := p.LogError(
+			str.Pluralize(s.Errors, "value", "values") + " failed to resolve",
+		); err != nil {
 			return err
 		}
 	}
-	return tw.Flush()
+	if s.Warnings > 0 {
+		if err := p.LogWarning(
+			str.Pluralize(s.Warnings, "value", "values") + " resolved with warnings",
+		); err != nil {
+			return err
+		}
+	}
+	return p.LogBlank()
 }
 
-// bannerLine returns a leading summary line when resolution is incomplete, or an
-// empty string when every value resolved. It is symbol-free.
-func bannerLine(s envmerge.ExplanationSummary) string {
-	switch {
-	case s.Errors > 0:
-		return fmt.Sprintf(
-			"ERROR: %d value(s) failed to resolve, %d warning(s)", s.Errors, s.Warnings,
-		)
-	case s.Warnings > 0:
-		return fmt.Sprintf("WARNING: %d value(s) resolved with warnings", s.Warnings)
+// toStyleSeverity maps an envmerge severity onto a style severity, keeping the
+// style package a dependency-free leaf that never imports envmerge.
+func toStyleSeverity(s envmerge.Severity) style.Severity {
+	switch s {
+	case envmerge.SeverityOK:
+		return style.SeverityOK
+	case envmerge.SeverityWarning:
+		return style.SeverityWarning
+	case envmerge.SeverityError:
+		return style.SeverityError
 	default:
-		return ""
+		return style.SeverityNone
 	}
 }
