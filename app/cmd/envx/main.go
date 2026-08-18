@@ -4,11 +4,12 @@ package main
 
 import (
 	"errors"
-	"fmt"
+	"io"
 	"os"
 
 	"github.com/go-envx/envx/app/internal/cli"
 	"github.com/go-envx/envx/app/internal/exitcode"
+	"github.com/go-envx/envx/app/internal/printer"
 )
 
 // Build metadata is injected at link time via -ldflags (see .goreleaser.yaml);
@@ -48,7 +49,9 @@ func run() int {
 		return exitErr.Code
 	}
 
-	fmt.Fprintln(os.Stderr, "Error:", err)
+	// Fatal command errors are reported at the process boundary so actions can
+	// return errors without duplicating diagnostics or owning exit handling.
+	_ = reportError(os.Stderr, err)
 
 	// The root's PersistentPreRunE flips SilenceUsage on only after parsing and
 	// validation succeed, so a command that still has it unset failed at the usage
@@ -57,4 +60,9 @@ func run() int {
 		return exitcode.Usage
 	}
 	return exitcode.Runtime
+}
+
+// reportError writes a returned command error through the shared printer.
+func reportError(w io.Writer, err error) error {
+	return printer.New(printer.Options{Out: io.Discard, Err: w}).LogError(err.Error())
 }

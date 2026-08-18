@@ -2,15 +2,17 @@ package encrypt
 
 import (
 	"fmt"
-	"io"
 	"strconv"
 	"strings"
+
+	"github.com/go-envx/envx/app/internal/printer"
+	"github.com/go-envx/envx/app/pkg/str"
 )
 
 // renderParams are the inputs to the encrypt action renderer.
 type renderParams struct {
-	// Writer receives the safe mutation summary.
-	Writer io.Writer
+	// Printer is the styled output layer for the safe mutation summary.
+	Printer *printer.Printer
 	// Result contains the changed identities and store location.
 	Result actionResult
 	// Verbose lists each changed identity in addition to the summary count.
@@ -22,22 +24,21 @@ type renderParams struct {
 // when nothing needed encrypting.
 func render(p *renderParams) error {
 	if len(p.Result.Changed) == 0 {
-		_, err := fmt.Fprintln(p.Writer, "No plaintext values to encrypt.")
-		return err
+		return p.Printer.LogMessage("No plaintext values to encrypt.")
 	}
 
 	var b strings.Builder
 	fmt.Fprintf(
-		&b, "Encrypted %d secret(s) in:\n%s\n",
-		len(p.Result.Changed), renderStorePath(p.Result.StorePath),
+		&b, "Encrypted %s in:\n%s",
+		str.Pluralize(len(p.Result.Changed), "secret", "secrets"),
+		renderStorePath(p.Result.StorePath),
 	)
 	if p.Verbose {
 		for _, secret := range p.Result.Changed {
-			fmt.Fprintf(&b, "  %s/%s\n", secret.Group, secret.Key)
+			fmt.Fprintf(&b, "\n  %s/%s", secret.Group, secret.Key)
 		}
 	}
-	_, err := io.WriteString(p.Writer, b.String())
-	return err
+	return p.Printer.LogMessage(b.String())
 }
 
 // renderStorePath quotes a path only when a space would make its boundary
