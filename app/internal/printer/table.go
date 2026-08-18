@@ -20,12 +20,18 @@ type Table struct {
 	Rows [][]Cell
 }
 
-// Cell is a single table value with an optional severity that drives its color.
+// Cell is a single table value with an optional color. When Color is set it
+// takes precedence; otherwise Severity drives the color. Both zero values leave
+// the cell unstyled.
 type Cell struct {
 	// Text is the cell's displayed content.
 	Text string
 	// Severity colors the cell; style.SeverityNone leaves it unstyled.
 	Severity style.Severity
+	// Color sets an explicit foreground color, overriding Severity when not
+	// style.ColorNone. Used for content whose meaning is not a severity, such as
+	// diff signs.
+	Color style.Color
 }
 
 // WriteTable renders t to standard output as an aligned table with an emphasized
@@ -34,12 +40,16 @@ type Cell struct {
 func (p *Printer) WriteTable(t Table) error {
 	widths := columnWidths(t)
 
-	styledHeaders := make([]string, len(t.Headers))
-	for i, header := range t.Headers {
-		styledHeaders[i] = p.outStyle.Bold(header)
-	}
-	if err := writeRow(p.out, styledHeaders, t.Headers, widths); err != nil {
-		return err
+	// A headerless table (for example diff) skips the header row entirely rather
+	// than emitting a blank line.
+	if len(t.Headers) > 0 {
+		styledHeaders := make([]string, len(t.Headers))
+		for i, header := range t.Headers {
+			styledHeaders[i] = p.outStyle.Bold(header)
+		}
+		if err := writeRow(p.out, styledHeaders, t.Headers, widths); err != nil {
+			return err
+		}
 	}
 
 	for _, row := range t.Rows {
@@ -47,13 +57,21 @@ func (p *Printer) WriteTable(t Table) error {
 		plain := make([]string, len(row))
 		for i := range row {
 			plain[i] = row[i].Text
-			styled[i] = p.outStyle.Severity(row[i].Severity, row[i].Text)
+			styled[i] = styleCell(p.outStyle, row[i])
 		}
 		if err := writeRow(p.out, styled, plain, widths); err != nil {
 			return err
 		}
 	}
 	return nil
+}
+
+// styleCell colors a cell: an explicit Color wins, otherwise Severity applies.
+func styleCell(s style.Styler, c Cell) string {
+	if c.Color != style.ColorNone {
+		return s.Color(c.Color, c.Text)
+	}
+	return s.Severity(c.Severity, c.Text)
 }
 
 // writeRow prints one row, padding each column to its width based on the plain
