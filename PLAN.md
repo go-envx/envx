@@ -38,7 +38,7 @@ Every action migration has the same shape:
 
 - [x] **Task 3 — Migrate `diff` (colored change table).** Replace the `tabwriter` rows with colored output: additions green `+`, removals red `-`, changes yellow `~`, following the conventional diff palette. Because green-for-added is not in the severity palette (OK is cyan) and the diff table is headerless, this PR extends the printer minimally: (a) skip the header row when `Table.Headers` is empty, and (b) let a cell carry an explicit color rather than only a severity (for example a `style.Color` enum on `Cell`). Replace the JSON encoder with `p.WriteJSON`. Acceptance: table and JSON shapes are unchanged aside from color, and a no-diff run still prints nothing.
 
-- [ ] **Task 4 — Migrate `encrypt`.** Convert the count-and-path summary, the verbose per-identity list, and the "No plaintext values to encrypt." line to `p.LogMessage`. Acceptance: output parity with today, and tests assert via a printer buffer.
+- [x] **Task 4 — Migrate `encrypt`.** Convert the count-and-path summary, the verbose per-identity list, and the "No plaintext values to encrypt." line to `p.LogMessage`. Acceptance: output parity with today, and tests assert via a printer buffer.
 
 - [ ] **Task 5 — Migrate `keypair` (generate, inspect, print, rotate).** Convert the four sibling summaries from `fmt.Fprintf` to `p.LogMessage`, one PR for the cohesive family. Acceptance: identical text, no private-key material in output, tests updated.
 

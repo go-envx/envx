@@ -5,17 +5,25 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/go-envx/envx/app/internal/printer"
 	"github.com/go-envx/envx/app/internal/secrets"
 )
+
+// plainPrinter builds a printer over the given sinks with color forced off so
+// assertions can match exact, unstyled output.
+func plainPrinter(out, errOut *bytes.Buffer) *printer.Printer {
+	disabled := false
+	return printer.New(printer.Options{Out: out, Err: errOut, Color: &disabled})
+}
 
 // TestRenderReportsCountByDefault verifies the default summary reports the count
 // and store location without listing each identity.
 func TestRenderReportsCountByDefault(t *testing.T) {
 	t.Parallel()
 
-	var out bytes.Buffer
+	var out, errOut bytes.Buffer
 	err := render(&renderParams{
-		Writer: &out,
+		Printer: plainPrinter(&out, &errOut),
 		Result: actionResult{
 			Changed: []secrets.SecretReference{
 				{Group: "production", Key: "api_key"},
@@ -28,12 +36,15 @@ func TestRenderReportsCountByDefault(t *testing.T) {
 		t.Fatalf("render(): %v", err)
 	}
 	got := out.String()
-	if !strings.Contains(got, "Encrypted 2 secret(s)") ||
+	if !strings.Contains(got, "Encrypted 2 secrets") ||
 		!strings.Contains(got, "/workspace/secrets.yaml") {
 		t.Errorf("render() = %q, want the count and store location", got)
 	}
 	if strings.Contains(got, "production/api_key") {
 		t.Errorf("render() = %q, want no per-identity list by default", got)
+	}
+	if errOut.Len() != 0 {
+		t.Errorf("stderr = %q, want empty", errOut.String())
 	}
 }
 
@@ -42,9 +53,9 @@ func TestRenderReportsCountByDefault(t *testing.T) {
 func TestRenderListsIdentitiesWhenVerbose(t *testing.T) {
 	t.Parallel()
 
-	var out bytes.Buffer
+	var out, errOut bytes.Buffer
 	err := render(&renderParams{
-		Writer:  &out,
+		Printer: plainPrinter(&out, &errOut),
 		Verbose: true,
 		Result: actionResult{
 			Changed: []secrets.SecretReference{
@@ -65,6 +76,9 @@ func TestRenderListsIdentitiesWhenVerbose(t *testing.T) {
 			t.Errorf("render() = %q, want it to contain %q", got, want)
 		}
 	}
+	if errOut.Len() != 0 {
+		t.Errorf("stderr = %q, want empty", errOut.String())
+	}
 }
 
 // TestRenderReportsNothingChanged verifies an empty result reports plainly
@@ -72,12 +86,18 @@ func TestRenderListsIdentitiesWhenVerbose(t *testing.T) {
 func TestRenderReportsNothingChanged(t *testing.T) {
 	t.Parallel()
 
-	var out bytes.Buffer
-	if err := render(&renderParams{Writer: &out, Result: actionResult{}}); err != nil {
+	var out, errOut bytes.Buffer
+	if err := render(&renderParams{
+		Printer: plainPrinter(&out, &errOut),
+		Result:  actionResult{},
+	}); err != nil {
 		t.Fatalf("render(): %v", err)
 	}
 	if !strings.Contains(out.String(), "No plaintext values to encrypt.") {
 		t.Errorf("render() = %q, want the nothing-to-do message", out.String())
+	}
+	if errOut.Len() != 0 {
+		t.Errorf("stderr = %q, want empty", errOut.String())
 	}
 }
 
