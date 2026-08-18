@@ -5,17 +5,32 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/go-envx/envx/app/internal/printer"
 	"github.com/go-envx/envx/app/internal/secrets"
 )
+
+// plainPrinter builds a printer over the given sinks with color forced off so
+// assertions can match exact, unstyled output.
+func plainPrinter(out, errOut *bytes.Buffer) *printer.Printer {
+	disabled := false
+	return printer.New(printer.Options{Out: out, Err: errOut, Color: &disabled})
+}
+
+// colorPrinter builds a printer over the given sinks with color forced on so
+// assertions can verify styling is applied.
+func colorPrinter(out, errOut *bytes.Buffer) *printer.Printer {
+	enabled := true
+	return printer.New(printer.Options{Out: out, Err: errOut, Color: &enabled})
+}
 
 // TestRenderReportsCountByDefault verifies the default summary reports the count
 // and store location without listing each identity.
 func TestRenderReportsCountByDefault(t *testing.T) {
 	t.Parallel()
 
-	var out bytes.Buffer
+	var out, errOut bytes.Buffer
 	err := render(&renderParams{
-		Writer: &out,
+		Printer: plainPrinter(&out, &errOut),
 		Result: actionResult{
 			Changed: []secrets.SecretReference{
 				{Group: "production", Key: "api_key"},
@@ -28,7 +43,7 @@ func TestRenderReportsCountByDefault(t *testing.T) {
 		t.Fatalf("render(): %v", err)
 	}
 	got := out.String()
-	if !strings.Contains(got, "Decrypted 2 secret(s)") ||
+	if !strings.Contains(got, "Decrypted 2 secrets") ||
 		!strings.Contains(got, "/workspace/secrets.yaml") {
 		t.Errorf("render() = %q, want the count and store location", got)
 	}
@@ -42,9 +57,9 @@ func TestRenderReportsCountByDefault(t *testing.T) {
 func TestRenderListsIdentitiesWhenVerbose(t *testing.T) {
 	t.Parallel()
 
-	var out bytes.Buffer
+	var out, errOut bytes.Buffer
 	err := render(&renderParams{
-		Writer:  &out,
+		Printer: plainPrinter(&out, &errOut),
 		Verbose: true,
 		Result: actionResult{
 			Changed: []secrets.SecretReference{
@@ -72,8 +87,9 @@ func TestRenderListsIdentitiesWhenVerbose(t *testing.T) {
 func TestRenderReportsNothingChanged(t *testing.T) {
 	t.Parallel()
 
-	var out bytes.Buffer
-	if err := render(&renderParams{Writer: &out, Result: actionResult{}}); err != nil {
+	var out, errOut bytes.Buffer
+	p := plainPrinter(&out, &errOut)
+	if err := render(&renderParams{Printer: p, Result: actionResult{}}); err != nil {
 		t.Fatalf("render(): %v", err)
 	}
 	if !strings.Contains(out.String(), "No encrypted values to decrypt.") {
@@ -88,9 +104,8 @@ func TestRenderWarnsOnUnavailableGroups(t *testing.T) {
 
 	var out, errOut bytes.Buffer
 	err := render(&renderParams{
-		Writer:    &out,
-		ErrWriter: &errOut,
-		Verbose:   true,
+		Printer: plainPrinter(&out, &errOut),
+		Verbose: true,
 		Result: actionResult{
 			Changed:     []secrets.SecretReference{{Group: "dev", Key: "api_key"}},
 			Unavailable: []string{"prd"},
@@ -104,30 +119,28 @@ func TestRenderWarnsOnUnavailableGroups(t *testing.T) {
 		t.Errorf("stdout = %q, want the decrypted summary", out.String())
 	}
 	warning := errOut.String()
-	if !strings.Contains(warning, "warning:") || !strings.Contains(warning, `"prd"`) {
+	if !strings.Contains(warning, "WARNING:") || !strings.Contains(warning, `"prd"`) {
 		t.Errorf("stderr = %q, want a warning naming the skipped group", warning)
 	}
-	if strings.Contains(warning, ansiYellow) {
-		t.Errorf("stderr = %q, want no color when Color is false", warning)
+	if strings.Contains(warning, "\033[") {
+		t.Errorf("stderr = %q, want no color when color is forced off", warning)
 	}
 }
 
-// TestRenderColorizesWarningOnTerminal verifies the warning label is colored when
-// standard error is a terminal.
+// TestRenderColorizesWarningOnTerminal verifies the warning is colored when the
+// printer has color enabled.
 func TestRenderColorizesWarningOnTerminal(t *testing.T) {
 	t.Parallel()
 
-	var errOut bytes.Buffer
+	var out, errOut bytes.Buffer
 	err := render(&renderParams{
-		Writer:    &bytes.Buffer{},
-		ErrWriter: &errOut,
-		Color:     true,
-		Result:    actionResult{Unavailable: []string{"prd"}},
+		Printer: colorPrinter(&out, &errOut),
+		Result:  actionResult{Unavailable: []string{"prd"}},
 	})
 	if err != nil {
 		t.Fatalf("render(): %v", err)
 	}
-	if !strings.Contains(errOut.String(), ansiYellow) {
+	if !strings.Contains(errOut.String(), "\033[") {
 		t.Errorf("stderr = %q, want the warning colorized", errOut.String())
 	}
 }
@@ -139,9 +152,8 @@ func TestRenderSilentSummaryWhenAllSkipped(t *testing.T) {
 
 	var out, errOut bytes.Buffer
 	err := render(&renderParams{
-		Writer:    &out,
-		ErrWriter: &errOut,
-		Result:    actionResult{Unavailable: []string{"prd"}},
+		Printer: plainPrinter(&out, &errOut),
+		Result:  actionResult{Unavailable: []string{"prd"}},
 	})
 	if err != nil {
 		t.Fatalf("render(): %v", err)
