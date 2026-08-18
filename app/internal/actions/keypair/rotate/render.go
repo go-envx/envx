@@ -2,13 +2,16 @@ package rotate
 
 import (
 	"fmt"
-	"io"
+	"strings"
+
+	"github.com/go-envx/envx/app/internal/printer"
+	"github.com/go-envx/envx/app/pkg/str"
 )
 
 // renderParams bundles the output sink and safe rotation result.
 type renderParams struct {
-	// Writer is the output sink to render to.
-	Writer io.Writer
+	// Printer is the styled output layer for the safe rotation summary.
+	Printer *printer.Printer
 	// Result is the safe rotation metadata to render.
 	Result actionResult
 }
@@ -22,28 +25,23 @@ func render(p *renderParams) error {
 	}
 	rotated := keypairs[0]
 
-	if _, err := fmt.Fprintf(
-		p.Writer,
+	var b strings.Builder
+	fmt.Fprintf(
+		&b,
 		"Rotated keypair for group %q:\n"+
 			"  public key: %s\n"+
 			"  secrets store: %s\n"+
 			"  private key file: %s\n"+
-			"  re-encrypted %d secret(s)\n",
+			"  re-encrypted %s",
 		rotated.Group,
 		rotated.PublicKey,
 		p.Result.SecretsPath,
 		p.Result.KeysPath,
-		len(p.Result.Result.Secrets),
-	); err != nil {
-		return err
-	}
+		str.Pluralize(len(p.Result.Result.Secrets), "secret", "secrets"),
+	)
 
 	for _, secret := range p.Result.Result.Secrets {
-		if _, err := fmt.Fprintf(
-			p.Writer, "    %s/%s\n", secret.Group, secret.Key,
-		); err != nil {
-			return err
-		}
+		fmt.Fprintf(&b, "\n    %s/%s", secret.Group, secret.Key)
 	}
-	return nil
+	return p.Printer.LogMessage(b.String())
 }

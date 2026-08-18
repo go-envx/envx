@@ -40,7 +40,7 @@ Every action migration has the same shape:
 
 - [x] **Task 4 — Migrate `encrypt`.** Convert the count-and-path summary, the verbose per-identity list, and the "No plaintext values to encrypt." line to `p.LogMessage`. Acceptance: output parity with today, and tests assert via a printer buffer.
 
-- [ ] **Task 5 — Migrate `keypair` (generate, inspect, print, rotate).** Convert the four sibling summaries from `fmt.Fprintf` to `p.LogMessage`, one PR for the cohesive family. Acceptance: identical text, no private-key material in output, tests updated.
+- [x] **Task 5 — Migrate `keypair` (generate, inspect, print, rotate).** Convert the four sibling summaries from `fmt.Fprintf` to `p.LogMessage`, one PR for the cohesive family. Acceptance: identical text, no private-key material in output, tests updated.
 
 - [ ] **Task 6 — Migrate secrets confirmation summaries (`secrets set`, `secrets delete`).** Route each "… in: <path>" confirmation through `p.LogMessage`. Acceptance: output parity, tests updated.
 
