@@ -42,7 +42,7 @@ Every action migration has the same shape:
 
 - [x] **Task 5 — Migrate `keypair` (generate, inspect, print, rotate).** Convert the four sibling summaries from `fmt.Fprintf` to `p.LogMessage`, one PR for the cohesive family. Acceptance: identical text, no private-key material in output, tests updated.
 
-- [ ] **Task 6 — Migrate secrets confirmation summaries (`secrets set`, `secrets delete`).** Route each "… in: <path>" confirmation through `p.LogMessage`. Acceptance: output parity, tests updated.
+- [x] **Task 6 — Migrate secrets confirmation summaries (`secrets set`, `secrets delete`).** Route each "… in: <path>" confirmation through `p.LogMessage`. Acceptance: output parity, tests updated.
 
 - [ ] **Task 7 — Migrate config-writer summaries (`set`, `create`).** Route `set`'s "Set … in: <path>" and `create`'s scaffold summary through `p.LogMessage`; `create` currently prints from `command.go`, so pass its `summary()` string through the printer instead. Acceptance: output parity, tests updated.
 
