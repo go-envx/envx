@@ -72,12 +72,16 @@ func TestQuickStartResolves(t *testing.T) {
 	if err != nil {
 		t.Fatalf("resolve: %v", err)
 	}
-	env, err := envmerge.Build(resolved.Envmerge)
+	manager, err := envmerge.New(resolved.Envmerge)
 	if err != nil {
-		t.Fatalf("build: %v", err)
+		t.Fatalf("new: %v", err)
+	}
+	entry, err := manager.Get(envmerge.GetParams{Key: "DATABASE_HOST"})
+	if err != nil {
+		t.Fatalf("get: %v", err)
 	}
 
-	if got, _ := env.Get("DATABASE_HOST"); got != "localhost" {
-		t.Errorf("DATABASE_HOST = %q, want %q", got, "localhost")
+	if entry.Value != "localhost" {
+		t.Errorf("DATABASE_HOST = %q, want %q", entry.Value, "localhost")
 	}
 }

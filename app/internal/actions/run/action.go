@@ -24,9 +24,9 @@ type streams struct {
 	Stderr io.Writer
 }
 
-// execute is the imperative shell: resolve the input into an envmerge.Params, build
-// the merged environment, then run the child process with the merged environment
-// using the resolved overload setting.
+// execute is the imperative shell: resolve the input into an envmerge.Manager,
+// materialize the complete environment, then run the child process with it using
+// the resolved overload setting.
 func execute(p actionParams, in *config.Input, s streams) error {
 	// resolve the input config, always revealing secrets because a child process
 	// needs plaintext; a decryption failure fails here before the process starts.
@@ -35,15 +35,18 @@ func execute(p actionParams, in *config.Input, s streams) error {
 		return err
 	}
 
-	// build the merged environment
-	env, err := envmerge.Build(resolved.Envmerge)
+	// construct the manager from the resolved params
+	manager, err := envmerge.New(resolved.Envmerge)
 	if err != nil {
 		return err
 	}
 
-	// fail before starting the child if any reference is unresolved; a child
-	// process must never receive an unresolved reference as plaintext.
-	if err := env.Verify(); err != nil {
+	// materialize the complete environment; Materialize reveals and resolves every
+	// winner and fails closed, so a child process can never receive an unresolved
+	// reference as plaintext. The environment comes from the precedence-resolved
+	// default the manager already carries.
+	env, err := manager.Materialize("")
+	if err != nil {
 		return err
 	}
 

@@ -7,6 +7,25 @@ import (
 	"sort"
 )
 
+// Source records where a resolved value came from: the absolute path to the
+// YAML file and the original nested key before flattening (e.g.
+// "postgres.password").
+type Source struct {
+	// File is the absolute path to the YAML file the value came from.
+	File string
+	// Key is the original nested key before flattening (e.g. "postgres.password").
+	Key string
+}
+
+// Origin describes where a resolved value came from, plus every source it
+// shadowed during the merge.
+type Origin struct {
+	// Winner is the source whose value survived the merge.
+	Winner Source
+	// Shadowed lists the sources the winner overrode, in merge order.
+	Shadowed []Source
+}
+
 // Environment is an immutable, complete set of materialized values and their
 // provenance. A Manager returns one only when every winning value resolved, so a
 // caller can never observe a partial or reference-carrying environment.

@@ -14,7 +14,6 @@ tasks:
     cmds:
       - mise install
       - pnpm install
-      - task envx:install
 
   clean:git:
     desc: Remove local branches whose remote was deleted (interactive)
