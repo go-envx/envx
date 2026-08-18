@@ -14,8 +14,9 @@ import (
 // resolution pass. Actions read the fields they need and ignore the rest;
 // OverlayPath derives the set action's target file from the same result.
 type Result struct {
-	// Envmerge is the resolved envmerge input for actions that merge an environment.
-	Envmerge envmerge.Params
+	// Envmerge is the constructed envmerge Manager the environment-building actions
+	// operate through. ResolveProject builds it; ResolveWorkspace leaves it nil.
+	Envmerge *envmerge.Manager
 
 	// Runner is the resolved runner input for actions that run a command. Config
 	// resolves only the Overload knob (flag > ENVX_OVERLOAD > project > global); the
@@ -23,14 +24,17 @@ type Result struct {
 	Runner runner.Params
 
 	// Secrets locates the workspace secrets store and private-key file.
-	// ResolveProject constructs the manager, opens the store through its resolver,
-	// and wires the value resolver; ResolveWorkspace leaves these paths as data
-	// and never reads the store.
+	// ResolveProject binds these into the resolver factory the Manager opens on
+	// demand; ResolveWorkspace leaves them as data and never reads the store.
 	Secrets secrets.Params
 
 	// Cipher contains the configured cipher construction parameters used to
 	// compose the secrets manager.
 	Cipher cipher.Params
+
+	// defaultEnvironment is the precedence-resolved default environment. OverlayPath
+	// reads it to target the set action's overlay file without a Manager.
+	defaultEnvironment string
 
 	// manifestContext retains the loaded manifest and its directory so OverlayPath
 	// can validate and join a target without re-loading.
@@ -50,7 +54,7 @@ func (r *Result) WorkspaceDir() string {
 // against the workspace directory. It targets a single overlay file without
 // merging an environment, so it never builds an envmerge result.
 func (r *Result) OverlayPath(includePath string) (string, error) {
-	env := r.Envmerge.DefaultEnvironment
+	env := r.defaultEnvironment
 	if env == "" {
 		env = r.manifest.DefaultEnvironment()
 	}

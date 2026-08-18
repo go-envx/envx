@@ -68,15 +68,11 @@ func TestQuickStartResolves(t *testing.T) {
 
 	manifestPath := filepath.Join(dir, "envx.yaml")
 	in := &config.Input{ConfigPath: &manifestPath}
-	resolved, err := config.ResolveProject(in, "api-service", false)
+	resolved, err := config.ResolveProject(in, "api-service")
 	if err != nil {
 		t.Fatalf("resolve: %v", err)
 	}
-	manager, err := envmerge.New(resolved.Envmerge)
-	if err != nil {
-		t.Fatalf("new: %v", err)
-	}
-	entry, err := manager.Get(envmerge.GetParams{Key: "DATABASE_HOST"})
+	entry, err := resolved.Envmerge.Get(envmerge.GetParams{Key: "DATABASE_HOST"})
 	if err != nil {
 		t.Fatalf("get: %v", err)
 	}

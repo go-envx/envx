@@ -4,7 +4,6 @@ import (
 	"io"
 
 	"github.com/go-envx/envx/app/internal/config"
-	"github.com/go-envx/envx/app/internal/envmerge"
 	"github.com/go-envx/envx/app/internal/runner"
 )
 
@@ -28,24 +27,18 @@ type streams struct {
 // materialize the complete environment, then run the child process with it using
 // the resolved overload setting.
 func execute(p actionParams, in *config.Input, s streams) error {
-	// resolve the input config, always revealing secrets because a child process
-	// needs plaintext; a decryption failure fails here before the process starts.
-	resolved, err := config.ResolveProject(in, p.Project, true)
-	if err != nil {
-		return err
-	}
-
-	// construct the manager from the resolved params
-	manager, err := envmerge.New(resolved.Envmerge)
+	// resolve the input config
+	resolved, err := config.ResolveProject(in, p.Project)
 	if err != nil {
 		return err
 	}
 
 	// materialize the complete environment; Materialize reveals and resolves every
 	// winner and fails closed, so a child process can never receive an unresolved
-	// reference as plaintext. The environment comes from the precedence-resolved
-	// default the manager already carries.
-	env, err := manager.Materialize("")
+	// reference as plaintext. A decryption failure fails here before the process
+	// starts. The environment comes from the precedence-resolved default the
+	// manager already carries.
+	env, err := resolved.Envmerge.Materialize("")
 	if err != nil {
 		return err
 	}

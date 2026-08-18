@@ -24,10 +24,6 @@ type Params struct {
 	// ResolverFactory opens a fresh, operation-scoped value resolver on demand. A
 	// nil factory is identity behavior for callers with no reference syntax.
 	ResolverFactory ValueResolverFactory
-	// ValueResolver is the transitional resolver the legacy Build entry point uses
-	// to dereference reference-valued leaves. Manager operations obtain a resolver
-	// from ResolverFactory instead; a nil resolver leaves every value untouched.
-	ValueResolver ValueResolver
 }
 
 // ValueResolver dereferences one winning scalar value and returns unrecognized

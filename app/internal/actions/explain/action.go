@@ -46,25 +46,19 @@ type actionResultEntry struct {
 	Resolution envmerge.Resolution
 }
 
-// execute is the imperative shell: resolve the project configuration, construct
-// a manager, and run the non-aborting diagnostic explanation. Secret status is
-// always computed; plaintext is materialized only under Reveal.
+// execute is the imperative shell: resolve the project configuration and run the
+// non-aborting diagnostic explanation through the constructed manager. Secret
+// status is always computed; plaintext is materialized only under Reveal.
 func execute(p actionParams, in *config.Input) (actionResult, error) {
 	// resolve the input config
-	resolved, err := config.ResolveProject(in, p.Project, p.Reveal)
-	if err != nil {
-		return actionResult{}, err
-	}
-
-	// construct the manager from the resolved params
-	manager, err := envmerge.New(resolved.Envmerge)
+	resolved, err := config.ResolveProject(in, p.Project)
 	if err != nil {
 		return actionResult{}, err
 	}
 
 	// diagnose the selected keys; a per-key resolution failure is carried by its
 	// status rather than aborting the command.
-	explanation, err := manager.Explain(envmerge.ExplainParams{
+	explanation, err := resolved.Envmerge.Explain(envmerge.ExplainParams{
 		Key:    p.Key,
 		Reveal: p.Reveal,
 	})
