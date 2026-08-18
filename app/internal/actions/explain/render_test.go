@@ -7,7 +7,15 @@ import (
 	"testing"
 
 	"github.com/go-envx/envx/app/internal/envmerge"
+	"github.com/go-envx/envx/app/internal/printer"
 )
+
+// plainPrinter builds a printer over the given sinks with color forced off so
+// assertions can match exact, unstyled output.
+func plainPrinter(out, errOut *bytes.Buffer) *printer.Printer {
+	disabled := false
+	return printer.New(printer.Options{Out: out, Err: errOut, Color: &disabled})
+}
 
 // sampleResult is a single ok config-value row used by the render tests.
 func sampleResult() actionResult {
@@ -33,10 +41,11 @@ func TestRenderJSON(t *testing.T) {
 	t.Parallel()
 
 	var buf bytes.Buffer
+	var errBuf bytes.Buffer
 	err := render(&renderParams{
-		Writer: &buf,
-		Result: sampleResult(),
-		Format: "json",
+		Printer: plainPrinter(&buf, &errBuf),
+		Result:  sampleResult(),
+		Format:  "json",
 	})
 	if err != nil {
 		t.Fatalf("render: %v", err)
@@ -77,10 +86,11 @@ func TestRenderTable(t *testing.T) {
 	t.Parallel()
 
 	var buf bytes.Buffer
+	var errBuf bytes.Buffer
 	err := render(&renderParams{
-		Writer: &buf,
-		Result: sampleResult(),
-		Format: "table",
+		Printer: plainPrinter(&buf, &errBuf),
+		Result:  sampleResult(),
+		Format:  "table",
 	})
 	if err != nil {
 		t.Fatalf("render: %v", err)
@@ -110,11 +120,12 @@ func TestRenderTableReveal(t *testing.T) {
 	res.Entries[0].Resolution.HasResolved = true
 
 	var buf bytes.Buffer
+	var errBuf bytes.Buffer
 	err := render(&renderParams{
-		Writer: &buf,
-		Result: res,
-		Format: "table",
-		Reveal: true,
+		Printer: plainPrinter(&buf, &errBuf),
+		Result:  res,
+		Format:  "table",
+		Reveal:  true,
 	})
 	if err != nil {
 		t.Fatalf("render: %v", err)
@@ -124,7 +135,8 @@ func TestRenderTableReveal(t *testing.T) {
 	}
 }
 
-// TestRenderTableBanner verifies an incomplete result leads with an ERROR banner.
+// TestRenderTableBanner verifies an incomplete result leads with an ERROR banner
+// on stderr while stdout carries only the table.
 func TestRenderTableBanner(t *testing.T) {
 	t.Parallel()
 
@@ -145,16 +157,61 @@ func TestRenderTableBanner(t *testing.T) {
 	}
 
 	var buf bytes.Buffer
-	err := render(&renderParams{Writer: &buf, Result: res, Format: "table"})
+	var errBuf bytes.Buffer
+	err := render(&renderParams{
+		Printer: plainPrinter(&buf, &errBuf),
+		Result:  res,
+		Format:  "table",
+	})
 	if err != nil {
 		t.Fatalf("render: %v", err)
 	}
-	out := buf.String()
-	if !strings.HasPrefix(out, "ERROR:") {
-		t.Errorf("expected ERROR banner leading output:\n%s", out)
+	if !strings.HasPrefix(errBuf.String(), "ERROR:") {
+		t.Errorf("expected ERROR banner on stderr:\n%s", errBuf.String())
 	}
-	if !strings.Contains(out, "SECRET_NOT_FOUND") {
-		t.Errorf("expected status code in output:\n%s", out)
+	if !strings.Contains(errBuf.String(), "ERROR: 1 value failed to resolve") {
+		t.Errorf("expected singular banner text:\n%q", errBuf.String())
+	}
+	if !strings.HasSuffix(errBuf.String(), "\n\n") {
+		t.Errorf("expected blank line separating banner from table:\n%q", errBuf.String())
+	}
+	if strings.Contains(buf.String(), "ERROR:") {
+		t.Errorf("banner should not appear on stdout:\n%s", buf.String())
+	}
+	if !strings.Contains(buf.String(), "SECRET_NOT_FOUND") {
+		t.Errorf("expected status code in table output:\n%s", buf.String())
+	}
+}
+
+// TestRenderBannerSplitsAndPluralizes verifies a mixed outcome prints a separate
+// error and warning line, each with correctly pluralized counts.
+func TestRenderBannerSplitsAndPluralizes(t *testing.T) {
+	t.Parallel()
+
+	res := actionResult{
+		Summary: envmerge.ExplanationSummary{Errors: 3, Warnings: 1},
+	}
+
+	var buf bytes.Buffer
+	var errBuf bytes.Buffer
+	err := render(&renderParams{
+		Printer: plainPrinter(&buf, &errBuf),
+		Result:  res,
+		Format:  "table",
+	})
+	if err != nil {
+		t.Fatalf("render: %v", err)
+	}
+
+	got := errBuf.String()
+	if !strings.Contains(got, "ERROR: 3 values failed to resolve\n") {
+		t.Errorf("expected plural error line:\n%q", got)
+	}
+	if !strings.Contains(got, "WARNING: 1 value resolved with warnings\n") {
+		t.Errorf("expected singular warning line:\n%q", got)
+	}
+	if !strings.HasSuffix(got, "\n\n") {
+		t.Errorf("expected blank line after the banner:\n%q", got)
 	}
 }
 
@@ -189,7 +246,12 @@ func TestRenderJSONResolvedEmpty(t *testing.T) {
 	}
 
 	var buf bytes.Buffer
-	err := render(&renderParams{Writer: &buf, Result: res, Format: "json"})
+	var errBuf bytes.Buffer
+	err := render(&renderParams{
+		Printer: plainPrinter(&buf, &errBuf),
+		Result:  res,
+		Format:  "json",
+	})
 	if err != nil {
 		t.Fatalf("render: %v", err)
 	}
@@ -217,10 +279,11 @@ func TestRenderInvalidFormat(t *testing.T) {
 	t.Parallel()
 
 	var buf bytes.Buffer
+	var errBuf bytes.Buffer
 	err := render(&renderParams{
-		Writer: &buf,
-		Result: sampleResult(),
-		Format: "jsonn",
+		Printer: plainPrinter(&buf, &errBuf),
+		Result:  sampleResult(),
+		Format:  "jsonn",
 	})
 	if err == nil {
 		t.Fatal("expected error for invalid output format")

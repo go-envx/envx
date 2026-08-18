@@ -17,6 +17,25 @@ func newTestPrinter(out, errStream *bytes.Buffer, color bool) *Printer {
 	return New(Options{Out: out, Err: errStream, Color: boolPtr(color)})
 }
 
+// TestLogBlank verifies a single empty line is written to standard error and
+// nothing to standard output.
+func TestLogBlank(t *testing.T) {
+	t.Parallel()
+
+	var out, errStream bytes.Buffer
+	p := newTestPrinter(&out, &errStream, true)
+	if err := p.LogBlank(); err != nil {
+		t.Fatalf("LogBlank() error = %v", err)
+	}
+
+	if got := errStream.String(); got != "\n" {
+		t.Errorf("err = %q, want %q", got, "\n")
+	}
+	if out.Len() != 0 {
+		t.Errorf("out = %q, want empty", out.String())
+	}
+}
+
 // TestLogMessage verifies a plain line is written to standard output, uncolored.
 func TestLogMessage(t *testing.T) {
 	t.Parallel()
@@ -99,7 +118,8 @@ func TestLogErrorNoColor(t *testing.T) {
 }
 
 // TestLogError verifies errors carry the glyph, go to standard error, and are
-// bold-red when color is enabled.
+// red (not bold) when color is enabled, so the hue matches error-severity table
+// cells.
 func TestLogError(t *testing.T) {
 	t.Parallel()
 
@@ -113,8 +133,11 @@ func TestLogError(t *testing.T) {
 	if !strings.Contains(got, errorGlyph+"  "+errorLabel) {
 		t.Errorf("error %q missing glyph and label", got)
 	}
-	if !strings.Contains(got, "\033[1m") || !strings.Contains(got, "\033[31m") {
-		t.Errorf("error %q missing bold-red codes", got)
+	if !strings.Contains(got, "\033[31m") {
+		t.Errorf("error %q missing red code", got)
+	}
+	if strings.Contains(got, "\033[1m") {
+		t.Errorf("error %q should not be bold", got)
 	}
 	if out.Len() != 0 {
 		t.Errorf("out = %q, want empty", out.String())

@@ -81,15 +81,23 @@ func (p *Printer) LogWarning(message string) error {
 	return err
 }
 
-// LogError writes a bold-red error to standard error. The ERROR label always
-// signals severity; the glyph is added only when color is enabled, keeping plain
-// output clean for pipes, logs, and assistive tech.
+// LogError writes a red error to standard error. The ERROR label always signals
+// severity; the glyph is added only when color is enabled, keeping plain output
+// clean for pipes, logs, and assistive tech. The red matches the error severity
+// used in tables so the color is consistent across all output.
 func (p *Printer) LogError(message string) error {
 	body := errorLabel + " " + message
 	if p.errStyle.Enabled() {
 		body = errorGlyph + "  " + body
 	}
-	_, err := fmt.Fprintln(p.err, p.errStyle.Bold(p.errStyle.Red(body)))
+	_, err := fmt.Fprintln(p.err, p.errStyle.Red(body))
+	return err
+}
+
+// LogBlank writes an empty line to standard error, separating a banner or
+// warning from the output that follows on standard output.
+func (p *Printer) LogBlank() error {
+	_, err := fmt.Fprintln(p.err)
 	return err
 }
 

@@ -2,6 +2,7 @@ package explain
 
 import (
 	"github.com/go-envx/envx/app/internal/flags"
+	"github.com/go-envx/envx/app/internal/printer"
 	"github.com/go-envx/envx/app/internal/schema"
 	"github.com/go-envx/envx/app/pkg/arg"
 	"github.com/go-envx/envx/app/pkg/str"
@@ -66,12 +67,16 @@ func NewCommand() *cobra.Command {
 				return err
 			}
 
-			// render the result
+			// render the result through the shared printer
+			pr := printer.New(printer.Options{
+				Out: cmd.OutOrStdout(),
+				Err: cmd.ErrOrStderr(),
+			})
 			return render(&renderParams{
-				Writer: cmd.OutOrStdout(),
-				Result: res,
-				Format: output,
-				Reveal: reveal,
+				Printer: pr,
+				Result:  res,
+				Format:  output,
+				Reveal:  reveal,
 			})
 		},
 	}
