@@ -1,51 +1,86 @@
-# Printer Migration: Adopt the Unified Output Layer Across All Actions
+# Variable Substitution: Compose Values From Other Variables
 
-This document plans the migration of every action's rendering onto the shared `internal/printer` package (backed by `internal/style`), which now owns terminal capability detection, color and glyph styling, severity coloring, aligned tables, and JSON encoding. Each task is a single, independently reviewable pull request. The tasks share one transformation and have no ordering dependencies; the sequence runs from the highest-value, pattern-establishing changes to the trivial ones.
+This plan adds variable substitution to envx: a value may embed a reference to another resolved value, e.g. `POSTGRES_URL: postgresql://user:pass@{{POSTGRES_HOST}}:5432/db`. References may point at other references in any order, transitively, with circular-reference and missing-reference detection. Substitution runs as a reveal-gated stage of resolution, so masked output shows the variable definition and `--reveal` produces the composed value. Each task below is one independently reviewable pull request.
 
-## Overview
+## One effective environment; masked vs revealed
 
-### What already exists
+`get`, `explain`, and `run` all read the same effective environment, so their output mirrors each other. Two axes govern it, and they are independent:
 
-`internal/printer` and `internal/style` are built, tested, and merged. `printer.New(printer.Options{Out, Err, Color})` returns a `*Printer` that auto-detects color per stream (enabled only for a terminal with `NO_COLOR` unset) unless `Color` overrides it. It exposes `LogMessage` (plain, stdout), `LogWarning` (`⚠  WARNING:`, stderr), `LogError` (`✗  ERROR:`, stderr), `WriteJSON` (indented, never colored, stdout), and `WriteTable` (bold header, severity-colored cells, ANSI-safe manual alignment). `style.Severity` maps to cyan (OK), yellow (warning), and red (error). Glyphs are emitted only when color is enabled; the label always carries severity in plain mode.
+- **Source selection (OS override + overload) — always applied, masked or revealed.** A namespace key that is also set in the OS environment resolves to the OS value by default, or to the namespace value under `overload`, exactly as the `run` child process would see it. So masked `get POSTGRES_HOST` returns the OS value when it is set — "return the environment variable instead of the namespace value." This mirrors run's *source choice*. In `explain`, an OS override becomes an `"OS environment"` merge source that shadows the file, so the provenance is visible.
+- **Substitution and secret decryption — reveal-gated.** Masked mode shows definitions (`{{POSTGRES_PASSWORD}}`, `secret://group/key`); `--reveal` substitutes every reference and decrypts secrets, producing the actual composed value. So masked mode mirrors run's source selection, and `--reveal` mirrors run's final values.
 
-### The common transformation
+`get`, `explain`, and `diff` gain a `--overload` flag for this. They enumerate namespace keys only (with OS overriding their values); `run`/`Materialize` additionally union the OS-only keys so the child receives a complete environment.
 
-Every action migration has the same shape:
+## Where this lives
 
-- In `command.go`, build one printer — `printer.New(printer.Options{Out: cmd.OutOrStdout(), Err: cmd.ErrOrStderr()})` — and pass it to `render`. `Color` stays `nil` (auto-detect) unless Task 9 lands.
-- In `render.go`, replace the `Writer io.Writer` field on `renderParams` with a `*printer.Printer`, and rewrite the body to call the printer's semantic methods instead of `fmt.Fprintln`/`fmt.Fprintf`/`text/tabwriter`/a hand-rolled `json.Encoder`.
-- Delete the now-dead local helpers (per-action `tabwriter` setup, ANSI constants, `isTerminal`, bespoke JSON encoders).
-- Update `render_test.go` to construct a printer over `bytes.Buffer` sinks with `Color` forced (`&false` for deterministic plain assertions, `&true` to assert styling), using separate stdout and stderr buffers where an action writes to both.
+`{{VAR}}` is pure namespace resolution, but `{{@VAR}}`, OS override, and overload all need the OS environment. Because `get`/`explain`/`diff` need them too, this is a shared resolution concern, not a run-only one. It lives in `envmerge`, which gains an injected OS-environment snapshot (the `os` package is standard library, already used across the codebase; injecting the snapshot rather than calling `os.Environ()` inside the core keeps envmerge hermetically testable) and an `overload` setting. `overload` and the OS-env composition move out of `runner`: `envmerge.Materialize` becomes the complete effective environment and `runner` becomes a pure exec wrapper that receives a ready environment.
 
-### Cross-cutting decisions
+## Design decisions (locked)
 
-- Severity banners move to stderr. `explain`'s banner becomes `LogError`/`LogWarning` (stderr) so stdout carries only the table. This improves piping (`explain … | grep` no longer sees the banner) and is an intentional behavior change to call out in that PR.
-- `WriteJSON` replaces every action's private `json.NewEncoder(w); SetIndent; Encode` block; JSON output stays byte-for-byte uncolored.
-- Actions keep their own `Format`/`Verbose`/`Reveal` flags; only the write mechanism changes.
-- Prefer `str.Pluralize` for any count-and-noun summary (for example "Decrypted 1 secret" vs. "2 secrets") instead of a hard-coded `secret(s)` suffix. Apply it opportunistically as the remaining tasks touch each action's summary.
-- Data outputs are not messages. `get` and `secrets get --reveal` print a raw value meant for capture in `$(…)`; that value stays a plain write and is never routed through a styling method.
+- **Two reference syntaxes, one delimiter family.** `{{VAR}}` references an envx namespace variable (a final, flattened, uppercased env key), namespace-only, never the OS environment. `{{@VAR}}` references the effective value of a variable: by default the OS environment wins and falls back to the namespace value; under `overload` the namespace value wins and falls back to the OS environment. `@` is chosen over `$` to avoid colliding with Go/Helm `{{$var}}` template variables that may legitimately appear in `values` files. Both patterns are configurable later (Task 7), so the exact sigil is not load-bearing.
+- **Escape hatch.** A leading backslash makes the token a literal: `\{{VAR}}` renders `{{VAR}}`. This mirrors the existing `\secret://` escape and lets a value carry an untouched Go/Helm template.
+- **References resolve against the final env-key namespace.** A `{{VAR}}` resolves against the merged, post-affix map of env keys (the same names `get`/`explain` print). With a `prefix`/`suffix`/`namespace_prefix` in play, write the final key name.
+- **Substitution is reveal-gated; masked shows the definition.** Masked `get`/`explain`/`diff` show the template literal and undecrypted secret references; `--reveal` (and always `run`) substitutes and decrypts. There is no secret taint or masked-wrapping machinery, because masked output never substitutes a secret into a value.
+- **The `explain` TYPE for a composed value is `variable`.** Masked `explain` displays the variable definition, not a resolved value, so the type is `variable`; a referenced secret shows as its own reference. `explain` still reports whether the variable resolves (dry-run status) and shows the composed value only under `--reveal`.
+- **Always on, disable via a setting.** A `disable_substitution` setting (default `false`) turns substitution off so values pass through literally (Task 5). Escaping covers the per-value case.
+- **Missing reference is fatal.** A `{{VAR}}` naming an undefined key, or a `{{@VAR}}` resolving in neither the OS environment nor the namespace, is a hard error (fail-closed, consistent with a dangling `secret://` reference). `explain` reports it as an error-severity row rather than aborting; `run --ignore-errors` (Task 6) can downgrade it so the child still starts.
+- **`KindVariableSubstitution` replaces `KindCommandSubstitution`.** The reserved `Kind` is renamed (value `"variable"`). Running a shell command stays a separate, still-unimplemented future feature.
 
-### Out of scope
+## Syntax
 
-- `run` has no render layer — the child process owns stdout and stderr — so it is not migrated.
-- No new severity levels, output formats, or table features beyond what the printer already provides.
+- `{{VAR}}` — internal reference to another env key's resolved namespace value.
+- `{{@VAR}}` — effective value: OS environment then namespace fallback (namespace then OS under overload).
+- `\{{...}}` — literal `{{...}}` (escape).
+- Whitespace inside the braces is trimmed: `{{ VAR }}` == `{{VAR}}`.
+- A value may contain any number of references mixed with literal text.
+
+## Pipeline placement
+
+The current resolution stages are: `merge(env)` produces `mergeState` (unresolved `leafValue`s); `openResolver(reveal)` yields the secrets `ValueResolver`; then `resolveLeaf` dereferences each item and `renderLeafValue` joins lists. Substitution adds two stages:
+
+1. **Merge** produces namespace `leafValue`s (may hold `secret://` refs and `{{ }}` templates).
+2. **Secret-resolve + render** each leaf (existing) — masked leaves keep secret references, revealed leaves are decrypted — producing `map[string]string` (may still hold `{{ }}` templates).
+3. **Compose the effective environment** (new): overlay the injected OS environment per `overload`. `get`/`explain`/`diff` override namespace key values; `run`/`Materialize` also union OS-only keys.
+4. **Substitute** (new, reveal-gated): resolve every `{{ }}` reference over the effective environment, transitively. Skipped in masked mode; `explain` runs it in dry-run mode to compute status.
+
+## The substitution engine
+
+A pure, string-in/string-out core, unit-testable in isolation:
+
+- **Input:** the composed effective symbol table (`map[string]string`), a `getenv func(name string) (string, bool)` seam (injected so tests are hermetic), and the `overload` flag ordering `{{@VAR}}` fallback.
+- **Tokenizer:** scans a value into literal spans and reference tokens (internal `{{VAR}}` vs OS `{{@VAR}}`), honoring the backslash escape.
+- **Resolver:** a dependency graph walked with DFS + memoization. A `visiting` set detects cycles; a resolved-value cache makes each key resolve once regardless of fan-in. `{{VAR}}` looks up the namespace table; `{{@VAR}}` looks up OS-then-namespace (namespace-then-OS under overload), and a namespace hit re-enters the graph. OS values are opaque leaves.
+- **Modes:** a reveal mode that returns composed values, and a dry-run mode for `explain` that reports resolvability (OK / unresolved / circular) without exposing the value.
+- **Errors:** missing internal reference (names the referencing key and the missing key), missing OS reference (names the referencing key and the variable), and circular reference (lists the cycle path). Errors never include a value.
+
+## Settings
+
+- `disable_substitution` (bool, default `false` = substitution on) — Task 5. Fits the repo's default-false-bool convention.
+- Configurable matching patterns (stretch) — Task 7: an internal-reference pattern and an external/OS-reference pattern, each overriding the built-in default, validated (compiled) at config time.
 
 ## Tasks
 
-- [x] **Task 1 — Migrate `explain` (flagship: table + banner + JSON + severity).** Replace `bannerLine` with `p.LogError`/`p.LogWarning` on stderr, passing only the message body (the printer owns the `ERROR:`/`WARNING:` label and glyph). Replace the `tabwriter` block with `printer.Table`: headers `KEY TYPE VALUE SOURCE STATUS` (plus `RESOLVED` under `--reveal`) and rows of `Cell`s whose STATUS cell carries a `style.Severity` mapped from `envmerge.Severity` via a small local `toStyleSeverity` helper (keeping `style` a dependency-free leaf). Replace `renderJSON` with `p.WriteJSON`. Delete the `text/tabwriter` import and `bannerLine`. Acceptance: masked and `--reveal` tables render, the JSON object is unchanged, the banner is on stderr, and `task envx:all` is green.
+- [x] **Task 1 — Effective environment, overload centralization, and `runner` simplification.** Inject an OS-environment snapshot into `envmerge`; move `overload` from `runner.Params` into `envmerge.Settings`. Compose the effective environment: `get`/`explain`/`diff` override namespace key values from the OS env (overload-aware), with an OS override recorded as an `"OS environment"` merge source that shadows the file; `run`/`Materialize` also union OS-only keys. `envmerge.Materialize` returns the complete effective environment and `runner` becomes a pure exec wrapper taking a ready env (delete its `buildEnv`/overload logic). Add a `--overload` flag to `get`/`explain`/`diff`. No substitution yet. Acceptance: masked `get`/`explain` reflect OS overrides and overload; `explain` shows the OS-environment source; the `run` child environment is byte-identical; `runner` no longer references overload; `task envx:all` green. (May split into a run/runner PR and a get/explain/diff PR.)
 
-- [x] **Task 2 — Migrate `decrypt` and retire the duplicated color code.** Route the summary through `p.LogMessage` and the per-group skipped-key warnings through `p.LogWarning`. Delete the local `ansiYellow`/`ansiReset` constants, the local `isTerminal`, and the `Color`/`ErrWriter` fields threaded through `command.go` and `renderParams` — the printer now owns TTY detection and the stderr sink. Acceptance: warnings still go to stderr, colored on a TTY and plain when piped; the exit code is unchanged; tests assert via a printer over split buffers with forced color.
+- [ ] **Task 2 — Substitution engine (pure core) + `Kind` rename.** Add the tokenizer + dependency-graph resolver as a self-contained unit (effective symbol table + injected `getenv` + `overload` in), with reveal and dry-run modes. Support `{{VAR}}`, `{{@VAR}}` with overload-aware fallback, and the `\{{` escape. Rename `KindCommandSubstitution` to `KindVariableSubstitution` (value `"variable"`). Not wired into any operation yet. Acceptance: exhaustive unit tests (order-independence, transitive chains, diamond fan-in, cycles of length 1 and N, missing internal ref, missing OS ref, OS-then-namespace and overload precedence, escape, multiple refs per value, dry-run status, literal passthrough) and `task envx:all` green.
 
-- [x] **Task 3 — Migrate `diff` (colored change table).** Replace the `tabwriter` rows with colored output: additions green `+`, removals red `-`, changes yellow `~`, following the conventional diff palette. Because green-for-added is not in the severity palette (OK is cyan) and the diff table is headerless, this PR extends the printer minimally: (a) skip the header row when `Table.Headers` is empty, and (b) let a cell carry an explicit color rather than only a severity (for example a `style.Color` enum on `Cell`). Replace the JSON encoder with `p.WriteJSON`. Acceptance: table and JSON shapes are unchanged aside from color, and a no-diff run still prints nothing.
+- [ ] **Task 3 — Wire reveal-gated substitution into `Materialize`, `Get`, and `Diff`.** Add stage 4, gated on reveal (always on for `run`/`Materialize`). Masked `get`/`diff` show definitions unchanged; revealed operations substitute over the effective environment. `Get` resolves the requested key's transitive dependency closure when revealing (a dangling ref behind a *referenced* variable blocks the read; unrelated dangling refs still do not). Missing-ref and cycle are fatal on the reveal path. Acceptance: `run`, `get --reveal`, and `diff --reveal` resolve `{{VAR}}` and `{{@VAR}}`; masked output shows definitions; cycles and missing refs fail clearly; non-substitution behavior is byte-identical.
 
-- [x] **Task 4 — Migrate `encrypt`.** Convert the count-and-path summary, the verbose per-identity list, and the "No plaintext values to encrypt." line to `p.LogMessage`. Acceptance: output parity with today, and tests assert via a printer buffer.
+- [ ] **Task 4 — `explain` substitution diagnostics.** Diagnose each composed value in dry-run mode so status is reported even when masked: TYPE `variable`, LITERAL the template as written, STATUS one of OK / `UNRESOLVED_VARIABLE` / `CIRCULAR_REFERENCE`, and the composed value in the RESOLVED column only under `--reveal`. Acceptance: masked `explain` shows templates with resolvability status in table and JSON; the summary banner reflects unresolved/circular entries; `--reveal` shows resolved values; no value leaks in masked mode.
 
-- [x] **Task 5 — Migrate `keypair` (generate, inspect, print, rotate).** Convert the four sibling summaries from `fmt.Fprintf` to `p.LogMessage`, one PR for the cohesive family. Acceptance: identical text, no private-key material in output, tests updated.
+- [ ] **Task 5 — `disable_substitution` setting.** Full precedence plumbing: `schema.DisableSubstitution` FlagSpec (flag `--disable-substitution`, env `ENVX_DISABLE_SUBSTITUTION`), `schema.Settings` + `envmerge.Settings` fields, manifest key, `config.Input`, flag binding on the resolving commands, and `GetInput` wiring. When set, stage 4 is skipped and `{{ }}` tokens pass through literally. Acceptance: setting resolves through the full flag > env > project > global > default chain and disables substitution; default keeps substitution on.
 
-- [x] **Task 6 — Migrate secrets confirmation summaries (`secrets set`, `secrets delete`).** Route each "… in: <path>" confirmation through `p.LogMessage`. Acceptance: output parity, tests updated.
+- [ ] **Task 6 — `run --ignore-errors`.** A command-local flag on `run` that downgrades *resolution* errors (missing internal ref, missing OS ref, dangling secret) to stderr warnings and omits the failing keys from the child environment so the process still starts. Structural errors (YAML parse, flatten collision) stay fatal; the cycle-vs-fatal decision is settled in this task. Acceptance: `run --ignore-errors` with a missing reference starts the child with the failing key omitted and a warning on stderr; without the flag it fails; a malformed file still aborts regardless.
 
-- [x] **Task 7 — Migrate config-writer summaries (`set`, `create`).** Route `set`'s "Set … in: <path>" and `create`'s scaffold summary through `p.LogMessage`; `create` currently prints from `command.go`, so pass its `summary()` string through the printer instead. Acceptance: output parity, tests updated.
+- [ ] **Task 7 — Configurable matching patterns (stretch).** Two settings supplying regexes for the internal-reference and external/OS-reference syntaxes, each overriding the built-in default and validated (compiled) at config time with a clear error on an invalid pattern. Acceptance: a workspace can redefine the reference syntaxes; an invalid pattern fails at config resolution, not at use.
 
-- [ ] **Task 8 — Migrate value and presence outputs (`get`, `secrets get`).** Route the presence *message* (`secrets get` masked: "Secret … exists …") through `p.LogMessage`, but keep the raw *value* outputs (`get`, and `secrets get --reveal`) on a plain write so captured output stays byte-identical for scripting. `get` may otherwise be left unchanged. Acceptance: piped value output is unchanged, and the presence message matches today.
+- [ ] **Task 8 — Documentation.** Site docs (a substitution page under configuration, plus schema entries for the new setting/flags and the `--overload` additions) and any README/help-text updates, done once the feature is complete and safe to teach.
 
-- [ ] **Task 9 — Global `--no-color` flag (optional).** Add a `schema` flag (`--no-color`; the printer already honors the `NO_COLOR` env var) and thread it into each command's `printer.Options.Color` (`false` when set, `nil` otherwise). Acceptance: `--no-color` forces plain output even on a TTY; default behavior is unchanged.
+## Out of scope
+
+- Command substitution (running a shell command); `KindVariableSubstitution` is this feature, and shell command substitution remains a separate future feature.
+- A masked structural preview (substitute non-secrets, wrap secrets as `{secret://group/key}`); the definition view is used instead. Revisit only if a safe composed preview is wanted, which would reintroduce secret taint tracking.
+- Default-value syntax for references (e.g. `{{@VAR:-fallback}}`); revisit only if a real need appears.
+- Re-checking a substituted expansion against the list delimiter.
+- External secret backends and any change to the secret store format.
+- Windows case-insensitive environment-variable matching. OS-key composition (and the upcoming `{{@VAR}}` OS-reference lookup) matches keys case-sensitively, so on Windows a namespace key colliding case-insensitively with an OS var (e.g. `PATH` vs `Path`) may miss its override and let Go's `os/exec` case-fold dedup pick the surviving value nondeterministically. This is pre-existing behavior (the former `runner` env merge was equally case-sensitive) and is preserved byte-for-byte here; first-class Windows support would need a platform-aware key-normalization seam applied consistently at every OS-env boundary, done as its own follow-up.

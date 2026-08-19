@@ -93,6 +93,10 @@ func (m *Manager) Materialize(environment string) (*Environment, error) {
 		return nil, err
 	}
 
+	// Compose the complete effective environment: overlay OS overrides and union
+	// OS-only keys so the child receives every variable it would see under a shell.
+	m.applyOSEnvironment(state, true)
+
 	resolver, err := m.openResolver(true)
 	if err != nil {
 		return nil, err
@@ -111,7 +115,7 @@ func (m *Manager) Materialize(environment string) (*Environment, error) {
 func resolveLeaf(
 	value leafValue, resolver ValueResolver, environment string,
 ) (leafValue, error) {
-	if resolver == nil {
+	if value.opaque || resolver == nil {
 		return value, nil
 	}
 

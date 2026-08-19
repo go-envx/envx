@@ -4,11 +4,11 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/go-envx/envx/app/internal/cipher"
 	"github.com/go-envx/envx/app/internal/envmerge"
 	"github.com/go-envx/envx/app/internal/manifest"
-	"github.com/go-envx/envx/app/internal/runner"
 	"github.com/go-envx/envx/app/internal/schema"
 	"github.com/go-envx/envx/app/internal/secrets"
 	"github.com/go-envx/envx/app/pkg/file"
@@ -217,7 +217,6 @@ func resolveManifest(mc manifestContext, in *Input) (*Result, envmerge.Params, e
 	// Build the config Result from the manifest context, Input, and project layer.
 	// Envmerge is left nil here; ResolveProject constructs and assigns the Manager.
 	return &Result{
-		Runner:             resolveRunnerParams(mc, in, pl),
 		Secrets:            resolveSecretsParams(mc),
 		Cipher:             resolveCipherParams(mc),
 		defaultEnvironment: params.DefaultEnvironment,
@@ -299,24 +298,28 @@ func resolveEnvmergeParams(
 				proj.NamespacePrefix,
 				global.NamespacePrefix,
 			),
+			Overload: precedenceBool(&schema.Overload,
+				in.Overload,
+				proj.Overload,
+				global.Overload,
+			),
 		},
+		OSEnvironment: osEnvironment(),
 	}
 }
 
-// resolveRunnerParams builds the runner input: the overload knob layered through
-// the precedence chain explicit (input) > ENVX_OVERLOAD > project > global.
-func resolveRunnerParams(
-	mc manifestContext,
-	in *Input,
-	pl projectLayer,
-) runner.Params {
-	return runner.Params{
-		Overload: precedenceBool(&schema.Overload,
-			in.Overload,
-			pl.settings.Overload,
-			mc.manifest.Settings.Overload,
-		),
+// osEnvironment snapshots the process environment into a map so envmerge can
+// compose the effective environment from an injected value rather than reading
+// os.Environ() inside its core.
+func osEnvironment() map[string]string {
+	environ := os.Environ()
+	out := make(map[string]string, len(environ))
+	for _, entry := range environ {
+		if i := strings.IndexByte(entry, '='); i >= 0 {
+			out[entry[:i]] = entry[i+1:]
+		}
 	}
+	return out
 }
 
 // resolveSecretsParams builds the secrets input: the resolved workspace store

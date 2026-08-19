@@ -1,6 +1,9 @@
 package envmerge
 
-import "slices"
+import (
+	"maps"
+	"slices"
+)
 
 // defaultDelimiter joins list-valued leaves when no delimiter is configured.
 const defaultDelimiter = ","
@@ -24,6 +27,11 @@ type Params struct {
 	// ResolverFactory opens a fresh, operation-scoped value resolver on demand. A
 	// nil factory is identity behavior for callers with no reference syntax.
 	ResolverFactory ValueResolverFactory
+	// OSEnvironment is the injected snapshot of the process environment used to
+	// compose the effective environment. Injecting it rather than calling
+	// os.Environ() in the core keeps envmerge hermetically testable; a nil map is
+	// an empty environment with no OS overrides.
+	OSEnvironment map[string]string
 }
 
 // ValueResolver dereferences one winning scalar value and returns unrecognized
@@ -63,6 +71,10 @@ type Settings struct {
 	Delimiter string
 	// NamespacePrefix prefixes each resolved key with its namespace name.
 	NamespacePrefix bool
+	// Overload controls source selection against the OS environment: false
+	// (default) lets an OS value override a namespace key, true lets the namespace
+	// value win. It mirrors exactly the precedence a run child process sees.
+	Overload bool
 }
 
 // normalizeParams applies envmerge's structural terminal defaults, copies the
@@ -76,9 +88,11 @@ func normalizeParams(params Params) (Params, error) {
 		params.Settings.Delimiter = defaultDelimiter
 	}
 
-	// Copy caller-owned slices so caller mutation cannot change manager behavior.
+	// Copy caller-owned slices and the OS snapshot so caller mutation cannot
+	// change manager behavior.
 	params.Includes = slices.Clone(params.Includes)
 	params.Environments = slices.Clone(params.Environments)
+	params.OSEnvironment = maps.Clone(params.OSEnvironment)
 
 	// No structural defaults fail today; the error result keeps the contract
 	// stable for future validation.

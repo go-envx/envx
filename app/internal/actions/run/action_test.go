@@ -54,6 +54,27 @@ func TestExecuteOverloadFromEnv(t *testing.T) {
 	}
 }
 
+// TestExecuteUnionsOSKeys verifies the child receives OS-only environment
+// variables too, so the effective environment stays complete now that
+// Materialize (not the runner) composes it.
+func TestExecuteUnionsOSKeys(t *testing.T) {
+	t.Setenv("OS_ONLY_VAR", "present")
+
+	path := fixtures.Manifest("basic")
+	var stdout bytes.Buffer
+	in := &config.Input{ConfigPath: &path}
+	err := execute(actionParams{
+		Project:  "api-core",
+		ExecArgs: []string{"printenv", "OS_ONLY_VAR"},
+	}, in, streams{Stdout: &stdout, Stderr: io.Discard})
+	if err != nil {
+		t.Fatalf("execute: %v", err)
+	}
+	if got := stdout.String(); got != "present\n" {
+		t.Errorf("child OS_ONLY_VAR = %q, want present", got)
+	}
+}
+
 // TestExecuteRevealFailurePreventsChildStartup verifies run reveals secrets
 // before starting the child, so a reference it cannot decrypt fails during
 // resolution and the child process never runs. The workspace stores real

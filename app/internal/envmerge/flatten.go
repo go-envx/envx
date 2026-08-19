@@ -13,6 +13,10 @@ type leafValue struct {
 	items []string
 	// list distinguishes a YAML list from a scalar, including an empty list.
 	list bool
+	// opaque marks a value taken from the OS environment: it bypasses reference
+	// resolution and substitution, so a value that looks like a reference is never
+	// dereferenced.
+	opaque bool
 }
 
 // flatten converts a nested map to flat KEY=VALUE pairs while preserving scalar

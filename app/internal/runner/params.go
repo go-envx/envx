@@ -9,12 +9,10 @@ import (
 // parameters controlling how Run runs the command. Every field is optional; Run
 // normalizes terminal defaults itself via normalizeParams.
 type Params struct {
-	// Env is the merged set of env vars to inject into the child process.
+	// Env is the complete, ready-to-inject set of env vars for the child process.
+	// It is the effective environment the caller already composed (namespace
+	// values, OS overrides, and OS-only keys); Run injects it verbatim.
 	Env map[string]string
-	// Overload controls env-var precedence:
-	//   false (default): existing OS env vars take priority over file values.
-	//   true:            file values override existing OS env vars.
-	Overload bool
 	// Stdout override where the child's output is written.
 	// When nil, os.Stdout is used (normal interactive mode).
 	// This is configurable primarily for in-process testing.

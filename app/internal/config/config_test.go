@@ -163,31 +163,31 @@ func TestOverloadResolution(t *testing.T) {
 	}
 
 	t.Run("explicit wins over manifest", func(t *testing.T) {
-		r, _, err := resolveManifest(
+		_, params, err := resolveManifest(
 			manifestContext{manifest: manifestWith(boolPtr(false), nil), project: "api"},
 			&Input{Overload: boolPtr(true)},
 		)
 		if err != nil {
 			t.Fatal(err)
 		}
-		if !r.Runner.Overload {
+		if !params.Settings.Overload {
 			t.Error("explicit overload true should win")
 		}
 	})
 	t.Run("manifest global layer honored", func(t *testing.T) {
-		r, _, err := resolveManifest(
+		_, params, err := resolveManifest(
 			manifestContext{manifest: manifestWith(boolPtr(true), nil), project: "api"},
 			&Input{},
 		)
 		if err != nil {
 			t.Fatal(err)
 		}
-		if !r.Runner.Overload {
+		if !params.Settings.Overload {
 			t.Error("manifest global overload=true should be honored")
 		}
 	})
 	t.Run("project layer over global", func(t *testing.T) {
-		r, _, err := resolveManifest(
+		_, params, err := resolveManifest(
 			manifestContext{
 				manifest: manifestWith(boolPtr(false), boolPtr(true)),
 				project:  "api",
@@ -197,7 +197,7 @@ func TestOverloadResolution(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if !r.Runner.Overload {
+		if !params.Settings.Overload {
 			t.Error("project overload=true should win over global false")
 		}
 	})

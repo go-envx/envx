@@ -6,7 +6,6 @@ import (
 
 	"github.com/go-envx/envx/app/internal/cipher"
 	"github.com/go-envx/envx/app/internal/envmerge"
-	"github.com/go-envx/envx/app/internal/runner"
 	"github.com/go-envx/envx/app/internal/secrets"
 )
 
@@ -17,11 +16,6 @@ type Result struct {
 	// Envmerge is the constructed envmerge Manager the environment-building actions
 	// operate through. ResolveProject builds it; ResolveWorkspace leaves it nil.
 	Envmerge *envmerge.Manager
-
-	// Runner is the resolved runner input for actions that run a command. Config
-	// resolves only the Overload knob (flag > ENVX_OVERLOAD > project > global); the
-	// run action supplies the merged Env and output streams before invoking runner.
-	Runner runner.Params
 
 	// Secrets locates the workspace secrets store and private-key file.
 	// ResolveProject binds these into the resolver factory the Manager opens on

@@ -3,7 +3,6 @@ package runner
 import (
 	"errors"
 	"fmt"
-	"maps"
 	"os"
 	"os/exec"
 	"os/signal"
@@ -36,9 +35,9 @@ var ttyDeliveredSignals = map[os.Signal]bool{
 	syscall.SIGQUIT: true, // SIGQUIT — Ctrl+\
 }
 
-// Run spawns the specified command as a child process with the merged
-// environment (respecting Overload precedence). It stays deliberately
-// transparent: rather than binding the child's lifetime to a context and
+// Run spawns the specified command as a child process with the ready-to-inject
+// environment supplied in Params.Env. It stays deliberately transparent: rather
+// than binding the child's lifetime to a context and
 // force-killing it, Run relays received signals to the child and lets the child
 // decide when to exit, then mirrors its exit status — so `envx run -- cmd`
 // behaves just like running `cmd` directly. Returns nil on success, an
@@ -61,7 +60,7 @@ func Run(args []string, p Params) error {
 	cmd.Stdin = os.Stdin
 	cmd.Stdout = p.Stdout
 	cmd.Stderr = p.Stderr
-	cmd.Env = buildEnv(p)
+	cmd.Env = mapToEnv(p.Env)
 
 	if err := cmd.Start(); err != nil {
 		// Mirror a shell: report the failure and exit with its conventional code
@@ -155,42 +154,7 @@ func stdinIsTerminal() bool {
 	return info.Mode()&os.ModeCharDevice != 0
 }
 
-// buildEnv constructs the full environment slice for the child process by
-// combining the OS environment with the merged file values. With Overload=false
-// (default) OS env wins, so CI-set vars cannot be clobbered by checked-in
-// files; with Overload=true file values win.
-func buildEnv(p Params) []string {
-	var base, overlay map[string]string
-
-	osEnv := envToMap(os.Environ())
-	if p.Overload {
-		base, overlay = osEnv, p.Env
-	} else {
-		base, overlay = p.Env, osEnv
-	}
-
-	env := make(map[string]string, len(base)+len(overlay))
-	maps.Copy(env, base)
-	maps.Copy(env, overlay)
-	return mapToEnv(env)
-}
-
-// envToMap converts an os.Environ()-style slice (["KEY=VALUE", ...]) into a map
-// for easy lookup and overlay operations.
-func envToMap(environ []string) map[string]string {
-	m := make(map[string]string, len(environ))
-	for _, entry := range environ {
-		for i := range entry {
-			if entry[i] == '=' {
-				m[entry[:i]] = entry[i+1:]
-				break
-			}
-		}
-	}
-	return m
-}
-
-// mapToEnv converts a key-value map back into the os.Environ() slice format
+// mapToEnv converts a key-value map into the os.Environ() slice format
 // (["KEY=VALUE", ...]) suitable for exec.Cmd.Env.
 func mapToEnv(m map[string]string) []string {
 	result := make([]string, 0, len(m))
