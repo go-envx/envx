@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/go-envx/envx/app/internal/printer"
 	"github.com/go-envx/envx/app/pkg/str"
 	"github.com/spf13/cobra"
 )
@@ -63,11 +64,13 @@ func newTemplateCmd(name, short, long string) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			out := summary(name, targetDir, res.Written)
-			if _, err := fmt.Fprint(cmd.OutOrStdout(), out); err != nil {
-				return err
-			}
-			return nil
+
+			// render the scaffold summary through the shared printer
+			pr := printer.New(printer.Options{
+				Out: cmd.OutOrStdout(),
+				Err: cmd.ErrOrStderr(),
+			})
+			return pr.LogMessage(summary(name, targetDir, res.Written))
 		},
 	}
 	cmd.Flags().StringVar(&targetDir, "target-dir", name, "directory to scaffold into")
@@ -90,5 +93,5 @@ func summary(name, targetDir string, written []string) string {
 		"  cd "+targetDir,
 		"  envx get api-service DATABASE_HOST",
 	)
-	return strings.Join(lines, "\n") + "\n"
+	return strings.Join(lines, "\n")
 }
