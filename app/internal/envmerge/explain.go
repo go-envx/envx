@@ -83,6 +83,10 @@ func (m *Manager) Explain(params ExplainParams) (*Explanation, error) {
 		return nil, err
 	}
 
+	// Apply OS source selection over the namespace keys so an override surfaces as
+	// an "OS environment" source; OS-only keys are left out of the enumeration.
+	m.applyOSEnvironment(state, false)
+
 	keys, err := explainKeys(state, params.Key)
 	if err != nil {
 		return nil, err
@@ -98,7 +102,7 @@ func (m *Manager) Explain(params ExplainParams) (*Explanation, error) {
 	var summary ExplanationSummary
 	for _, key := range keys {
 		value := state.values[key]
-		resolution := diagnoseLeaf(value, diagnoser, environment, delimiter)
+		resolution := diagnoseLeaf(value, diagnoser, environment, delimiter, params.Reveal)
 		switch resolution.Severity {
 		case SeverityError:
 			summary.Errors++
@@ -164,7 +168,21 @@ func (m *Manager) openDiagnoser(reveal bool) (ValueDiagnoser, error) {
 // materialized, and list items are rejoined with the delimiter.
 func diagnoseLeaf(
 	value leafValue, diagnoser ValueDiagnoser, environment, delimiter string,
+	reveal bool,
 ) Resolution {
+	// An opaque OS value is a plain config value that resolves to itself; its
+	// plaintext is retained only under reveal, mirroring a plain config value.
+	if value.opaque {
+		resolution := Resolution{
+			Kind: KindConfigValue, Severity: SeverityOK, Code: codeOK,
+		}
+		if reveal {
+			resolution.Resolved = literalValue(value, delimiter)
+			resolution.HasResolved = true
+		}
+		return resolution
+	}
+
 	if diagnoser == nil {
 		return Resolution{Kind: KindConfigValue, Severity: SeverityOK, Code: codeOK}
 	}

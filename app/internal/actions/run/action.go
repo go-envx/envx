@@ -24,8 +24,9 @@ type streams struct {
 }
 
 // execute is the imperative shell: resolve the input into an envmerge.Manager,
-// materialize the complete environment, then run the child process with it using
-// the resolved overload setting.
+// materialize the complete effective environment, then run the child process with
+// it. Overload and OS composition are settled inside Materialize, so the runner
+// receives a ready environment.
 func execute(p actionParams, in *config.Input, s streams) error {
 	// resolve the input config
 	resolved, err := config.ResolveProject(in, p.Project)
@@ -43,15 +44,12 @@ func execute(p actionParams, in *config.Input, s streams) error {
 		return err
 	}
 
-	// start from the resolved runner params, then supply the merged environment
-	// and output streams the config layer can't know about.
-	params := resolved.Runner
-	params.Env = env.All()
-	params.Stdout = s.Stdout
-	params.Stderr = s.Stderr
-
-	// run the child process with the merged environment; the runner forwards
-	// signals to the child and surfaces a non-zero or signal-terminated exit as
-	// an *exitcode.Error so main.go can propagate it.
-	return runner.Run(p.ExecArgs, params)
+	// run the child process with the ready environment; the runner injects it
+	// verbatim, forwards signals to the child, and surfaces a non-zero or
+	// signal-terminated exit as an *exitcode.Error so main.go can propagate it.
+	return runner.Run(p.ExecArgs, runner.Params{
+		Env:    env.All(),
+		Stdout: s.Stdout,
+		Stderr: s.Stderr,
+	})
 }

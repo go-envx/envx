@@ -59,6 +59,11 @@ func (m *Manager) Diff(environmentA, environmentB string) (*DiffResult, error) {
 		return nil, err
 	}
 
+	// Apply OS source selection to each side so an OS override is compared exactly
+	// as run would see it; OS-only keys are excluded from the comparison.
+	m.applyOSEnvironment(stateA, false)
+	m.applyOSEnvironment(stateB, false)
+
 	delimiter := m.params.Settings.Delimiter
 	literalsA, err := renderLiterals(stateA, delimiter)
 	if err != nil {

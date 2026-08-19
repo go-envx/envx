@@ -10,8 +10,8 @@ import (
 	"github.com/go-envx/envx/app/internal/exitcode"
 )
 
-// TestRunInjectsEnv verifies the merged env is passed to the child and that file
-// values appear in its environment.
+// TestRunInjectsEnv verifies the merged env is passed to the child and that only
+// the supplied values appear in its environment.
 func TestRunInjectsEnv(t *testing.T) {
 	t.Parallel()
 
@@ -44,44 +44,6 @@ func TestRunPropagatesExitCode(t *testing.T) {
 	}
 	if ec.Code != 3 {
 		t.Errorf("Code = %d, want 3", ec.Code)
-	}
-}
-
-// TestRunOverloadPrecedence verifies that Overload lets file values win over an
-// OS env var of the same name.
-func TestRunOverloadPrecedence(t *testing.T) {
-	t.Setenv("SHARED_KEY", "from-os")
-
-	var stdout bytes.Buffer
-	err := Run([]string{"printenv", "SHARED_KEY"}, Params{
-		Env:      map[string]string{"SHARED_KEY": "from-file"},
-		Overload: true,
-		Stdout:   &stdout,
-		Stderr:   &bytes.Buffer{},
-	})
-	if err != nil {
-		t.Fatalf("Run: %v", err)
-	}
-	if got := stdout.String(); got != "from-file\n" {
-		t.Errorf("with overload child saw %q, want %q", got, "from-file\n")
-	}
-}
-
-// TestRunDefaultPrecedence verifies that without Overload the OS env var wins.
-func TestRunDefaultPrecedence(t *testing.T) {
-	t.Setenv("SHARED_KEY", "from-os")
-
-	var stdout bytes.Buffer
-	err := Run([]string{"printenv", "SHARED_KEY"}, Params{
-		Env:    map[string]string{"SHARED_KEY": "from-file"},
-		Stdout: &stdout,
-		Stderr: &bytes.Buffer{},
-	})
-	if err != nil {
-		t.Fatalf("Run: %v", err)
-	}
-	if got := stdout.String(); got != "from-os\n" {
-		t.Errorf("without overload child saw %q, want %q", got, "from-os\n")
 	}
 }
 

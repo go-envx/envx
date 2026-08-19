@@ -44,6 +44,10 @@ func (m *Manager) Get(params GetParams) (Entry, error) {
 		return Entry{}, err
 	}
 
+	// Apply OS source selection over the namespace keys, without unioning OS-only
+	// keys, so a get reflects an OS override exactly as run would.
+	m.applyOSEnvironment(state, false)
+
 	key := strings.ToUpper(params.Key)
 	value, ok := state.values[key]
 	if !ok {
