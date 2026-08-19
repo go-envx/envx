@@ -2,7 +2,6 @@ package encrypt
 
 import (
 	"fmt"
-	"strconv"
 	"strings"
 
 	"github.com/go-envx/envx/app/internal/printer"
@@ -31,7 +30,7 @@ func render(p *renderParams) error {
 	fmt.Fprintf(
 		&b, "Encrypted %s in:\n%s",
 		str.Pluralize(len(p.Result.Changed), "secret", "secrets"),
-		renderStorePath(p.Result.StorePath),
+		str.QuotePath(p.Result.StorePath),
 	)
 	if p.Verbose {
 		for _, secret := range p.Result.Changed {
@@ -39,13 +38,4 @@ func render(p *renderParams) error {
 		}
 	}
 	return p.Printer.LogMessage(b.String())
-}
-
-// renderStorePath quotes a path only when a space would make its boundary
-// ambiguous in terminal output.
-func renderStorePath(path string) string {
-	if strings.Contains(path, " ") {
-		return strconv.Quote(path)
-	}
-	return path
 }

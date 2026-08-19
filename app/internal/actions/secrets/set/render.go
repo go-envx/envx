@@ -2,10 +2,9 @@ package set
 
 import (
 	"fmt"
-	"strconv"
-	"strings"
 
 	"github.com/go-envx/envx/app/internal/printer"
+	"github.com/go-envx/envx/app/pkg/str"
 )
 
 // renderParams are the inputs to the set action renderer.
@@ -22,15 +21,6 @@ func render(p *renderParams) error {
 		"Stored secret %q in group %q at:\n%s",
 		p.Result.Key,
 		p.Result.Group,
-		renderStorePath(p.Result.StorePath),
+		str.QuotePath(p.Result.StorePath),
 	))
-}
-
-// renderStorePath quotes a path only when a space would make its boundary
-// ambiguous in terminal output.
-func renderStorePath(path string) string {
-	if strings.Contains(path, " ") {
-		return strconv.Quote(path)
-	}
-	return path
 }

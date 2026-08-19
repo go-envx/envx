@@ -165,17 +165,3 @@ func TestRenderSilentSummaryWhenAllSkipped(t *testing.T) {
 		t.Errorf("stderr = %q, want a warning", errOut.String())
 	}
 }
-
-// TestRenderStorePathQuotesSpaces verifies a path with a space is quoted so its
-// boundary is unambiguous.
-func TestRenderStorePathQuotesSpaces(t *testing.T) {
-	t.Parallel()
-
-	if got := renderStorePath("/no/space"); got != "/no/space" {
-		t.Errorf("renderStorePath() = %q, want the raw path", got)
-	}
-	const spaced = "/with space/secrets.yaml"
-	if got := renderStorePath(spaced); got != `"`+spaced+`"` {
-		t.Errorf("renderStorePath() = %q, want a quoted path", got)
-	}
-}

@@ -2,7 +2,6 @@ package decrypt
 
 import (
 	"fmt"
-	"strconv"
 	"strings"
 
 	"github.com/go-envx/envx/app/internal/printer"
@@ -50,7 +49,7 @@ func renderSummary(p *printer.Printer, result actionResult, verbose bool) error 
 	fmt.Fprintf(
 		&b, "Decrypted %s in:\n%s",
 		str.Pluralize(len(result.Changed), "secret", "secrets"),
-		renderStorePath(result.StorePath),
+		str.QuotePath(result.StorePath),
 	)
 	if verbose {
 		for _, secret := range result.Changed {
@@ -71,13 +70,4 @@ func renderWarnings(p *printer.Printer, groups []string) error {
 		}
 	}
 	return nil
-}
-
-// renderStorePath quotes a path only when a space would make its boundary
-// ambiguous in terminal output.
-func renderStorePath(path string) string {
-	if strings.Contains(path, " ") {
-		return strconv.Quote(path)
-	}
-	return path
 }
