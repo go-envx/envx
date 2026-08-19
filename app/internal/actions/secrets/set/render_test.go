@@ -3,15 +3,24 @@ package set
 import (
 	"bytes"
 	"testing"
+
+	"github.com/go-envx/envx/app/internal/printer"
 )
+
+// plainPrinter builds a printer over the given sinks with color forced off so
+// assertions can match exact, unstyled output.
+func plainPrinter(out, errOut *bytes.Buffer) *printer.Printer {
+	disabled := false
+	return printer.New(printer.Options{Out: out, Err: errOut, Color: &disabled})
+}
 
 // TestRenderReportsStorePath verifies safe metadata uses a dedicated path line.
 func TestRenderReportsStorePath(t *testing.T) {
 	t.Parallel()
 
-	var output bytes.Buffer
+	var output, errOut bytes.Buffer
 	err := render(&renderParams{
-		Writer: &output,
+		Printer: plainPrinter(&output, &errOut),
 		Result: actionResult{
 			Group:     "production",
 			Key:       "database_password",
@@ -26,6 +35,9 @@ func TestRenderReportsStorePath(t *testing.T) {
 	if output.String() != want {
 		t.Errorf("rendered output = %q, want %q", output.String(), want)
 	}
+	if errOut.Len() != 0 {
+		t.Errorf("stderr = %q, want empty", errOut.String())
+	}
 }
 
 // TestRenderQuotesStorePathWithSpaces verifies paths with spaces remain
@@ -33,9 +45,9 @@ func TestRenderReportsStorePath(t *testing.T) {
 func TestRenderQuotesStorePathWithSpaces(t *testing.T) {
 	t.Parallel()
 
-	var output bytes.Buffer
+	var output, errOut bytes.Buffer
 	err := render(&renderParams{
-		Writer: &output,
+		Printer: plainPrinter(&output, &errOut),
 		Result: actionResult{
 			Group:     "production",
 			Key:       "db_pass4",
@@ -49,5 +61,8 @@ func TestRenderQuotesStorePathWithSpaces(t *testing.T) {
 		"\"/workspace/my secrets/secrets.yaml\"\n"
 	if output.String() != want {
 		t.Errorf("rendered output = %q, want %q", output.String(), want)
+	}
+	if errOut.Len() != 0 {
+		t.Errorf("stderr = %q, want empty", errOut.String())
 	}
 }
