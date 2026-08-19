@@ -22,26 +22,34 @@ type actionParams struct {
 	Value string
 }
 
+// actionResult carries the written key and overlay location to the renderer.
+type actionResult struct {
+	// Key is the dot-separated key path that was written.
+	Key string
+	// OverlayPath is the overlay file that received the value.
+	OverlayPath string
+}
+
 // execute is the imperative shell: it resolves the target overlay (environment +
 // include path) via config, reads the current document into a YAML node tree,
 // applies the pure edit, and writes the result back atomically. Editing the node
 // tree in place preserves the file's comments, key order, and formatting; set
 // never invokes envmerge since no project means there is nothing to merge.
-func execute(p actionParams, in *config.Input) error {
+func execute(p actionParams, in *config.Input) (actionResult, error) {
 	// resolve the workspace (no project) and derive the target overlay file
 	resolved, err := config.ResolveWorkspace(in)
 	if err != nil {
-		return err
+		return actionResult{}, err
 	}
 	target, err := resolved.OverlayPath(p.IncludePath)
 	if err != nil {
-		return err
+		return actionResult{}, err
 	}
 
 	// read the current document, preserving comments, key order, and formatting
 	doc, source, err := readDoc(target)
 	if err != nil {
-		return err
+		return actionResult{}, err
 	}
 
 	// match the file's existing indentation so the edit blends in
@@ -49,16 +57,19 @@ func execute(p actionParams, in *config.Input) error {
 
 	// apply the change surgically to the node tree
 	if err := apply(doc, p); err != nil {
-		return fmt.Errorf("setting %q in %s: %w", p.Key, target, err)
+		return actionResult{}, fmt.Errorf("setting %q in %s: %w", p.Key, target, err)
 	}
 
 	// re-encode and write the result back atomically
 	out, err := yamlx.Marshal(doc, indent)
 	if err != nil {
-		return fmt.Errorf("marshaling %s: %w", target, err)
+		return actionResult{}, fmt.Errorf("marshaling %s: %w", target, err)
 	}
 	out = yamlx.PreserveBlankLines(source, out)
-	return file.WriteAtomic(target, out)
+	if err := file.WriteAtomic(target, out); err != nil {
+		return actionResult{}, err
+	}
+	return actionResult{Key: p.Key, OverlayPath: target}, nil
 }
 
 // readDoc parses the overlay at path into a YAML document node, preserving its

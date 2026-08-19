@@ -2,6 +2,7 @@ package set
 
 import (
 	"github.com/go-envx/envx/app/internal/flags"
+	"github.com/go-envx/envx/app/internal/printer"
 	"github.com/go-envx/envx/app/pkg/str"
 	"github.com/spf13/cobra"
 )
@@ -47,7 +48,20 @@ func NewCommand() *cobra.Command {
 
 			// execute the action
 			in := flags.GetInput(cmd.Flags())
-			return execute(p, in)
+			result, err := execute(p, in)
+			if err != nil {
+				return err
+			}
+
+			// render the write confirmation through the shared printer
+			pr := printer.New(printer.Options{
+				Out: cmd.OutOrStdout(),
+				Err: cmd.ErrOrStderr(),
+			})
+			return render(&renderParams{
+				Printer: pr,
+				Result:  result,
+			})
 		},
 	}
 

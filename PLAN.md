@@ -44,7 +44,7 @@ Every action migration has the same shape:
 
 - [x] **Task 6 — Migrate secrets confirmation summaries (`secrets set`, `secrets delete`).** Route each "… in: <path>" confirmation through `p.LogMessage`. Acceptance: output parity, tests updated.
 
-- [ ] **Task 7 — Migrate config-writer summaries (`set`, `create`).** Route `set`'s "Set … in: <path>" and `create`'s scaffold summary through `p.LogMessage`; `create` currently prints from `command.go`, so pass its `summary()` string through the printer instead. Acceptance: output parity, tests updated.
+- [x] **Task 7 — Migrate config-writer summaries (`set`, `create`).** Route `set`'s "Set … in: <path>" and `create`'s scaffold summary through `p.LogMessage`; `create` currently prints from `command.go`, so pass its `summary()` string through the printer instead. Acceptance: output parity, tests updated.
 
 - [ ] **Task 8 — Migrate value and presence outputs (`get`, `secrets get`).** Route the presence *message* (`secrets get` masked: "Secret … exists …") through `p.LogMessage`, but keep the raw *value* outputs (`get`, and `secrets get --reveal`) on a plain write so captured output stays byte-identical for scripting. `get` may otherwise be left unchanged. Acceptance: piped value output is unchanged, and the presence message matches today.
 
