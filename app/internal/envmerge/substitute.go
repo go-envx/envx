@@ -154,14 +154,50 @@ func (e *circularReferenceError) Error() string {
 	return "circular reference: " + strings.Join(e.cycle, " -> ")
 }
 
+// symbolTable is the substitution engine's view of the variable namespace. It
+// separates a cheap declared check from value resolution so an OS-first {{@VAR}}
+// lookup never forces resolution of a namespace value the OS environment
+// supersedes, and it marks opaque OS values that must not be re-tokenized.
+type symbolTable struct {
+	// declared reports whether name is a namespace variable.
+	declared func(name string) bool
+	// opaque reports whether name's value is an opaque OS value that must be
+	// carried through without substitution.
+	opaque func(name string) bool
+	// value resolves name to its unsubstituted value, decrypting secrets under the
+	// active reveal policy. The engine invokes it at most once per name.
+	value func(name string) (string, error)
+}
+
+// mapSymbols builds a symbolTable over a fully resolved value map keyed the same
+// as its origins. Every value is already materialized, so value never fails;
+// opacity is read from provenance so an OS-sourced value is carried through
+// without substitution.
+func mapSymbols(values map[string]string, origins map[string]Origin) symbolTable {
+	return symbolTable{
+		declared: func(name string) bool { _, ok := values[name]; return ok },
+		opaque:   func(name string) bool { return origins[name].Winner.File == osSource },
+		value:    func(name string) (string, error) { return values[name], nil },
+	}
+}
+
+// rawEntry memoizes one symbol's unsubstituted value and any resolution error so
+// each symbol is materialized at most once regardless of fan-in.
+type rawEntry struct {
+	// value is the symbol's unsubstituted value.
+	value string
+	// err is the resolution error, if any.
+	err error
+}
+
 // substituter composes variable references over an effective symbol table. It is
-// a pure, string-in/string-out core: the namespace table supplies internal
-// variables, the getenv seam supplies OS variables, and overload orders the
+// a string-in/string-out core: the symbol table supplies internal variables and
+// their opacity, the getenv seam supplies OS variables, and overload orders the
 // {{@VAR}} fallback. A resolved-value cache makes each variable compose once
 // regardless of fan-in, and a visiting stack detects cycles.
 type substituter struct {
-	// table maps each internal variable name to its unresolved value.
-	table map[string]string
+	// symbols is the engine's view of the namespace.
+	symbols symbolTable
 	// getenv reads an OS variable, reporting whether it is set.
 	getenv func(name string) (string, bool)
 	// overload flips {{@VAR}} ordering: namespace-then-OS when true, OS-then-
@@ -173,26 +209,57 @@ type substituter struct {
 	visiting map[string]bool
 	// stack records the active resolution path to report a cycle.
 	stack []string
+	// raw memoizes each symbol's unsubstituted value and resolution error.
+	raw map[string]rawEntry
 }
 
-// newSubstituter builds an engine over the effective symbol table, the injected
-// getenv seam, and the overload ordering.
+// newSubstituter builds an engine over a fully resolved value map, the injected
+// getenv seam, and the overload ordering. It backs the pure, table-driven core
+// used where every value is already materialized and no value is opaque.
 func newSubstituter(
 	table map[string]string,
 	getenv func(name string) (string, bool),
 	overload bool,
 ) *substituter {
+	symbols := symbolTable{
+		declared: func(name string) bool { _, ok := table[name]; return ok },
+		opaque:   func(string) bool { return false },
+		value:    func(name string) (string, error) { return table[name], nil },
+	}
+	return newSymbolSubstituter(symbols, getenv, overload)
+}
+
+// newSymbolSubstituter builds an engine over an arbitrary symbol table, so a
+// caller can supply lazy, reveal-gated resolution and opacity.
+func newSymbolSubstituter(
+	symbols symbolTable,
+	getenv func(name string) (string, bool),
+	overload bool,
+) *substituter {
 	return &substituter{
-		table:    table,
+		symbols:  symbols,
 		getenv:   getenv,
 		overload: overload,
 		cache:    make(map[string]string),
 		visiting: make(map[string]bool),
+		raw:      make(map[string]rawEntry),
 	}
 }
 
+// rawValue returns a symbol's unsubstituted value, materializing it once and
+// memoizing the result so a symbol referenced many times resolves a single time.
+func (s *substituter) rawValue(key string) (string, error) {
+	if entry, ok := s.raw[key]; ok {
+		return entry.value, entry.err
+	}
+	value, err := s.symbols.value(key)
+	s.raw[key] = rawEntry{value: value, err: err}
+	return value, err
+}
+
 // resolve returns the fully composed value of key, substituting every reference
-// transitively. A missing reference or a cycle is returned as a typed error that
+// transitively. An opaque OS value is returned untouched. A missing reference, a
+// cycle, or an underlying resolution failure is returned as a typed error that
 // never includes a value.
 func (s *substituter) resolve(key string) (string, error) {
 	if value, ok := s.cache[key]; ok {
@@ -202,7 +269,15 @@ func (s *substituter) resolve(key string) (string, error) {
 		return "", s.cycleError(key)
 	}
 
-	raw := s.table[key]
+	raw, err := s.rawValue(key)
+	if err != nil {
+		return "", err
+	}
+	if s.symbols.opaque(key) {
+		s.cache[key] = raw
+		return raw, nil
+	}
+
 	s.visiting[key] = true
 	s.stack = append(s.stack, key)
 
@@ -259,7 +334,7 @@ func (s *substituter) compose(value, key string) (string, error) {
 // internal resolves a {{VAR}} reference against the namespace table, re-entering
 // the dependency graph so a referenced variable composes transitively.
 func (s *substituter) internal(name, key string) (string, error) {
-	if _, ok := s.table[name]; !ok {
+	if !s.symbols.declared(name) {
 		return "", &missingInternalReferenceError{key: key, reference: name}
 	}
 	return s.resolve(name)
@@ -268,12 +343,13 @@ func (s *substituter) internal(name, key string) (string, error) {
 // effective resolves a {{@VAR}} reference. Without overload the OS environment
 // wins and falls back to the namespace; under overload the namespace wins and
 // falls back to the OS environment. An OS value is an opaque leaf, while a
-// namespace hit re-enters the graph.
+// namespace hit re-enters the graph. The namespace value is materialized only
+// when it is actually chosen, so a superseded dangling reference never errors.
 func (s *substituter) effective(name, key string) (string, error) {
-	_, inTable := s.table[name]
+	declared := s.symbols.declared(name)
 
 	if s.overload {
-		if inTable {
+		if declared {
 			return s.resolve(name)
 		}
 		if value, ok := s.getenv(name); ok {
@@ -285,7 +361,7 @@ func (s *substituter) effective(name, key string) (string, error) {
 	if value, ok := s.getenv(name); ok {
 		return value, nil
 	}
-	if inTable {
+	if declared {
 		return s.resolve(name)
 	}
 	return "", &missingOSReferenceError{key: key, reference: name}

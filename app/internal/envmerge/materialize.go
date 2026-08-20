@@ -79,9 +79,11 @@ type materializedState struct {
 }
 
 // Materialize loads the requested environment, reveals and resolves every winning
-// value, and returns a complete Environment only when every value succeeds. It
-// aggregates all per-key failures deterministically and never exposes a partial
-// environment, so it is the fail-closed path for child-process execution.
+// value, substitutes every {{ }} reference over the composed effective
+// environment, and returns a complete Environment only when every value succeeds.
+// It aggregates all per-key resolution failures deterministically and treats a
+// missing reference or a cycle as fatal, so it never exposes a partial
+// environment and is the fail-closed path for child-process execution.
 func (m *Manager) Materialize(environment string) (*Environment, error) {
 	environment, err := m.normalizeEnvironment(environment)
 	if err != nil {
@@ -102,11 +104,13 @@ func (m *Manager) Materialize(environment string) (*Environment, error) {
 		return nil, err
 	}
 
-	result := materialize(state, m.params.Settings, resolver, environment)
-	if err := materializationError(result.errs); err != nil {
+	// Resolve every winning value and then substitute every {{ }} reference over
+	// the composed effective environment; a materialized child always reveals.
+	values, err := m.resolveEffective(state, resolver, environment)
+	if err != nil {
 		return nil, err
 	}
-	return &Environment{values: result.values, origins: result.origins}, nil
+	return &Environment{values: values, origins: state.origins}, nil
 }
 
 // resolveLeaf dereferences each scalar item in one winning leaf value. List

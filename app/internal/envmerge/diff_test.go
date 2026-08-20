@@ -27,6 +27,9 @@ func findChange(changes []Change, key string) (Change, bool) {
 	return Change{}, false
 }
 
+// devToProd is the common masked diff selecting development against production.
+var devToProd = DiffParams{EnvironmentA: "development", EnvironmentB: "production"}
+
 // TestDiffValidatesEnvironmentsBeforeIO verifies an undeclared environment on
 // either side errors, and that validation happens before namespace I/O by using
 // a manager whose base file does not exist.
@@ -38,10 +41,14 @@ func TestDiffValidatesEnvironmentsBeforeIO(t *testing.T) {
 		Environments: []string{"development", "production"},
 	})
 
-	if _, err := manager.Diff("ghost", "production"); err == nil {
+	if _, err := manager.Diff(DiffParams{
+		EnvironmentA: "ghost", EnvironmentB: "production",
+	}); err == nil {
 		t.Error("expected error for undeclared environment A")
 	}
-	if _, err := manager.Diff("development", "ghost"); err == nil {
+	if _, err := manager.Diff(DiffParams{
+		EnvironmentA: "development", EnvironmentB: "ghost",
+	}); err == nil {
 		t.Error("expected error for undeclared environment B")
 	}
 }
@@ -56,7 +63,7 @@ func TestDiffClassifiesChanges(t *testing.T) {
 	writeYAML(t, dir, "app.development.yaml", "only_dev: yes\n")
 	writeYAML(t, dir, "app.production.yaml", "host: prod\nonly_prod: yes\n")
 
-	result, err := diffManager(t, dir, nil).Diff("development", "production")
+	result, err := diffManager(t, dir, nil).Diff(devToProd)
 	if err != nil {
 		t.Fatalf("Diff: %v", err)
 	}
@@ -92,7 +99,7 @@ func TestDiffSortsResults(t *testing.T) {
 	writeYAML(t, dir, "app.yaml", "b: 1\nd: 1\nf: 1\n")
 	writeYAML(t, dir, "app.production.yaml", "b: 2\nd: 2\nf: 2\n")
 
-	result, err := diffManager(t, dir, nil).Diff("development", "production")
+	result, err := diffManager(t, dir, nil).Diff(devToProd)
 	if err != nil {
 		t.Fatalf("Diff: %v", err)
 	}
@@ -119,7 +126,9 @@ func TestDiffIdenticalEnvironments(t *testing.T) {
 	dir := t.TempDir()
 	writeYAML(t, dir, "app.yaml", "host: base\n")
 
-	result, err := diffManager(t, dir, nil).Diff("development", "development")
+	result, err := diffManager(t, dir, nil).Diff(DiffParams{
+		EnvironmentA: "development", EnvironmentB: "development",
+	})
 	if err != nil {
 		t.Fatalf("Diff: %v", err)
 	}
@@ -144,7 +153,7 @@ func TestDiffNeverOpensResolver(t *testing.T) {
 		values: map[string]string{"secret://dev": "same", "secret://prod": "same"},
 	}}
 
-	result, err := diffManager(t, dir, factory).Diff("development", "production")
+	result, err := diffManager(t, dir, factory).Diff(devToProd)
 	if err != nil {
 		t.Fatalf("Diff: %v", err)
 	}
@@ -169,7 +178,7 @@ func TestDiffDanglingReferenceCompares(t *testing.T) {
 	writeYAML(t, dir, "app.production.yaml", "token: secret://also-missing\n")
 
 	factory := &recordingFactory{resolver: fakeResolver{failAll: true}}
-	result, err := diffManager(t, dir, factory).Diff("development", "production")
+	result, err := diffManager(t, dir, factory).Diff(devToProd)
 	if err != nil {
 		t.Fatalf("Diff: %v", err)
 	}
@@ -189,7 +198,7 @@ func TestDiffLiteralNotCanonicalized(t *testing.T) {
 	writeYAML(t, dir, "app.yaml", "a: \"group/key\"\nb: \"\\\\secret://x\"\n")
 	writeYAML(t, dir, "app.production.yaml", "a: \"group/other\"\n")
 
-	result, err := diffManager(t, dir, nil).Diff("development", "production")
+	result, err := diffManager(t, dir, nil).Diff(devToProd)
 	if err != nil {
 		t.Fatalf("Diff: %v", err)
 	}
@@ -211,7 +220,7 @@ func TestDiffListDelimiterFails(t *testing.T) {
 	dir := t.TempDir()
 	writeYAML(t, dir, "app.yaml", "hosts:\n  - \"a,b\"\n")
 
-	_, err := diffManager(t, dir, nil).Diff("development", "production")
+	_, err := diffManager(t, dir, nil).Diff(devToProd)
 	if err == nil {
 		t.Fatal("expected a literal-render error for an item containing the delimiter")
 	}
@@ -229,7 +238,7 @@ func TestDiffNamespaceFailureNoPartial(t *testing.T) {
 	writeYAML(t, dir, "app.yaml", "host: base\n")
 	writeYAML(t, dir, "app.production.yaml", "host:\n  - key: val\n")
 
-	if _, err := diffManager(t, dir, nil).Diff("development", "production"); err == nil {
+	if _, err := diffManager(t, dir, nil).Diff(devToProd); err == nil {
 		t.Error("expected a fatal error for the malformed production overlay")
 	}
 }

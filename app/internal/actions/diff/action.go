@@ -13,6 +13,9 @@ type actionParams struct {
 	EnvA string
 	// EnvB is the second ("after") environment to resolve.
 	EnvB string
+	// Reveal controls whether each side is resolved and substituted before the
+	// comparison; masked, references are compared as declarations.
+	Reveal bool
 }
 
 // actionResult is the data the diff action returns.
@@ -36,18 +39,22 @@ type actionResultChange struct {
 }
 
 // execute is the imperative shell: resolve the project configuration and compare
-// the two declared environments through the constructed manager. Diff is
-// literal-only, so secret references are compared as declarations and never
-// decrypted.
+// the two declared environments through the constructed manager. Masked, diff
+// compares declarations and never decrypts; revealed, it resolves and
+// substitutes each side before comparing.
 func execute(p actionParams, in *config.Input) (actionResult, error) {
-	// resolve the shared config; diff never opens a resolver.
+	// resolve the shared config.
 	resolved, err := config.ResolveProject(in, p.Project)
 	if err != nil {
 		return actionResult{}, err
 	}
 
-	// compare the two environments using their literal winners
-	difference, err := resolved.Envmerge.Diff(p.EnvA, p.EnvB)
+	// compare the two environments under the requested reveal policy.
+	difference, err := resolved.Envmerge.Diff(envmerge.DiffParams{
+		EnvironmentA: p.EnvA,
+		EnvironmentB: p.EnvB,
+		Reveal:       p.Reveal,
+	})
 	if err != nil {
 		return actionResult{}, err
 	}

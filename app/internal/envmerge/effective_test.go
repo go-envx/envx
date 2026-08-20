@@ -216,7 +216,9 @@ func TestDiffAppliesOSOverride(t *testing.T) {
 	writeYAML(t, dir, "app.production.yaml", "host: prod\n")
 
 	manager := osManager(t, dir, map[string]string{"HOST": "os-value"}, false)
-	result, err := manager.Diff("development", "production")
+	result, err := manager.Diff(DiffParams{
+		EnvironmentA: "development", EnvironmentB: "production",
+	})
 	if err != nil {
 		t.Fatalf("Diff: %v", err)
 	}
