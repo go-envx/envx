@@ -8,9 +8,9 @@ const (
 	KindConfigValue Kind = "config"
 	// KindSecretReference is a reference resolved from the secrets store.
 	KindSecretReference Kind = "secret"
-	// KindCommandSubstitution is reserved for command substitution; it is
-	// defined but not yet produced.
-	KindCommandSubstitution Kind = "command_substitution"
+	// KindVariableSubstitution marks a value composed from the resolved values of
+	// other variables through {{VAR}} and {{@VAR}} references.
+	KindVariableSubstitution Kind = "variable"
 )
 
 // Severity ranks a resolution outcome.
