@@ -27,12 +27,14 @@ type GetParams struct {
 
 // Get loads the requested environment, selects the single winning value for the
 // normalized key, and resolves and renders only that leaf under the call's reveal
-// policy. Unrelated references never reach the resolver, so a dangling or
-// undecryptable value behind a different key cannot block the read. Namespace and
-// flatten failures are fatal, while the requested key's own resolution or
-// list-render failure is returned without leaking its value. A masked get still
-// invokes the resolver so implicit references are canonicalized and escaped
-// references are unescaped; it is not a raw literal read.
+// policy. When revealing, it substitutes the requested key's transitive {{ }}
+// dependency closure over the effective environment, so a dangling or
+// undecryptable value behind an unrelated key cannot block the read while one
+// behind a referenced key does. Namespace and flatten failures are fatal, while
+// the requested key's own resolution, list-render, missing-reference, or cycle
+// failure is returned without leaking its value. A masked get still invokes the
+// resolver so implicit references are canonicalized and escaped references are
+// unescaped, but it never substitutes: the {{ }} template is shown as declared.
 func (m *Manager) Get(params GetParams) (Entry, error) {
 	environment, err := m.normalizeEnvironment(params.Environment)
 	if err != nil {
@@ -60,16 +62,39 @@ func (m *Manager) Get(params GetParams) (Entry, error) {
 		return Entry{}, err
 	}
 
-	resolved, err := resolveLeaf(value, resolver, environment)
-	if err != nil {
-		return Entry{}, err
-	}
-	rendered, err := renderLeafValue(
-		resolved, origin.Winner.Key, m.params.Settings.Delimiter,
+	rendered, err := m.getValue(
+		params.Reveal, state, resolver, environment, key, value, origin,
 	)
 	if err != nil {
 		return Entry{}, err
 	}
 
 	return Entry{Key: key, Value: rendered, Origin: origin}, nil
+}
+
+// getValue renders the requested key's value under the call's reveal policy. A
+// masked read resolves and renders only the requested leaf, leaving any {{ }}
+// template literal; a revealed read composes the key's transitive dependency
+// closure through the substitution engine.
+func (m *Manager) getValue(
+	reveal bool,
+	state *mergeState,
+	resolver ValueResolver,
+	environment, key string,
+	value leafValue,
+	origin Origin,
+) (string, error) {
+	if reveal {
+		engine := newSymbolSubstituter(
+			m.getSymbols(state, resolver, environment),
+			m.getenv(), m.params.Settings.Overload,
+		)
+		return engine.resolve(key)
+	}
+
+	resolved, err := resolveLeaf(value, resolver, environment)
+	if err != nil {
+		return "", err
+	}
+	return renderLeafValue(resolved, origin.Winner.Key, m.params.Settings.Delimiter)
 }

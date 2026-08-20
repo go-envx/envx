@@ -12,9 +12,10 @@ type Change struct {
 	After string
 }
 
-// DiffResult is the sorted comparison between two complete environments. It
-// compares rendered literal winners, so a changed reference is visible even when
-// both references currently decrypt to the same plaintext.
+// DiffResult is the sorted comparison between two complete environments. Masked,
+// it compares rendered literal winners, so a changed reference is visible even
+// when both references currently decrypt to the same plaintext; revealed, it
+// compares fully resolved and substituted values on each side.
 type DiffResult struct {
 	// EnvironmentA is the first ("before") environment name.
 	EnvironmentA string
@@ -28,19 +29,34 @@ type DiffResult struct {
 	Changed []Change
 }
 
+// DiffParams selects the two environments to compare and the reveal policy, so a
+// diff mirrors get: masked it compares declarations, revealed it compares
+// resolved values.
+type DiffParams struct {
+	// EnvironmentA is the first ("before") environment name.
+	EnvironmentA string
+	// EnvironmentB is the second ("after") environment name.
+	EnvironmentB string
+	// Reveal controls whether each side is resolved and substituted before the
+	// comparison.
+	Reveal bool
+}
+
 // Diff validates both environment names, loads and flattens every base namespace
-// once for the call, applies each environment's overlays independently to that
-// operation-local snapshot, and compares the two rendered literal maps. It never
-// opens a resolver, reads the secrets store, or touches private keys, so dangling
-// references and equal plaintext behind different references never hide a
-// declaration change or block comparison. Namespace, YAML, flatten, and
-// literal-render failures on either side are fatal and yield no partial result.
-func (m *Manager) Diff(environmentA, environmentB string) (*DiffResult, error) {
-	envA, err := m.normalizeEnvironment(environmentA)
+// once for the call, and applies each environment's overlays independently to
+// that operation-local snapshot. Masked, it compares the two rendered literal
+// maps without opening a resolver, so dangling references and equal plaintext
+// behind different references never hide a declaration change or block
+// comparison. Revealed, it resolves and substitutes every value on each side, so
+// a dangling reference or cycle on either side is fatal. Namespace, YAML,
+// flatten, and render failures on either side are fatal and yield no partial
+// result.
+func (m *Manager) Diff(params DiffParams) (*DiffResult, error) {
+	envA, err := m.normalizeEnvironment(params.EnvironmentA)
 	if err != nil {
 		return nil, err
 	}
-	envB, err := m.normalizeEnvironment(environmentB)
+	envB, err := m.normalizeEnvironment(params.EnvironmentB)
 	if err != nil {
 		return nil, err
 	}
@@ -64,17 +80,47 @@ func (m *Manager) Diff(environmentA, environmentB string) (*DiffResult, error) {
 	m.applyOSEnvironment(stateA, false)
 	m.applyOSEnvironment(stateB, false)
 
-	delimiter := m.params.Settings.Delimiter
-	literalsA, err := renderLiterals(stateA, delimiter)
-	if err != nil {
-		return nil, err
-	}
-	literalsB, err := renderLiterals(stateB, delimiter)
+	valuesA, valuesB, err := m.diffValues(params.Reveal, stateA, stateB, envA, envB)
 	if err != nil {
 		return nil, err
 	}
 
-	return compare(envA, envB, literalsA, literalsB), nil
+	return compare(envA, envB, valuesA, valuesB), nil
+}
+
+// diffValues renders each side's values for comparison under the call's reveal
+// policy: masked, each side is rendered to its declared literals without a
+// resolver; revealed, each side is resolved and substituted through a shared
+// revealing resolver.
+func (m *Manager) diffValues(
+	reveal bool, stateA, stateB *mergeState, envA, envB string,
+) (mapA, mapB map[string]string, err error) {
+	if !reveal {
+		delimiter := m.params.Settings.Delimiter
+		literalsA, lerr := renderLiterals(stateA, delimiter)
+		if lerr != nil {
+			return nil, nil, lerr
+		}
+		literalsB, lerr := renderLiterals(stateB, delimiter)
+		if lerr != nil {
+			return nil, nil, lerr
+		}
+		return literalsA, literalsB, nil
+	}
+
+	resolver, rerr := m.openResolver(true)
+	if rerr != nil {
+		return nil, nil, rerr
+	}
+	valuesA, rerr := m.resolveEffective(stateA, resolver, envA)
+	if rerr != nil {
+		return nil, nil, rerr
+	}
+	valuesB, rerr := m.resolveEffective(stateB, resolver, envB)
+	if rerr != nil {
+		return nil, nil, rerr
+	}
+	return valuesA, valuesB, nil
 }
 
 // renderLiterals renders every unresolved winner to its final env-var string with
