@@ -94,6 +94,30 @@ func tokenize(value string) []token {
 	return tokens
 }
 
+// hasReferences reports whether value contains at least one {{ }} reference, so a
+// diagnoser can classify it as a variable substitution rather than a plain value.
+func hasReferences(value string) bool {
+	for _, tok := range tokenize(value) {
+		if tok.kind != tokenLiteral {
+			return true
+		}
+	}
+	return false
+}
+
+// hasEscape reports whether value carries a \{{ escape, so the substitution stage
+// strips the backslash even though the value holds no live reference. A diagnoser
+// uses this to route an escape-only value through the engine so its revealed
+// value matches what run and get produce.
+func hasEscape(value string) bool {
+	for i := 0; i < len(value); i++ {
+		if value[i] == escape && strings.HasPrefix(value[i+1:], refOpen) {
+			return true
+		}
+	}
+	return false
+}
+
 // substitutionStatus classifies whether a variable resolves, without exposing its
 // composed value.
 type substitutionStatus int

@@ -6,8 +6,17 @@ import (
 	"strings"
 )
 
-// codeOK is the status code for a value that resolved successfully.
-const codeOK = "OK"
+// Status codes for a diagnosed value. codeOK marks a successful resolution,
+// while the substitution codes classify a dry-run substitution failure.
+const (
+	// codeOK is the status code for a value that resolved successfully.
+	codeOK = "OK"
+	// codeUnresolvedVariable marks a substitution with a missing internal or OS
+	// reference.
+	codeUnresolvedVariable = "UNRESOLVED_VARIABLE"
+	// codeCircularReference marks a substitution with a reference cycle.
+	codeCircularReference = "CIRCULAR_REFERENCE"
+)
 
 // ExplainParams selects all keys or one case-insensitive key from an environment
 // and chooses the reveal policy for a diagnostic explanation.
@@ -92,17 +101,29 @@ func (m *Manager) Explain(params ExplainParams) (*Explanation, error) {
 		return nil, err
 	}
 
-	diagnoser, err := m.openDiagnoser(params.Reveal)
+	resolver, err := m.openResolver(params.Reveal)
 	if err != nil {
 		return nil, err
 	}
+	diagnoser, err := asDiagnoser(resolver)
+	if err != nil {
+		return nil, err
+	}
+	engine := newSymbolSubstituter(
+		m.getSymbols(state, resolver, environment),
+		m.getenv(), m.params.Settings.Overload,
+	)
 
 	delimiter := m.params.Settings.Delimiter
 	entries := make([]ExplanationEntry, 0, len(keys))
 	var summary ExplanationSummary
 	for _, key := range keys {
 		value := state.values[key]
-		resolution := diagnoseLeaf(value, diagnoser, environment, delimiter, params.Reveal)
+		literal := literalValue(value, delimiter)
+		resolution := diagnoseEntry(
+			value, literal, key, diagnoser, engine, environment, delimiter,
+			params.Reveal,
+		)
 		switch resolution.Severity {
 		case SeverityError:
 			summary.Errors++
@@ -112,7 +133,7 @@ func (m *Manager) Explain(params ExplainParams) (*Explanation, error) {
 		}
 		entries = append(entries, ExplanationEntry{
 			Key:        key,
-			Literal:    literalValue(value, delimiter),
+			Literal:    literal,
 			Origin:     state.origins[key],
 			Resolution: resolution,
 		})
@@ -141,16 +162,12 @@ func explainKeys(state *mergeState, key string) ([]string, error) {
 	return keys, nil
 }
 
-// openDiagnoser obtains a fresh, operation-scoped diagnoser under the reveal
-// policy. A nil factory yields a nil diagnoser, which diagnoseLeaf treats as
-// plain config-value identity. A configured factory that returns a resolver not
-// also implementing ValueDiagnoser is an operation error, so a reference is
-// never silently classified as a plain config value.
-func (m *Manager) openDiagnoser(reveal bool) (ValueDiagnoser, error) {
-	resolver, err := m.openResolver(reveal)
-	if err != nil {
-		return nil, err
-	}
+// asDiagnoser adapts an opened resolver into a ValueDiagnoser. A nil resolver
+// yields a nil diagnoser, which diagnoseLeaf treats as plain config-value
+// identity. A resolver that does not also implement ValueDiagnoser is an
+// operation error, so a reference is never silently classified as a plain config
+// value.
+func asDiagnoser(resolver ValueResolver) (ValueDiagnoser, error) {
 	if resolver == nil {
 		return nil, nil
 	}
@@ -159,6 +176,58 @@ func (m *Manager) openDiagnoser(reveal bool) (ValueDiagnoser, error) {
 		return nil, fmt.Errorf("configured resolver does not support diagnosis")
 	}
 	return diagnoser, nil
+}
+
+// diagnoseEntry classifies one winning value. A non-opaque value touched by the
+// substitution stage — one carrying a {{ }} reference or a \{{ escape — is
+// diagnosed through the engine so its revealed value matches run and get; every
+// other value is diagnosed as a plain config value or secret reference.
+func diagnoseEntry(
+	value leafValue, literal, key string,
+	diagnoser ValueDiagnoser, engine *substituter,
+	environment, delimiter string, reveal bool,
+) Resolution {
+	refs := hasReferences(literal)
+	if !value.opaque && (refs || hasEscape(literal)) {
+		return diagnoseSubstitution(engine, key, reveal, refs)
+	}
+	return diagnoseLeaf(value, diagnoser, environment, delimiter, reveal)
+}
+
+// diagnoseSubstitution classifies a substitution-stage value in dry-run mode. It
+// reports resolvability through the engine's status pass without exposing the
+// composed value, mapping a missing reference to UNRESOLVED_VARIABLE and a cycle
+// to CIRCULAR_REFERENCE. An escape-only value references nothing, so it is a plain
+// config value that always resolves; only a live reference marks it as a variable
+// substitution. The composed value is materialized and retained only under
+// reveal, so masked diagnosis never leaks it.
+func diagnoseSubstitution(
+	engine *substituter, key string, reveal, variable bool,
+) Resolution {
+	kind := KindConfigValue
+	if variable {
+		kind = KindVariableSubstitution
+	}
+	resolution := Resolution{Kind: kind, Severity: SeverityOK, Code: codeOK}
+	switch engine.status(key) {
+	case statusCircular:
+		resolution.Severity = SeverityError
+		resolution.Code = codeCircularReference
+		resolution.Message = "reference cycle detected"
+	case statusUnresolved:
+		resolution.Severity = SeverityError
+		resolution.Code = codeUnresolvedVariable
+		resolution.Message = "references an undefined variable"
+	case statusOK:
+		if reveal {
+			// status already composed the value successfully; resolve returns the
+			// cached result, so no work is repeated and no error is possible here.
+			composed, _ := engine.resolve(key)
+			resolution.Resolved = composed
+			resolution.HasResolved = true
+		}
+	}
+	return resolution
 }
 
 // diagnoseLeaf classifies one winning leaf, aggregating a list's items into a

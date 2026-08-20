@@ -229,3 +229,163 @@ func TestDiffRevealSubstitutes(t *testing.T) {
 		t.Errorf("URL change = %+v, ok=%v; want base -> prod", c, ok)
 	}
 }
+
+// TestExplainSubstitutionMaskedStatus verifies a masked explain classifies a
+// resolvable template as a variable substitution at OK status without exposing
+// the composed value.
+func TestExplainSubstitutionMaskedStatus(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+	writeYAML(t, dir, "app.yaml", "host: db.local\nurl: \"{{HOST}}:5432\"\n")
+
+	exp, err := subManager(t, dir, nil, nil).Explain(ExplainParams{Key: "url"})
+	if err != nil {
+		t.Fatalf("Explain: %v", err)
+	}
+	entry, ok := findExplanation(exp, "URL")
+	if !ok {
+		t.Fatal("URL entry missing")
+	}
+	if entry.Literal != "{{HOST}}:5432" {
+		t.Errorf("literal = %q, want the template {{HOST}}:5432", entry.Literal)
+	}
+	if entry.Resolution.Kind != KindVariableSubstitution {
+		t.Errorf("kind = %q, want variable", entry.Resolution.Kind)
+	}
+	if entry.Resolution.Severity != SeverityOK ||
+		entry.Resolution.Code != codeOK {
+		t.Errorf("status = %s/%s, want ok/OK",
+			entry.Resolution.Severity, entry.Resolution.Code)
+	}
+	if entry.Resolution.HasResolved || entry.Resolution.Resolved != "" {
+		t.Errorf("masked diagnosis leaked a value: %+v", entry.Resolution)
+	}
+}
+
+// TestExplainSubstitutionRevealResolves verifies a revealed explain composes the
+// template into the RESOLVED value.
+func TestExplainSubstitutionRevealResolves(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+	writeYAML(t, dir, "app.yaml", "host: db.local\nurl: \"{{HOST}}:5432\"\n")
+
+	exp, err := subManager(t, dir, nil, nil).
+		Explain(ExplainParams{Key: "url", Reveal: true})
+	if err != nil {
+		t.Fatalf("Explain: %v", err)
+	}
+	entry, _ := findExplanation(exp, "URL")
+	if !entry.Resolution.HasResolved ||
+		entry.Resolution.Resolved != "db.local:5432" {
+		t.Errorf("resolved = %+v, want db.local:5432", entry.Resolution)
+	}
+}
+
+// TestExplainSubstitutionUnresolved verifies a template naming an undefined
+// variable is diagnosed as UNRESOLVED_VARIABLE without aborting, and is counted
+// in the summary even when masked.
+func TestExplainSubstitutionUnresolved(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+	writeYAML(t, dir, "app.yaml", "url: \"{{NOPE}}\"\n")
+
+	exp, err := subManager(t, dir, nil, nil).Explain(ExplainParams{})
+	if err != nil {
+		t.Fatalf("Explain: %v", err)
+	}
+	entry, _ := findExplanation(exp, "URL")
+	if entry.Resolution.Kind != KindVariableSubstitution ||
+		entry.Resolution.Severity != SeverityError ||
+		entry.Resolution.Code != codeUnresolvedVariable {
+		t.Errorf("resolution = %+v, want error/UNRESOLVED_VARIABLE", entry.Resolution)
+	}
+	if entry.Resolution.HasResolved {
+		t.Errorf("unresolved diagnosis leaked a value: %+v", entry.Resolution)
+	}
+	if exp.Summary.Errors != 1 || exp.Summary.Severity() != SeverityError {
+		t.Errorf("summary = %+v, severity %q", exp.Summary, exp.Summary.Severity())
+	}
+}
+
+// TestExplainSubstitutionCircular verifies a reference cycle is diagnosed as
+// CIRCULAR_REFERENCE without aborting.
+func TestExplainSubstitutionCircular(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+	writeYAML(t, dir, "app.yaml", "a: \"{{B}}\"\nb: \"{{A}}\"\n")
+
+	exp, err := subManager(t, dir, nil, nil).Explain(ExplainParams{Key: "a"})
+	if err != nil {
+		t.Fatalf("Explain: %v", err)
+	}
+	entry, _ := findExplanation(exp, "A")
+	if entry.Resolution.Severity != SeverityError ||
+		entry.Resolution.Code != codeCircularReference {
+		t.Errorf("resolution = %+v, want error/CIRCULAR_REFERENCE", entry.Resolution)
+	}
+}
+
+// TestExplainOSOverrideNotSubstitution verifies an opaque OS override whose value
+// looks like a reference is diagnosed as a plain config value, never a variable
+// substitution, so an OS value is never re-tokenized.
+func TestExplainOSOverrideNotSubstitution(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+	writeYAML(t, dir, "app.yaml", "host: db.local\n")
+
+	exp, err := subManager(t, dir, nil, map[string]string{"HOST": "{{OTHER}}"}).
+		Explain(ExplainParams{Key: "host"})
+	if err != nil {
+		t.Fatalf("Explain: %v", err)
+	}
+	entry, _ := findExplanation(exp, "HOST")
+	if entry.Literal != "{{OTHER}}" {
+		t.Errorf("literal = %q, want the opaque OS value {{OTHER}}", entry.Literal)
+	}
+	if entry.Resolution.Kind != KindConfigValue {
+		t.Errorf("HOST kind = %q, want config", entry.Resolution.Kind)
+	}
+	if entry.Resolution.Severity != SeverityOK {
+		t.Errorf("HOST severity = %q, want ok", entry.Resolution.Severity)
+	}
+}
+
+// TestExplainEscapeStaysConfigButReveals verifies an escape-only value is
+// diagnosed as a plain config value whose masked literal keeps the backslash,
+// while its revealed value strips the escape to match run and get.
+func TestExplainEscapeStaysConfigButReveals(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+	writeYAML(t, dir, "app.yaml", "host: db.local\nlit: \"\\\\{{HOST}}\"\n")
+	manager := subManager(t, dir, nil, nil)
+
+	masked, err := manager.Explain(ExplainParams{Key: "lit"})
+	if err != nil {
+		t.Fatalf("Explain masked: %v", err)
+	}
+	entry, _ := findExplanation(masked, "LIT")
+	if entry.Resolution.Kind != KindConfigValue {
+		t.Errorf("kind = %q, want config", entry.Resolution.Kind)
+	}
+	if entry.Literal != "\\{{HOST}}" {
+		t.Errorf("masked literal = %q, want the escaped \\{{HOST}}", entry.Literal)
+	}
+	if entry.Resolution.HasResolved {
+		t.Errorf("masked diagnosis leaked a value: %+v", entry.Resolution)
+	}
+
+	revealed, err := manager.Explain(ExplainParams{Key: "lit", Reveal: true})
+	if err != nil {
+		t.Fatalf("Explain reveal: %v", err)
+	}
+	got, _ := findExplanation(revealed, "LIT")
+	if !got.Resolution.HasResolved || got.Resolution.Resolved != "{{HOST}}" {
+		t.Errorf("revealed resolution = %+v, want {{HOST}}", got.Resolution)
+	}
+}
