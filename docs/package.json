@@ -7,17 +7,17 @@
     "#components/*": "./src/components/*"
   },
   "dependencies": {
-    "@astrojs/starlight": "0.41.3",
+    "@astrojs/starlight": "0.41.7",
     "@astrojs/starlight-tailwind": "5.0.0",
-    "@iconify-json/material-symbols": "1.2.86",
+    "@iconify-json/material-symbols": "1.2.89",
     "@tailwindcss/vite": "4.3.3",
-    "astro": "7.1.3",
-    "astro-icon": "1.1.5",
+    "astro": "7.2.4",
+    "astro-icon": "1.2.0",
     "sharp": "0.35.3",
     "tailwindcss": "4.3.3"
   },
   "devDependencies": {
-    "@astrojs/check": "0.9.9",
+    "@astrojs/check": "0.9.10",
     "typescript": "6.0.3"
   }
 }
