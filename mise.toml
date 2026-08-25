@@ -15,15 +15,15 @@ minimum_release_age = "24h"
 [tools]
 
 # Go
-go = "1.26.5"                     # https://go.dev/ref/spec
-golangci-lint = "2.12.2"          # https://golangci-lint.run/
-goreleaser = "2.17.0"             # https://goreleaser.com/
+go = "1.27.0"                     # https://go.dev/ref/spec
+golangci-lint = "2.13.1"          # https://golangci-lint.run/
+goreleaser = "2.17.1"             # https://goreleaser.com/
 
 # Node
-node = "24.18.0"                  # https://nodejs.org/docs/latest/api/
-pnpm = "11.15.1"                   # https://pnpm.io/motivation
+node = "24.19.0"                  # https://nodejs.org/docs/latest/api/
+pnpm = "11.22.0"                   # https://pnpm.io/motivation
 
 # Tools
-gh = "2.96.0"                     # https://cli.github.com/manual/
+gh = "2.98.0"                     # https://cli.github.com/manual/
 svu = "3.4.1"                     # https://github.com/caarlos0/svu
-task = "3.52.0"                   # https://taskfile.dev/docs/guide
+task = "3.53.1"                   # https://taskfile.dev/docs/guide
