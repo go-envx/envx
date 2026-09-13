@@ -15,7 +15,24 @@ tasks:
       - mise install
       - pnpm install
 
-  clean:git:
+  clean-git:
     desc: Remove local branches whose remote was deleted (interactive)
     cmds:
       - pnpm exec smili clean-git
+
+  auth-gh:
+    desc: Authenticate the GitHub CLI (skips if already signed in)
+    silent: true
+    cmds:
+      - |
+        if ! command -v gh >/dev/null 2>&1; then
+          echo "GitHub CLI (gh) is not installed; skipping. Install it, then re-run 'task auth'."
+          exit 1
+        fi
+        if gh auth status >/dev/null 2>&1; then
+          echo "GitHub CLI: already authenticated."
+        else
+          echo "GitHub CLI: launching interactive login..."
+          gh auth login
+        fi
+        gh auth setup-git
