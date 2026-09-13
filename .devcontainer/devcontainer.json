@@ -1,36 +1,33 @@
 // https://aka.ms/devcontainer.json
 {
-	"name": "envx",
-	"dockerComposeFile": "docker-compose.yaml",
-	"service": "devcontainer",
-	"workspaceFolder": "/ws",
-	"remoteEnv": {
-		"PATH": "/home/vscode/.local/share/mise/shims:${containerEnv:PATH}"
-	},
-	// Features to add to the dev container (https://containers.dev/features)
-	"features": {
-		"ghcr.io/devcontainers-extra/features/mise": {}
-	},
-	// Lifecycle scripts (https://containers.dev/implementors/json_reference/#lifecycle-scripts)
-	"onCreateCommand": "echo 'eval \"$(mise activate bash)\"' >> ~/.bashrc && echo 'eval \"$(mise activate zsh)\"' >> ~/.zshrc",
-	"postCreateCommand": "mise trust -- --non-interactive",
-	"postStartCommand": "mise install --yes && task install",
-	"waitFor": "postStartCommand",
-	// IDE Customizations
-	"customizations": {
-		"vscode": {
-			"extensions": [
-				"amodio.toggle-excluded-files",
-				"Anthropic.claude-code",
+  "name": "envx",
+  "dockerComposeFile": "docker-compose.yaml",
+  "service": "devcontainer",
+  "workspaceFolder": "/ws",
+  "shutdownAction": "stopCompose",
+  "containerEnv": {
+    "MISE_TRUSTED_CONFIG_PATHS": "/ws"
+  },
+  "remoteEnv": {
+    "PATH": "/home/vscode/.local/share/mise/shims:${containerEnv:PATH}"
+  },
+  // Features to add to the dev container (https://containers.dev/features)
+  "features": {
+    "ghcr.io/devcontainers-extra/features/mise": {}
+  },
+  // Lifecycle scripts (https://containers.dev/implementors/json_reference/#lifecycle-scripts)
+  "postStartCommand": "mise install --yes",
+  "waitFor": "postStartCommand",
+  // IDE Customizations
+  "customizations": {
+    "vscode": {
+      "extensions": [
         "astro-build.astro-vscode",
-				"biomejs.biome",
-				"golang.Go",
-				"logerfo.open-all-files",
-				"mhutchie.git-graph",
-				"tamasfe.even-better-toml",
-				"task.vscode-task",
+        "biomejs.biome",
+        "golang.Go",
+        "task.vscode-task",
         "unifiedjs.vscode-mdx"
-			]
-		}
-	}
+      ]
+    }
+  }
 }
