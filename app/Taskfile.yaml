@@ -20,9 +20,9 @@ tasks:
       - go build -o bin/envx ./cmd/envx
 
   install:
-    desc: Install the CLI to your Go bin/ directory
+    desc: Install the CLI to ~/.local/bin (on PATH, stable across Go versions)
     cmds:
-      - go install ./cmd/envx
+      - go build -o "$HOME/.local/bin/envx" ./cmd/envx
 
   test:
     desc: Run tests for the CLI

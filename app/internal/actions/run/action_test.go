@@ -6,6 +6,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/go-envx/envx/app/internal/cipher"
@@ -119,6 +120,95 @@ func TestExecuteRevealFailurePreventsChildStartup(t *testing.T) {
 		t.Errorf(
 			"child produced output %q despite the reveal failure", stdout.String(),
 		)
+	}
+}
+
+// TestExecuteIgnoreErrorsFailsClosedByDefault verifies that without
+// --ignore-errors an unresolved reference aborts the run before the child starts.
+func TestExecuteIgnoreErrorsFailsClosedByDefault(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+	writeWorkspaceFile(t, dir, "envx.yaml",
+		"environments: [development]\nprojects:\n  api:\n    includes: [env/app]\n")
+	writeWorkspaceFile(t, dir, filepath.Join("env", "app.yaml"),
+		"good: value\nbroken: \"{{NOPE}}\"\n")
+
+	cfgPath := filepath.Join(dir, "envx.yaml")
+	var stdout bytes.Buffer
+	err := execute(actionParams{
+		Project:  "api",
+		ExecArgs: []string{"printenv", "GOOD"},
+	}, &config.Input{ConfigPath: &cfgPath}, streams{Stdout: &stdout, Stderr: io.Discard})
+	if err == nil {
+		t.Fatal("expected the missing reference to abort the run")
+	}
+	if stdout.Len() != 0 {
+		t.Errorf("child produced output %q despite the failure", stdout.String())
+	}
+}
+
+// TestExecuteIgnoreErrorsStartsChild verifies --ignore-errors downgrades an
+// unresolved reference to a stderr warning, omits its key (leaving it unset, not
+// empty), and still starts the child with the keys that did resolve.
+func TestExecuteIgnoreErrorsStartsChild(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+	writeWorkspaceFile(t, dir, "envx.yaml",
+		"environments: [development]\nprojects:\n  api:\n    includes: [env/app]\n")
+	writeWorkspaceFile(t, dir, filepath.Join("env", "app.yaml"),
+		"good: value\nbroken: \"{{NOPE}}\"\n")
+
+	cfgPath := filepath.Join(dir, "envx.yaml")
+	var stdout, stderr bytes.Buffer
+	err := execute(actionParams{
+		Project:      "api",
+		ExecArgs:     []string{"sh", "-c", "echo GOOD=$GOOD; echo BROKEN=${BROKEN-<unset>}"},
+		IgnoreErrors: true,
+	}, &config.Input{ConfigPath: &cfgPath}, streams{Stdout: &stdout, Stderr: &stderr})
+	if err != nil {
+		t.Fatalf("execute: %v", err)
+	}
+	// GOOD resolves; BROKEN is omitted entirely, so the child sees it as unset
+	// rather than an empty string.
+	if got := stdout.String(); got != "GOOD=value\nBROKEN=<unset>\n" {
+		t.Errorf("child output = %q, want GOOD=value + BROKEN unset", got)
+	}
+	warned := stderr.String()
+	if !strings.Contains(warned, "WARNING") || !strings.Contains(warned, "BROKEN") {
+		t.Errorf("stderr = %q, want a warning naming BROKEN", warned)
+	}
+}
+
+// TestExecuteIgnoreErrorsKeepsAmbientValue verifies that under --overload a broken
+// file value which the shell already defines is not omitted: the ambient value
+// survives so the file value never clobbers it.
+func TestExecuteIgnoreErrorsKeepsAmbientValue(t *testing.T) {
+	t.Setenv("BROKEN", "from-shell")
+	t.Setenv("ENVX_OVERLOAD", "true")
+
+	dir := t.TempDir()
+	writeWorkspaceFile(t, dir, "envx.yaml",
+		"environments: [development]\nprojects:\n  api:\n    includes: [env/app]\n")
+	writeWorkspaceFile(t, dir, filepath.Join("env", "app.yaml"),
+		"broken: \"{{MISSING}}\"\n")
+
+	cfgPath := filepath.Join(dir, "envx.yaml")
+	var stdout, stderr bytes.Buffer
+	err := execute(actionParams{
+		Project:      "api",
+		ExecArgs:     []string{"sh", "-c", "echo BROKEN=$BROKEN"},
+		IgnoreErrors: true,
+	}, &config.Input{ConfigPath: &cfgPath}, streams{Stdout: &stdout, Stderr: &stderr})
+	if err != nil {
+		t.Fatalf("execute: %v", err)
+	}
+	if got := stdout.String(); got != "BROKEN=from-shell\n" {
+		t.Errorf("child BROKEN = %q, want the ambient from-shell", got)
+	}
+	if !strings.Contains(stderr.String(), "keeping the value") {
+		t.Errorf("stderr = %q, want a fallback warning", stderr.String())
 	}
 }
 

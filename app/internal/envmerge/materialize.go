@@ -78,30 +78,53 @@ type materializedState struct {
 	errs map[string]error
 }
 
+// MaterializeParams selects the environment to materialize and the failure
+// policy. It mirrors GetParams and DiffParams so every Manager operation is
+// driven by one struct.
+type MaterializeParams struct {
+	// Environment overrides the configured default; an empty value uses it.
+	Environment string
+	// IgnoreErrors downgrades every per-key resolution failure to a warning and
+	// omits the failing key instead of aborting, so the child process still starts.
+	IgnoreErrors bool
+}
+
+// MaterializeResult is a complete materialized environment plus any downgraded
+// warnings. In the default fail-closed mode Warnings is nil, because any failure
+// aborts with an error instead; under IgnoreErrors it lists the omitted keys in
+// sorted key order.
+type MaterializeResult struct {
+	// Environment is the complete materialized environment.
+	Environment *Environment
+	// Warnings lists the downgraded per-key failures under IgnoreErrors, sorted by
+	// key; nil when nothing was downgraded.
+	Warnings []error
+}
+
 // Materialize loads the requested environment, reveals and resolves every winning
-// value, substitutes every {{ }} reference over the composed effective
-// environment, and returns a complete Environment only when every value succeeds.
-// It aggregates all per-key resolution failures deterministically and treats a
-// missing reference or a cycle as fatal, so it never exposes a partial
-// environment and is the fail-closed path for child-process execution.
-func (m *Manager) Materialize(environment string) (*Environment, error) {
-	environment, err := m.normalizeEnvironment(environment)
+// value, and substitutes every {{ }} reference over the composed effective
+// environment. By default it returns a complete environment only when every value
+// succeeds, aggregating all per-key resolution failures deterministically and
+// treating a missing reference or a cycle as fatal, so it never exposes a partial
+// environment and is the fail-closed path for child-process execution. Under
+// IgnoreErrors it instead downgrades every per-key failure — a dangling secret, a
+// missing reference, or a reference cycle — to a returned warning and omits the
+// failing key, so the child still starts and inherits an omitted key from the
+// ambient environment. Structural failures (a malformed manifest, unreadable
+// YAML, or a flatten collision) remain fatal in both modes because they leave no
+// salvageable environment.
+func (m *Manager) Materialize(params MaterializeParams) (*MaterializeResult, error) {
+	state, resolver, environment, err := m.prepareMaterialize(params.Environment)
 	if err != nil {
 		return nil, err
 	}
 
-	state, err := m.merge(environment)
-	if err != nil {
-		return nil, err
-	}
-
-	// Compose the complete effective environment: overlay OS overrides and union
-	// OS-only keys so the child receives every variable it would see under a shell.
-	m.applyOSEnvironment(state, true)
-
-	resolver, err := m.openResolver(true)
-	if err != nil {
-		return nil, err
+	if params.IgnoreErrors {
+		values, warnings := m.resolveEffectiveTolerant(state, resolver, environment)
+		return &MaterializeResult{
+			Environment: &Environment{values: values, origins: state.origins},
+			Warnings:    warnings,
+		}, nil
 	}
 
 	// Resolve every winning value and then substitute every {{ }} reference over
@@ -110,7 +133,37 @@ func (m *Manager) Materialize(environment string) (*Environment, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &Environment{values: values, origins: state.origins}, nil
+	return &MaterializeResult{
+		Environment: &Environment{values: values, origins: state.origins},
+	}, nil
+}
+
+// prepareMaterialize runs the shared front half of materialization: it normalizes
+// the environment, merges the namespaces and composes the effective environment,
+// and opens a revealing resolver. Structural failures are fatal here, before
+// either the strict or the lenient path resolves any value.
+func (m *Manager) prepareMaterialize(
+	environment string,
+) (state *mergeState, resolver ValueResolver, env string, err error) {
+	env, err = m.normalizeEnvironment(environment)
+	if err != nil {
+		return nil, nil, "", err
+	}
+
+	state, err = m.merge(env)
+	if err != nil {
+		return nil, nil, "", err
+	}
+
+	// Compose the complete effective environment: overlay OS overrides and union
+	// OS-only keys so the child receives every variable it would see under a shell.
+	m.applyOSEnvironment(state, true)
+
+	resolver, err = m.openResolver(true)
+	if err != nil {
+		return nil, nil, "", err
+	}
+	return state, resolver, env, nil
 }
 
 // resolveLeaf dereferences each scalar item in one winning leaf value. List

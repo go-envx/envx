@@ -1,9 +1,44 @@
 package envmerge
 
 import (
+	"os"
 	"path/filepath"
 	"testing"
 )
+
+// setupWorkspace creates a temp directory with one namespace (env/postgres) and
+// returns its path. envmerge reads only the namespace overlays, so no other
+// files are needed.
+func setupWorkspace(t *testing.T) string {
+	t.Helper()
+	dir := t.TempDir()
+	envDir := filepath.Join(dir, "env")
+	if err := os.MkdirAll(envDir, 0o750); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(
+		filepath.Join(envDir, "postgres.yaml"),
+		[]byte("host: localhost\nport: 5432\n"), 0o600,
+	); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(
+		filepath.Join(envDir, "postgres.production.yaml"),
+		[]byte("host: prod-db\n"), 0o600,
+	); err != nil {
+		t.Fatal(err)
+	}
+	return dir
+}
+
+// baseParams builds envmerge.Params for the temp workspace declaring the
+// development and production environments.
+func baseParams(dir string) Params {
+	return Params{
+		Includes:     []string{filepath.Join(dir, "env", "postgres")},
+		Environments: []string{"development", "production"},
+	}
+}
 
 // TestNewAppliesStructuralDefaults verifies New applies the delimiter default and
 // does not validate an environment that an operation may override.
@@ -84,4 +119,63 @@ func TestNormalizeEnvironment(t *testing.T) {
 			t.Error("expected error for undeclared environment")
 		}
 	})
+}
+
+// TestSelectExplicitEnvironment verifies an explicitly selected environment
+// resolves to the merged environment, applying only that environment's overlays.
+func TestSelectExplicitEnvironment(t *testing.T) {
+	t.Parallel()
+
+	p := baseParams(setupWorkspace(t))
+	p.DefaultEnvironment = "development"
+	res, err := mergeEnv(t, p)
+	if err != nil {
+		t.Fatalf("Resolve: %v", err)
+	}
+	if v, _ := res.Get("HOST"); v != "localhost" {
+		t.Errorf("HOST = %q, want localhost (development overlay absent)", v)
+	}
+}
+
+// TestSelectDefaultsToFirstEnvironment verifies an empty DefaultEnvironment falls
+// back to the first declared environment.
+func TestSelectDefaultsToFirstEnvironment(t *testing.T) {
+	t.Parallel()
+
+	p := baseParams(setupWorkspace(t))
+	res, err := mergeEnv(t, p)
+	if err != nil {
+		t.Fatalf("Resolve: %v", err)
+	}
+	want := p.Environments[0]
+	if v, _ := res.Get("HOST"); v != "localhost" {
+		t.Errorf("HOST = %q, want localhost (default env %q)", v, want)
+	}
+}
+
+// TestSelectProductionAppliesOverlay verifies DefaultEnvironment selects that
+// environment's overlay (as diff relies on, passing each side).
+func TestSelectProductionAppliesOverlay(t *testing.T) {
+	t.Parallel()
+
+	p := baseParams(setupWorkspace(t))
+	p.DefaultEnvironment = "production"
+	res, err := mergeEnv(t, p)
+	if err != nil {
+		t.Fatalf("Resolve: %v", err)
+	}
+	if v, _ := res.Get("HOST"); v != "prod-db" {
+		t.Errorf("HOST = %q, want prod-db", v)
+	}
+}
+
+// TestSelectUndeclaredEnvironmentFails verifies an undeclared environment fails.
+func TestSelectUndeclaredEnvironmentFails(t *testing.T) {
+	t.Parallel()
+
+	p := baseParams(setupWorkspace(t))
+	p.DefaultEnvironment = "nope"
+	if _, err := mergeEnv(t, p); err == nil {
+		t.Error("expected error for undeclared environment")
+	}
 }

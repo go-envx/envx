@@ -4,6 +4,8 @@ import (
 	"io"
 
 	"github.com/go-envx/envx/app/internal/config"
+	"github.com/go-envx/envx/app/internal/envmerge"
+	"github.com/go-envx/envx/app/internal/printer"
 	"github.com/go-envx/envx/app/internal/runner"
 )
 
@@ -13,6 +15,9 @@ type actionParams struct {
 	Project string
 	// ExecArgs is the child command and its arguments to run.
 	ExecArgs []string
+	// IgnoreErrors downgrades resolution failures to warnings and omits the failing
+	// keys so the child process still starts.
+	IgnoreErrors bool
 }
 
 // streams bundles the output sinks the run action wires the child process to.
@@ -34,21 +39,31 @@ func execute(p actionParams, in *config.Input, s streams) error {
 		return err
 	}
 
-	// materialize the complete environment; Materialize reveals and resolves every
-	// winner and fails closed, so a child process can never receive an unresolved
-	// reference as plaintext. A decryption failure fails here before the process
-	// starts. The environment comes from the precedence-resolved default the
-	// manager already carries.
-	env, err := resolved.Envmerge.Materialize("")
+	// materialize the complete environment; by default a single unresolved value
+	// aborts here, before the child starts, so it can never receive an unresolved
+	// reference as plaintext. Under --ignore-errors each resolution failure is
+	// downgraded to a stderr warning and its key is omitted instead, so the child
+	// still starts and inherits the omitted key from the ambient environment.
+	// Structural failures stay fatal in both modes.
+	result, err := resolved.Envmerge.Materialize(envmerge.MaterializeParams{
+		IgnoreErrors: p.IgnoreErrors,
+	})
 	if err != nil {
 		return err
+	}
+	pr := printer.New(printer.Options{
+		Out: s.Stdout,
+		Err: s.Stderr,
+	})
+	for _, warning := range result.Warnings {
+		_ = pr.LogWarning(warning.Error())
 	}
 
 	// run the child process with the ready environment; the runner injects it
 	// verbatim, forwards signals to the child, and surfaces a non-zero or
 	// signal-terminated exit as an *exitcode.Error so main.go can propagate it.
 	return runner.Run(p.ExecArgs, runner.Params{
-		Env:    env.All(),
+		Env:    result.Environment.All(),
 		Stdout: s.Stdout,
 		Stderr: s.Stderr,
 	})
