@@ -21,7 +21,7 @@ goreleaser = "2.17.0"             # https://goreleaser.com/
 
 # Node
 node = "24.18.0"                  # https://nodejs.org/docs/latest/api/
-pnpm = "11.15.1"                   # https://pnpm.io/motivation
+pnpm = "12.4.1"                   # https://pnpm.io/motivation
 
 # Tools
 gh = "2.96.0"                     # https://cli.github.com/manual/
