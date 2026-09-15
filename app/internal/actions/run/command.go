@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/go-envx/envx/app/internal/flags"
+	"github.com/go-envx/envx/app/internal/schema"
 	"github.com/go-envx/envx/app/pkg/str"
 	"github.com/spf13/cobra"
 )
@@ -20,6 +21,10 @@ const (
 		By default existing OS environment variables take precedence over file
 		values; use --overload to let file values win instead.
 
+		By default an unresolved value aborts the run; use --ignore-errors to warn
+		on each unresolved value, omit it from the child environment, and start the
+		process anyway.
+
 		The target environment is determined by the --env flag, the ENVX_ENV env
 		var, a manifest env setting, or defaults to the first environment declared
 		in envx.yaml.
@@ -28,6 +33,7 @@ const (
 		envx run api-service -- npm start
 		envx run api-service --env=production -- node server.js
 		envx run api-service --overload -- ./run.sh
+		envx run api-service --ignore-errors -- ./run.sh
 	`
 )
 
@@ -35,6 +41,8 @@ const (
 // params/config, executes the action, and runs the specified command with the
 // merged environment for a project.
 func NewCommand() *cobra.Command {
+	var ignoreErrors bool
+
 	cmd := &cobra.Command{
 		Use:     usage,
 		Short:   short,
@@ -45,8 +53,9 @@ func NewCommand() *cobra.Command {
 			// validateArgs guarantees exactly one project before "--", so args[0]
 			// is the project and args[1:] is the command to run.
 			p := actionParams{
-				Project:  args[0],
-				ExecArgs: args[1:],
+				Project:      args[0],
+				ExecArgs:     args[1:],
+				IgnoreErrors: ignoreErrors,
 			}
 
 			// get the flag inputs
@@ -70,6 +79,10 @@ func NewCommand() *cobra.Command {
 		flags.WithNamespacePrefix,
 		flags.WithOverload,
 	)
+
+	// --ignore-errors is a command-local flag, not a precedence-resolved setting,
+	// so it binds directly rather than through flags.Register.
+	flags.BindBool(cmd.Flags(), &ignoreErrors, &schema.IgnoreErrors)
 
 	return cmd
 }
