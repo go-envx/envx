@@ -29,10 +29,7 @@ func TestMaterializeSubstitutesInternalReference(t *testing.T) {
 		"scheme: postgresql\nhost: db.local\nurl: \"{{SCHEME}}://{{HOST}}:5432\"\n",
 	)
 
-	env, err := subManager(t, dir, nil, nil).Materialize("")
-	if err != nil {
-		t.Fatalf("Materialize: %v", err)
-	}
+	env := materializeEnv(t, subManager(t, dir, nil, nil), "")
 	if got, _ := env.Get("URL"); got != "postgresql://db.local:5432" {
 		t.Errorf("URL = %q, want postgresql://db.local:5432", got)
 	}
@@ -46,11 +43,9 @@ func TestMaterializeSubstitutesOSReference(t *testing.T) {
 	dir := t.TempDir()
 	writeYAML(t, dir, "app.yaml", "url: \"https://{{@API_HOST}}\"\n")
 
-	env, err := subManager(t, dir, nil, map[string]string{"API_HOST": "api.example"}).
-		Materialize("")
-	if err != nil {
-		t.Fatalf("Materialize: %v", err)
-	}
+	env := materializeEnv(
+		t, subManager(t, dir, nil, map[string]string{"API_HOST": "api.example"}), "",
+	)
 	if got, _ := env.Get("URL"); got != "https://api.example" {
 		t.Errorf("URL = %q, want https://api.example", got)
 	}
@@ -64,11 +59,9 @@ func TestMaterializeOSValueNotSubstituted(t *testing.T) {
 	dir := t.TempDir()
 	writeYAML(t, dir, "app.yaml", "host: localhost\n")
 
-	env, err := subManager(t, dir, nil, map[string]string{"WEIRD": "{{HOST}}"}).
-		Materialize("")
-	if err != nil {
-		t.Fatalf("Materialize: %v", err)
-	}
+	env := materializeEnv(
+		t, subManager(t, dir, nil, map[string]string{"WEIRD": "{{HOST}}"}), "",
+	)
 	if got, _ := env.Get("WEIRD"); got != "{{HOST}}" {
 		t.Errorf("WEIRD = %q, want the opaque OS value {{HOST}}", got)
 	}
@@ -82,7 +75,8 @@ func TestMaterializeMissingReferenceFails(t *testing.T) {
 	dir := t.TempDir()
 	writeYAML(t, dir, "app.yaml", "url: \"{{NOPE}}\"\n")
 
-	if _, err := subManager(t, dir, nil, nil).Materialize(""); err == nil {
+	manager := subManager(t, dir, nil, nil)
+	if _, err := manager.Materialize(MaterializeParams{}); err == nil {
 		t.Fatal("expected a missing-reference error")
 	}
 }
@@ -94,7 +88,7 @@ func TestMaterializeCircularReferenceFails(t *testing.T) {
 	dir := t.TempDir()
 	writeYAML(t, dir, "app.yaml", "a: \"{{B}}\"\nb: \"{{A}}\"\n")
 
-	_, err := subManager(t, dir, nil, nil).Materialize("")
+	_, err := subManager(t, dir, nil, nil).Materialize(MaterializeParams{})
 	if err == nil {
 		t.Fatal("expected a circular-reference error")
 	}

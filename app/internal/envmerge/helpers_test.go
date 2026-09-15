@@ -95,5 +95,20 @@ func mergeEnv(t *testing.T, p Params) (*Environment, error) {
 	if err != nil {
 		return nil, err
 	}
-	return manager.Materialize("")
+	result, err := manager.Materialize(MaterializeParams{})
+	if err != nil {
+		return nil, err
+	}
+	return result.Environment, nil
+}
+
+// materializeEnv materializes environment through manager, failing the test on
+// error and returning the resulting environment for assertions.
+func materializeEnv(t *testing.T, manager *Manager, environment string) *Environment {
+	t.Helper()
+	result, err := manager.Materialize(MaterializeParams{Environment: environment})
+	if err != nil {
+		t.Fatalf("Materialize(%q): %v", environment, err)
+	}
+	return result.Environment
 }

@@ -67,6 +67,13 @@ var (
 		Usage: "limit to one key group (default: all groups)",
 	}
 
+	// IgnoreErrors downgrades resolution failures to warnings and omits the failing
+	// keys so the child process still starts.
+	IgnoreErrors = FlagSpec{
+		Name:  "ignore-errors",
+		Usage: "warn on unresolved values and omit them instead of aborting",
+	}
+
 	// Key narrows a bulk secret operation to one secret key (default: all keys).
 	Key = FlagSpec{
 		Name:  "key",

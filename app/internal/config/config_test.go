@@ -403,7 +403,7 @@ func TestResolveProjectDanglingSecretReference(t *testing.T) {
 
 	// Revealed: materializing the environment fails loudly on the dangling
 	// reference, so a child process never receives an unresolved reference.
-	if _, err := resolved.Envmerge.Materialize(""); err == nil {
+	if _, err := resolved.Envmerge.Materialize(envmerge.MaterializeParams{}); err == nil {
 		t.Fatal("expected dangling reference error when materialized")
 	}
 }

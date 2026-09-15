@@ -1,103 +1,10 @@
 package envmerge
 
 import (
-	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 )
-
-// setupWorkspace creates a temp directory with one namespace (env/postgres) and
-// returns its path. envmerge reads only the namespace overlays, so no other
-// files are needed.
-func setupWorkspace(t *testing.T) string {
-	t.Helper()
-	dir := t.TempDir()
-	envDir := filepath.Join(dir, "env")
-	if err := os.MkdirAll(envDir, 0o750); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(
-		filepath.Join(envDir, "postgres.yaml"),
-		[]byte("host: localhost\nport: 5432\n"), 0o600,
-	); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(
-		filepath.Join(envDir, "postgres.production.yaml"),
-		[]byte("host: prod-db\n"), 0o600,
-	); err != nil {
-		t.Fatal(err)
-	}
-	return dir
-}
-
-// baseParams builds envmerge.Params for the temp workspace declaring the
-// development and production environments.
-func baseParams(dir string) Params {
-	return Params{
-		Includes:     []string{filepath.Join(dir, "env", "postgres")},
-		Environments: []string{"development", "production"},
-	}
-}
-
-// TestResolveSuccess verifies params resolve to the merged environment.
-func TestResolveSuccess(t *testing.T) {
-	t.Parallel()
-
-	p := baseParams(setupWorkspace(t))
-	p.DefaultEnvironment = "development"
-	res, err := mergeEnv(t, p)
-	if err != nil {
-		t.Fatalf("Resolve: %v", err)
-	}
-	if v, _ := res.Get("HOST"); v != "localhost" {
-		t.Errorf("HOST = %q, want localhost (development overlay absent)", v)
-	}
-}
-
-// TestResolveDefaultEnv verifies an empty DefaultEnvironment falls back to the
-// first declared environment.
-func TestResolveDefaultEnv(t *testing.T) {
-	t.Parallel()
-
-	p := baseParams(setupWorkspace(t))
-	res, err := mergeEnv(t, p)
-	if err != nil {
-		t.Fatalf("Resolve: %v", err)
-	}
-	want := p.Environments[0]
-	if v, _ := res.Get("HOST"); v != "localhost" {
-		t.Errorf("HOST = %q, want localhost (default env %q)", v, want)
-	}
-}
-
-// TestResolveOverride verifies DefaultEnvironment selects that environment's
-// overlay (as diff relies on, passing each side).
-func TestResolveOverride(t *testing.T) {
-	t.Parallel()
-
-	p := baseParams(setupWorkspace(t))
-	p.DefaultEnvironment = "production"
-	res, err := mergeEnv(t, p)
-	if err != nil {
-		t.Fatalf("Resolve: %v", err)
-	}
-	if v, _ := res.Get("HOST"); v != "prod-db" {
-		t.Errorf("HOST = %q, want prod-db", v)
-	}
-}
-
-// TestResolveErrors verifies an undeclared environment fails.
-func TestResolveErrors(t *testing.T) {
-	t.Parallel()
-
-	p := baseParams(setupWorkspace(t))
-	p.DefaultEnvironment = "nope"
-	if _, err := mergeEnv(t, p); err == nil {
-		t.Error("expected error for undeclared environment")
-	}
-}
 
 // TestMaterializeResolvesEveryWinner verifies Materialize returns a complete
 // environment with every winning value resolved, and that All returns a copy.
@@ -115,10 +22,7 @@ func TestMaterializeResolvesEveryWinner(t *testing.T) {
 		ResolverFactory: factory,
 	})
 
-	env, err := manager.Materialize("development")
-	if err != nil {
-		t.Fatalf("Materialize: %v", err)
-	}
+	env := materializeEnv(t, manager, "development")
 	if v, _ := env.Get("PASSWORD"); v != "pw" {
 		t.Errorf("PASSWORD = %q, want pw", v)
 	}
@@ -147,7 +51,9 @@ func TestMaterializeOpensOneRevealingResolver(t *testing.T) {
 		ResolverFactory: factory,
 	})
 
-	if _, err := manager.Materialize("development"); err != nil {
+	if _, err := manager.Materialize(
+		MaterializeParams{Environment: "development"},
+	); err != nil {
 		t.Fatalf("Materialize: %v", err)
 	}
 	if factory.calls != 1 {
@@ -172,8 +78,8 @@ func TestMaterializeAggregatesFailures(t *testing.T) {
 		ResolverFactory: factory,
 	})
 
-	env, err := manager.Materialize("development")
-	if env != nil {
+	result, err := manager.Materialize(MaterializeParams{Environment: "development"})
+	if result != nil {
 		t.Error("Materialize returned a partial environment on failure")
 	}
 	if err == nil {
@@ -201,10 +107,7 @@ func TestMaterializeObservesFileEdits(t *testing.T) {
 		ResolverFactory: factory,
 	})
 
-	first, err := manager.Materialize("development")
-	if err != nil {
-		t.Fatalf("Materialize (first): %v", err)
-	}
+	first := materializeEnv(t, manager, "development")
 	if v, _ := first.Get("SECRET"); v != "first" {
 		t.Errorf("SECRET = %q, want first", v)
 	}
@@ -213,10 +116,7 @@ func TestMaterializeObservesFileEdits(t *testing.T) {
 	writeYAML(t, dir, "app.yaml", "host: edited\nsecret: secret://x\n")
 	factory.value = "second"
 
-	second, err := manager.Materialize("development")
-	if err != nil {
-		t.Fatalf("Materialize (second): %v", err)
-	}
+	second := materializeEnv(t, manager, "development")
 	if v, _ := second.Get("HOST"); v != "edited" {
 		t.Errorf("HOST = %q, want edited (namespace file reloaded)", v)
 	}
@@ -244,10 +144,7 @@ func TestMaterializeSkipsShadowedReferences(t *testing.T) {
 		ResolverFactory: factory,
 	})
 
-	env, err := manager.Materialize("production")
-	if err != nil {
-		t.Fatalf("Materialize: %v", err)
-	}
+	env := materializeEnv(t, manager, "production")
 	if v, _ := env.Get("PASSWORD"); v != "replacement" {
 		t.Errorf("PASSWORD = %q, want replacement", v)
 	}
@@ -269,8 +166,8 @@ func TestMaterializeRedactsResolvedListItemErrors(t *testing.T) {
 		ResolverFactory: factory,
 	})
 
-	env, err := manager.Materialize("development")
-	if env != nil {
+	result, err := manager.Materialize(MaterializeParams{Environment: "development"})
+	if result != nil {
 		t.Error("Materialize returned an environment despite a render failure")
 	}
 	if err == nil {

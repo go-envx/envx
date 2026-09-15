@@ -143,10 +143,7 @@ func TestMaterializeUnionsOSKeys(t *testing.T) {
 		"HOST":    "os-value",
 		"OS_ONLY": "extra",
 	}, false)
-	env, err := manager.Materialize("")
-	if err != nil {
-		t.Fatalf("Materialize: %v", err)
-	}
+	env := materializeEnv(t, manager, "")
 	if got, _ := env.Get("HOST"); got != "os-value" {
 		t.Errorf("HOST = %q, want os-value (OS wins)", got)
 	}
@@ -170,10 +167,7 @@ func TestMaterializeOverloadKeepsFile(t *testing.T) {
 		"HOST":    "os-value",
 		"OS_ONLY": "extra",
 	}, true)
-	env, err := manager.Materialize("")
-	if err != nil {
-		t.Fatalf("Materialize: %v", err)
-	}
+	env := materializeEnv(t, manager, "")
 	if got, _ := env.Get("HOST"); got != "file-value" {
 		t.Errorf("HOST = %q, want file-value (overload keeps file)", got)
 	}
@@ -197,10 +191,7 @@ func TestMaterializeOSValueIsOpaque(t *testing.T) {
 		OSEnvironment:   map[string]string{"HOST": "secret://group/key"},
 		ResolverFactory: &recordingFactory{resolver: fakeResolver{failAll: true}},
 	})
-	env, err := manager.Materialize("")
-	if err != nil {
-		t.Fatalf("Materialize: %v", err)
-	}
+	env := materializeEnv(t, manager, "")
 	if got, _ := env.Get("HOST"); got != "secret://group/key" {
 		t.Errorf("HOST = %q, want the opaque OS value verbatim", got)
 	}
