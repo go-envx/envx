@@ -7,16 +7,6 @@ import (
 	"strings"
 )
 
-// Substitution grammar delimiters. A value embeds a reference as {{VAR}} for an
-// internal namespace variable or {{@VAR}} for an effective (OS-aware) variable; a
-// leading backslash on the opening brace makes the whole token a literal.
-const (
-	refOpen  = "{{"
-	refClose = "}}"
-	osSigil  = "@"
-	escape   = '\\'
-)
-
 // tokenKind classifies a span produced by the tokenizer.
 type tokenKind int
 
@@ -37,85 +27,6 @@ type token struct {
 	// text is literal content for a literal span, or the variable name for a
 	// reference span.
 	text string
-}
-
-// tokenize scans a value into literal spans and reference tokens, honoring the
-// \{{ escape that renders the following token literally. An unterminated {{ is
-// treated as literal text, so a value can never fail to tokenize.
-func tokenize(value string) []token {
-	var tokens []token
-	var lit strings.Builder
-
-	flush := func() {
-		if lit.Len() > 0 {
-			tokens = append(tokens, token{kind: tokenLiteral, text: lit.String()})
-			lit.Reset()
-		}
-	}
-
-	for i := 0; i < len(value); {
-		// A backslash before an opening brace escapes the token: emit a literal
-		// {{ and drop the backslash.
-		if value[i] == escape && strings.HasPrefix(value[i+1:], refOpen) {
-			lit.WriteString(refOpen)
-			i += 1 + len(refOpen)
-			continue
-		}
-
-		if strings.HasPrefix(value[i:], refOpen) {
-			rest := value[i+len(refOpen):]
-			end := strings.Index(rest, refClose)
-			if end < 0 {
-				// No closing brace; treat the opener as literal text.
-				lit.WriteString(refOpen)
-				i += len(refOpen)
-				continue
-			}
-
-			flush()
-			name := strings.TrimSpace(rest[:end])
-			if after, ok := strings.CutPrefix(name, osSigil); ok {
-				tokens = append(tokens, token{
-					kind: tokenOSRef,
-					text: strings.TrimSpace(after),
-				})
-			} else {
-				tokens = append(tokens, token{kind: tokenInternalRef, text: name})
-			}
-			i += len(refOpen) + end + len(refClose)
-			continue
-		}
-
-		lit.WriteByte(value[i])
-		i++
-	}
-
-	flush()
-	return tokens
-}
-
-// hasReferences reports whether value contains at least one {{ }} reference, so a
-// diagnoser can classify it as a variable substitution rather than a plain value.
-func hasReferences(value string) bool {
-	for _, tok := range tokenize(value) {
-		if tok.kind != tokenLiteral {
-			return true
-		}
-	}
-	return false
-}
-
-// hasEscape reports whether value carries a \{{ escape, so the substitution stage
-// strips the backslash even though the value holds no live reference. A diagnoser
-// uses this to route an escape-only value through the engine so its revealed
-// value matches what run and get produce.
-func hasEscape(value string) bool {
-	for i := 0; i < len(value); i++ {
-		if value[i] == escape && strings.HasPrefix(value[i+1:], refOpen) {
-			return true
-		}
-	}
-	return false
 }
 
 // substitutionStatus classifies whether a variable resolves, without exposing its
@@ -220,6 +131,8 @@ type rawEntry struct {
 // {{@VAR}} fallback. A resolved-value cache makes each variable compose once
 // regardless of fan-in, and a visiting stack detects cycles.
 type substituter struct {
+	// grammar is the compiled reference syntax the engine tokenizes values with.
+	grammar *grammar
 	// symbols is the engine's view of the namespace.
 	symbols symbolTable
 	// getenv reads an OS variable, reporting whether it is set.
@@ -238,8 +151,9 @@ type substituter struct {
 }
 
 // newSubstituter builds an engine over a fully resolved value map, the injected
-// getenv seam, and the overload ordering. It backs the pure, table-driven core
-// used where every value is already materialized and no value is opaque.
+// getenv seam, and the overload ordering, using the built-in reference grammar. It
+// backs the pure, table-driven core used where every value is already materialized
+// and no value is opaque.
 func newSubstituter(
 	table map[string]string,
 	getenv func(name string) (string, bool),
@@ -250,17 +164,20 @@ func newSubstituter(
 		opaque:   func(string) bool { return false },
 		value:    func(name string) (string, error) { return table[name], nil },
 	}
-	return newSymbolSubstituter(symbols, getenv, overload)
+	return newSymbolSubstituter(defaultGrammar, symbols, getenv, overload)
 }
 
-// newSymbolSubstituter builds an engine over an arbitrary symbol table, so a
-// caller can supply lazy, reveal-gated resolution and opacity.
+// newSymbolSubstituter builds an engine over an arbitrary symbol table and the
+// caller's reference grammar, so a caller can supply lazy, reveal-gated resolution
+// and opacity alongside a workspace's configured reference syntax.
 func newSymbolSubstituter(
+	grammar *grammar,
 	symbols symbolTable,
 	getenv func(name string) (string, bool),
 	overload bool,
 ) *substituter {
 	return &substituter{
+		grammar:  grammar,
 		symbols:  symbols,
 		getenv:   getenv,
 		overload: overload,
@@ -334,7 +251,7 @@ func (s *substituter) status(key string) substitutionStatus {
 // reference to key.
 func (s *substituter) compose(value, key string) (string, error) {
 	var b strings.Builder
-	for _, tok := range tokenize(value) {
+	for _, tok := range s.grammar.tokenize(value) {
 		switch tok.kind {
 		case tokenLiteral:
 			b.WriteString(tok.text)

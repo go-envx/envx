@@ -64,6 +64,18 @@ func WithOverload(fs *pflag.FlagSet) {
 	registerBool(fs, &schema.Overload)
 }
 
+// WithReferencePattern registers the --reference-pattern flag, overriding the
+// {{VAR}} internal-reference syntax with a custom regex.
+func WithReferencePattern(fs *pflag.FlagSet) {
+	registerString(fs, &schema.ReferencePattern)
+}
+
+// WithOSReferencePattern registers the --os-reference-pattern flag, overriding the
+// {{@VAR}} OS-reference syntax with a custom regex.
+func WithOSReferencePattern(fs *pflag.FlagSet) {
+	registerString(fs, &schema.OSReferencePattern)
+}
+
 // registerString registers spec as a dest-less string flag on fs, delegating to
 // BindString and discarding the destination since GetInput reads the value back
 // from the flag set.

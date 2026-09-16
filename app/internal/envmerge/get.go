@@ -86,6 +86,7 @@ func (m *Manager) getValue(
 ) (string, error) {
 	if reveal {
 		engine := newSymbolSubstituter(
+			m.grammar,
 			m.getSymbols(state, resolver, environment),
 			m.getenv(), m.params.Settings.Overload,
 		)

@@ -13,6 +13,10 @@ type Manager struct {
 	// params is the normalized, privately-owned configuration copied at
 	// construction so caller mutation cannot change manager behavior.
 	params Params
+	// grammar is the compiled reference syntax, built once at construction from the
+	// configured (or default) reference patterns so an invalid pattern fails here
+	// rather than mid-operation.
+	grammar *grammar
 }
 
 // New validates structural settings, applies terminal defaults, and privately
@@ -25,7 +29,14 @@ func New(params Params) (*Manager, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &Manager{params: normalized}, nil
+	grammar, err := newGrammar(
+		normalized.Settings.ReferencePattern,
+		normalized.Settings.OSReferencePattern,
+	)
+	if err != nil {
+		return nil, err
+	}
+	return &Manager{params: normalized, grammar: grammar}, nil
 }
 
 // normalizeEnvironment applies the configured default when the call is empty,

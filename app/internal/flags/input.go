@@ -12,14 +12,16 @@ import (
 // to nil and falls through to the ENVX_* var and manifest layers.
 func GetInput(fs *pflag.FlagSet) *config.Input {
 	return &config.Input{
-		ConfigPath:      optString(fs, &schema.Config),
-		Env:             optString(fs, &schema.Env),
-		RequireOverlays: optBool(fs, &schema.RequireOverlays),
-		Prefix:          optString(fs, &schema.Prefix),
-		Suffix:          optString(fs, &schema.Suffix),
-		Delimiter:       optString(fs, &schema.Delimiter),
-		NamespacePrefix: optBool(fs, &schema.NamespacePrefix),
-		Overload:        optBool(fs, &schema.Overload),
+		ConfigPath:         optString(fs, &schema.Config),
+		Env:                optString(fs, &schema.Env),
+		RequireOverlays:    optBool(fs, &schema.RequireOverlays),
+		Prefix:             optString(fs, &schema.Prefix),
+		Suffix:             optString(fs, &schema.Suffix),
+		Delimiter:          optString(fs, &schema.Delimiter),
+		NamespacePrefix:    optBool(fs, &schema.NamespacePrefix),
+		Overload:           optBool(fs, &schema.Overload),
+		ReferencePattern:   optString(fs, &schema.ReferencePattern),
+		OSReferencePattern: optString(fs, &schema.OSReferencePattern),
 	}
 }
 

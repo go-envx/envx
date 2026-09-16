@@ -78,6 +78,8 @@ func NewCommand() *cobra.Command {
 		flags.WithDelimiter,
 		flags.WithNamespacePrefix,
 		flags.WithOverload,
+		flags.WithReferencePattern,
+		flags.WithOSReferencePattern,
 	)
 
 	// --ignore-errors is a command-local flag, not a precedence-resolved setting,
