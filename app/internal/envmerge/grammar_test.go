@@ -4,6 +4,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/go-envx/envx/app/internal/status"
 )
 
 // customPatternManager builds a Manager over a single "app" namespace in dir whose
@@ -243,7 +245,7 @@ func TestExplainCustomPatternLifecycle(t *testing.T) {
 	}
 
 	bad, _ := findExplanation(exp, "BAD")
-	if bad.Resolution.Code != codeUnresolvedVariable {
+	if bad.Resolution.Code != status.UnresolvedVariableReference {
 		t.Errorf("BAD code = %q, want UNRESOLVED_VARIABLE", bad.Resolution.Code)
 	}
 }

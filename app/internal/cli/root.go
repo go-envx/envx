@@ -9,6 +9,7 @@ import (
 	"github.com/go-envx/envx/app/internal/actions/run"
 	"github.com/go-envx/envx/app/internal/actions/secrets"
 	"github.com/go-envx/envx/app/internal/actions/set"
+	"github.com/go-envx/envx/app/internal/actions/validate"
 	"github.com/go-envx/envx/app/internal/flags"
 	"github.com/spf13/cobra"
 )
@@ -53,6 +54,7 @@ func NewRootCmd(info BuildInfo) *cobra.Command {
 		explain.NewCommand(),
 		diff.NewCommand(),
 		secrets.NewCommand(),
+		validate.NewCommand(),
 	)
 	return root
 }

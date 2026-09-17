@@ -4,6 +4,8 @@ import (
 	"errors"
 	"fmt"
 	"slices"
+
+	"github.com/go-envx/envx/app/internal/status"
 )
 
 // Manifest is the parsed, validated content of envx.yaml: the declared
@@ -22,6 +24,11 @@ type Manifest struct {
 	Projects map[string]Project `yaml:"projects"`
 	// Secrets configures the workspace-level secrets store.
 	Secrets SecretsConfig `yaml:"secrets"`
+	// ValidateSeverities configures the validate command's per-check severities,
+	// keyed by the lowercased check code (e.g. "secret_is_not_referenced") with an
+	// off/warn/error value. It is read only from envx.yaml — no flag or env var
+	// overrides it — so severity policy stays a committed property of the workspace.
+	ValidateSeverities map[string]string `yaml:"validate"`
 }
 
 // SecretsConfig configures the workspace-level secrets store. Its zero value
@@ -126,6 +133,12 @@ func (m *Manifest) Validate() error {
 		if slices.Contains(project.Includes, "") {
 			return fmt.Errorf("manifest: project %q contains an empty include", name)
 		}
+	}
+
+	// Reject an unknown check or an invalid severity in the validate block so a
+	// typo fails at load rather than being silently ignored.
+	if _, err := status.Resolve(m.ValidateSeverities); err != nil {
+		return fmt.Errorf("manifest: validate: %w", err)
 	}
 
 	return nil

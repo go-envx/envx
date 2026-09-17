@@ -37,6 +37,14 @@ linters:
       excludes:
         - G104 # Covered by errcheck
 
+  exclusions:
+    rules:
+      # The status package holds only status-code constants; G101 misreads the
+      # "SECRET_*" identifiers as hardcoded credentials.
+      - path: internal/status/status.go
+        linters:
+          - gosec
+
 formatters:
   enable:
     - gofumpt

@@ -27,6 +27,30 @@ func (d *Document) PublicKey(group string) (string, bool) {
 	return value, true
 }
 
+// PublicKeyGroups returns the names of every group that declares a public key,
+// in document order. It reads the public-keys block without exposing any key
+// material.
+func (d *Document) PublicKeyGroups() []string {
+	result := make([]string, 0)
+	root, err := d.topLevel()
+	if err != nil {
+		return result
+	}
+	entry, err := getMappingEntry(root, publicKeysField, false)
+	if err != nil || !entry.found || entry.value.Kind != yaml.MappingNode {
+		return result
+	}
+	groups := entry.value
+	for i := 0; i+1 < len(groups.Content); i += 2 {
+		name, err := getStringValue(groups.Content[i], "public key group")
+		if err != nil {
+			continue
+		}
+		result = append(result, name)
+	}
+	return result
+}
+
 // Secret returns one stored value and whether the entry exists.
 func (d *Document) Secret(group, key string) (Secret, bool) {
 	if group == "" || key == "" {

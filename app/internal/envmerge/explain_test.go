@@ -4,6 +4,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/go-envx/envx/app/internal/status"
 )
 
 // fakeDiagnoser implements both ValueResolver and ValueDiagnoser for testing the
@@ -34,7 +36,7 @@ func (f fakeDiagnoser) Resolve(value, _ string) (string, error) {
 // plaintext only when reveal is set.
 func (f fakeDiagnoser) Diagnose(value, _ string) Resolution {
 	if !strings.HasPrefix(value, "secret://") {
-		res := Resolution{Kind: KindConfigValue, Severity: SeverityOK, Code: codeOK}
+		res := Resolution{Kind: KindConfigValue, Severity: SeverityOK, Code: status.OK}
 		if f.reveal {
 			res.Resolved = value
 			res.HasResolved = true
@@ -44,16 +46,16 @@ func (f fakeDiagnoser) Diagnose(value, _ string) Resolution {
 	if value == f.fail {
 		return Resolution{
 			Kind: KindSecretReference, Severity: SeverityError,
-			Code: "SECRET_NOT_FOUND", Message: "dangling reference",
+			Code: status.SecretReferenceNotFound, Message: "dangling reference",
 		}
 	}
 	if value == f.warn {
 		return Resolution{
 			Kind: KindSecretReference, Severity: SeverityWarning,
-			Code: "PRIVATE_KEY_UNAVAILABLE", Message: "no key",
+			Code: status.PrivateKeyIsUnavailable, Message: "no key",
 		}
 	}
-	res := Resolution{Kind: KindSecretReference, Severity: SeverityOK, Code: codeOK}
+	res := Resolution{Kind: KindSecretReference, Severity: SeverityOK, Code: status.OK}
 	if f.reveal {
 		res.Resolved = f.values[value]
 		res.HasResolved = true
@@ -170,7 +172,7 @@ func TestExplainPerKeyFailureDoesNotAbort(t *testing.T) {
 		t.Errorf("summary = %+v, severity %q", exp.Summary, exp.Summary.Severity())
 	}
 	bad, ok := findExplanation(exp, "BAD")
-	if !ok || bad.Resolution.Code != "SECRET_NOT_FOUND" {
+	if !ok || bad.Resolution.Code != status.SecretReferenceNotFound {
 		t.Errorf("BAD resolution = %+v", bad.Resolution)
 	}
 	if bad.Resolution.Kind != KindSecretReference {

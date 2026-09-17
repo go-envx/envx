@@ -4,18 +4,8 @@ import (
 	"fmt"
 	"sort"
 	"strings"
-)
 
-// Status codes for a diagnosed value. codeOK marks a successful resolution,
-// while the substitution codes classify a dry-run substitution failure.
-const (
-	// codeOK is the status code for a value that resolved successfully.
-	codeOK = "OK"
-	// codeUnresolvedVariable marks a substitution with a missing internal or OS
-	// reference.
-	codeUnresolvedVariable = "UNRESOLVED_VARIABLE"
-	// codeCircularReference marks a substitution with a reference cycle.
-	codeCircularReference = "CIRCULAR_REFERENCE"
+	"github.com/go-envx/envx/app/internal/status"
 )
 
 // ExplainParams selects all keys or one case-insensitive key from an environment
@@ -47,6 +37,12 @@ type ExplanationEntry struct {
 	Key string
 	// Literal is the pre-resolution winning value written in the source file.
 	Literal string
+	// Items is the winning leaf's raw, pre-resolution items, before joining or
+	// dereferencing. It is nil for an opaque OS value, which is never
+	// dereferenced, so a caller enumerating references never mistakes an OS value
+	// for one. A workspace-wide validator reads it to discover which stored
+	// secrets a reference actually uses.
+	Items []string
 	// Origin records the winning source and every source it shadowed.
 	Origin Origin
 	// Resolution is the non-fatal, dry-run outcome of diagnosing the value.
@@ -135,12 +131,25 @@ func (m *Manager) Explain(params ExplainParams) (*Explanation, error) {
 		entries = append(entries, ExplanationEntry{
 			Key:        key,
 			Literal:    literal,
+			Items:      itemsOf(value),
 			Origin:     state.origins[key],
 			Resolution: resolution,
 		})
 	}
 
 	return &Explanation{Entries: entries, Summary: summary}, nil
+}
+
+// itemsOf returns a copy of a leaf's raw pre-resolution items, or nil for an
+// opaque OS value that is never dereferenced. Copying keeps the caller from
+// aliasing the manager's merge state.
+func itemsOf(value leafValue) []string {
+	if value.opaque {
+		return nil
+	}
+	items := make([]string, len(value.items))
+	copy(items, value.items)
+	return items
 }
 
 // explainKeys returns the keys to diagnose in sorted order: every winning key
@@ -197,11 +206,12 @@ func diagnoseEntry(
 
 // diagnoseSubstitution classifies a substitution-stage value in dry-run mode. It
 // reports resolvability through the engine's status pass without exposing the
-// composed value, mapping a missing reference to UNRESOLVED_VARIABLE and a cycle
-// to CIRCULAR_REFERENCE. An escape-only value references nothing, so it is a plain
-// config value that always resolves; only a live reference marks it as a variable
-// substitution. The composed value is materialized and retained only under
-// reveal, so masked diagnosis never leaks it.
+// composed value, mapping a missing reference to UNRESOLVED_VARIABLE_REFERENCE
+// and a cycle to CIRCULAR_VARIABLE_REFERENCE. An escape-only value references
+// nothing, so it is a plain config value that always resolves; only a live
+// reference marks it as a variable substitution. The composed value is
+// materialized and retained only under reveal, so masked diagnosis never leaks
+// it.
 func diagnoseSubstitution(
 	engine *substituter, key string, reveal, variable bool,
 ) Resolution {
@@ -209,15 +219,15 @@ func diagnoseSubstitution(
 	if variable {
 		kind = KindVariableSubstitution
 	}
-	resolution := Resolution{Kind: kind, Severity: SeverityOK, Code: codeOK}
+	resolution := Resolution{Kind: kind, Severity: SeverityOK, Code: status.OK}
 	switch engine.status(key) {
 	case statusCircular:
 		resolution.Severity = SeverityError
-		resolution.Code = codeCircularReference
+		resolution.Code = status.CircularVariableReference
 		resolution.Message = "reference cycle detected"
 	case statusUnresolved:
 		resolution.Severity = SeverityError
-		resolution.Code = codeUnresolvedVariable
+		resolution.Code = status.UnresolvedVariableReference
 		resolution.Message = "references an undefined variable"
 	case statusOK:
 		if reveal {
@@ -244,7 +254,7 @@ func diagnoseLeaf(
 	// plaintext is retained only under reveal, mirroring a plain config value.
 	if value.opaque {
 		resolution := Resolution{
-			Kind: KindConfigValue, Severity: SeverityOK, Code: codeOK,
+			Kind: KindConfigValue, Severity: SeverityOK, Code: status.OK,
 		}
 		if reveal {
 			resolution.Resolved = literalValue(value, delimiter)
@@ -254,10 +264,10 @@ func diagnoseLeaf(
 	}
 
 	if diagnoser == nil {
-		return Resolution{Kind: KindConfigValue, Severity: SeverityOK, Code: codeOK}
+		return Resolution{Kind: KindConfigValue, Severity: SeverityOK, Code: status.OK}
 	}
 
-	agg := Resolution{Kind: KindConfigValue, Severity: SeverityOK, Code: codeOK}
+	agg := Resolution{Kind: KindConfigValue, Severity: SeverityOK, Code: status.OK}
 	resolvedItems := make([]string, len(value.items))
 	allResolved := len(value.items) > 0
 	for i, item := range value.items {
