@@ -4,6 +4,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/go-envx/envx/app/internal/status"
 )
 
 // subManager builds a Manager over a single "app" namespace in dir with the given
@@ -248,7 +250,7 @@ func TestExplainSubstitutionMaskedStatus(t *testing.T) {
 		t.Errorf("kind = %q, want variable", entry.Resolution.Kind)
 	}
 	if entry.Resolution.Severity != SeverityOK ||
-		entry.Resolution.Code != codeOK {
+		entry.Resolution.Code != status.OK {
 		t.Errorf("status = %s/%s, want ok/OK",
 			entry.Resolution.Severity, entry.Resolution.Code)
 	}
@@ -293,7 +295,7 @@ func TestExplainSubstitutionUnresolved(t *testing.T) {
 	entry, _ := findExplanation(exp, "URL")
 	if entry.Resolution.Kind != KindVariableSubstitution ||
 		entry.Resolution.Severity != SeverityError ||
-		entry.Resolution.Code != codeUnresolvedVariable {
+		entry.Resolution.Code != status.UnresolvedVariableReference {
 		t.Errorf("resolution = %+v, want error/UNRESOLVED_VARIABLE", entry.Resolution)
 	}
 	if entry.Resolution.HasResolved {
@@ -318,7 +320,7 @@ func TestExplainSubstitutionCircular(t *testing.T) {
 	}
 	entry, _ := findExplanation(exp, "A")
 	if entry.Resolution.Severity != SeverityError ||
-		entry.Resolution.Code != codeCircularReference {
+		entry.Resolution.Code != status.CircularVariableReference {
 		t.Errorf("resolution = %+v, want error/CIRCULAR_REFERENCE", entry.Resolution)
 	}
 }

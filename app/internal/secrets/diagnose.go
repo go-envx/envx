@@ -9,31 +9,13 @@ import (
 	"github.com/go-envx/envx/app/internal/envmerge"
 	"github.com/go-envx/envx/app/internal/privatekey"
 	"github.com/go-envx/envx/app/internal/secrets/internal/envelope"
+	"github.com/go-envx/envx/app/internal/status"
 )
 
 // ErrSecretNotFound indicates a reference to a value absent from the store. It
 // is the dangling-reference sentinel, distinct from the cipher and private-key
 // sentinels a diagnosis reuses for the remaining failure modes.
 var ErrSecretNotFound = errors.New("secret not found")
-
-// Status codes reported by Diagnose. Each is a stable identifier, free of
-// private-key or resolved-secret material, so machine output stays classifiable.
-const (
-	// CodeOK marks a value that resolved successfully.
-	CodeOK = "OK"
-	// CodePrivateKeyUnavailable marks a reference with no private key in context.
-	CodePrivateKeyUnavailable = "PRIVATE_KEY_UNAVAILABLE"
-	// CodeSecretNotFound marks a dangling reference with no stored value.
-	CodeSecretNotFound = "SECRET_NOT_FOUND"
-	// CodeInvalidPrivateKey marks a present but malformed or mismatched key.
-	CodeInvalidPrivateKey = "INVALID_PRIVATE_KEY"
-	// CodeAlgorithmMismatch marks an envelope algorithm the cipher cannot use.
-	CodeAlgorithmMismatch = "ALGORITHM_MISMATCH"
-	// CodeInvalidReference marks a value whose reference grammar is malformed.
-	CodeInvalidReference = "INVALID_REFERENCE"
-	// CodeNotEncrypted marks a referenced store value that is not ciphertext.
-	CodeNotEncrypted = "NOT_ENCRYPTED"
-)
 
 // Diagnose reports a value's kind and dry-run resolution without materializing
 // plaintext unless the resolver reveals. It never returns an error; a failure is
@@ -57,7 +39,7 @@ func (r *Resolver) Diagnose(value, _ string) envmerge.Resolution {
 		return envmerge.Resolution{
 			Kind:     envmerge.KindSecretReference,
 			Severity: envmerge.SeverityError,
-			Code:     CodeInvalidReference,
+			Code:     status.InvalidSecretReference,
 			Message:  err.Error(),
 		}
 	}
@@ -70,7 +52,7 @@ func (r *Resolver) configValueResolution(value string) envmerge.Resolution {
 	res := envmerge.Resolution{
 		Kind:     envmerge.KindConfigValue,
 		Severity: envmerge.SeverityOK,
-		Code:     CodeOK,
+		Code:     status.OK,
 	}
 	if r.reveal {
 		res.Resolved = value
@@ -88,7 +70,7 @@ func (r *Resolver) diagnoseReference(ref reference) envmerge.Resolution {
 	ciphertext, ok := r.values[ref]
 	if !ok {
 		res.Severity = envmerge.SeverityError
-		res.Code = CodeSecretNotFound
+		res.Code = status.SecretReferenceNotFound
 		res.Message = "no stored value for this reference"
 		return res
 	}
@@ -96,13 +78,13 @@ func (r *Resolver) diagnoseReference(ref reference) envmerge.Resolution {
 	algorithm, payload, err := envelope.Decode(ciphertext)
 	if err != nil {
 		res.Severity = envmerge.SeverityError
-		res.Code = CodeNotEncrypted
+		res.Code = status.SecretIsNotEncrypted
 		res.Message = "the stored value is not encrypted"
 		return res
 	}
 	if algorithm != r.cipher.Algorithm() {
 		res.Severity = envmerge.SeverityError
-		res.Code = CodeAlgorithmMismatch
+		res.Code = status.SecretAlgorithmMismatch
 		res.Message = fmt.Sprintf(
 			"stored with %q, but the configured cipher is %q",
 			algorithm, r.cipher.Algorithm(),
@@ -120,13 +102,13 @@ func (r *Resolver) diagnoseReference(ref reference) envmerge.Resolution {
 	plaintext, err := r.cipher.Decrypt(payload, privateKey)
 	if err != nil {
 		res.Severity = envmerge.SeverityError
-		res.Code = CodeInvalidPrivateKey
+		res.Code = status.PrivateKeyIsInvalid
 		res.Message = "the private key for this group does not decrypt the value"
 		return res
 	}
 
 	res.Severity = envmerge.SeverityOK
-	res.Code = CodeOK
+	res.Code = status.OK
 	if r.reveal {
 		res.Resolved = plaintext
 		res.HasResolved = true
@@ -141,18 +123,18 @@ func referenceKeyResolution(
 ) envmerge.Resolution {
 	if errors.Is(err, privatekey.ErrNotAvailable) {
 		res.Severity = envmerge.SeverityWarning
-		res.Code = CodePrivateKeyUnavailable
+		res.Code = status.PrivateKeyIsUnavailable
 		res.Message = "no private key for this group in this context"
 		return res
 	}
 	if errors.Is(err, privatekey.ErrInvalidKey) || errors.Is(err, cipher.ErrInvalidKey) {
 		res.Severity = envmerge.SeverityError
-		res.Code = CodeInvalidPrivateKey
+		res.Code = status.PrivateKeyIsInvalid
 		res.Message = "the private key for this group is malformed"
 		return res
 	}
 	res.Severity = envmerge.SeverityError
-	res.Code = CodeInvalidPrivateKey
+	res.Code = status.PrivateKeyIsInvalid
 	res.Message = "the private key for this group could not be resolved"
 	return res
 }

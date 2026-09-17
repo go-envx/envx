@@ -142,6 +142,12 @@ var (
 		Usage: "decrypt secret references instead of masking them",
 	}
 
+	// Strict fails validation on warnings as well as errors.
+	Strict = FlagSpec{
+		Name:  "strict",
+		Usage: "fail on warnings as well as errors",
+	}
+
 	// Suffix is appended to every resolved env-var key.
 	Suffix = FlagSpec{
 		Name:  "suffix",

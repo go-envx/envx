@@ -8,6 +8,7 @@ import (
 	"github.com/go-envx/envx/app/internal/envmerge"
 	"github.com/go-envx/envx/app/internal/privatekey"
 	"github.com/go-envx/envx/app/internal/secrets/internal/envelope"
+	"github.com/go-envx/envx/app/internal/status"
 )
 
 // diagnoseResolver builds a resolver over a manager that has one stored secret,
@@ -71,7 +72,7 @@ func TestDiagnoseConfigValue(t *testing.T) {
 	if res.Kind != envmerge.KindConfigValue {
 		t.Errorf("Kind = %q, want config", res.Kind)
 	}
-	if res.Severity != envmerge.SeverityOK || res.Code != CodeOK {
+	if res.Severity != envmerge.SeverityOK || res.Code != status.OK {
 		t.Errorf("status = %s/%s, want ok/OK", res.Severity, res.Code)
 	}
 	if res.HasResolved {
@@ -95,7 +96,7 @@ func TestDiagnoseSecretReference(t *testing.T) {
 	if res.Kind != envmerge.KindSecretReference {
 		t.Errorf("Kind = %q, want secret", res.Kind)
 	}
-	if res.Severity != envmerge.SeverityOK || res.Code != CodeOK {
+	if res.Severity != envmerge.SeverityOK || res.Code != status.OK {
 		t.Errorf("status = %s/%s, want ok/OK", res.Severity, res.Code)
 	}
 	if res.HasResolved {
@@ -116,8 +117,10 @@ func TestDiagnoseDanglingReference(t *testing.T) {
 
 	r := diagnoseResolver(t, false, fixedPrivateKeyResolver{})
 	res := r.Diagnose("secret://production/missing", "")
-	if res.Severity != envmerge.SeverityError || res.Code != CodeSecretNotFound {
-		t.Errorf("status = %s/%s, want error/SECRET_NOT_FOUND", res.Severity, res.Code)
+	if res.Severity != envmerge.SeverityError ||
+		res.Code != status.SecretReferenceNotFound {
+		t.Errorf("status = %s/%s, want error/SECRET_REFERENCE_NOT_FOUND",
+			res.Severity, res.Code)
 	}
 }
 
@@ -129,7 +132,7 @@ func TestDiagnoseUnavailableKey(t *testing.T) {
 	r := diagnoseResolver(t, false, newPrivateKeyTestResolver())
 	res := r.Diagnose("secret://production/database_password", "")
 	if res.Severity != envmerge.SeverityWarning ||
-		res.Code != CodePrivateKeyUnavailable {
+		res.Code != status.PrivateKeyIsUnavailable {
 		t.Errorf(
 			"status = %s/%s, want warning/PRIVATE_KEY_UNAVAILABLE",
 			res.Severity, res.Code,
@@ -170,8 +173,10 @@ func TestDiagnoseInvalidReference(t *testing.T) {
 	if res.Kind != envmerge.KindSecretReference {
 		t.Errorf("Kind = %q, want secret", res.Kind)
 	}
-	if res.Severity != envmerge.SeverityError || res.Code != CodeInvalidReference {
-		t.Errorf("status = %s/%s, want error/INVALID_REFERENCE", res.Severity, res.Code)
+	if res.Severity != envmerge.SeverityError ||
+		res.Code != status.InvalidSecretReference {
+		t.Errorf("status = %s/%s, want error/INVALID_SECRET_REFERENCE",
+			res.Severity, res.Code)
 	}
 }
 
@@ -182,7 +187,7 @@ func TestDiagnoseNotEncrypted(t *testing.T) {
 
 	r := diagnoseRawResolver(t, "plain-not-an-envelope")
 	res := r.Diagnose("secret://production/database_password", "")
-	if res.Severity != envmerge.SeverityError || res.Code != CodeNotEncrypted {
+	if res.Severity != envmerge.SeverityError || res.Code != status.SecretIsNotEncrypted {
 		t.Errorf("status = %s/%s, want error/NOT_ENCRYPTED", res.Severity, res.Code)
 	}
 }
@@ -200,8 +205,10 @@ func TestDiagnoseAlgorithmMismatch(t *testing.T) {
 
 	r := diagnoseRawResolver(t, mismatched)
 	res := r.Diagnose("secret://production/database_password", "")
-	if res.Severity != envmerge.SeverityError || res.Code != CodeAlgorithmMismatch {
-		t.Errorf("status = %s/%s, want error/ALGORITHM_MISMATCH", res.Severity, res.Code)
+	if res.Severity != envmerge.SeverityError ||
+		res.Code != status.SecretAlgorithmMismatch {
+		t.Errorf("status = %s/%s, want error/SECRET_ALGORITHM_MISMATCH",
+			res.Severity, res.Code)
 	}
 }
 
@@ -228,7 +235,7 @@ func TestDiagnoseInvalidPrivateKey(t *testing.T) {
 	}
 
 	res := r.Diagnose("secret://production/database_password", "")
-	if res.Severity != envmerge.SeverityError || res.Code != CodeInvalidPrivateKey {
+	if res.Severity != envmerge.SeverityError || res.Code != status.PrivateKeyIsInvalid {
 		t.Errorf("status = %s/%s, want error/INVALID_PRIVATE_KEY", res.Severity, res.Code)
 	}
 }
