@@ -50,6 +50,10 @@ type Input struct {
 	NamespacePrefix *bool
 	// Overload, when set, lets file values win over existing OS env vars.
 	Overload *bool
+	// ReferencePattern is the explicitly requested {{VAR}} reference-syntax regex.
+	ReferencePattern *string
+	// OSReferencePattern is the explicitly requested {{@VAR}} OS-reference-syntax regex.
+	OSReferencePattern *string
 }
 
 // manifestContext bundles the loaded manifest, the directory it was loaded from,
@@ -302,6 +306,16 @@ func resolveEnvmergeParams(
 				in.Overload,
 				proj.Overload,
 				global.Overload,
+			),
+			ReferencePattern: precedenceString(&schema.ReferencePattern,
+				in.ReferencePattern,
+				proj.ReferencePattern,
+				global.ReferencePattern,
+			),
+			OSReferencePattern: precedenceString(&schema.OSReferencePattern,
+				in.OSReferencePattern,
+				proj.OSReferencePattern,
+				global.OSReferencePattern,
 			),
 		},
 		OSEnvironment: osEnvironment(),

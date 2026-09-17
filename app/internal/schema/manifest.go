@@ -60,10 +60,14 @@ type Settings struct {
 	Env *string `yaml:"env"`
 	// NamespacePrefix prefixes each key with its namespace name, if true.
 	NamespacePrefix *bool `yaml:"namespace_prefix"`
+	// OSReferencePattern overrides the {{@VAR}} OS-reference syntax with a regex.
+	OSReferencePattern *string `yaml:"os_reference_pattern"`
 	// Overload lets file values override existing OS env vars, if true.
 	Overload *bool `yaml:"overload"`
 	// Prefix is prepended to every resolved env-var key.
 	Prefix *string `yaml:"prefix"`
+	// ReferencePattern overrides the {{VAR}} internal-reference syntax with a regex.
+	ReferencePattern *string `yaml:"reference_pattern"`
 	// RequireOverlays requires every environment overlay file in the namespace to exist.
 	RequireOverlays *bool `yaml:"require_overlays"`
 	// Suffix is appended to every resolved env-var key.

@@ -89,6 +89,8 @@ func NewCommand() *cobra.Command {
 		flags.WithDelimiter,
 		flags.WithNamespacePrefix,
 		flags.WithOverload,
+		flags.WithReferencePattern,
+		flags.WithOSReferencePattern,
 	)
 
 	flags.BindString(cmd.Flags(), &output, &schema.Output)

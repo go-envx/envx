@@ -23,7 +23,7 @@ func (m *Manager) substituteAll(
 	values map[string]string, origins map[string]Origin,
 ) (map[string]string, error) {
 	engine := newSymbolSubstituter(
-		mapSymbols(values, origins), m.getenv(), m.params.Settings.Overload,
+		m.grammar, mapSymbols(values, origins), m.getenv(), m.params.Settings.Overload,
 	)
 	out := make(map[string]string, len(values))
 	for key := range values {
@@ -67,6 +67,7 @@ func (m *Manager) resolveEffectiveTolerant(
 	failures := result.errs
 
 	engine := newSymbolSubstituter(
+		m.grammar,
 		mapSymbols(result.values, result.origins),
 		m.getenv(),
 		m.params.Settings.Overload,

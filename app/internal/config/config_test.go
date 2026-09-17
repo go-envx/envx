@@ -203,6 +203,69 @@ func TestOverloadResolution(t *testing.T) {
 	})
 }
 
+// TestReferencePatternResolution verifies the internal and OS reference-pattern
+// settings layer through the manifest (explicit > project > global) into the
+// resolved envmerge settings.
+func TestReferencePatternResolution(t *testing.T) {
+	t.Parallel()
+
+	manifestWith := func(global, project *string) *schema.Manifest {
+		return &schema.Manifest{
+			Environments: []string{"development"},
+			Settings:     schema.Settings{ReferencePattern: global},
+			Projects: map[string]schema.Project{
+				"api": {
+					Includes: []string{"env/x"},
+					Settings: schema.Settings{ReferencePattern: project},
+				},
+			},
+		}
+	}
+
+	t.Run("explicit wins over manifest", func(t *testing.T) {
+		_, params, err := resolveManifest(
+			manifestContext{manifest: manifestWith(strPtr("global"), nil), project: "api"},
+			&Input{ReferencePattern: strPtr("flag")},
+		)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if params.Settings.ReferencePattern != "flag" {
+			t.Errorf("ReferencePattern = %q, want flag", params.Settings.ReferencePattern)
+		}
+	})
+	t.Run("project layer over global", func(t *testing.T) {
+		_, params, err := resolveManifest(
+			manifestContext{
+				manifest: manifestWith(strPtr("global"), strPtr("project")),
+				project:  "api",
+			},
+			&Input{},
+		)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if params.Settings.ReferencePattern != "project" {
+			t.Errorf("ReferencePattern = %q, want project", params.Settings.ReferencePattern)
+		}
+	})
+	t.Run("os pattern explicit flows through", func(t *testing.T) {
+		_, params, err := resolveManifest(
+			manifestContext{manifest: manifestWith(nil, nil), project: "api"},
+			&Input{OSReferencePattern: strPtr(`\$env\{([^}]*)\}`)},
+		)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if params.Settings.OSReferencePattern != `\$env\{([^}]*)\}` {
+			t.Errorf(
+				"OSReferencePattern = %q, want the custom regex",
+				params.Settings.OSReferencePattern,
+			)
+		}
+	})
+}
+
 // TestResolveProject verifies ResolveProject loads the manifest from the input's
 // config path and constructs a Manager that resolves a known fixture project end
 // to end.
