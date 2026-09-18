@@ -60,6 +60,43 @@ var (
 		Usage: "target environment (defaults to first declared environment in envx.yaml)",
 	}
 
+	// EmitTarget selects the output shape the emit command renders to.
+	EmitTarget = FlagSpec{
+		Name:  "target",
+		Short: "t",
+		Usage: "output shape: k8s|k8s-bundle|json|dotenv",
+	}
+
+	// EmitOnly restricts the emitted output to one slice of the environment:
+	// "secrets" for the secret-derived values or "config" for the plain ones.
+	// Unset emits everything.
+	EmitOnly = FlagSpec{
+		Name:  "only",
+		Usage: "restrict output to one slice: secrets|config (default: all values)",
+	}
+
+	// EmitName overrides the base for k8s resource names (default: the project
+	// name); the render appends the slice suffix. k8s targets only.
+	EmitName = FlagSpec{
+		Name:  "name",
+		Short: "n",
+		Usage: "base for k8s resource names (default: project name; k8s targets only)",
+	}
+
+	// EmitKey overrides the k8s-bundle data key, which is also the mounted
+	// filename; its .json/.env extension picks the body format.
+	EmitKey = FlagSpec{
+		Name:  "key",
+		Usage: "k8s-bundle data key / filename (default: config.json or secrets.json)",
+	}
+
+	// EmitOutput writes the rendered output to a file instead of stdout.
+	EmitOutput = FlagSpec{
+		Name:  "output",
+		Short: "o",
+		Usage: "write output to this file instead of stdout",
+	}
+
 	// Group narrows a bulk secret operation to one key group (default: all groups).
 	Group = FlagSpec{
 		Name:  "group",
