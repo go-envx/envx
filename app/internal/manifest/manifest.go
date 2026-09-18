@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"gopkg.in/yaml.v3"
@@ -135,7 +136,10 @@ func (m *Manager) parse(data []byte) (*Manifest, error) {
 
 // discover locates the manifest file using a two-tier strategy:
 //
-//  1. An explicit path is provided via the --config flag or ENVX_CONFIG env variable.
+//  1. An explicit path is provided via the --config flag or ENVX_CONFIG env
+//     variable. A file path is used as-is; a directory path resolves to the
+//     conventional manifest filename inside it (so --config ./dist finds
+//     ./dist/envx.yaml).
 //  2. A walk-up search from the working directory until the manifest file is found
 //     or the search reaches the git repository root or filesystem root.
 //
@@ -146,6 +150,24 @@ func (m *Manager) discover() (string, error) {
 		abs, err := file.AbsExisting(m.params.Path)
 		if err != nil {
 			return "", fmt.Errorf("manifest not found at %q: %w", m.params.Path, err)
+		}
+
+		// A directory resolves to the conventional manifest inside it, so
+		// `--config ./dist` locates ./dist/envx.yaml. This lets a deployment point
+		// at a bundle directory without naming the manifest file.
+		info, err := os.Stat(abs)
+		if err != nil {
+			return "", fmt.Errorf("manifest not found at %q: %w", m.params.Path, err)
+		}
+		if info.IsDir() {
+			manifestPath, err := file.AbsExisting(filepath.Join(abs, m.params.Filename))
+			if err != nil {
+				return "", fmt.Errorf(
+					"%s not found in directory %q: %w",
+					m.params.Filename, m.params.Path, err,
+				)
+			}
+			return manifestPath, nil
 		}
 		return abs, nil
 	}

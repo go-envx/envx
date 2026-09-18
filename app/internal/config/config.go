@@ -63,6 +63,8 @@ type Input struct {
 type manifestContext struct {
 	// manifest is the parsed, validated manifest.
 	manifest *schema.Manifest
+	// path is the absolute path the manifest was loaded from.
+	path string
 	// dir is the absolute directory the manifest was loaded from.
 	dir string
 	// indent is the block indentation detected in the manifest source document.
@@ -180,6 +182,7 @@ func resolve(in *Input, project string) (*Result, envmerge.Params, error) {
 	// Construct the manifest context.
 	mc := manifestContext{
 		manifest: manifestDocument.Content,
+		path:     manifestDocument.Path,
 		dir:      dir,
 		indent:   manifestDocument.Indent,
 		project:  project,

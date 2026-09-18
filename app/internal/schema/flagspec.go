@@ -40,7 +40,7 @@ var (
 	Config = FlagSpec{
 		Name:  "config",
 		Env:   "ENVX_CONFIG",
-		Usage: "path to envx.yaml",
+		Usage: "path to envx.yaml, or a directory containing it",
 	}
 
 	// Delimiter joins a list-valued leaf into a single env var.
@@ -99,6 +99,35 @@ var (
 		Name:  "output",
 		Short: "o",
 		Usage: "output format: table|json",
+	}
+
+	// Out selects the destination directory a bundle is written to.
+	Out = FlagSpec{
+		Name:  "out",
+		Usage: "destination directory for the packed workspace",
+	}
+
+	// PackEnv selects one or more environments to include in a pack bundle. It is
+	// repeatable and distinct from --env: pack copies several environments'
+	// overlays into one bundle rather than resolving a single environment.
+	PackEnv = FlagSpec{
+		Name:  "env",
+		Short: "e",
+		Usage: "environment to include (repeatable; default: all declared)",
+	}
+
+	// PackProject narrows a pack bundle to one or more projects' includes.
+	PackProject = FlagSpec{
+		Name:  "project",
+		Short: "p",
+		Usage: "limit the bundle to this project's includes (repeatable; default: all)",
+	}
+
+	// PackForce replaces an existing non-empty output directory instead of
+	// refusing it, clearing the directory before the bundle is written.
+	PackForce = FlagSpec{
+		Name:  "force",
+		Usage: "replace the output directory if it already exists and is not empty",
 	}
 
 	// OSReferencePattern overrides the {{@VAR}} OS-reference syntax with a regex.

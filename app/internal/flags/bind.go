@@ -18,3 +18,10 @@ func BindString(fs *pflag.FlagSet, dst *string, spec *schema.FlagSpec) {
 func BindBool(fs *pflag.FlagSet, dst *bool, spec *schema.FlagSpec) {
 	fs.BoolVarP(dst, spec.Name, spec.Short, spec.DefaultBool, spec.HelpText())
 }
+
+// BindStringSlice registers spec as a repeatable string flag on fs, accumulating
+// each occurrence into dst. It backs command-consumed multi-value flags (such as
+// pack's --env) that select rather than resolve, so it takes no default.
+func BindStringSlice(fs *pflag.FlagSet, dst *[]string, spec *schema.FlagSpec) {
+	fs.StringSliceVarP(dst, spec.Name, spec.Short, nil, spec.HelpText())
+}

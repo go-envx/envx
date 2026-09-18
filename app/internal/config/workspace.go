@@ -40,6 +40,77 @@ type WorkspaceProjects struct {
 	Severity map[string]status.Severity
 }
 
+// WorkspaceLayout is the file-level view of a resolved workspace: the manifest
+// location, the shared secrets and private-key paths, the declared environments,
+// and each project's includes as declared in the manifest. Unlike
+// WorkspaceProjects it constructs no envmerge Manager and opens no secrets store,
+// because pack only selects and copies files — it never resolves or decrypts.
+type WorkspaceLayout struct {
+	// ManifestPath is the absolute path the manifest was loaded from.
+	ManifestPath string
+	// Root is the absolute workspace directory every relative path resolves against.
+	Root string
+	// SecretsPath is the absolute path of the workspace secrets store.
+	SecretsPath string
+	// KeysPath is the absolute path of the workspace private-key file, which pack
+	// deliberately excludes from the bundle.
+	KeysPath string
+	// Environments is the manifest's declared environment list.
+	Environments []string
+	// Projects is every declared project's includes, sorted by name for
+	// deterministic iteration and output.
+	Projects []ProjectIncludes
+}
+
+// ProjectIncludes pairs a project name with its includes as declared in the
+// manifest (relative prefixes, not yet joined against the workspace directory).
+type ProjectIncludes struct {
+	// Name is the manifest project name.
+	Name string
+	// Includes lists the project's ordered namespace prefixes, verbatim from the
+	// manifest so pack can preserve their relative layout in the bundle.
+	Includes []string
+}
+
+// ResolveWorkspaceLayout resolves the manifest into the file-level view pack
+// needs to select and copy a bundle. It loads the manifest once, reads the
+// workspace-level secrets and private-key paths, and returns each project's
+// includes sorted by name. It constructs no envmerge Manager and opens no
+// secrets store, because pack copies files without resolving or decrypting them.
+func ResolveWorkspaceLayout(in *Input) (*WorkspaceLayout, error) {
+	// Resolve manifest-level config once to read the projects, environments, and
+	// the workspace-level secrets and private-key locations.
+	base, err := ResolveWorkspace(in)
+	if err != nil {
+		return nil, err
+	}
+
+	// Collect and sort the declared project names for deterministic iteration.
+	names := make([]string, 0, len(base.manifest.Projects))
+	for name := range base.manifest.Projects {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+
+	// Capture each project's includes verbatim so pack can preserve their layout.
+	projects := make([]ProjectIncludes, 0, len(names))
+	for _, name := range names {
+		projects = append(projects, ProjectIncludes{
+			Name:     name,
+			Includes: base.manifest.Projects[name].Includes,
+		})
+	}
+
+	return &WorkspaceLayout{
+		ManifestPath: base.path,
+		Root:         base.dir,
+		SecretsPath:  base.Secrets.SecretsPath,
+		KeysPath:     base.Secrets.KeysPath,
+		Environments: base.manifest.Environments,
+		Projects:     projects,
+	}, nil
+}
+
 // ResolveWorkspaceProjects resolves every project declared in the manifest into a
 // build-ready Result, alongside the declared environments and the shared secrets
 // store parameters. It is the workspace-wide counterpart to ResolveProject: it

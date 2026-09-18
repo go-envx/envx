@@ -4,3 +4,4 @@ services:
     volumes:
       - ../:/ws:cached
     command: sleep infinity
+    network_mode: host
