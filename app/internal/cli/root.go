@@ -3,6 +3,7 @@ package cli
 import (
 	"github.com/go-envx/envx/app/internal/actions/create"
 	"github.com/go-envx/envx/app/internal/actions/diff"
+	"github.com/go-envx/envx/app/internal/actions/emit"
 	"github.com/go-envx/envx/app/internal/actions/explain"
 	"github.com/go-envx/envx/app/internal/actions/get"
 	"github.com/go-envx/envx/app/internal/actions/keypair"
@@ -54,6 +55,7 @@ func NewRootCmd(info BuildInfo) *cobra.Command {
 		run.NewCommand(),
 		set.NewCommand(),
 		explain.NewCommand(),
+		emit.NewCommand(),
 		diff.NewCommand(),
 		secrets.NewCommand(),
 		validate.NewCommand(),

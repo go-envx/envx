@@ -2,6 +2,7 @@ package cli
 
 import (
 	"bytes"
+	"encoding/base64"
 	"encoding/json"
 	"os"
 	"path/filepath"
@@ -391,6 +392,213 @@ func TestPackFiltersAndDecryptsSecrets(t *testing.T) {
 	if got := strings.TrimSpace(stdout.String()); got != "s3cr3t" {
 		t.Errorf("decrypted API_KEY = %q, want s3cr3t", got)
 	}
+}
+
+// TestEmitDotenv verifies emit renders a resolved environment as dotenv through
+// the ordinary --config pipeline.
+func TestEmitDotenv(t *testing.T) {
+	t.Parallel()
+
+	cfg := fixtures.Manifest("basic")
+	stdout, _, err := execCmd(
+		"emit", "--config", cfg, "--env", "development", "api-core", "--target", "dotenv",
+	)
+	if err != nil {
+		t.Fatalf("emit: %v", err)
+	}
+	if got := stdout.String(); !strings.Contains(got, "APP_NAME=api-core\n") {
+		t.Errorf("emit dotenv missing APP_NAME:\n%s", got)
+	}
+}
+
+// TestEmitRequiresTarget verifies emit rejects an invocation with no --target.
+func TestEmitRequiresTarget(t *testing.T) {
+	t.Parallel()
+
+	cfg := fixtures.Manifest("basic")
+	if _, _, err := execCmd("emit", "--config", cfg, "api-core"); err == nil {
+		t.Fatal("expected emit to require --target")
+	}
+}
+
+// TestEmitRejectsNameForPlainTarget verifies --name is rejected for a target
+// that does not render a Kubernetes resource, so it is never silently ignored.
+func TestEmitRejectsNameForPlainTarget(t *testing.T) {
+	t.Parallel()
+
+	cfg := fixtures.Manifest("basic")
+	if _, _, err := execCmd(
+		"emit", "--config", cfg, "api-core", "--target", "dotenv", "--name", "oops",
+	); err == nil {
+		t.Fatal("expected --name to be rejected for the dotenv target")
+	}
+}
+
+// TestEmitK8sAutoNamesFromProject verifies a k8s target with no --name derives
+// the resource name from the project (here api-core-config).
+func TestEmitK8sAutoNamesFromProject(t *testing.T) {
+	t.Parallel()
+
+	cfg := fixtures.Manifest("basic")
+	stdout, _, err := execCmd(
+		"emit", "--config", cfg, "api-core", "--target", "k8s", "--only", "config",
+	)
+	if err != nil {
+		t.Fatalf("emit k8s without --name: %v", err)
+	}
+	if !strings.Contains(stdout.String(), "name: api-core-config") {
+		t.Errorf("expected auto-named ConfigMap api-core-config:\n%s", stdout.String())
+	}
+}
+
+// TestEmitK8sSplitDecrypts is the end-to-end Kubernetes path: it builds a
+// workspace with a real keypair and one encrypted, referenced secret, then emits
+// the k8s target with each slice and confirms the split — "--only secrets" emits
+// a Secret carrying the decrypted secret value (base64-encoded) while "--only
+// config" emits a ConfigMap carrying only the plain value.
+func TestEmitK8sSplitDecrypts(t *testing.T) {
+	// Not parallel: t.Setenv drives the private-key lookup through the process env.
+	work := t.TempDir()
+	cfg := filepath.Join(work, "envx.yaml")
+	body := "environments: [production]\n" +
+		"secrets:\n  cipher: age\n" +
+		"projects:\n  app:\n    includes: [env/app]\n"
+	if err := os.WriteFile(cfg, []byte(body), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	appPath := filepath.Join(work, "env", "app.yaml")
+	if err := os.MkdirAll(filepath.Dir(appPath), 0o750); err != nil {
+		t.Fatal(err)
+	}
+	appYAML := "GREETING: hello\nAPI_KEY: secret://app/api_key\n"
+	if err := os.WriteFile(appPath, []byte(appYAML), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	// Generate a keypair and store one encrypted secret.
+	if _, _, err := execCmd("keypair", "generate", "app", "--config", cfg); err != nil {
+		t.Fatalf("keypair generate: %v", err)
+	}
+	if _, _, err := execCmd(
+		"secrets", "set", "app", "api_key", "s3cr3t", "--config", cfg,
+	); err != nil {
+		t.Fatalf("secrets set: %v", err)
+	}
+	//nolint:gosec // test-local path.
+	privateKey, err := os.ReadFile(filepath.Join(work, "envx.keys"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("ENVX_PRIVATE_KEY", string(privateKey))
+
+	// The Secret carries the decrypted, base64-encoded secret and not the plain
+	// value.
+	secretOut, _, err := execCmd(
+		"emit", "--config", cfg, "--env", "production", "app",
+		"--target", "k8s", "--only", "secrets", "--name", "app-secrets",
+	)
+	if err != nil {
+		t.Fatalf("emit k8s --only secrets: %v", err)
+	}
+	wantData := "API_KEY: " + base64.StdEncoding.EncodeToString([]byte("s3cr3t"))
+	if !strings.Contains(secretOut.String(), wantData) {
+		t.Errorf("Secret missing decrypted secret %q:\n%s", wantData, secretOut.String())
+	}
+	if strings.Contains(secretOut.String(), "GREETING") {
+		t.Errorf("Secret unexpectedly carries the plain value:\n%s", secretOut.String())
+	}
+
+	// The ConfigMap carries the plain value and not the secret.
+	configOut, _, err := execCmd(
+		"emit", "--config", cfg, "--env", "production", "app",
+		"--target", "k8s", "--only", "config", "--name", "app-config",
+	)
+	if err != nil {
+		t.Fatalf("emit k8s --only config: %v", err)
+	}
+	if !strings.Contains(configOut.String(), "GREETING: hello") {
+		t.Errorf("ConfigMap missing the plain value:\n%s", configOut.String())
+	}
+	for _, secret := range []string{"API_KEY", "s3cr3t"} {
+		if strings.Contains(configOut.String(), secret) {
+			t.Errorf("ConfigMap leaked secret material %q:\n%s", secret, configOut.String())
+		}
+	}
+}
+
+// TestEmitK8sBundleDecrypts is the end-to-end bundle path: it reuses the
+// encrypted workspace and emits a merged --bundle, then confirms the single
+// Secret data key holds a base64 JSON body carrying both the decrypted secret and
+// the plain value — the shape an app volume-mounts and parses as one file.
+func TestEmitK8sBundleDecrypts(t *testing.T) {
+	// Not parallel: t.Setenv drives the private-key lookup through the process env.
+	work := t.TempDir()
+	cfg := filepath.Join(work, "envx.yaml")
+	body := "environments: [production]\n" +
+		"secrets:\n  cipher: age\n" +
+		"projects:\n  app:\n    includes: [env/app]\n"
+	if err := os.WriteFile(cfg, []byte(body), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	appPath := filepath.Join(work, "env", "app.yaml")
+	if err := os.MkdirAll(filepath.Dir(appPath), 0o750); err != nil {
+		t.Fatal(err)
+	}
+	appYAML := "GREETING: hello\nAPI_KEY: secret://app/api_key\n"
+	if err := os.WriteFile(appPath, []byte(appYAML), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := execCmd("keypair", "generate", "app", "--config", cfg); err != nil {
+		t.Fatalf("keypair generate: %v", err)
+	}
+	if _, _, err := execCmd(
+		"secrets", "set", "app", "api_key", "s3cr3t", "--config", cfg,
+	); err != nil {
+		t.Fatalf("secrets set: %v", err)
+	}
+	//nolint:gosec // test-local path.
+	privateKey, err := os.ReadFile(filepath.Join(work, "envx.keys"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("ENVX_PRIVATE_KEY", string(privateKey))
+
+	out, _, err := execCmd(
+		"emit", "--config", cfg, "--env", "production", "app",
+		"--target", "k8s-bundle", "--name", "app", "--key", "app.json",
+	)
+	if err != nil {
+		t.Fatalf("emit k8s-bundle: %v", err)
+	}
+	// The merged bundle is a single Secret data key; decode its base64 body and
+	// confirm it is JSON carrying both the decrypted secret and the plain value.
+	if !strings.Contains(out.String(), "kind: Secret") {
+		t.Fatalf("bundle should be a Secret:\n%s", out.String())
+	}
+	encoded := dataValue(t, out.String(), "app.json")
+	decoded, err := base64.StdEncoding.DecodeString(encoded)
+	if err != nil {
+		t.Fatalf("bundle body is not valid base64: %v", err)
+	}
+	for _, want := range []string{`"API_KEY": "s3cr3t"`, `"GREETING": "hello"`} {
+		if !strings.Contains(string(decoded), want) {
+			t.Errorf("bundle body missing %q:\n%s", want, decoded)
+		}
+	}
+}
+
+// dataValue extracts the scalar value of one data key from a rendered k8s
+// manifest, so a test can decode a Secret's single bundle body.
+func dataValue(t *testing.T, manifest, key string) string {
+	t.Helper()
+	for _, line := range strings.Split(manifest, "\n") {
+		trimmed := strings.TrimSpace(line)
+		if prefix := key + ": "; strings.HasPrefix(trimmed, prefix) {
+			return strings.TrimSpace(strings.TrimPrefix(trimmed, prefix))
+		}
+	}
+	t.Fatalf("data key %q not found in manifest:\n%s", key, manifest)
+	return ""
 }
 
 // TestRunRequiresCommand verifies run rejects a missing "-- command".

@@ -101,6 +101,13 @@ func (p *Printer) LogBlank() error {
 	return err
 }
 
+// LogNote writes a muted, non-severity hint to standard error, for guidance that
+// accompanies but is not part of the primary output (which stays on stdout).
+func (p *Printer) LogNote(message string) error {
+	_, err := fmt.Fprintln(p.err, p.errStyle.Muted(message))
+	return err
+}
+
 // WriteJSON writes value as indented JSON to standard output. It is never
 // colored so the output stays machine-readable.
 func (p *Printer) WriteJSON(value any) error {
