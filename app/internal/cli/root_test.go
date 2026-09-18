@@ -268,6 +268,131 @@ func TestRun(t *testing.T) {
 	}
 }
 
+// TestPackThenRun verifies pack produces a bundle that run executes through the
+// ordinary --config pipeline: it copies the basic workspace scoped to one
+// environment, then runs a command from the copied directory and confirms the
+// merged environment reaches the child.
+func TestPackThenRun(t *testing.T) {
+	t.Parallel()
+
+	work := t.TempDir()
+	copyTree(t, fixtures.Testdata("basic"), work)
+	cfg := filepath.Join(work, "envx.yaml")
+	dist := filepath.Join(t.TempDir(), "dist")
+
+	if _, _, err := execCmd(
+		"pack", "--config", cfg, "-e", "development", "--out", dist,
+	); err != nil {
+		t.Fatalf("pack: %v", err)
+	}
+
+	// The bundle flattens namespaces into the root, keeps the selected
+	// environment's overlays, and drops the rest.
+	kept := filepath.Join(dist, "postgres.development.yaml")
+	if _, err := os.Stat(kept); err != nil {
+		t.Errorf("selected development overlay missing from bundle: %v", err)
+	}
+	dropped := filepath.Join(dist, "postgres.production.yaml")
+	if _, err := os.Stat(dropped); !os.IsNotExist(err) {
+		t.Error("unselected production overlay copied into bundle")
+	}
+
+	// The copied workspace runs through the ordinary pipeline under --config.
+	stdout, _, err := execCmd(
+		"run", "--config", filepath.Join(dist, "envx.yaml"),
+		"--env", "development", "--overload",
+		"api-core", "--", "printenv", "APP_NAME",
+	)
+	if err != nil {
+		t.Fatalf("run from bundle: %v", err)
+	}
+	if got := strings.TrimSpace(stdout.String()); got != "api-core" {
+		t.Errorf("child APP_NAME from bundle = %q, want api-core", got)
+	}
+}
+
+// TestPackFiltersAndDecryptsSecrets is the end-to-end secret path: it builds a
+// workspace with a real keypair and one encrypted, referenced secret, packs it,
+// and confirms the bundle store keeps only that secret (no public keys), fails
+// closed without the private key, and decrypts at runtime with ENVX_PRIVATE_KEY.
+func TestPackFiltersAndDecryptsSecrets(t *testing.T) {
+	// Not parallel: t.Setenv drives the private-key lookup through the process env.
+	work := t.TempDir()
+	cfg := filepath.Join(work, "envx.yaml")
+	body := "environments: [production]\n" +
+		"secrets:\n  cipher: age\n" +
+		"projects:\n  app:\n    includes: [env/app]\n"
+	if err := os.WriteFile(cfg, []byte(body), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	appPath := filepath.Join(work, "env", "app.yaml")
+	if err := os.MkdirAll(filepath.Dir(appPath), 0o750); err != nil {
+		t.Fatal(err)
+	}
+	appYAML := "GREETING: hello\nAPI_KEY: secret://app/api_key\n"
+	if err := os.WriteFile(appPath, []byte(appYAML), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	// Generate a keypair and store one encrypted secret.
+	if _, _, err := execCmd("keypair", "generate", "app", "--config", cfg); err != nil {
+		t.Fatalf("keypair generate: %v", err)
+	}
+	if _, _, err := execCmd(
+		"secrets", "set", "app", "api_key", "s3cr3t", "--config", cfg,
+	); err != nil {
+		t.Fatalf("secrets set: %v", err)
+	}
+	//nolint:gosec // test-local path.
+	privateKey, err := os.ReadFile(filepath.Join(work, "envx.keys"))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Pack the production environment.
+	dist := filepath.Join(t.TempDir(), "dist")
+	if _, _, err := execCmd(
+		"pack", "--config", cfg, "-e", "production", "--out", dist,
+	); err != nil {
+		t.Fatalf("pack: %v", err)
+	}
+
+	// The bundle store keeps only the referenced value and no public keys.
+	//nolint:gosec // test-local path.
+	store, err := os.ReadFile(filepath.Join(dist, "secrets.yaml"))
+	if err != nil {
+		t.Fatalf("bundle store missing: %v", err)
+	}
+	if !strings.Contains(string(store), "api_key:") {
+		t.Errorf("bundle store missing referenced secret:\n%s", store)
+	}
+	if strings.Contains(string(store), "public_keys") {
+		t.Errorf("bundle store still carries public keys:\n%s", store)
+	}
+
+	// Without the private key, the reference fails closed.
+	bundleCfg := filepath.Join(dist, "envx.yaml")
+	if _, _, err := execCmd(
+		"run", "--config", bundleCfg, "--env", "production",
+		"app", "--", "printenv", "API_KEY",
+	); err == nil {
+		t.Error("run from bundle succeeded without a private key")
+	}
+
+	// With ENVX_PRIVATE_KEY, the bundle decrypts at runtime.
+	t.Setenv("ENVX_PRIVATE_KEY", string(privateKey))
+	stdout, _, err := execCmd(
+		"run", "--config", bundleCfg, "--env", "production",
+		"app", "--", "printenv", "API_KEY",
+	)
+	if err != nil {
+		t.Fatalf("run from bundle with key: %v", err)
+	}
+	if got := strings.TrimSpace(stdout.String()); got != "s3cr3t" {
+		t.Errorf("decrypted API_KEY = %q, want s3cr3t", got)
+	}
+}
+
 // TestRunRequiresCommand verifies run rejects a missing "-- command".
 func TestRunRequiresCommand(t *testing.T) {
 	t.Parallel()

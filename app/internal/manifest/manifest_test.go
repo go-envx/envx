@@ -3,6 +3,7 @@ package manifest
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/go-envx/envx/app/internal/fixtures"
@@ -67,6 +68,40 @@ func TestLoadValid(t *testing.T) {
 	}
 	if _, ok := m.LookupProject("api"); !ok {
 		t.Error("expected project api to be present")
+	}
+}
+
+// TestLoadFromDirectoryPath verifies a directory --config resolves to the
+// conventional manifest inside it.
+func TestLoadFromDirectoryPath(t *testing.T) {
+	t.Parallel()
+
+	manifestPath := writeManifest(t,
+		"environments: [production]\nprojects:\n  app:\n    includes: [env/app]\n")
+	dir := filepath.Dir(manifestPath)
+
+	loaded, err := newManager(t, dir).Load()
+	if err != nil {
+		t.Fatalf("Load from directory: %v", err)
+	}
+	if loaded.Path != manifestPath {
+		t.Errorf("path = %q, want %q", loaded.Path, manifestPath)
+	}
+}
+
+// TestLoadFromDirectoryMissingManifest verifies a directory --config with no
+// manifest inside reports an actionable error naming the filename and directory.
+func TestLoadFromDirectoryMissingManifest(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+	_, err := newManager(t, dir).Load()
+	if err == nil {
+		t.Fatal("expected an error for a directory without a manifest")
+	}
+	got := err.Error()
+	if !strings.Contains(got, "envx.yaml") || !strings.Contains(got, dir) {
+		t.Errorf("error %q should name the manifest filename and directory", got)
 	}
 }
 
