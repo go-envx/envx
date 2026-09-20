@@ -12,21 +12,14 @@
 	"editor.formatOnSave": true,
 	"editor.rulers": [88],
 	"editor.tabSize": 2,
-	// Files Settings
+  // Files Settings
 	"files.insertFinalNewline": true,
 	"files.trimFinalNewlines": true,
 	"files.trimTrailingWhitespace": true,
 	"files.associations": {
 		"mise.lock": "toml"
-	},	
-	// JSON Schemas
-	"json.schemaDownload.trustedDomains": {
-		"https://biomejs.dev/": true,
-		"https://docs.renovatebot.com/": true
 	},
-	// Go Settings
-	"go.toolsManagement.autoUpdate": true,
-	// Text Overrides
+	// File Overrides
 	"[plaintext]": {
 	  "editor.wordWrap": "bounded",
 	  "editor.wordWrapColumn": 88,
@@ -42,7 +35,13 @@
 	  "editor.wordWrapColumn": 88,
 	  "editor.rulers": [88]
 	},
-	// Extensions Recommendations
+	// JSON Schemas
+	"json.schemaDownload.trustedDomains": {
+		"https://biomejs.dev/": true,
+		"https://docs.renovatebot.com/": true
+	},
+	// Extension Settings
+	"go.toolsManagement.autoUpdate": true,
 	"biome.suggestInstallingGlobally": false,
 	"extensions.ignoreRecommendations": true
 }
