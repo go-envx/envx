@@ -21,6 +21,7 @@ When invoked:
 - No duplicated code
 - Single responsibility principle followed
 - Appropriate abstractions used
+- Exports are minimized and intentional; internal helpers, types, and constants are not needlessly exposed
 
 ### Error Handling
 - Proper error handling implemented
