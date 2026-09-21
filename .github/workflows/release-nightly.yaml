@@ -1,0 +1,168 @@
+name: Release nightly
+
+# Builds a nightly from the current tip of main: the latest green, PR-reviewed
+# code that has NOT yet been through the deliberate release decision (the svu
+# bump, changelog, and `production` approval in release.yaml). It is explicitly
+# not a stable release — it may move backwards and carries no guarantees.
+#
+# Binary-only: publishes ONE immutable, dated GitHub pre-release per day,
+# `nightly-<YYYYMMDD>`, holding the cross-platform archives + checksums. Pin it
+# with `mise use github:go-envx/envx@nightly-<YYYYMMDD>`, or download an archive
+# directly (e.g. `ADD`/`curl` it in a Dockerfile). There is deliberately NO
+# prebuilt nightly container image — building one into your own image from the
+# release archive is trivial, and the stable binary-donor image
+# (ghcr.io/go-envx/envx) is unaffected and remains the path for released builds.
+#
+# IMMUTABLE-RELEASE COMPATIBLE. If this repo enables GitHub immutable releases
+# (no moving a tag, no overwriting assets, no REUSING a tag name), this workflow
+# stays valid: each dated release is created exactly once and never mutated, so
+# there is deliberately no rolling `nightly` release. A same-day re-run is a
+# no-op (skip-if-exists).
+#
+# Pruning is TAG-FILTERED — it only deletes releases whose tag starts with
+# `nightly-`, never a real `vX.Y.Z` release, and keeps the newest $KEEP.
+# Deleting a release (and its tag) is permitted under immutability; the freed
+# date is never reused, so the burned name is safe.
+
+on:
+  schedule:
+    - cron: "0 6 * * *" # 06:00 UTC daily
+  workflow_dispatch: {} # allow an on-demand nightly
+
+# Never build two nightlies at once; a newer run supersedes an in-flight one.
+concurrency:
+  group: nightly
+  cancel-in-progress: true
+
+# Least-privilege default; the build job elevates only what it needs.
+permissions:
+  contents: read
+
+env:
+  KEEP: "3" # dated nightly releases to retain
+
+jobs:
+  # ─────────────────────────────────────────────────────────────
+  # Guard: skip the scheduled run when main hasn't moved in 24h.
+  # A manual dispatch always proceeds.
+  # ─────────────────────────────────────────────────────────────
+  guard:
+    name: Should run
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      proceed: ${{ steps.check.outputs.proceed }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0 # need history to count recent commits
+      - name: Check for new commits
+        id: check
+        env:
+          EVENT: ${{ github.event_name }}
+        run: |
+          if [ "$EVENT" = "workflow_dispatch" ]; then
+            echo "Manual dispatch — proceeding."
+            echo "proceed=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          count="$(git rev-list --count --since='24 hours ago' HEAD)"
+          echo "Commits in the last 24h: $count"
+          if [ "$count" -gt 0 ]; then
+            echo "proceed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "proceed=false" >> "$GITHUB_OUTPUT"
+            echo "No new commits since the last nightly — skipping." >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+  # ─────────────────────────────────────────────────────────────
+  # Build: snapshot artifacts, dated pre-release, prune.
+  # ─────────────────────────────────────────────────────────────
+  nightly:
+    name: Build & publish
+    needs: guard
+    if: ${{ needs.guard.outputs.proceed == 'true' }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # create the dated nightly pre-release + tag
+    defaults:
+      run:
+        working-directory: app
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      GH_REPO: ${{ github.repository }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0 # full history/tags so GoReleaser can derive the snapshot version
+      - name: Setup tools
+        uses: jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c # v4.3.0
+        with:
+          install_args: go goreleaser gh
+
+      # Shared build metadata. DATE is UTC so it matches the daily schedule.
+      - name: Compute build metadata
+        run: |
+          echo "DATE=$(date -u +%Y%m%d)" >> "$GITHUB_ENV"
+          echo "SHA=$(git rev-parse --short HEAD)" >> "$GITHUB_ENV"
+
+      # Build binaries + archives + checksums for every target. `--snapshot`
+      # keeps this off the version tags and the stable release page; `--skip=docker`
+      # skips GoReleaser's own image build (there is no nightly image, and it
+      # would need buildx we no longer set up).
+      - name: Build snapshot artifacts
+        run: goreleaser release --clean --snapshot --skip=docker
+
+      # Publish ONE immutable, dated pre-release, `nightly-<DATE>`, created exactly
+      # once. No delete/recreate and no rolling `nightly` release — both are
+      # forbidden under immutable releases (a tag name can't be moved or reused).
+      # Skip-if-exists makes a same-day re-run a safe no-op. `--latest=false` keeps
+      # it out of the "Latest release" slot; the tag is not semver, so svu ignores
+      # it for real releases.
+      - name: Publish nightly pre-release
+        run: |
+          tag="nightly-${DATE}"
+          if gh release view "$tag" >/dev/null 2>&1; then
+            echo "Release $tag already exists (same-day re-run) — skipping."
+            exit 0
+          fi
+          notes="Automated nightly build from \`main\` (${SHA}, ${DATE}). Unstable — not a released version and may move backwards.
+
+          - Pin (mise): \`mise use github:go-envx/envx@${tag}\`
+          - Or download an archive below (e.g. \`ADD\`/\`curl\` it into a Dockerfile)."
+          gh release create "$tag" dist/*.tar.gz dist/*.zip dist/checksums.txt \
+            --prerelease \
+            --latest=false \
+            --target "${GITHUB_SHA}" \
+            --title "Nightly ${DATE} (${SHA})" \
+            --notes "$notes"
+
+      # Prune old dated nightly RELEASES, keeping the newest $KEEP. Deleting a
+      # release (and its tag via `--cleanup-tag`) is permitted under immutable
+      # releases; the freed date is never reused, so the name stays burned safely.
+      - name: Prune old nightly releases
+        run: |
+          old="$(gh release list --limit 200 --json tagName,createdAt --jq \
+            "[.[] | select(.tagName | startswith(\"nightly-\"))]
+             | sort_by(.createdAt) | reverse | .[${KEEP}:] | .[].tagName")"
+          if [ -z "$old" ]; then
+            echo "No old nightly releases to prune."
+          else
+            for tag in $old; do
+              echo "Deleting nightly release $tag"
+              gh release delete "$tag" --yes --cleanup-tag
+            done
+          fi
+
+      - name: Summary
+        run: |
+          {
+            echo "## Nightly release published"
+            echo ""
+            echo "- **Release:** \`nightly-${DATE}\` (immutable pre-release)"
+            echo "- **Pin:** \`mise use github:go-envx/envx@nightly-${DATE}\`"
+            echo "- **Commit:** \`${SHA}\`"
+          } >> "$GITHUB_STEP_SUMMARY"

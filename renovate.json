@@ -7,10 +7,10 @@
     "labels": ["security"],
     "minimumReleaseAge": null,
     "dependencyDashboardApproval": false,
-    "prCreation": "immediate",
-    "automerge": true
+    "prCreation": "immediate"
   },
   "osvVulnerabilityAlerts": true,
+  "postUpdateOptions": ["gomodTidy"],
   "packageRules": [
     {
       "groupName": "non-major dependencies",
@@ -33,20 +33,6 @@
       "groupName": "devcontainer",
       "description": "Devcontainer updates require manual approval from the Dependency Dashboard before a PR is opened.",
       "matchFileNames": [".devcontainer/**"],
-      "dependencyDashboardApproval": true
-    },
-    {
-      "description": "Python minor releases (e.g. 3.12 to 3.13) require manual approval from the Dependency Dashboard before a PR is opened.",
-      "matchManagers": ["mise"],
-      "matchDepNames": ["python"],
-      "versioning": "regex:^(?<compatibility>\\d+)\\.(?<major>\\d+)\\.(?<patch>\\d+)$"
-    },
-    {
-      "groupName": "python docker image",
-      "description": "Python base image minor releases (e.g. 3.12 to 3.13) require manual approval from the Dependency Dashboard before a PR is opened.",
-      "matchDatasources": ["docker"],
-      "matchDepNames": ["python"],
-      "matchUpdateTypes": ["minor", "major"],
       "dependencyDashboardApproval": true
     }
   ]
