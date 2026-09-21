@@ -107,19 +107,22 @@ func assignProjectDirs(
 // assignProjectNames maps each of one project's namespaces to a base filename
 // stem within that project's directory. The stem is the include's final segment
 // (e.g. "env/postgres" -> "postgres"); two namespaces in the same project that
-// share a final segment are disambiguated with "-2", "-3", … in include order.
-// Because filenames are scoped to the project directory, no cross-project or
+// would share a stem — or whose files would otherwise collide — are disambiguated
+// with "-2", "-3", … in include order. A stem must be unique on its own (not just
+// its files), because the stem is the include's identity in the rewritten
+// manifest: two namespaces sharing a stem would be merged into one include at
+// resolution time. The filename check additionally guards the rarer case of two
+// distinct stems whose output files collide because an environment name embeds a
+// ".". Because names are scoped to the project directory, no cross-project or
 // reserved-name bookkeeping is needed here.
 func assignProjectNames(includes []includeFiles) (map[string]string, error) {
-	used := make(map[string]bool, len(includes))
+	usedStems := make(map[string]bool, len(includes))
+	usedFiles := make(map[string]bool, len(includes))
 	names := make(map[string]string, len(includes))
 	for _, include := range includes {
 		base := filepath.Base(include.rel)
 		candidate := base
-		for n := 1; ; n++ {
-			if n > 1 {
-				candidate = fmt.Sprintf("%s-%d", base, n)
-			}
+		for n := 2; ; n++ {
 			if len(candidate)+include.maxSuffix() > maxFilenameLen {
 				return nil, fmt.Errorf(
 					"cannot pack include %q: its bundle filename exceeds the"+
@@ -127,24 +130,18 @@ func assignProjectNames(includes []includeFiles) (map[string]string, error) {
 					include.rel, maxFilenameLen,
 				)
 			}
-
-			filenames := include.outputFilenames(candidate)
-			collision := false
-			for _, filename := range filenames {
-				if used[filename] {
-					collision = true
-					break
-				}
+			if !usedStems[candidate] &&
+				!anyUsed(usedFiles, include.outputFilenames(candidate)) {
+				break
 			}
-			if collision {
-				continue
-			}
-			for _, filename := range filenames {
-				used[filename] = true
-			}
-			names[include.rel] = candidate
-			break
+			candidate = fmt.Sprintf("%s-%d", base, n)
 		}
+
+		usedStems[candidate] = true
+		for _, filename := range include.outputFilenames(candidate) {
+			usedFiles[filename] = true
+		}
+		names[include.rel] = candidate
 	}
 	return names, nil
 }
@@ -162,27 +159,45 @@ func (f includeFiles) outputFilenames(stem string) []string {
 	return filenames
 }
 
+// anyUsed reports whether any of filenames is already taken.
+func anyUsed(used map[string]bool, filenames []string) bool {
+	for _, filename := range filenames {
+		if used[filename] {
+			return true
+		}
+	}
+	return false
+}
+
 // sanitizeDirName converts an arbitrary project name (an unconstrained manifest
-// map key) into a single filesystem-safe path component: characters outside
-// [A-Za-z0-9._-] become "_", so the result never contains a path separator and a
-// project can never escape the bundle root. A name that reduces to empty, "." or
-// ".." falls back to "project".
+// map key) into a single filesystem-safe path component: only [A-Za-z0-9_-] pass
+// through, every other character (including "." and "/") becomes "_", and runs of
+// underscores collapse to a single one. The result therefore contains no path
+// separator and no "." component, so a project can never escape the bundle root.
+// A name that sanitizes to empty falls back to "project".
 func sanitizeDirName(name string) string {
 	var b strings.Builder
 	b.Grow(len(name))
+	prevUnderscore := false
 	for _, r := range name {
 		switch {
 		case r >= 'a' && r <= 'z',
 			r >= 'A' && r <= 'Z',
 			r >= '0' && r <= '9',
-			r == '.', r == '_', r == '-':
+			r == '-':
 			b.WriteRune(r)
+			prevUnderscore = false
 		default:
-			b.WriteRune('_')
+			// Any other character — including a literal "_" — becomes one
+			// underscore, collapsing consecutive runs into a single separator.
+			if !prevUnderscore {
+				b.WriteByte('_')
+				prevUnderscore = true
+			}
 		}
 	}
 	cleaned := b.String()
-	if cleaned == "" || cleaned == "." || cleaned == ".." {
+	if cleaned == "" {
 		return "project"
 	}
 	return cleaned

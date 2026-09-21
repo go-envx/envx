@@ -65,6 +65,32 @@ func TestAssignProjectNamesDisambiguatesCollisions(t *testing.T) {
 	}
 }
 
+// TestAssignProjectNamesDisambiguatesDisjointFiles verifies two namespaces that
+// share a final segment get distinct stems even when their output files do not
+// overlap — a base-only namespace and an overlay-only namespace. Sharing a stem
+// would merge them into one include at resolution time.
+func TestAssignProjectNamesDisambiguatesDisjointFiles(t *testing.T) {
+	t.Parallel()
+	// env/app produces app.yaml; svc/app produces only app.development.yaml.
+	includes := []includeFiles{
+		{rel: "env/app", base: "x"},
+		{rel: "svc/app", overlays: []overlayFile{{env: "development", src: "y"}}},
+	}
+	names := mustNames(t, includes)
+	if names["env/app"] == names["svc/app"] {
+		t.Errorf(
+			"env/app and svc/app share stem %q; disjoint files must still get distinct stems",
+			names["env/app"],
+		)
+	}
+	if names["env/app"] != "app" {
+		t.Errorf("env/app = %q, want app", names["env/app"])
+	}
+	if names["svc/app"] != "app-2" {
+		t.Errorf("svc/app = %q, want app-2", names["svc/app"])
+	}
+}
+
 // TestAssignProjectDirsUsesProjectNames verifies each project directory is named
 // after its project when the name is already filesystem-safe.
 func TestAssignProjectDirsUsesProjectNames(t *testing.T) {
@@ -137,21 +163,26 @@ func TestAssignProjectDirsRejectsOverlongName(t *testing.T) {
 	}
 }
 
-// TestSanitizeDirName verifies unsafe characters are replaced and degenerate
-// names fall back to a safe placeholder, so a project can never escape the bundle
-// root or produce an invalid directory.
+// TestSanitizeDirName verifies only [A-Za-z0-9_-] survive, every other character
+// (including "." and "/") becomes an underscore, consecutive underscores collapse
+// to one, and a name that sanitizes to empty falls back to a safe placeholder — so
+// a project can never escape the bundle root or produce an invalid directory.
 func TestSanitizeDirName(t *testing.T) {
 	t.Parallel()
 	cases := map[string]string{
 		"api":       "api",
 		"api-svc_1": "api-svc_1",
 		"a/b":       "a_b",
-		"../escape": ".._escape",
-		"..":        "project",
-		".":         "project",
+		"../escape": "_escape",
+		"..":        "_",
+		".":         "_",
 		"":          "project",
 		"a b":       "a_b",
 		"x\\y":      "x_y",
+		"a__b":      "a_b",   // pre-existing underscore run collapses
+		"a...b":     "a_b",   // dots are no longer allowed
+		"a/./b":     "a_b",   // mixed separators collapse to one underscore
+		"a_-_b":     "a_-_b", // dashes break an underscore run
 	}
 	for in, want := range cases {
 		if got := sanitizeDirName(in); got != want {
