@@ -7,11 +7,11 @@
     "#components/*": "./src/components/*"
   },
   "dependencies": {
-    "@astrojs/starlight": "0.42.0",
+    "@astrojs/starlight": "0.42.1",
     "@astrojs/starlight-tailwind": "5.0.0",
     "@iconify-json/material-symbols": "1.2.92",
     "@tailwindcss/vite": "4.3.3",
-    "astro": "7.3.2",
+    "astro": "7.3.3",
     "astro-icon": "1.2.0",
     "sharp": "0.35.4",
     "tailwindcss": "4.3.3"
