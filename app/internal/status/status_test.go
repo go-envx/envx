@@ -28,6 +28,10 @@ func TestDefaultSeverity(t *testing.T) {
 			name: "missing key defaults to warn",
 			code: PrivateKeyIsUnavailable, wantSev: Warn, wantOK: true,
 		},
+		{
+			name: "base declaration is a known check but defaults to off",
+			code: PropertyNotDeclaredInBase, wantSev: Off, wantOK: true,
+		},
 		{name: "OK is not a finding", code: OK, wantOK: false},
 		{name: "unknown is not a finding", code: "NOPE", wantOK: false},
 	}

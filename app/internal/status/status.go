@@ -67,8 +67,11 @@ const (
 )
 
 // defaults holds the built-in severity for every reportable code. Everything is
-// an error except a private key that is merely unavailable in this context, which
-// is normal on a developer laptop and so defaults to a warning.
+// an error except two checks: a private key that is merely unavailable in this
+// context (normal on a developer laptop, so a warning), and the base-declaration
+// check, an opt-in best practice that defaults to off so it never surprises an
+// existing workspace — a team enables it by setting property_not_declared_in_base
+// in the validate block.
 var defaults = map[string]Severity{
 	SecretIsNotEncrypted:        Error,
 	SecretAlgorithmMismatch:     Error,
@@ -81,7 +84,7 @@ var defaults = map[string]Severity{
 	SecretReferenceIsUnresolved: Error,
 	CircularVariableReference:   Error,
 	UnresolvedVariableReference: Error,
-	PropertyNotDeclaredInBase:   Error,
+	PropertyNotDeclaredInBase:   Off,
 }
 
 // DefaultSeverity returns the built-in severity for code, and false for a code

@@ -139,11 +139,14 @@ func TestExecuteSeverityConfigOverrides(t *testing.T) {
 	}
 }
 
-// TestExecuteBaseDeclaration verifies an environment overlay key its namespace
-// base file never declares surfaces PROPERTY_NOT_DECLARED_IN_BASE.
+// TestExecuteBaseDeclaration verifies the base-declaration check is off by
+// default — an environment overlay key its namespace base file never declares is
+// tolerated — and surfaces PROPERTY_NOT_DECLARED_IN_BASE only once a workspace
+// opts in through the validate block.
 func TestExecuteBaseDeclaration(t *testing.T) {
 	t.Parallel()
 
+	// By default the check is off: the overlay-only key produces no finding.
 	dir := t.TempDir()
 	writeFile(t, filepath.Join(dir, "envx.yaml"),
 		"environments: [production]\n"+
@@ -153,18 +156,38 @@ func TestExecuteBaseDeclaration(t *testing.T) {
 	writeFile(t, filepath.Join(dir, "env", "app.yaml"), "shared: base-value\n")
 	writeFile(t, filepath.Join(dir, "env", "app.production.yaml"), "only_in_overlay: x\n")
 
-	report := executeManifest(t, filepath.Join(dir, "envx.yaml"), actionParams{})
+	off := executeManifest(t, filepath.Join(dir, "envx.yaml"), actionParams{})
+	if _, ok := findFinding(off, status.PropertyNotDeclaredInBase); ok {
+		t.Errorf("base-declaration check must be off by default: %+v", off.Findings)
+	}
+	if off.Failed {
+		t.Errorf("an overlay-only key must not fail by default: %+v", off.Findings)
+	}
 
+	// Opting in through the validate block surfaces the finding and fails the run.
+	optedIn := t.TempDir()
+	writeFile(t, filepath.Join(optedIn, "envx.yaml"),
+		"environments: [production]\n"+
+			"validate:\n"+
+			"  property_not_declared_in_base: error\n"+
+			"projects:\n"+
+			"  api:\n"+
+			"    includes: [env/app]\n")
+	writeFile(t, filepath.Join(optedIn, "env", "app.yaml"), "shared: base-value\n")
+	writeFile(t,
+		filepath.Join(optedIn, "env", "app.production.yaml"), "only_in_overlay: x\n")
+
+	report := executeManifest(t, filepath.Join(optedIn, "envx.yaml"), actionParams{})
 	finding, ok := findFinding(report, status.PropertyNotDeclaredInBase)
 	if !ok {
-		t.Fatalf("no base-declaration finding: %+v", report.Findings)
+		t.Fatalf("no base-declaration finding after opt-in: %+v", report.Findings)
 	}
 	if finding.Code != status.PropertyNotDeclaredInBase ||
 		finding.Key != "ONLY_IN_OVERLAY" {
 		t.Errorf("finding = %+v, want base-declaration on ONLY_IN_OVERLAY", finding)
 	}
 	if !report.Failed {
-		t.Error("an undeclared overlay key must fail the run at the default error severity")
+		t.Error("an undeclared overlay key must fail once configured to error")
 	}
 }
 
