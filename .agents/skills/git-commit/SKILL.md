@@ -31,7 +31,7 @@ If you find yourself reaching for a `## Summary` heading, stop: that content is 
 6. Push: `git push -u origin <branch>`.
 7. Open the PR with **title = the commit subject** and **body = the commit body** (plain text).
 8. If there is review scaffolding (test plan, QA steps, screenshots, reviewer guidance, open questions), post it as a **separate PR comment** — never in the body.
-9. Present the commands for confirmation before running anything that pushes or creates a PR. Do not push or open the PR unprompted.
+9. After the commit is ready, push the branch and open the PR by default. Only pause or omit either action when the user explicitly requests a different workflow, such as keeping changes local, pushing without opening a PR, or reviewing the commands first.
 
 ## The message is the commit
 
@@ -48,6 +48,21 @@ If you find yourself reaching for a `## Summary` heading, stop: that content is 
 
 **Body** (optional, only when the *why* isn't obvious from the title):
 
+- Use this shape:
+
+  ```text
+  <description>
+
+  - <change or effect>
+  - <change or effect>
+  - <change or effect>
+
+  [footer]
+  ```
+
+- `<description>` is a concise, active summary of the motivation and overall effect, usually one sentence or short paragraph.
+- The list names the important changes or outcomes, with one idea per bullet. Use concrete behavior rather than implementation trivia.
+- `[footer]` is optional and is reserved for issue references, breaking-change notices, or authorship metadata.
 - plain text, wrapped at ~72 characters
 - explain the motivation and the effect, not the mechanics — the diff already shows *how*
 - plain hyphen bullets are fine for enumerating a few distinct logical changes; keep them terse
@@ -101,10 +116,10 @@ Use a heredoc with `--body-file -` so the body stays plain and you avoid quote-e
 gh pr create \
   --title "feat(auth): add password reset flow" \
   --body-file - <<'EOF'
-Let users who forget their password regain access without contacting
-support.
+Adds a password reset flow so users who forget their password can regain
+access without contacting support.
 
-- add forgot-password form with email validation
+- add a forgot-password form with email validation
 - generate and email single-use reset tokens
 - rate-limit reset requests to curb abuse
 
@@ -112,7 +127,7 @@ Closes #123
 EOF
 ```
 
-Present the title, the body, and the exact command(s) for the user to confirm before running.
+Proceed with the push and PR creation without asking for confirmation by default. Pause only when the user has explicitly requested a different workflow.
 
 ## Flags to suggest when relevant
 
@@ -137,4 +152,4 @@ EOF
 - Never commit directly to `main`/`master`; branch first.
 - One logical change per PR — a squash merge is one commit, so a PR should be one thing.
 - Never force-push without explicit instruction.
-- Confirm before pushing or opening the PR.
+- Push and open the PR automatically unless the user has explicitly requested otherwise.

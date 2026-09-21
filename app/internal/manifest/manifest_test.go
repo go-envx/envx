@@ -194,6 +194,108 @@ func TestLoadInvalid(t *testing.T) {
 	}
 }
 
+// TestLoadRejectsUnknownFields verifies strict decoding fails a manifest that
+// carries an unknown key rather than silently dropping it, and that the error is
+// reported in manifest-domain terms: it names the key with its block label,
+// never leaks a Go type name, and points at the schema docs. This guards removed
+// and renamed keys: once a key leaves the schema, a manifest still setting it
+// errors at load instead of having the setting silently ignored.
+func TestLoadRejectsUnknownFields(t *testing.T) {
+	t.Parallel()
+
+	tests := map[string]struct {
+		body      string
+		wantLabel string
+	}{
+		"unknown top-level key": {
+			body: "environments: [development]\n" +
+				"projects:\n  api:\n    includes: [env/x]\n" +
+				"bogus: true\n",
+			wantLabel: "manifest key",
+		},
+		"unknown settings key": {
+			body: "environments: [development]\n" +
+				"settings:\n  not_a_setting: true\n" +
+				"projects:\n  api:\n    includes: [env/x]\n",
+			wantLabel: "setting",
+		},
+		"unknown secrets key": {
+			body: "environments: [development]\n" +
+				"secrets:\n  not_a_secret: true\n" +
+				"projects:\n  api:\n    includes: [env/x]\n",
+			wantLabel: "secrets setting",
+		},
+	}
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			_, err := newManager(t, writeManifest(t, tc.body)).Load()
+			if err == nil {
+				t.Fatal("expected an error for an unknown manifest key")
+			}
+			got := err.Error()
+			if !strings.Contains(got, "unknown "+tc.wantLabel) {
+				t.Errorf("error %q should label the block as %q", got, tc.wantLabel)
+			}
+			if strings.Contains(got, "schema.") || strings.Contains(got, "yaml:") {
+				t.Errorf("error %q should not leak internal decoder/type details", got)
+			}
+			if !strings.Contains(got, schemaDocsURL) {
+				t.Errorf("error %q should point at the schema docs", got)
+			}
+		})
+	}
+}
+
+// TestLoadSuggestsNearestKey verifies a rejected key close to a valid one offers
+// a "did you mean" correction. This is the migration hint a v1 manifest hits once
+// a settings key is renamed: the near-miss old spelling maps to the new key.
+func TestLoadSuggestsNearestKey(t *testing.T) {
+	t.Parallel()
+
+	body := "environments: [development]\n" +
+		"settings:\n  require_overlays: false\n" +
+		"projects:\n  api:\n    includes: [env/x]\n"
+
+	_, err := newManager(t, writeManifest(t, body)).Load()
+	if err == nil {
+		t.Fatal("expected an error for a renamed settings key")
+	}
+	if !strings.Contains(err.Error(), `Did you mean "require-overlays"?`) {
+		t.Errorf("error %q should suggest the nearest valid key", err)
+	}
+}
+
+// TestLoadKebabSettingsKeys verifies the v2 kebab-case settings keys decode into
+// their fields, guarding the yaml-tag rename from snake_case. The old snake keys
+// are rejected by strict decoding (see TestLoadRejectsUnknownFields), so this
+// pins the accepted spelling on the positive side.
+func TestLoadKebabSettingsKeys(t *testing.T) {
+	t.Parallel()
+
+	body := "environments: [development]\n" +
+		"settings:\n" +
+		"  os-reference-pattern: '@@(.+)@@'\n" +
+		"  reference-pattern: '<<(.+)>>'\n" +
+		"  require-overlays: true\n" +
+		"projects:\n  api:\n    includes: [env/x]\n"
+
+	loaded, err := newManager(t, writeManifest(t, body)).Load()
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	s := loaded.Content.Settings
+	if s.OSReferencePattern == nil || *s.OSReferencePattern != "@@(.+)@@" {
+		t.Errorf("OSReferencePattern = %v, want @@(.+)@@", s.OSReferencePattern)
+	}
+	if s.ReferencePattern == nil || *s.ReferencePattern != "<<(.+)>>" {
+		t.Errorf("ReferencePattern = %v, want <<(.+)>>", s.ReferencePattern)
+	}
+	if s.RequireOverlays == nil || !*s.RequireOverlays {
+		t.Errorf("RequireOverlays = %v, want true", s.RequireOverlays)
+	}
+}
+
 // TestLoadDiscovers verifies Load discovers an explicit path and loads it.
 func TestLoadDiscovers(t *testing.T) {
 	t.Parallel()

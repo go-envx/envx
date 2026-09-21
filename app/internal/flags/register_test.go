@@ -17,7 +17,7 @@ func TestRegisterAndGetInput(t *testing.T) {
 	t.Parallel()
 
 	fs := newFlags()
-	Register(fs, WithEnv, WithRequireOverlays, WithPrefix, WithSuffix, WithNamespacePrefix)
+	Register(fs, WithEnv, WithRequireOverlays, WithPrefix, WithSuffix)
 	args := []string{"--env", "production", "--prefix", "APP", "--require-overlays"}
 	if err := fs.Parse(args); err != nil {
 		t.Fatalf("parse: %v", err)

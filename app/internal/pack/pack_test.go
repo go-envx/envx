@@ -88,7 +88,7 @@ func bundleFiles(t *testing.T, outDir string) []string {
 }
 
 // projectIncludes parses the bundle manifest and returns the named project's
-// includes, so a test can assert they were rewritten to flat stems.
+// includes, so a test can assert they were rewritten to per-project paths.
 func projectIncludes(t *testing.T, manifestPath, project string) []string {
 	t.Helper()
 	data, err := os.ReadFile(manifestPath) //nolint:gosec // path is test-local.
@@ -104,6 +104,28 @@ func projectIncludes(t *testing.T, manifestPath, project string) []string {
 		t.Fatal(err)
 	}
 	return doc.Projects[project].Includes
+}
+
+// manifestProjects parses the bundle manifest and returns its declared project
+// names, sorted, so a test can assert unselected projects were pruned.
+func manifestProjects(t *testing.T, manifestPath string) []string {
+	t.Helper()
+	data, err := os.ReadFile(manifestPath) //nolint:gosec // path is test-local.
+	if err != nil {
+		t.Fatal(err)
+	}
+	var doc struct {
+		Projects map[string]yaml.Node `yaml:"projects"`
+	}
+	if err := yaml.Unmarshal(data, &doc); err != nil {
+		t.Fatal(err)
+	}
+	names := make([]string, 0, len(doc.Projects))
+	for name := range doc.Projects {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	return names
 }
 
 // readFile reads a bundle file and fails the test on error.
@@ -144,10 +166,12 @@ func absent(t *testing.T, dir, rel string) {
 	}
 }
 
-// TestPackFlattensNamespaceFiles verifies a single-environment pack writes flat
-// filenames in the bundle root: the manifest, the selected base files and
-// overlays, and the secrets store, excluding the unselected overlay and the keys.
-func TestPackFlattensNamespaceFiles(t *testing.T) {
+// TestPackWritesPerProjectDirectories verifies a single-environment pack writes
+// each project's namespace files under its own <project>/ directory, with the
+// manifest and secrets store at the bundle root, excluding the unselected overlay
+// and the keys. A namespace both projects include (env/app) is copied into both
+// directories.
+func TestPackWritesPerProjectDirectories(t *testing.T) {
 	t.Parallel()
 	root, ws := newWorkspace(t)
 	writeSource(t, root, "envx.keys", "shared: PRIVATE\n") // must never be copied
@@ -156,11 +180,13 @@ func TestPackFlattensNamespaceFiles(t *testing.T) {
 	result := mustPack(t, ws, Params{Environments: []string{"production"}, OutDir: out})
 
 	want := []string{
-		"api.yaml",
-		"app.production.yaml",
-		"app.yaml",
+		"api/api.yaml",
+		"api/app.production.yaml",
+		"api/app.yaml",
 		"envx.yaml",
 		"secrets.yaml",
+		"web/app.production.yaml",
+		"web/app.yaml",
 	}
 	if got := bundleFiles(t, out); !equal(got, want) {
 		t.Errorf("bundle files = %v, want %v", got, want)
@@ -169,17 +195,12 @@ func TestPackFlattensNamespaceFiles(t *testing.T) {
 		t.Errorf("result files = %v, want %v", result.Files, want)
 	}
 	absent(t, out, "envx.keys")
-	absent(t, out, "app.development.yaml")
-	// Nothing nested remains: every file sits directly in the bundle root.
-	for _, f := range want {
-		if strings.Contains(f, "/") {
-			t.Errorf("bundle file %q is not flat", f)
-		}
-	}
+	absent(t, out, "api/app.development.yaml")
 }
 
 // TestPackRewritesManifestIncludes verifies the bundle manifest's includes are
-// rewritten to the flat stems, so run resolves them against the bundle root.
+// rewritten to their per-project paths, so run resolves them against each
+// project's bundle directory.
 func TestPackRewritesManifestIncludes(t *testing.T) {
 	t.Parallel()
 	_, ws := newWorkspace(t)
@@ -189,19 +210,19 @@ func TestPackRewritesManifestIncludes(t *testing.T) {
 
 	bundleManifest := filepath.Join(out, "envx.yaml")
 	api := projectIncludes(t, bundleManifest, "api")
-	if !equal(api, []string{"app", "api"}) {
-		t.Errorf("api includes = %v, want [app api]", api)
+	if !equal(api, []string{"api/app", "api/api"}) {
+		t.Errorf("api includes = %v, want [api/app api/api]", api)
 	}
 	web := projectIncludes(t, bundleManifest, "web")
-	if !equal(web, []string{"app"}) {
-		t.Errorf("web includes = %v, want [app]", web)
+	if !equal(web, []string{"web/app"}) {
+		t.Errorf("web includes = %v, want [web/app]", web)
 	}
 }
 
-// TestPackDisambiguatesCollidingBasenames verifies two namespaces that share a
-// basename in different directories are flattened to distinct filenames and the
-// manifest points each project at its own name.
-func TestPackDisambiguatesCollidingBasenames(t *testing.T) {
+// TestPackSeparatesCollidingBasenamesByProject verifies two projects that each
+// include a differently-located namespace sharing a basename keep their own copy
+// under their own directory, with no cross-project disambiguation.
+func TestPackSeparatesCollidingBasenamesByProject(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()
 	manifest := writeSource(t, root, "envx.yaml",
@@ -224,29 +245,140 @@ func TestPackDisambiguatesCollidingBasenames(t *testing.T) {
 
 	mustPack(t, ws, Params{OutDir: out})
 
-	// "env/app" sorts first and keeps "app"; "svc/app" becomes "app-2".
-	present(t, out, "app.yaml")
-	present(t, out, "app-2.yaml")
+	// Each project keeps the plain "app.yaml" name inside its own directory.
+	present(t, out, "one/app.yaml")
+	present(t, out, "two/app.yaml")
 	bundleManifest := filepath.Join(out, "envx.yaml")
 	first := projectIncludes(t, bundleManifest, "one")
-	if !equal(first, []string{"app"}) {
-		t.Errorf("project one includes = %v, want [app]", first)
+	if !equal(first, []string{"one/app"}) {
+		t.Errorf("project one includes = %v, want [one/app]", first)
 	}
 	second := projectIncludes(t, bundleManifest, "two")
-	if !equal(second, []string{"app-2"}) {
-		t.Errorf("project two includes = %v, want [app-2]", second)
+	if !equal(second, []string{"two/app"}) {
+		t.Errorf("project two includes = %v, want [two/app]", second)
 	}
 	// The two source files, though identically named, land as distinct files.
-	one := readFile(t, filepath.Join(out, "app.yaml"))
-	two := readFile(t, filepath.Join(out, "app-2.yaml"))
+	one := readFile(t, filepath.Join(out, "one", "app.yaml"))
+	two := readFile(t, filepath.Join(out, "two", "app.yaml"))
 	if bytes.Equal(one, two) {
 		t.Error("colliding namespaces were merged into one file")
 	}
 }
 
+// TestPackDisambiguatesIntraProjectCollision verifies that when one project
+// includes two differently-located namespaces sharing a basename, the second is
+// disambiguated within the project directory and the manifest points at it.
+func TestPackDisambiguatesIntraProjectCollision(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	manifest := writeSource(t, root, "envx.yaml",
+		"environments: [development]\n"+
+			"projects:\n"+
+			"  one:\n    includes: [env/app, svc/app]\n")
+	writeSource(t, root, "env/app.yaml", "A: 1\n")
+	writeSource(t, root, "svc/app.yaml", "A: 2\n")
+	ws := Workspace{
+		ManifestPath: manifest,
+		Root:         root,
+		Environments: []string{"development"},
+		Projects: []Project{
+			{Name: "one", Includes: []string{"env/app", "svc/app"}},
+		},
+	}
+	out := filepath.Join(t.TempDir(), "dist")
+
+	mustPack(t, ws, Params{OutDir: out})
+
+	// "env/app" comes first and keeps "app"; "svc/app" becomes "app-2".
+	present(t, out, "one/app.yaml")
+	present(t, out, "one/app-2.yaml")
+	got := projectIncludes(t, filepath.Join(out, "envx.yaml"), "one")
+	if !equal(got, []string{"one/app", "one/app-2"}) {
+		t.Errorf("project one includes = %v, want [one/app one/app-2]", got)
+	}
+	first := readFile(t, filepath.Join(out, "one", "app.yaml"))
+	second := readFile(t, filepath.Join(out, "one", "app-2.yaml"))
+	if bytes.Equal(first, second) {
+		t.Error("colliding namespaces were merged into one file")
+	}
+}
+
+// TestPackDisambiguatesBaseOverlayCollision verifies a namespace's overlay
+// cannot overwrite another namespace's base file when their complete output
+// filenames would otherwise match.
+func TestPackDisambiguatesBaseOverlayCollision(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	manifest := writeSource(t, root, "envx.yaml",
+		"environments: [production]\n"+
+			"projects:\n  one:\n    includes: [env/app, svc/app.production]\n")
+	writeSource(t, root, "env/app.yaml", "A: base\n")
+	writeSource(t, root, "env/app.production.yaml", "A: overlay\n")
+	writeSource(t, root, "svc/app.production.yaml", "B: other\n")
+	ws := Workspace{
+		ManifestPath: manifest,
+		Root:         root,
+		Environments: []string{"production"},
+		Projects: []Project{{
+			Name:     "one",
+			Includes: []string{"env/app", "svc/app.production"},
+		}},
+	}
+	out := filepath.Join(t.TempDir(), "dist")
+
+	mustPack(t, ws, Params{OutDir: out})
+
+	present(t, out, "one/app.production.yaml")
+	present(t, out, "one/app.production-2.yaml")
+	got := projectIncludes(t, filepath.Join(out, "envx.yaml"), "one")
+	if !equal(got, []string{"one/app", "one/app.production-2"}) {
+		t.Errorf("project one includes = %v, want [one/app one/app.production-2]", got)
+	}
+	if got := string(readFile(
+		t, filepath.Join(out, "one", "app.production.yaml"),
+	)); got != "A: overlay\n" {
+		t.Errorf("overlay content = %q, want %q", got, "A: overlay\n")
+	}
+	if got := string(readFile(
+		t, filepath.Join(out, "one", "app.production-2.yaml"),
+	)); got != "B: other\n" {
+		t.Errorf("base content = %q, want %q", got, "B: other\n")
+	}
+}
+
+// TestPackSanitizesProjectDirectoryName verifies a project name that is not
+// filesystem-safe is sanitized into a single safe directory component and the
+// manifest includes are rewritten to match.
+func TestPackSanitizesProjectDirectoryName(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	manifest := writeSource(t, root, "envx.yaml",
+		"environments: [development]\n"+
+			"projects:\n"+
+			"  \"team/api\":\n    includes: [env/app]\n")
+	writeSource(t, root, "env/app.yaml", "A: 1\n")
+	ws := Workspace{
+		ManifestPath: manifest,
+		Root:         root,
+		Environments: []string{"development"},
+		Projects: []Project{
+			{Name: "team/api", Includes: []string{"env/app"}},
+		},
+	}
+	out := filepath.Join(t.TempDir(), "dist")
+
+	mustPack(t, ws, Params{OutDir: out})
+
+	present(t, out, "team_api/app.yaml")
+	got := projectIncludes(t, filepath.Join(out, "envx.yaml"), "team/api")
+	if !equal(got, []string{"team_api/app"}) {
+		t.Errorf("includes = %v, want [team_api/app]", got)
+	}
+}
+
 // TestPackHandlesEscapingInclude verifies an include that resolves outside the
-// workspace root is flattened into the bundle root (flattening removes the
-// directory-nesting constraint the structure-preserving copy had).
+// workspace root is copied into the project's bundle directory under its base
+// name, dropping the original directory structure.
 func TestPackHandlesEscapingInclude(t *testing.T) {
 	t.Parallel()
 	parent := t.TempDir()
@@ -264,10 +396,10 @@ func TestPackHandlesEscapingInclude(t *testing.T) {
 	out := filepath.Join(t.TempDir(), "dist")
 
 	mustPack(t, ws, Params{Environments: []string{"development"}, OutDir: out})
-	present(t, out, "outside.yaml")
+	present(t, out, "escape/outside.yaml")
 	got := projectIncludes(t, filepath.Join(out, "envx.yaml"), "escape")
-	if !equal(got, []string{"outside"}) {
-		t.Errorf("escape includes = %v, want [outside]", got)
+	if !equal(got, []string{"escape/outside"}) {
+		t.Errorf("escape includes = %v, want [escape/outside]", got)
 	}
 }
 
@@ -283,9 +415,10 @@ func TestPackMultipleEnvironmentsKeepsEveryOverlay(t *testing.T) {
 		OutDir:       out,
 	})
 
-	present(t, out, "app.development.yaml")
-	present(t, out, "app.production.yaml")
-	present(t, out, "api.development.yaml")
+	present(t, out, "api/app.development.yaml")
+	present(t, out, "api/app.production.yaml")
+	present(t, out, "api/api.development.yaml")
+	present(t, out, "web/app.development.yaml")
 }
 
 // TestPackDefaultsToAllDeclaredEnvironments verifies an empty environment
@@ -310,27 +443,48 @@ func TestPackProjectNarrowsIncludes(t *testing.T) {
 
 	mustPack(t, ws, Params{Projects: []string{"web"}, OutDir: out})
 
-	// web only includes env/app, so api must not appear.
-	absent(t, out, "api.yaml")
-	present(t, out, "app.yaml")
+	// Only the web project directory is written; api is not selected at all.
+	present(t, out, "web/app.yaml")
+	absent(t, out, "api/app.yaml")
+	absent(t, out, "api/api.yaml")
 }
 
-// TestPackDeduplicatesSharedNamespace verifies a namespace two projects both
-// include is copied exactly once.
-func TestPackDeduplicatesSharedNamespace(t *testing.T) {
+// TestPackPrunesUnselectedProjectsFromManifest verifies a --project selection
+// drops the unselected projects from the bundle manifest, so it declares only the
+// projects the bundle actually carries.
+func TestPackPrunesUnselectedProjectsFromManifest(t *testing.T) {
+	t.Parallel()
+	_, ws := newWorkspace(t)
+	out := filepath.Join(t.TempDir(), "dist")
+
+	mustPack(t, ws, Params{Projects: []string{"web"}, OutDir: out})
+
+	got := manifestProjects(t, filepath.Join(out, "envx.yaml"))
+	if !equal(got, []string{"web"}) {
+		t.Errorf("bundle manifest projects = %v, want [web]", got)
+	}
+}
+
+// TestPackDuplicatesSharedNamespace verifies a namespace two projects both
+// include is copied into each project's directory rather than shared.
+func TestPackDuplicatesSharedNamespace(t *testing.T) {
 	t.Parallel()
 	_, ws := newWorkspace(t)
 	out := filepath.Join(t.TempDir(), "dist")
 
 	result := mustPack(t, ws, Params{Environments: []string{"development"}, OutDir: out})
+
+	// env/app is included by both api and web, so it lands in both directories.
+	present(t, out, "api/app.yaml")
+	present(t, out, "web/app.yaml")
 	count := 0
 	for _, f := range result.Files {
-		if f == "app.yaml" {
+		if strings.HasSuffix(f, "/app.yaml") {
 			count++
 		}
 	}
-	if count != 1 {
-		t.Errorf("app.yaml appears %d times, want 1", count)
+	if count != 2 {
+		t.Errorf("app.yaml copies = %d, want 2 (one per project)", count)
 	}
 }
 
@@ -457,7 +611,7 @@ func TestPackStandardizesManifestAndStoreNames(t *testing.T) {
 	root := t.TempDir()
 	manifest := writeSource(t, root, "config.yaml",
 		"environments: [production]\n"+
-			"secrets:\n  path: private/vault.yaml\n  keys_path: private/envx.keys\n"+
+			"secrets:\n  path: private/vault.yaml\n  keys-path: private/envx.keys\n"+
 			"projects:\n  app:\n    includes: [env/app]\n")
 	writeSource(t, root, "env/app.yaml", "TOKEN: secret://shared/token\n")
 	store := writeSource(t, root, "private/vault.yaml",
@@ -481,12 +635,12 @@ func TestPackStandardizesManifestAndStoreNames(t *testing.T) {
 
 	manifestBody := string(readFile(t, filepath.Join(out, "envx.yaml")))
 	// The explicit secrets path is gone so the default secrets.yaml resolves; the
-	// harmless keys_path is left as declared.
+	// harmless keys-path is left as declared.
 	if strings.Contains(manifestBody, "vault.yaml") {
 		t.Errorf("bundle manifest still declares the source secrets path:\n%s", manifestBody)
 	}
-	if !strings.Contains(manifestBody, "keys_path:") {
-		t.Errorf("bundle manifest dropped keys_path unexpectedly:\n%s", manifestBody)
+	if !strings.Contains(manifestBody, "keys-path:") {
+		t.Errorf("bundle manifest dropped keys-path unexpectedly:\n%s", manifestBody)
 	}
 	// The referenced secret survived into the standardized store.
 	storeBody := string(readFile(t, filepath.Join(out, "secrets.yaml")))
@@ -582,7 +736,7 @@ func TestPackForceReplacesNonEmptyOutDir(t *testing.T) {
 
 	absent(t, out, "leftover.txt")
 	present(t, out, "envx.yaml")
-	present(t, out, "app.production.yaml")
+	present(t, out, "api/app.production.yaml")
 }
 
 // TestPackForceLeavesExistingBundleOnPrewriteError verifies a --force run that
@@ -599,6 +753,75 @@ func TestPackForceLeavesExistingBundleOnPrewriteError(t *testing.T) {
 	}
 	if _, statErr := os.Stat(stale); statErr != nil {
 		t.Errorf("--force cleared the directory despite a pre-write error: %v", statErr)
+	}
+}
+
+// TestPackSingleProjectStillNests verifies a single-project pack still nests the
+// project's files under a <project>/ directory, so the layout never forks on
+// project count.
+func TestPackSingleProjectStillNests(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	manifest := writeSource(t, root, "envx.yaml",
+		"environments: [development]\n"+
+			"projects:\n  solo:\n    includes: [env/app]\n")
+	writeSource(t, root, "env/app.yaml", "A: base\n")
+	ws := Workspace{
+		ManifestPath: manifest,
+		Root:         root,
+		Environments: []string{"development"},
+		Projects:     []Project{{Name: "solo", Includes: []string{"env/app"}}},
+	}
+	out := filepath.Join(t.TempDir(), "dist")
+
+	mustPack(t, ws, Params{OutDir: out})
+
+	present(t, out, "solo/app.yaml")
+	absent(t, out, "app.yaml")
+	got := projectIncludes(t, filepath.Join(out, "envx.yaml"), "solo")
+	if !equal(got, []string{"solo/app"}) {
+		t.Errorf("solo includes = %v, want [solo/app]", got)
+	}
+}
+
+// TestPackStoreCoversUnionOfProjects verifies the bundle keeps one shared
+// secrets.yaml at the root, filtered to the union of every selected project's
+// references — a secret referenced by only one of two selected projects survives.
+func TestPackStoreCoversUnionOfProjects(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	manifest := writeSource(t, root, "envx.yaml",
+		"environments: [development]\n"+
+			"projects:\n"+
+			"  one:\n    includes: [env/one]\n"+
+			"  two:\n    includes: [env/two]\n")
+	writeSource(t, root, "env/one.yaml", "A: secret://shared/alpha\n")
+	writeSource(t, root, "env/two.yaml", "B: secret://shared/beta\n")
+	store := writeSource(t, root, "secrets.yaml",
+		"secrets:\n  shared:\n    alpha: a0\n    beta: b0\n    gamma: g0\n")
+	ws := Workspace{
+		ManifestPath: manifest,
+		Root:         root,
+		SecretsPath:  store,
+		Environments: []string{"development"},
+		Projects: []Project{
+			{Name: "one", Includes: []string{"env/one"}},
+			{Name: "two", Includes: []string{"env/two"}},
+		},
+	}
+	out := filepath.Join(t.TempDir(), "dist")
+
+	mustPack(t, ws, Params{OutDir: out})
+
+	// A single store at the root holds both projects' references but not the unused
+	// one.
+	present(t, out, "secrets.yaml")
+	got := string(readFile(t, filepath.Join(out, "secrets.yaml")))
+	if !strings.Contains(got, "alpha: a0") || !strings.Contains(got, "beta: b0") {
+		t.Errorf("store missing a referenced secret from the union:\n%s", got)
+	}
+	if strings.Contains(got, "gamma") {
+		t.Errorf("store kept an unreferenced secret:\n%s", got)
 	}
 }
 

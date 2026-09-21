@@ -287,13 +287,13 @@ func TestPackThenRun(t *testing.T) {
 		t.Fatalf("pack: %v", err)
 	}
 
-	// The bundle flattens namespaces into the root, keeps the selected
-	// environment's overlays, and drops the rest.
-	kept := filepath.Join(dist, "postgres.development.yaml")
+	// The bundle nests each namespace under its project directory, keeps the
+	// selected environment's overlays, and drops the rest.
+	kept := filepath.Join(dist, "api-core", "postgres.development.yaml")
 	if _, err := os.Stat(kept); err != nil {
 		t.Errorf("selected development overlay missing from bundle: %v", err)
 	}
-	dropped := filepath.Join(dist, "postgres.production.yaml")
+	dropped := filepath.Join(dist, "api-core", "postgres.production.yaml")
 	if _, err := os.Stat(dropped); !os.IsNotExist(err) {
 		t.Error("unselected production overlay copied into bundle")
 	}

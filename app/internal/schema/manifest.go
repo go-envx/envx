@@ -39,7 +39,7 @@ type SecretsConfig struct {
 	SecretsPath string `yaml:"path"`
 	// KeysPath overrides the private-key file location. A relative path is joined
 	// against the manifest directory.
-	KeysPath string `yaml:"keys_path"`
+	KeysPath string `yaml:"keys-path"`
 	// Cipher selects the encryption algorithm used for new keypairs and values.
 	Cipher string `yaml:"cipher"`
 }
@@ -65,18 +65,16 @@ type Settings struct {
 	Delimiter *string `yaml:"delimiter"`
 	// Env is the target environment to load.
 	Env *string `yaml:"env"`
-	// NamespacePrefix prefixes each key with its namespace name, if true.
-	NamespacePrefix *bool `yaml:"namespace_prefix"`
 	// OSReferencePattern overrides the {{@VAR}} OS-reference syntax with a regex.
-	OSReferencePattern *string `yaml:"os_reference_pattern"`
+	OSReferencePattern *string `yaml:"os-reference-pattern"`
 	// Overload lets file values override existing OS env vars, if true.
 	Overload *bool `yaml:"overload"`
 	// Prefix is prepended to every resolved env-var key.
 	Prefix *string `yaml:"prefix"`
 	// ReferencePattern overrides the {{VAR}} internal-reference syntax with a regex.
-	ReferencePattern *string `yaml:"reference_pattern"`
+	ReferencePattern *string `yaml:"reference-pattern"`
 	// RequireOverlays requires every environment overlay file in the namespace to exist.
-	RequireOverlays *bool `yaml:"require_overlays"`
+	RequireOverlays *bool `yaml:"require-overlays"`
 	// Suffix is appended to every resolved env-var key.
 	Suffix *string `yaml:"suffix"`
 }

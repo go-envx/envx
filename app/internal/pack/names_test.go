@@ -5,19 +5,36 @@ import (
 	"testing"
 )
 
-// TestAssignFlatNamesBasenames verifies each namespace flattens to the final
-// segment of its include, regardless of how deep its directory is.
-func TestAssignFlatNamesBasenames(t *testing.T) {
+// mustNames runs assignProjectNames and fails the test on error.
+func mustNames(t *testing.T, includes []includeFiles) map[string]string {
+	t.Helper()
+	names, err := assignProjectNames(includes)
+	if err != nil {
+		t.Fatalf("assignProjectNames: %v", err)
+	}
+	return names
+}
+
+// mustDirs runs assignProjectDirs and fails the test on error.
+func mustDirs(t *testing.T, projects []Project, reserved []string) map[string]string {
+	t.Helper()
+	dirs, err := assignProjectDirs(projects, reserved)
+	if err != nil {
+		t.Fatalf("assignProjectDirs: %v", err)
+	}
+	return dirs
+}
+
+// TestAssignProjectNamesBasenames verifies each namespace is named after the
+// final segment of its include, regardless of how deep its directory is.
+func TestAssignProjectNamesBasenames(t *testing.T) {
 	t.Parallel()
 	includes := []includeFiles{
 		{rel: "env/postgres", base: "x"},
 		{rel: "apps/api/env/api", base: "x"},
 		{rel: "../outside", base: "x"},
 	}
-	names, err := assignFlatNames(includes, nil)
-	if err != nil {
-		t.Fatalf("assignFlatNames: %v", err)
-	}
+	names := mustNames(t, includes)
 	want := map[string]string{
 		"env/postgres":     "postgres",
 		"apps/api/env/api": "api",
@@ -30,20 +47,16 @@ func TestAssignFlatNamesBasenames(t *testing.T) {
 	}
 }
 
-// TestAssignFlatNamesDisambiguatesCollisions verifies two namespaces that share a
-// basename in different directories get distinct names, assigned deterministically
-// in sorted include order.
-func TestAssignFlatNamesDisambiguatesCollisions(t *testing.T) {
+// TestAssignProjectNamesDisambiguatesCollisions verifies two namespaces in the
+// same project that share a final segment get distinct names, assigned in include
+// order so the first keeps the plain name.
+func TestAssignProjectNamesDisambiguatesCollisions(t *testing.T) {
 	t.Parallel()
 	includes := []includeFiles{
-		{rel: "svc/app", base: "x"},
 		{rel: "env/app", base: "x"},
+		{rel: "svc/app", base: "x"},
 	}
-	names, err := assignFlatNames(includes, nil)
-	if err != nil {
-		t.Fatalf("assignFlatNames: %v", err)
-	}
-	// "env/app" sorts before "svc/app", so it keeps the plain "app".
+	names := mustNames(t, includes)
 	if names["env/app"] != "app" {
 		t.Errorf("env/app = %q, want app", names["env/app"])
 	}
@@ -52,89 +65,128 @@ func TestAssignFlatNamesDisambiguatesCollisions(t *testing.T) {
 	}
 }
 
-// TestAssignFlatNamesAvoidsReserved verifies a namespace never flattens onto a
-// reserved name (the manifest or secrets store stem).
-func TestAssignFlatNamesAvoidsReserved(t *testing.T) {
+// TestAssignProjectNamesDisambiguatesDisjointFiles verifies two namespaces that
+// share a final segment get distinct stems even when their output files do not
+// overlap — a base-only namespace and an overlay-only namespace. Sharing a stem
+// would merge them into one include at resolution time.
+func TestAssignProjectNamesDisambiguatesDisjointFiles(t *testing.T) {
 	t.Parallel()
-	includes := []includeFiles{{rel: "env/secrets", base: "x"}}
-	names, err := assignFlatNames(includes, []string{"envx", "secrets"})
-	if err != nil {
-		t.Fatalf("assignFlatNames: %v", err)
-	}
-	if names["env/secrets"] == "secrets" {
-		t.Error("namespace flattened onto the reserved secrets name")
-	}
-	if names["env/secrets"] != "secrets-2" {
-		t.Errorf("env/secrets = %q, want secrets-2", names["env/secrets"])
-	}
-}
-
-// TestAssignFlatNamesTruncatesToFit verifies a stem is truncated so the longest
-// filename it produces stays within the filename limit, and collisions after
-// truncation are still disambiguated.
-func TestAssignFlatNamesTruncatesToFit(t *testing.T) {
-	t.Parallel()
-	longEnv := strings.Repeat("e", 200)
-	longBase := strings.Repeat("a", 100)
-	overlays := []overlayFile{{env: longEnv, src: "x"}}
-	// Both share a parent and truncate to the same stem, so the guard must both
-	// truncate to fit and disambiguate the collision it creates.
+	// env/app produces app.yaml; svc/app produces only app.development.yaml.
 	includes := []includeFiles{
-		{rel: "d/" + longBase, base: "x", overlays: overlays},
-		{rel: "d/" + longBase + "x", base: "x", overlays: overlays},
+		{rel: "env/app", base: "x"},
+		{rel: "svc/app", overlays: []overlayFile{{env: "development", src: "y"}}},
 	}
-	names, err := assignFlatNames(includes, nil)
-	if err != nil {
-		t.Fatalf("assignFlatNames: %v", err)
+	names := mustNames(t, includes)
+	if names["env/app"] == names["svc/app"] {
+		t.Errorf(
+			"env/app and svc/app share stem %q; disjoint files must still get distinct stems",
+			names["env/app"],
+		)
 	}
-
-	suffix := len("." + longEnv + ".yaml")
-	seen := make(map[string]bool)
-	disambiguated := false
-	for rel, stem := range names {
-		if total := len(stem) + suffix; total > maxFilenameLen {
-			t.Errorf("%s: filename %d bytes exceeds limit %d", rel, total, maxFilenameLen)
-		}
-		if seen[stem] {
-			t.Errorf("%s: duplicate stem %q after truncation", rel, stem)
-		}
-		seen[stem] = true
-		if strings.HasSuffix(stem, "-2") {
-			disambiguated = true
-		}
+	if names["env/app"] != "app" {
+		t.Errorf("env/app = %q, want app", names["env/app"])
 	}
-	if !disambiguated {
-		t.Error("expected a truncation collision to be disambiguated with -2")
+	if names["svc/app"] != "app-2" {
+		t.Errorf("svc/app = %q, want app-2", names["svc/app"])
 	}
 }
 
-// TestAssignFlatNamesRejectsUnflattenable verifies an environment name so long
-// that no stem can fit is a clear error rather than an invalid filename.
-func TestAssignFlatNamesRejectsUnflattenable(t *testing.T) {
+// TestAssignProjectDirsUsesProjectNames verifies each project directory is named
+// after its project when the name is already filesystem-safe.
+func TestAssignProjectDirsUsesProjectNames(t *testing.T) {
+	t.Parallel()
+	projects := []Project{{Name: "api"}, {Name: "web"}}
+	dirs := mustDirs(t, projects, nil)
+	if dirs["api"] != "api" || dirs["web"] != "web" {
+		t.Errorf("dirs = %v, want api->api web->web", dirs)
+	}
+}
+
+// TestAssignProjectDirsAvoidsReserved verifies a project whose sanitized name
+// matches a reserved bundle name is disambiguated so no directory shadows a root
+// bundle file.
+func TestAssignProjectDirsAvoidsReserved(t *testing.T) {
+	t.Parallel()
+	projects := []Project{{Name: "envx"}, {Name: "secrets"}}
+	reserved := []string{"envx.yaml", "envx", "secrets.yaml", "secrets"}
+	dirs := mustDirs(t, projects, reserved)
+	if dirs["envx"] == "envx" {
+		t.Error("project directory shadowed the reserved envx name")
+	}
+	if dirs["secrets"] == "secrets" {
+		t.Error("project directory shadowed the reserved secrets name")
+	}
+	if dirs["envx"] != "envx-2" {
+		t.Errorf("envx = %q, want envx-2", dirs["envx"])
+	}
+	if dirs["secrets"] != "secrets-2" {
+		t.Errorf("secrets = %q, want secrets-2", dirs["secrets"])
+	}
+}
+
+// TestAssignProjectDirsDisambiguatesSanitizedCollisions verifies two projects
+// whose names sanitize to the same string get distinct directories.
+func TestAssignProjectDirsDisambiguatesSanitizedCollisions(t *testing.T) {
+	t.Parallel()
+	projects := []Project{{Name: "a/b"}, {Name: "a:b"}}
+	dirs := mustDirs(t, projects, nil)
+	if dirs["a/b"] != "a_b" {
+		t.Errorf("a/b = %q, want a_b", dirs["a/b"])
+	}
+	if dirs["a:b"] != "a_b-2" {
+		t.Errorf("a:b = %q, want a_b-2", dirs["a:b"])
+	}
+}
+
+// TestAssignProjectNamesRejectsOverlongFilename verifies an environment name so
+// long that the produced filename exceeds the limit is a clear error rather than
+// an invalid filename.
+func TestAssignProjectNamesRejectsOverlongFilename(t *testing.T) {
 	t.Parallel()
 	overlays := []overlayFile{{env: strings.Repeat("e", 260), src: "x"}}
 	includes := []includeFiles{{rel: "env/app", base: "x", overlays: overlays}}
-	if _, err := assignFlatNames(includes, nil); err == nil ||
+	if _, err := assignProjectNames(includes); err == nil ||
 		!strings.Contains(err.Error(), "filename limit") {
 		t.Fatalf("err = %v, want a filename-limit error", err)
 	}
 }
 
-// TestClampBytes verifies truncation respects the byte budget and never splits a
-// multi-byte rune.
-func TestClampBytes(t *testing.T) {
+// TestAssignProjectDirsRejectsOverlongName verifies a project name that exceeds
+// the per-component filename limit is a clear error rather than an invalid
+// directory.
+func TestAssignProjectDirsRejectsOverlongName(t *testing.T) {
 	t.Parallel()
-	if got := clampBytes("hello", 10); got != "hello" {
-		t.Errorf("clampBytes short = %q, want hello", got)
+	projects := []Project{{Name: strings.Repeat("p", 300)}}
+	if _, err := assignProjectDirs(projects, nil); err == nil ||
+		!strings.Contains(err.Error(), "filename limit") {
+		t.Fatalf("err = %v, want a filename-limit error", err)
 	}
-	if got := clampBytes("hello", 3); got != "hel" {
-		t.Errorf("clampBytes = %q, want hel", got)
+}
+
+// TestSanitizeDirName verifies only [A-Za-z0-9_-] survive, every other character
+// (including "." and "/") becomes an underscore, consecutive underscores collapse
+// to one, and a name that sanitizes to empty falls back to a safe placeholder — so
+// a project can never escape the bundle root or produce an invalid directory.
+func TestSanitizeDirName(t *testing.T) {
+	t.Parallel()
+	cases := map[string]string{
+		"api":       "api",
+		"api-svc_1": "api-svc_1",
+		"a/b":       "a_b",
+		"../escape": "_escape",
+		"..":        "_",
+		".":         "_",
+		"":          "project",
+		"a b":       "a_b",
+		"x\\y":      "x_y",
+		"a__b":      "a_b",   // pre-existing underscore run collapses
+		"a...b":     "a_b",   // dots are no longer allowed
+		"a/./b":     "a_b",   // mixed separators collapse to one underscore
+		"a_-_b":     "a_-_b", // dashes break an underscore run
 	}
-	if got := clampBytes("héllo", 2); got != "h" {
-		// "é" is two bytes; it cannot fit in the one remaining byte, so it is dropped.
-		t.Errorf("clampBytes multibyte = %q, want h", got)
-	}
-	if got := clampBytes("x", 0); got != "" {
-		t.Errorf("clampBytes zero = %q, want empty", got)
+	for in, want := range cases {
+		if got := sanitizeDirName(in); got != want {
+			t.Errorf("sanitizeDirName(%q) = %q, want %q", in, got, want)
+		}
 	}
 }

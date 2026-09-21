@@ -118,13 +118,6 @@ var (
 		Usage: "limit to one secret key (default: all keys)",
 	}
 
-	// NamespacePrefix prefixes each key with its namespace name.
-	NamespacePrefix = FlagSpec{
-		Name:  "namespace-prefix",
-		Env:   "ENVX_NAMESPACE_PREFIX",
-		Usage: "prefix each key with its namespace",
-	}
-
 	// NoConfirm skips the interactive confirmation after hidden input.
 	NoConfirm = FlagSpec{
 		Name:  "no-confirm",

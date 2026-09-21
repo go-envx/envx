@@ -297,64 +297,6 @@ Examples on this page are collapsed by default to keep it scannable.
   </ExampleBox>
   </ExampleAccordion>
 
-### `namespace_prefix`
-
-  <SchemaMeta type="bool" />
-
-  Prefix each key with the name of the namespace it came from. Most workspaces avoid this by nesting shared namespaces, but it is useful when flat namespaces collide. In the example below, the `worker` project includes `cache` and `queue`, which both define `host` and `port`.
-
-  - **CLI Flag:** `--namespace-prefix`
-  - **Environment Variable:** `ENVX_NAMESPACE_PREFIX`
-  - **Default Value:** `false`
-
-  <ExampleAccordion>
-  <ExampleBox>
-    <Fragment slot="manifest">
-      ```yaml
-      # envx.yaml
-      environments:
-        - development
-
-      projects:
-        worker:
-          settings:
-            namespace_prefix: true
-          includes:
-            - cache
-            - queue
-      ```
-    </Fragment>
-    <Fragment slot="files">
-      ```yaml
-      # cache.yaml
-      host: cache.local
-      port: 6379
-      ```
-
-      ```yaml
-      # queue.yaml
-      host: queue.local
-      port: 5672
-      ```
-    </Fragment>
-    <Fragment slot="commands">
-      ```sh
-      envx get worker CACHE_HOST
-      # cache.local
-      envx get worker QUEUE_HOST
-      # queue.local
-
-      # Turn it off and the flat keys collide — the last include wins.
-      ENVX_NAMESPACE_PREFIX=false envx get worker HOST
-      # queue.local
-
-      envx get worker HOST --namespace-prefix=false
-      # queue.local
-      ```
-    </Fragment>
-  </ExampleBox>
-  </ExampleAccordion>
-
 ### `overload`
 
   <SchemaMeta type="bool" />
@@ -452,7 +394,7 @@ Examples on this page are collapsed by default to keep it scannable.
   </ExampleBox>
   </ExampleAccordion>
 
-### `require_overlays`
+### `require-overlays`
 
   <SchemaMeta type="bool" />
 
@@ -472,7 +414,7 @@ Examples on this page are collapsed by default to keep it scannable.
         - staging
 
       settings:
-        require_overlays: true
+        require-overlays: true
 
       projects:
         web:
