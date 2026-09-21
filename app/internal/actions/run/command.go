@@ -76,7 +76,6 @@ func NewCommand() *cobra.Command {
 		flags.WithPrefix,
 		flags.WithSuffix,
 		flags.WithDelimiter,
-		flags.WithNamespacePrefix,
 		flags.WithOverload,
 		flags.WithReferencePattern,
 		flags.WithOSReferencePattern,

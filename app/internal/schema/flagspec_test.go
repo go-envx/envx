@@ -43,7 +43,6 @@ func TestCatalogEnvVarsUnique(t *testing.T) {
 		Config,
 		Delimiter,
 		Env,
-		NamespacePrefix,
 		Output,
 		Overload,
 		Prefix,

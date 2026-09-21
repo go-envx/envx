@@ -183,8 +183,8 @@ func TestMergeNamespacesSingleFileCollision(t *testing.T) {
 	}
 }
 
-// TestMergeNamespacesPrefixSuffix verifies global prefix/suffix and namespace
-// prefixing apply to every key.
+// TestMergeNamespacesPrefixSuffix verifies global prefix/suffix apply to every
+// key.
 func TestMergeNamespacesPrefixSuffix(t *testing.T) {
 	t.Parallel()
 
@@ -193,13 +193,13 @@ func TestMergeNamespacesPrefixSuffix(t *testing.T) {
 
 	res, err := buildNamespace(
 		t, dir, "postgres", "development",
-		Settings{Prefix: "app", Suffix: "v2", NamespacePrefix: true},
+		Settings{Prefix: "app", Suffix: "v2"},
 	)
 	if err != nil {
 		t.Fatalf("mergeNamespaces: %v", err)
 	}
-	if _, ok := res.Get("APP_POSTGRES_HOST_V2"); !ok {
-		t.Errorf("expected APP_POSTGRES_HOST_V2, got keys %v", res.Keys())
+	if _, ok := res.Get("APP_HOST_V2"); !ok {
+		t.Errorf("expected APP_HOST_V2, got keys %v", res.Keys())
 	}
 }
 

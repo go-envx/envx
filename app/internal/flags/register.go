@@ -52,12 +52,6 @@ func WithDelimiter(fs *pflag.FlagSet) {
 	registerString(fs, &schema.Delimiter)
 }
 
-// WithNamespacePrefix registers the --namespace-prefix flag, prefixing each key
-// with its namespace name.
-func WithNamespacePrefix(fs *pflag.FlagSet) {
-	registerBool(fs, &schema.NamespacePrefix)
-}
-
 // WithOverload registers the --overload flag, letting file values win over OS env
 // vars; only run hands the merged environment to the runner.
 func WithOverload(fs *pflag.FlagSet) {
