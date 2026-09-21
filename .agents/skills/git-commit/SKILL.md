@@ -48,6 +48,21 @@ If you find yourself reaching for a `## Summary` heading, stop: that content is 
 
 **Body** (optional, only when the *why* isn't obvious from the title):
 
+- Use this shape:
+
+  ```text
+  <description>
+
+  - <change or effect>
+  - <change or effect>
+  - <change or effect>
+
+  [footer]
+  ```
+
+- `<description>` is a concise, active summary of the motivation and overall effect, usually one sentence or short paragraph.
+- The list names the important changes or outcomes, with one idea per bullet. Use concrete behavior rather than implementation trivia.
+- `[footer]` is optional and is reserved for issue references, breaking-change notices, or authorship metadata.
 - plain text, wrapped at ~72 characters
 - explain the motivation and the effect, not the mechanics — the diff already shows *how*
 - plain hyphen bullets are fine for enumerating a few distinct logical changes; keep them terse
@@ -101,10 +116,10 @@ Use a heredoc with `--body-file -` so the body stays plain and you avoid quote-e
 gh pr create \
   --title "feat(auth): add password reset flow" \
   --body-file - <<'EOF'
-Let users who forget their password regain access without contacting
-support.
+Adds a password reset flow so users who forget their password can regain
+access without contacting support.
 
-- add forgot-password form with email validation
+- add a forgot-password form with email validation
 - generate and email single-use reset tokens
 - rate-limit reset requests to curb abuse
 

@@ -91,7 +91,7 @@ func TestMergeNamespacesShadowTracksBase(t *testing.T) {
 	}
 }
 
-// TestMergeNamespacesRequireOverlaysMissingOverlay verifies require_overlays mode
+// TestMergeNamespacesRequireOverlaysMissingOverlay verifies require-overlays mode
 // errors when an overlay file is absent, while lax mode tolerates it.
 func TestMergeNamespacesRequireOverlaysMissingOverlay(t *testing.T) {
 	t.Parallel()
@@ -103,7 +103,7 @@ func TestMergeNamespacesRequireOverlaysMissingOverlay(t *testing.T) {
 		t, dir, "postgres", "production", Settings{RequireOverlays: true},
 	)
 	if err == nil {
-		t.Error("expected require_overlays error for missing overlay")
+		t.Error("expected require-overlays error for missing overlay")
 	}
 	if _, err := buildNamespace(t, dir, "postgres", "production", Settings{}); err != nil {
 		t.Errorf("lax mode should tolerate missing overlay, got %v", err)

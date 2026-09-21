@@ -120,7 +120,7 @@ flowchart TD
 
 ## Settings resolution
 
-A "setting" is any knob that controls how envx loads and merges environment files (`env`, `require_overlays`, `prefix`, `suffix`, `delimiter`, `overload`, plus the `config` bootstrap flag). Every setting can be supplied from several places; `config` resolves them with a fixed **precedence**, highest to lowest:
+A "setting" is any knob that controls how envx loads and merges environment files (`env`, `require-overlays`, `prefix`, `suffix`, `delimiter`, `overload`, plus the `config` bootstrap flag). Every setting can be supplied from several places; `config` resolves them with a fixed **precedence**, highest to lowest:
 
 1. **CLI flag**: e.g. `--env production` (an explicit, non-nil value in `config.Input`).
 2. **`ENVX_*` environment variable**: e.g. `ENVX_ENV=production`.

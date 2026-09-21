@@ -254,15 +254,45 @@ func TestLoadSuggestsNearestKey(t *testing.T) {
 	t.Parallel()
 
 	body := "environments: [development]\n" +
-		"settings:\n  require_overlay: false\n" +
+		"settings:\n  require_overlays: false\n" +
 		"projects:\n  api:\n    includes: [env/x]\n"
 
 	_, err := newManager(t, writeManifest(t, body)).Load()
 	if err == nil {
-		t.Fatal("expected an error for a misspelled settings key")
+		t.Fatal("expected an error for a renamed settings key")
 	}
-	if !strings.Contains(err.Error(), `Did you mean "require_overlays"?`) {
+	if !strings.Contains(err.Error(), `Did you mean "require-overlays"?`) {
 		t.Errorf("error %q should suggest the nearest valid key", err)
+	}
+}
+
+// TestLoadKebabSettingsKeys verifies the v2 kebab-case settings keys decode into
+// their fields, guarding the yaml-tag rename from snake_case. The old snake keys
+// are rejected by strict decoding (see TestLoadRejectsUnknownFields), so this
+// pins the accepted spelling on the positive side.
+func TestLoadKebabSettingsKeys(t *testing.T) {
+	t.Parallel()
+
+	body := "environments: [development]\n" +
+		"settings:\n" +
+		"  os-reference-pattern: '@@(.+)@@'\n" +
+		"  reference-pattern: '<<(.+)>>'\n" +
+		"  require-overlays: true\n" +
+		"projects:\n  api:\n    includes: [env/x]\n"
+
+	loaded, err := newManager(t, writeManifest(t, body)).Load()
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	s := loaded.Content.Settings
+	if s.OSReferencePattern == nil || *s.OSReferencePattern != "@@(.+)@@" {
+		t.Errorf("OSReferencePattern = %v, want @@(.+)@@", s.OSReferencePattern)
+	}
+	if s.ReferencePattern == nil || *s.ReferencePattern != "<<(.+)>>" {
+		t.Errorf("ReferencePattern = %v, want <<(.+)>>", s.ReferencePattern)
+	}
+	if s.RequireOverlays == nil || !*s.RequireOverlays {
+		t.Errorf("RequireOverlays = %v, want true", s.RequireOverlays)
 	}
 }
 

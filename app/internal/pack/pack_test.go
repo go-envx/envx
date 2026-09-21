@@ -457,7 +457,7 @@ func TestPackStandardizesManifestAndStoreNames(t *testing.T) {
 	root := t.TempDir()
 	manifest := writeSource(t, root, "config.yaml",
 		"environments: [production]\n"+
-			"secrets:\n  path: private/vault.yaml\n  keys_path: private/envx.keys\n"+
+			"secrets:\n  path: private/vault.yaml\n  keys-path: private/envx.keys\n"+
 			"projects:\n  app:\n    includes: [env/app]\n")
 	writeSource(t, root, "env/app.yaml", "TOKEN: secret://shared/token\n")
 	store := writeSource(t, root, "private/vault.yaml",
@@ -481,12 +481,12 @@ func TestPackStandardizesManifestAndStoreNames(t *testing.T) {
 
 	manifestBody := string(readFile(t, filepath.Join(out, "envx.yaml")))
 	// The explicit secrets path is gone so the default secrets.yaml resolves; the
-	// harmless keys_path is left as declared.
+	// harmless keys-path is left as declared.
 	if strings.Contains(manifestBody, "vault.yaml") {
 		t.Errorf("bundle manifest still declares the source secrets path:\n%s", manifestBody)
 	}
-	if !strings.Contains(manifestBody, "keys_path:") {
-		t.Errorf("bundle manifest dropped keys_path unexpectedly:\n%s", manifestBody)
+	if !strings.Contains(manifestBody, "keys-path:") {
+		t.Errorf("bundle manifest dropped keys-path unexpectedly:\n%s", manifestBody)
 	}
 	// The referenced secret survived into the standardized store.
 	storeBody := string(readFile(t, filepath.Join(out, "secrets.yaml")))
