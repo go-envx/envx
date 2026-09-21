@@ -106,6 +106,28 @@ func projectIncludes(t *testing.T, manifestPath, project string) []string {
 	return doc.Projects[project].Includes
 }
 
+// manifestProjects parses the bundle manifest and returns its declared project
+// names, sorted, so a test can assert unselected projects were pruned.
+func manifestProjects(t *testing.T, manifestPath string) []string {
+	t.Helper()
+	data, err := os.ReadFile(manifestPath) //nolint:gosec // path is test-local.
+	if err != nil {
+		t.Fatal(err)
+	}
+	var doc struct {
+		Projects map[string]yaml.Node `yaml:"projects"`
+	}
+	if err := yaml.Unmarshal(data, &doc); err != nil {
+		t.Fatal(err)
+	}
+	names := make([]string, 0, len(doc.Projects))
+	for name := range doc.Projects {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	return names
+}
+
 // readFile reads a bundle file and fails the test on error.
 func readFile(t *testing.T, path string) []byte {
 	t.Helper()
@@ -425,6 +447,22 @@ func TestPackProjectNarrowsIncludes(t *testing.T) {
 	present(t, out, "web/app.yaml")
 	absent(t, out, "api/app.yaml")
 	absent(t, out, "api/api.yaml")
+}
+
+// TestPackPrunesUnselectedProjectsFromManifest verifies a --project selection
+// drops the unselected projects from the bundle manifest, so it declares only the
+// projects the bundle actually carries.
+func TestPackPrunesUnselectedProjectsFromManifest(t *testing.T) {
+	t.Parallel()
+	_, ws := newWorkspace(t)
+	out := filepath.Join(t.TempDir(), "dist")
+
+	mustPack(t, ws, Params{Projects: []string{"web"}, OutDir: out})
+
+	got := manifestProjects(t, filepath.Join(out, "envx.yaml"))
+	if !equal(got, []string{"web"}) {
+		t.Errorf("bundle manifest projects = %v, want [web]", got)
+	}
 }
 
 // TestPackDuplicatesSharedNamespace verifies a namespace two projects both

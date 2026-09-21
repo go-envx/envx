@@ -12,8 +12,8 @@ import (
 // each selected project's includes are replaced with their "<project>/<stem>"
 // paths under the project's bundle directory, and any explicit secrets store path
 // is dropped so the store resolves to the standardized secrets.yaml at the bundle
-// root. It edits the YAML node tree in place so comments, key order, and
-// formatting survive, and it leaves unselected projects untouched.
+// root. Projects that were not selected are removed entirely. It edits the YAML
+// node tree in place so comments, key order, and formatting survive.
 func rewriteManifest(source []byte, bundles []projectBundle) ([]byte, error) {
 	var doc yaml.Node
 	if err := yaml.Unmarshal(source, &doc); err != nil {
@@ -44,9 +44,9 @@ func rewriteManifest(source []byte, bundles []projectBundle) ([]byte, error) {
 }
 
 // rewriteIncludes replaces every selected project's include entries with their
-// "<project>/<stem>" paths under the project's bundle directory. A project not in
-// bundles (one that was not selected) is left untouched, as is an include entry
-// that has no assigned name.
+// "<project>/<stem>" paths under the project's bundle directory, and drops every
+// project that was not selected so the bundle manifest declares only the projects
+// it actually carries. An include entry with no assigned name is left untouched.
 func rewriteIncludes(root *yaml.Node, bundles []projectBundle) error {
 	projects, _ := yamlx.MappingEntry(root, "projects", false)
 	if projects == nil || projects.Kind != yaml.MappingNode {
@@ -58,10 +58,15 @@ func rewriteIncludes(root *yaml.Node, bundles []projectBundle) error {
 		byName[bundle.name] = bundle
 	}
 
-	for i := 0; i+1 < len(projects.Content); i += 2 {
+	// Walk the project entries back to front so removing an unselected project
+	// never shifts an index still to be visited.
+	for i := len(projects.Content) - 2; i >= 0; i -= 2 {
 		name := projects.Content[i].Value
 		bundle, ok := byName[name]
 		if !ok {
+			// A project the pack did not select carries no files into the bundle, so
+			// drop it from the manifest rather than leaving a dangling declaration.
+			yamlx.RemoveMappingEntry(projects, i)
 			continue
 		}
 		project := projects.Content[i+1]
