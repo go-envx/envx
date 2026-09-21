@@ -33,6 +33,14 @@ checksum:
   name_template: "checksums.txt"
   algorithm: sha256
 
+# Version string baked into the binary (and archive names) for `--snapshot`
+# builds — i.e. the nightly. Snapshot-only: a real release derives its version
+# from the git tag, so this never affects a tagged release. The `-nightly`
+# suffix plus the short commit make `envx --version` self-identify a nightly
+# and point at the exact build for bug reports (the release tag is date-only).
+snapshot:
+  version_template: '{{ incpatch .Version }}-nightly-{{ .Now.Format "20060102" }}'
+
 # Minimal `scratch` image published to GHCR containing only the binary. It is a
 # binary donor: consumers `COPY --from=ghcr.io/go-envx/envx:<tag> /envx ...` into
 # their own images (see ./Dockerfile). Uses buildx to build a multi-arch manifest

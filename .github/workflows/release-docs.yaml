@@ -1,4 +1,4 @@
-name: Deploy Docs 📚
+name: Release docs
 
 # Builds and publishes the documentation site to GitHub Pages. It runs either:
 #   • as part of a release — called by release.yaml via `workflow_call`, so the
