@@ -108,13 +108,18 @@ func (m *Manager) parse(data []byte) (*Manifest, error) {
 		return nil, fmt.Errorf("parsing manifest: %w", err)
 	}
 
-	// Decode the node into the struct, leaving an empty document to fail
-	// validation with a domain error rather than a decode error.
+	// Decode into the struct with strict field checking so a removed, renamed, or
+	// misspelled manifest key fails loudly at load rather than being silently
+	// dropped. The node round-trip above is kept only for indentation detection.
+	// An empty document is left to fail validation with a domain error rather than
+	// a decode error.
 	var manifest schema.Manifest
 	if node.Kind != 0 {
-		if err := node.Decode(&manifest); err != nil {
-			return nil, fmt.Errorf("parsing manifest: %w", err)
+		decoded, err := strictDecode(data)
+		if err != nil {
+			return nil, err
 		}
+		manifest = decoded
 	}
 
 	// Validate the manifest's structural constraints.
