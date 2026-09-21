@@ -8,17 +8,13 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-// rewriteManifest rewrites the manifest so its paths resolve against the flat
-// bundle root: each selected project's includes are replaced with their flat
-// stems, and any explicit secrets store path is dropped so the store resolves to
-// the standardized secrets.yaml beside the manifest. It edits the YAML node tree
-// in place so comments, key order, and formatting survive, and it leaves
-// unselected projects untouched.
-func rewriteManifest(
-	source []byte,
-	includeNames map[string]string,
-	selectedProjects map[string]bool,
-) ([]byte, error) {
+// rewriteManifest rewrites the manifest so its paths resolve against the bundle:
+// each selected project's includes are replaced with their "<project>/<stem>"
+// paths under the project's bundle directory, and any explicit secrets store path
+// is dropped so the store resolves to the standardized secrets.yaml at the bundle
+// root. Projects that were not selected are removed entirely. It edits the YAML
+// node tree in place so comments, key order, and formatting survive.
+func rewriteManifest(source []byte, bundles []projectBundle) ([]byte, error) {
 	var doc yaml.Node
 	if err := yaml.Unmarshal(source, &doc); err != nil {
 		return nil, fmt.Errorf("parsing manifest: %w", err)
@@ -31,7 +27,7 @@ func rewriteManifest(
 		return nil, errors.New("manifest root is not a mapping")
 	}
 
-	if err := rewriteIncludes(root, includeNames, selectedProjects); err != nil {
+	if err := rewriteIncludes(root, bundles); err != nil {
 		return nil, err
 	}
 	dropSecretsPath(root)
@@ -48,21 +44,29 @@ func rewriteManifest(
 }
 
 // rewriteIncludes replaces every selected project's include entries with their
-// assigned flat stems. An include with no assigned name (a project that was not
-// selected, or an entry pack did not plan) is left unchanged.
-func rewriteIncludes(
-	root *yaml.Node,
-	includeNames map[string]string,
-	selectedProjects map[string]bool,
-) error {
+// "<project>/<stem>" paths under the project's bundle directory, and drops every
+// project that was not selected so the bundle manifest declares only the projects
+// it actually carries. An include entry with no assigned name is left untouched.
+func rewriteIncludes(root *yaml.Node, bundles []projectBundle) error {
 	projects, _ := yamlx.MappingEntry(root, "projects", false)
 	if projects == nil || projects.Kind != yaml.MappingNode {
 		return errors.New("manifest has no projects mapping")
 	}
 
-	for i := 0; i+1 < len(projects.Content); i += 2 {
+	byName := make(map[string]projectBundle, len(bundles))
+	for _, bundle := range bundles {
+		byName[bundle.name] = bundle
+	}
+
+	// Walk the project entries back to front so removing an unselected project
+	// never shifts an index still to be visited.
+	for i := len(projects.Content) - 2; i >= 0; i -= 2 {
 		name := projects.Content[i].Value
-		if !selectedProjects[name] {
+		bundle, ok := byName[name]
+		if !ok {
+			// A project the pack did not select carries no files into the bundle, so
+			// drop it from the manifest rather than leaving a dangling declaration.
+			yamlx.RemoveMappingEntry(projects, i)
 			continue
 		}
 		project := projects.Content[i+1]
@@ -71,8 +75,8 @@ func rewriteIncludes(
 			continue
 		}
 		for _, entry := range includes.Content {
-			if flat, ok := includeNames[entry.Value]; ok {
-				yamlx.SetStringScalar(entry, flat)
+			if stem, ok := bundle.names[entry.Value]; ok {
+				yamlx.SetStringScalar(entry, bundle.dir+"/"+stem)
 			}
 		}
 	}
