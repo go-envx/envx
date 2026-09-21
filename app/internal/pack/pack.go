@@ -95,14 +95,15 @@ type copyItem struct {
 	dest string
 }
 
-// Pack selects the environment-scoped file set from ws and writes a flat bundle
-// into p.OutDir: the manifest, each selected namespace's base and selected-env
-// overlay files under flattened names in the bundle root, and the encrypted
-// secrets store. It rewrites the manifest so its includes and secrets path point
-// at the flattened names, excludes the private-key file, and decrypts nothing. It
-// returns the written file set or the first error, having written no output on a
-// selection error. An existing non-empty output directory is refused unless
-// p.Force is set, in which case it is cleared just before the bundle is written.
+// Pack selects the environment-scoped file set from ws and writes a per-project
+// bundle into p.OutDir: one manifest at the bundle root, each selected project's
+// namespace files (base and selected-env overlays) under its own <project>/
+// directory, and a single filtered secrets store at the root. It rewrites the
+// manifest so its includes point at the per-project paths and its secrets path is
+// dropped, excludes the private-key file, and decrypts nothing. It returns the
+// written file set or the first error, having written no output on a selection
+// error. An existing non-empty output directory is refused unless p.Force is set,
+// in which case it is cleared just before the bundle is written.
 func Pack(ws Workspace, p Params) (Result, error) {
 	if strings.TrimSpace(p.OutDir) == "" {
 		return Result{}, errors.New("output directory is required")
@@ -133,45 +134,40 @@ func Pack(ws Workspace, p Params) (Result, error) {
 		return Result{}, err
 	}
 
-	// Discover the distinct namespaces the selected projects reference and the
-	// source files each contributes for the selected environments.
-	includes, err := discoverIncludes(ws.Root, projects, environments)
-	if err != nil {
-		return Result{}, err
-	}
-
-	// Assign each namespace a unique flat filename stem, keeping clear of the
-	// standardized manifest and secrets store names and within the filename-length
-	// limit. The bundle always uses envx's default filenames, whatever the source
-	// workspace called them.
+	// The bundle always uses envx's default filenames, whatever the source
+	// workspace called them. Reserve those names (and their stems) so no project
+	// directory collides with a root bundle file.
 	manifestName := bundleManifestName
 	secretsName := ""
 	if ws.SecretsPath != "" && exists(ws.SecretsPath) {
 		secretsName = bundleSecretsName
 	}
-	reserved := []string{stemOf(manifestName)}
+	reserved := []string{manifestName, stemOf(manifestName)}
 	if secretsName != "" {
-		reserved = append(reserved, stemOf(secretsName))
+		reserved = append(reserved, secretsName, stemOf(secretsName))
 	}
-	names, err := assignFlatNames(includes, reserved)
+	dirs, err := assignProjectDirs(projects, reserved)
 	if err != nil {
 		return Result{}, err
 	}
 
-	// Build the flat copy plan for the namespace files.
-	items := planFiles(includes, names)
+	// Discover each project's namespaces and the source files each contributes for
+	// the selected environments, and assign filenames within the project directory.
+	bundles, err := planProjects(ws.Root, projects, environments, dirs)
+	if err != nil {
+		return Result{}, err
+	}
 
-	// Rewrite the manifest so its includes and secrets path resolve against the
-	// flat bundle root.
+	// Build the per-project copy plan for the namespace files.
+	items := planFiles(bundles)
+
+	// Rewrite the manifest so each project's includes resolve against its bundle
+	// directory and any explicit secrets path is dropped.
 	manifestData, err := file.Read(ws.ManifestPath)
 	if err != nil {
 		return Result{}, fmt.Errorf("reading manifest %s: %w", ws.ManifestPath, err)
 	}
-	selectedProjects := make(map[string]bool, len(projects))
-	for _, project := range projects {
-		selectedProjects[project.Name] = true
-	}
-	rewritten, err := rewriteManifest(manifestData, names, selectedProjects)
+	rewritten, err := rewriteManifest(manifestData, bundles)
 	if err != nil {
 		return Result{}, err
 	}
@@ -198,11 +194,12 @@ func Pack(ws Workspace, p Params) (Result, error) {
 		written = append(written, item.dest)
 	}
 
-	// Copy only the secrets the selected environments reference, dropping every
-	// public key so the bundle is run-only. A workspace with no referenced secret
-	// carries no store at all.
+	// Copy only the secrets the selected projects' namespaces reference, dropping
+	// every public key so the bundle is run-only. The store stays a single shared
+	// file at the bundle root, filtered to the union of the selected projects'
+	// references; a workspace with no referenced secret carries no store at all.
 	if secretsName != "" {
-		referenced, err := scanReferences(includes)
+		referenced, err := scanReferences(allIncludeFiles(bundles))
 		if err != nil {
 			return Result{}, err
 		}
@@ -230,68 +227,110 @@ func Pack(ws Workspace, p Params) (Result, error) {
 	}, nil
 }
 
-// discoverIncludes collects the distinct namespaces the selected projects
-// reference and, for each, the base file and the existing overlay files for the
-// selected environments. A namespace shared by two projects is discovered once.
-// An include that matches no file on disk is a hard error, so a manifest typo
-// cannot ship a bundle missing a namespace.
-func discoverIncludes(
-	root string, projects []Project, environments []string,
+// planProjects discovers each selected project's namespaces and assigns their
+// filenames within the project's bundle directory. Discovery is per project: a
+// namespace two projects both include is discovered — and later copied — into each
+// project's directory, so the bundle keeps no cross-project shared-file concept.
+func planProjects(
+	root string, projects []Project, environments []string, dirs map[string]string,
+) ([]projectBundle, error) {
+	bundles := make([]projectBundle, 0, len(projects))
+	for _, project := range projects {
+		includes, err := discoverProjectIncludes(root, project, environments)
+		if err != nil {
+			return nil, err
+		}
+		names, err := assignProjectNames(includes)
+		if err != nil {
+			return nil, err
+		}
+		bundles = append(bundles, projectBundle{
+			name:     project.Name,
+			dir:      dirs[project.Name],
+			includes: includes,
+			names:    names,
+		})
+	}
+	return bundles, nil
+}
+
+// discoverProjectIncludes collects one project's namespaces and, for each, the
+// base file and the existing overlay files for the selected environments. A
+// namespace listed twice in the same project is discovered once. An include that
+// matches no file on disk is a hard error, so a manifest typo cannot ship a
+// bundle missing a namespace.
+func discoverProjectIncludes(
+	root string, project Project, environments []string,
 ) ([]includeFiles, error) {
 	seen := make(map[string]struct{})
 	var includes []includeFiles
 
-	for _, project := range projects {
-		for _, include := range project.Includes {
-			if _, ok := seen[include]; ok {
-				continue
-			}
-			seen[include] = struct{}{}
-
-			prefix := filepath.Join(root, include)
-			files := includeFiles{rel: include}
-
-			if base := prefix + ".yaml"; exists(base) {
-				files.base = base
-			}
-			for _, env := range environments {
-				overlay := prefix + "." + env + ".yaml"
-				if exists(overlay) {
-					files.overlays = append(files.overlays, overlayFile{env: env, src: overlay})
-				}
-			}
-
-			if files.base == "" && len(files.overlays) == 0 {
-				return nil, fmt.Errorf(
-					"include %q in project %q matches no base file or selected overlay",
-					include, project.Name,
-				)
-			}
-			includes = append(includes, files)
+	for _, include := range project.Includes {
+		if _, ok := seen[include]; ok {
+			continue
 		}
+		seen[include] = struct{}{}
+
+		prefix := filepath.Join(root, include)
+		files := includeFiles{rel: include}
+
+		if base := prefix + ".yaml"; exists(base) {
+			files.base = base
+		}
+		for _, env := range environments {
+			overlay := prefix + "." + env + ".yaml"
+			if exists(overlay) {
+				files.overlays = append(files.overlays, overlayFile{env: env, src: overlay})
+			}
+		}
+
+		if files.base == "" && len(files.overlays) == 0 {
+			return nil, fmt.Errorf(
+				"include %q in project %q matches no base file or selected overlay",
+				include, project.Name,
+			)
+		}
+		includes = append(includes, files)
 	}
 	return includes, nil
 }
 
-// planFiles turns the discovered namespaces and their assigned flat stems into
-// the ordered copy plan: each namespace's base file as "<stem>.yaml" and each
-// overlay as "<stem>.<env>.yaml". The secrets store is handled separately because
-// pack filters it rather than copying it verbatim.
-func planFiles(includes []includeFiles, names map[string]string) []copyItem {
+// planFiles turns the per-project bundles into the ordered copy plan: each
+// namespace's base file as "<project>/<stem>.yaml" and each overlay as
+// "<project>/<stem>.<env>.yaml". Destinations use "/" so the bundle-relative
+// paths render and compare uniformly across platforms. The secrets store is
+// handled separately because pack filters it rather than copying it verbatim.
+func planFiles(bundles []projectBundle) []copyItem {
 	var items []copyItem
-	for _, include := range includes {
-		stem := names[include.rel]
-		if include.base != "" {
-			items = append(items, copyItem{src: include.base, dest: stem + ".yaml"})
-		}
-		for _, overlay := range include.overlays {
-			items = append(items, copyItem{
-				src:  overlay.src,
-				dest: stem + "." + overlay.env + ".yaml",
-			})
+	for _, bundle := range bundles {
+		for _, include := range bundle.includes {
+			stem := bundle.names[include.rel]
+			if include.base != "" {
+				items = append(items, copyItem{
+					src:  include.base,
+					dest: bundle.dir + "/" + stem + ".yaml",
+				})
+			}
+			for _, overlay := range include.overlays {
+				items = append(items, copyItem{
+					src:  overlay.src,
+					dest: bundle.dir + "/" + stem + "." + overlay.env + ".yaml",
+				})
+			}
 		}
 	}
 	return items
+}
+
+// allIncludeFiles flattens every bundle's namespaces into one slice, for scanning
+// the union of the selected projects' secret references. Duplicates from a shared
+// namespace are harmless: scanReferences de-duplicates by reference.
+func allIncludeFiles(bundles []projectBundle) []includeFiles {
+	var all []includeFiles
+	for _, bundle := range bundles {
+		all = append(all, bundle.includes...)
+	}
+	return all
 }
 
 // selectValues resolves a requested subset against the declared set, preserving
@@ -362,7 +401,7 @@ func selectProjects(declared []Project, requested []string) ([]Project, error) {
 }
 
 // stemOf returns a filename without its ".yaml" extension, used to reserve the
-// manifest and secrets store names so no namespace flattens onto them.
+// manifest and secrets store names so no project directory collides with them.
 func stemOf(name string) string {
 	return strings.TrimSuffix(name, ".yaml")
 }

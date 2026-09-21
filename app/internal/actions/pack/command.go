@@ -25,13 +25,17 @@ const (
 
 		-e/--env is repeatable and selects one or more environments (default: all
 		declared), so a single bundle can serve several environments — the container
-		picks one at start with 'envx run --config <dir>/envx.yaml --env production'.
-		--project narrows which projects' includes are copied (default: all).
+		picks one at start with 'envx run api --env production --config
+		<dir>/envx.yaml'. --project narrows which projects are copied (default: all).
 
-		The bundle is flat: every namespace file is written directly in the output
-		directory under its include's final segment (env/postgres becomes
-		postgres.yaml) and the manifest's includes are rewritten to match, so there
-		is no nested directory structure to carry into a container.
+		The bundle uses a per-project layout: each project gets its own <project>/
+		directory holding every namespace file it includes, and the manifest's
+		includes are rewritten to <project>/<name> to match. A file two projects both
+		include is copied into each directory; the secrets store stays a single
+		secrets.yaml at the bundle root, filtered to the union of the selected
+		projects' references. Because the store lives at the root, a project directory
+		is not runnable on its own — for per-project secret isolation, run pack once
+		per project into a separate output.
 
 		An existing, non-empty --out directory is refused so a bundle never merges
 		into stale files; pass --force to clear it and pack fresh.

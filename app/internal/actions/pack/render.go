@@ -32,18 +32,20 @@ func summary(result engine.Result) string {
 	}
 	lines = append(lines,
 		"",
-		"Run one of the packed environments:",
+		"Run one of the packed projects:",
 		fmt.Sprintf(
-			"  envx run --config %s --env %s -- <command>",
-			filepath.Join(result.OutDir, result.ManifestFile),
+			"  envx run %s --env %s --config %s -- <command>",
+			firstOr(result.Projects, "<project>"),
 			firstOr(result.Environments, "<env>"),
+			filepath.Join(result.OutDir, result.ManifestFile),
 		),
 	)
 	return strings.Join(lines, "\n")
 }
 
 // firstOr returns the first element of values, or fallback when values is empty,
-// so the run hint always names a concrete environment when one exists.
+// so the run hint names a concrete project and environment when one exists and a
+// placeholder otherwise.
 func firstOr(values []string, fallback string) string {
 	if len(values) == 0 {
 		return fallback
