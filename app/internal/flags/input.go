@@ -18,7 +18,6 @@ func GetInput(fs *pflag.FlagSet) *config.Input {
 		Prefix:             optString(fs, &schema.Prefix),
 		Suffix:             optString(fs, &schema.Suffix),
 		Delimiter:          optString(fs, &schema.Delimiter),
-		NamespacePrefix:    optBool(fs, &schema.NamespacePrefix),
 		Overload:           optBool(fs, &schema.Overload),
 		ReferencePattern:   optString(fs, &schema.ReferencePattern),
 		OSReferencePattern: optString(fs, &schema.OSReferencePattern),

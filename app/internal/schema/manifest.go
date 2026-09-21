@@ -65,8 +65,6 @@ type Settings struct {
 	Delimiter *string `yaml:"delimiter"`
 	// Env is the target environment to load.
 	Env *string `yaml:"env"`
-	// NamespacePrefix prefixes each key with its namespace name, if true.
-	NamespacePrefix *bool `yaml:"namespace_prefix"`
 	// OSReferencePattern overrides the {{@VAR}} OS-reference syntax with a regex.
 	OSReferencePattern *string `yaml:"os_reference_pattern"`
 	// Overload lets file values override existing OS env vars, if true.

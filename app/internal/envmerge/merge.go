@@ -118,8 +118,7 @@ func (m *Manager) mergeLoaded(
 
 // loadNamespace layers one namespace's optional environment overlay over its
 // pre-loaded base, flattens the overlay, and integrates the unresolved result
-// into the running values/origins maps. The namespace prefix is applied here,
-// while the base name is available.
+// into the running values/origins maps.
 func loadNamespace(
 	ns loadedNamespace, environment string, settings Settings, state *mergeState,
 ) error {
@@ -151,9 +150,6 @@ func loadNamespace(
 	envKeys := flattenKeys(envMap)
 	for key, value := range flat {
 		finalKey := key
-		if settings.NamespacePrefix {
-			finalKey = toEnvKey(ns.name) + "_" + key
-		}
 
 		sources := namespaceSources(key, ns.baseFile, envFile, ns.baseKeys, envKeys)
 		integrateSources(state, finalKey, sources)

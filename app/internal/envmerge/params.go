@@ -69,8 +69,6 @@ type Settings struct {
 	// Delimiter joins a list-valued leaf into one string; an empty value means
 	// the default (",") that normalizeParams applies.
 	Delimiter string
-	// NamespacePrefix prefixes each resolved key with its namespace name.
-	NamespacePrefix bool
 	// Overload controls source selection against the OS environment: false
 	// (default) lets an OS value override a namespace key, true lets the namespace
 	// value win. It mirrors exactly the precedence a run child process sees.

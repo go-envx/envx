@@ -46,8 +46,6 @@ type Input struct {
 	Suffix *string
 	// Delimiter is the explicitly requested list-join delimiter.
 	Delimiter *string
-	// NamespacePrefix, when set, prefixes each key with its namespace.
-	NamespacePrefix *bool
 	// Overload, when set, lets file values win over existing OS env vars.
 	Overload *bool
 	// ReferencePattern is the explicitly requested {{VAR}} reference-syntax regex.
@@ -299,11 +297,6 @@ func resolveEnvmergeParams(
 				in.Delimiter,
 				proj.Delimiter,
 				global.Delimiter,
-			),
-			NamespacePrefix: precedenceBool(&schema.NamespacePrefix,
-				in.NamespacePrefix,
-				proj.NamespacePrefix,
-				global.NamespacePrefix,
 			),
 			Overload: precedenceBool(&schema.Overload,
 				in.Overload,
