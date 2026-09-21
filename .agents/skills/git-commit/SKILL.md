@@ -31,7 +31,7 @@ If you find yourself reaching for a `## Summary` heading, stop: that content is 
 6. Push: `git push -u origin <branch>`.
 7. Open the PR with **title = the commit subject** and **body = the commit body** (plain text).
 8. If there is review scaffolding (test plan, QA steps, screenshots, reviewer guidance, open questions), post it as a **separate PR comment** — never in the body.
-9. Present the commands for confirmation before running anything that pushes or creates a PR. Do not push or open the PR unprompted.
+9. Present the commands for confirmation before running anything that pushes or creates a PR unless the user has already explicitly authorized those actions. When the user explicitly requests publication, push and open the PR in the same workflow without pausing for another confirmation.
 
 ## The message is the commit
 
@@ -112,7 +112,7 @@ Closes #123
 EOF
 ```
 
-Present the title, the body, and the exact command(s) for the user to confirm before running.
+Present the title, the body, and the exact command(s) for the user to confirm before running when publication has not already been explicitly authorized.
 
 ## Flags to suggest when relevant
 
@@ -137,4 +137,4 @@ EOF
 - Never commit directly to `main`/`master`; branch first.
 - One logical change per PR — a squash merge is one commit, so a PR should be one thing.
 - Never force-push without explicit instruction.
-- Confirm before pushing or opening the PR.
+- Confirm before pushing or opening the PR unless the user has explicitly requested those actions.
