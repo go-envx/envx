@@ -1,8 +1,8 @@
-name: Release docs
+name: Release (docs) 📜
 
 # Builds and publishes the documentation site to GitHub Pages. It runs either:
-#   • as part of a release — called by release.yaml via `workflow_call`, so the
-#     site is deployed in lockstep with a version, or
+#   • as part of a release — called by release-published.yaml via `workflow_call`,
+#     so the site is deployed in lockstep with a published version, or
 #   • on demand — `workflow_dispatch` from the Actions tab, for a docs-only fix
 #     between releases (built from the branch/tag you select).
 on:
