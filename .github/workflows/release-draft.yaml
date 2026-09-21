@@ -1,0 +1,107 @@
+name: Release (draft) 🚀
+
+# Cuts a DRAFT release MANUALLY from the Actions tab. Nothing is public here: you
+# review and test the draft, then click "Publish" in the GitHub UI. Publishing
+# creates the immutable `vX.Y.Z` tag, which triggers release-published.yaml to
+# push the container image + module tag and deploy docs.
+#
+# The version is derived by `svu` — the next semver from Conventional Commits
+# since the last release; drive a major bump with a `feat!:` / `BREAKING CHANGE:`
+# commit. The draft itself is the preview and the review gate — mis-cut a release
+# and you just discard the draft and re-run.
+on:
+  workflow_dispatch:
+
+# Never build two drafts at once.
+concurrency:
+  group: release-draft
+  cancel-in-progress: false
+
+# Least-privilege default; the job elevates only what it needs.
+permissions:
+  contents: read
+
+jobs:
+  # ─────────────────────────────────────────────────────────────
+  # Draft: resolve version, build binaries + changelog, create a DRAFT release
+  # ─────────────────────────────────────────────────────────────
+  draft:
+    name: Draft release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # create the draft GitHub release (no tag is pushed)
+    defaults:
+      run:
+        working-directory: app
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      GH_REPO: ${{ github.repository }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0 # full history + tags for svu and the changelog
+      - name: Setup tools
+        uses: jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c # v4.3.0
+        with:
+          install_args: go goreleaser svu
+      # Derive the version: svu computes the next semver from Conventional Commits
+      # since the last release. If nothing qualifies (next == current), stop —
+      # there is nothing to release.
+      - name: Resolve version
+        run: |
+          current="$(svu current 2>/dev/null || echo v0.0.0)"; current="${current#v}"
+          next="$(svu next)"; next="${next#v}"
+          if [ "$next" = "$current" ]; then
+            echo "::error::No qualifying commits since v${current} — nothing to release."
+            exit 1
+          fi
+          echo "svu resolved: v${current} -> v${next}"
+          echo "VERSION=${next}" >> "$GITHUB_ENV"
+      # A draft is safe to rebuild. Refuse only if a REAL release already exists
+      # for this version; otherwise clear any leftover draft so GoReleaser can
+      # recreate it cleanly (a draft has no tag, so nothing on the remote is
+      # deleted).
+      - name: Guard against an existing release
+        run: |
+          if gh release view "v${VERSION}" --json isDraft --jq .isDraft >/dev/null 2>&1; then
+            if [ "$(gh release view "v${VERSION}" --json isDraft --jq .isDraft)" = "true" ]; then
+              echo "Removing the existing draft v${VERSION} so it can be rebuilt."
+              gh release delete "v${VERSION}" --yes
+            else
+              echo "::error::A published release v${VERSION} already exists — aborting."
+              exit 1
+            fi
+          fi
+      # Create the tag GoReleaser derives the version from, but do NOT push it.
+      # GitHub creates the real tag (at the commit in `target_commitish`) only
+      # when you publish the draft, so nothing is locked under immutable releases
+      # yet. Guarded for re-runs on the same runner.
+      - name: Create local release tag
+        run: |
+          if git rev-parse -q --verify "refs/tags/v${VERSION}" >/dev/null; then
+            echo "Local tag v${VERSION} already exists; skipping create."
+          else
+            git tag -a "v${VERSION}" -m "v${VERSION}"
+          fi
+      # Build binaries + changelog and create the DRAFT release (release.draft is
+      # true in .goreleaser.yaml). `--skip=docker` defers the container image to
+      # release-published.yaml — no image is pushed for a draft you might discard.
+      - name: Build draft release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_DISABLE: "false" # create the draft release (see .goreleaser.yaml)
+        run: goreleaser release --clean --skip=docker
+      - name: Summary
+        env:
+          RELEASES_URL: ${{ github.server_url }}/${{ github.repository }}/releases
+        run: |
+          {
+            echo "## Draft release ready for review"
+            echo ""
+            echo "- **Version:** \`v${VERSION}\` (draft — not yet public)"
+            echo "- **Next:** review the assets + changelog, download a binary to test, then **Publish** the draft."
+            echo "- Publishing creates the \`v${VERSION}\` tag and triggers the image build, module tag, and docs deploy."
+            echo ""
+            echo "[Open drafts →](${RELEASES_URL})"
+          } >> "$GITHUB_STEP_SUMMARY"

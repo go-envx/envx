@@ -33,14 +33,6 @@ checksum:
   name_template: "checksums.txt"
   algorithm: sha256
 
-# Version string baked into the binary (and archive names) for `--snapshot`
-# builds — i.e. the nightly. Snapshot-only: a real release derives its version
-# from the git tag, so this never affects a tagged release. The `-nightly`
-# suffix plus the short commit make `envx --version` self-identify a nightly
-# and point at the exact build for bug reports (the release tag is date-only).
-snapshot:
-  version_template: '{{ incpatch .Version }}-nightly-{{ .Now.Format "20060102" }}'
-
 # Minimal `scratch` image published to GHCR containing only the binary. It is a
 # binary donor: consumers `COPY --from=ghcr.io/go-envx/envx:<tag> /envx ...` into
 # their own images (see ./Dockerfile). Uses buildx to build a multi-arch manifest
@@ -83,7 +75,22 @@ changelog:
     - title: "🔧 Maintenance"
       order: 999
 
+# Releases are cut as DRAFTS (see .github/workflows/release-draft.yaml): GoReleaser
+# builds the binaries + changelog and creates a DRAFT GitHub release, but does
+# NOT push the git tag. You review and test the draft, then click "Publish" in
+# the GitHub UI — that is what creates the immutable tag and makes the release
+# public. Nothing is public (no tag, no image, no docs) until you publish.
+#
+# `disable` is toggled by the RELEASE_DISABLE env var so the SAME config serves
+# two phases: the draft build leaves it "false" (create the draft release),
+# while the post-publish image build (release-published.yaml) sets it "true" so
+# GoReleaser pushes ONLY the container image and never tries to modify the
+# already-published — and now immutable — release.
 release:
-  draft: false
+  draft: true
+  disable: '{{ envOrDefault "RELEASE_DISABLE" "false" }}'
   prerelease: auto
+  # A draft's tag isn't pushed, so tell GitHub which commit to tag when the
+  # draft is published.
+  target_commitish: "{{ .FullCommit }}"
   name_template: "v{{ .Version }}"
