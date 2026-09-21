@@ -11,7 +11,7 @@ import (
 
 // namespace identifies one namespace to load. It resolves to up to two files:
 //   - base:    <dir>/<name>.yaml       (required — defines the namespace)
-//   - overlay: <dir>/<name>.<env>.yaml (optional unless require_overlays)
+//   - overlay: <dir>/<name>.<env>.yaml (optional unless require-overlays)
 type namespace struct {
 	// dir is the absolute directory holding the namespace's YAML files.
 	dir string

@@ -1,7 +1,7 @@
 environments: [development, production]
 secrets:
   path: ./private/secrets.yaml
-  keys_path: ./private/envx.keys
+  keys-path: ./private/envx.keys
   cipher: age
 projects:
   api:
