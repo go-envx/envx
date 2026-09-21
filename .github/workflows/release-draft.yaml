@@ -82,6 +82,8 @@ jobs:
           if git rev-parse -q --verify "refs/tags/v${VERSION}" >/dev/null; then
             echo "Local tag v${VERSION} already exists; skipping create."
           else
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
             git tag -a "v${VERSION}" -m "v${VERSION}"
           fi
       # Build binaries + changelog and create the DRAFT release (release.draft is
