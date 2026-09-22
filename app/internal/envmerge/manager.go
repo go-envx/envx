@@ -3,6 +3,8 @@ package envmerge
 import (
 	"fmt"
 	"slices"
+
+	"github.com/go-envx/envx/app/internal/features/env/syntax"
 )
 
 // Manager binds validated merge configuration without loading namespace files,
@@ -16,7 +18,7 @@ type Manager struct {
 	// grammar is the compiled reference syntax, built once at construction from the
 	// configured (or default) reference patterns so an invalid pattern fails here
 	// rather than mid-operation.
-	grammar *grammar
+	grammar *syntax.Grammar
 }
 
 // New validates structural settings, applies terminal defaults, and privately
@@ -29,7 +31,9 @@ func New(params Params) (*Manager, error) {
 	if err != nil {
 		return nil, err
 	}
-	grammar, err := newGrammar(normalized.Settings.ReferencePattern)
+	grammar, err := syntax.NewGrammar(syntax.GrammarParams{
+		ReferencePattern: normalized.Settings.ReferencePattern,
+	})
 	if err != nil {
 		return nil, err
 	}

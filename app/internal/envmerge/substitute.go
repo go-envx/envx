@@ -5,28 +5,9 @@ import (
 	"fmt"
 	"slices"
 	"strings"
+
+	"github.com/go-envx/envx/app/internal/features/env/syntax"
 )
-
-// tokenKind classifies a span produced by the tokenizer.
-type tokenKind int
-
-const (
-	// tokenLiteral is verbatim text carried through untouched.
-	tokenLiteral tokenKind = iota
-	// tokenReference is a {{VAR}} reference to a variable in the composed
-	// environment.
-	tokenReference
-)
-
-// token is one span of a scanned value: literal text, or a reference whose text
-// is the trimmed variable name.
-type token struct {
-	// kind classifies the span.
-	kind tokenKind
-	// text is literal content for a literal span, or the variable name for a
-	// reference span.
-	text string
-}
 
 // substitutionStatus classifies whether a variable resolves, without exposing its
 // composed value.
@@ -114,7 +95,7 @@ type rawEntry struct {
 // regardless of fan-in, and a visiting stack detects cycles.
 type substituter struct {
 	// grammar is the compiled reference syntax the engine tokenizes values with.
-	grammar *grammar
+	grammar *syntax.Grammar
 	// symbols is the engine's view of the namespace.
 	symbols symbolTable
 	// getenv reads an OS variable, reporting whether it is set.
@@ -146,14 +127,14 @@ func newSubstituter(
 		opaque:   func(string) bool { return false },
 		value:    func(name string) (string, error) { return table[name], nil },
 	}
-	return newSymbolSubstituter(defaultGrammar, symbols, getenv, overload)
+	return newSymbolSubstituter(syntax.DefaultGrammar, symbols, getenv, overload)
 }
 
 // newSymbolSubstituter builds an engine over an arbitrary symbol table and the
 // caller's reference grammar, so a caller can supply lazy, reveal-gated resolution
 // and opacity alongside a workspace's configured reference syntax.
 func newSymbolSubstituter(
-	grammar *grammar,
+	grammar *syntax.Grammar,
 	symbols symbolTable,
 	getenv func(name string) (string, bool),
 	overload bool,
@@ -233,12 +214,12 @@ func (s *substituter) status(key string) substitutionStatus {
 // reference to key.
 func (s *substituter) compose(value, key string) (string, error) {
 	var b strings.Builder
-	for _, tok := range s.grammar.tokenize(value) {
-		switch tok.kind {
-		case tokenLiteral:
-			b.WriteString(tok.text)
-		case tokenReference:
-			resolved, err := s.reference(tok.text, key)
+	for _, tok := range s.grammar.Tokenize(value) {
+		switch tok.Kind {
+		case syntax.TokenLiteral:
+			b.WriteString(tok.Text)
+		case syntax.TokenReference:
+			resolved, err := s.reference(tok.Text, key)
 			if err != nil {
 				return "", err
 			}

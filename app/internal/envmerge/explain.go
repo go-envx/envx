@@ -197,8 +197,8 @@ func diagnoseEntry(
 	diagnoser ValueDiagnoser, engine *substituter,
 	environment, delimiter string, reveal bool,
 ) Resolution {
-	refs := engine.grammar.hasReferences(literal)
-	if !value.opaque && (refs || engine.grammar.hasEscape(literal)) {
+	refs := engine.grammar.HasReferences(literal)
+	if !value.opaque && (refs || engine.grammar.HasEscape(literal)) {
 		return diagnoseSubstitution(engine, key, reveal, refs)
 	}
 	return diagnoseLeaf(value, diagnoser, environment, delimiter, reveal)

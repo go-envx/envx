@@ -2,7 +2,6 @@ package envmerge
 
 import (
 	"path/filepath"
-	"strings"
 	"testing"
 
 	"github.com/go-envx/envx/app/internal/shared/status"
@@ -22,86 +21,6 @@ func customPatternManager(
 			ReferencePattern: `\$\{([^}]*)\}`,
 		},
 	})
-}
-
-// TestNewGrammarDefaults verifies an empty pattern falls back to the built-in
-// grammar, tokenizing {{VAR}} exactly as the default constant does.
-func TestNewGrammarDefaults(t *testing.T) {
-	t.Parallel()
-
-	g, err := newGrammar("")
-	if err != nil {
-		t.Fatalf("newGrammar(default): %v", err)
-	}
-
-	got := g.tokenize("{{SCHEME}}://{{HOST}}")
-	want := []token{
-		{tokenReference, "SCHEME"},
-		{tokenLiteral, "://"},
-		{tokenReference, "HOST"},
-	}
-	if len(got) != len(want) {
-		t.Fatalf("tokenize = %v, want %v", got, want)
-	}
-	for i := range got {
-		if got[i] != want[i] {
-			t.Errorf("token[%d] = %v, want %v", i, got[i], want[i])
-		}
-	}
-}
-
-// TestNewGrammarCustomPattern verifies a workspace can redefine the reference
-// syntax and the engine composes values through the custom grammar.
-func TestNewGrammarCustomPattern(t *testing.T) {
-	t.Parallel()
-
-	// Redefine references as ${VAR}.
-	g, err := newGrammar(`\$\{([^}]*)\}`)
-	if err != nil {
-		t.Fatalf("newGrammar(custom): %v", err)
-	}
-
-	got := g.tokenize("${SCHEME}://${HOST}")
-	want := []token{
-		{tokenReference, "SCHEME"},
-		{tokenLiteral, "://"},
-		{tokenReference, "HOST"},
-	}
-	if len(got) != len(want) {
-		t.Fatalf("tokenize = %v, want %v", got, want)
-	}
-	for i := range got {
-		if got[i] != want[i] {
-			t.Errorf("token[%d] = %v, want %v", i, got[i], want[i])
-		}
-	}
-
-	// The default {{VAR}} syntax is inert under the custom grammar.
-	if refs := g.hasReferences("{{SCHEME}}"); refs {
-		t.Error("default {{VAR}} should not tokenize under a custom grammar")
-	}
-}
-
-// TestNewGrammarInvalidPattern verifies an uncompilable pattern is a clear error
-// naming the reference pattern, so it fails at config time rather than at use.
-func TestNewGrammarInvalidPattern(t *testing.T) {
-	t.Parallel()
-
-	if _, err := newGrammar(`(unterminated`); err == nil ||
-		!strings.Contains(err.Error(), "reference pattern") {
-		t.Errorf("pattern error = %v, want a reference pattern error", err)
-	}
-}
-
-// TestNewGrammarMissingCaptureGroup verifies a pattern without a capture group is
-// rejected, since the engine reads the variable name from the first group.
-func TestNewGrammarMissingCaptureGroup(t *testing.T) {
-	t.Parallel()
-
-	if _, err := newGrammar(`\{\{[^}]*\}\}`); err == nil ||
-		!strings.Contains(err.Error(), "capture group") {
-		t.Errorf("error = %v, want a missing-capture-group error", err)
-	}
 }
 
 // TestCustomGrammarResolvesThroughManager verifies a Manager built with a custom
