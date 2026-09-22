@@ -9,7 +9,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/go-envx/envx/app/pkg/file"
+	"github.com/go-envx/envx/app/internal/utils/file"
 )
 
 // templatesFS embeds the create templates. Each subdirectory of templates/ is one

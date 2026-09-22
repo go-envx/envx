@@ -9,7 +9,7 @@ import (
 	"strings"
 
 	"github.com/go-envx/envx/app/internal/secrets"
-	"github.com/go-envx/envx/app/pkg/file"
+	"github.com/go-envx/envx/app/internal/utils/file"
 )
 
 // defaultIndent is the block indentation applied to a rewritten manifest whose

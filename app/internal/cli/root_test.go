@@ -10,7 +10,7 @@ import (
 	"testing"
 
 	"github.com/go-envx/envx/app/internal/fixtures"
-	"github.com/go-envx/envx/app/pkg/file"
+	"github.com/go-envx/envx/app/internal/utils/file"
 )
 
 // execCmd builds a root command wired to fresh stdout/stderr buffers, sets the

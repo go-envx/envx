@@ -5,7 +5,7 @@ import (
 
 	"gopkg.in/yaml.v3"
 
-	"github.com/go-envx/envx/app/pkg/file"
+	"github.com/go-envx/envx/app/internal/utils/file"
 )
 
 // loadYAML reads and unmarshals a YAML file into a generic map. It returns a

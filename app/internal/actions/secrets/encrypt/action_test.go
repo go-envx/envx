@@ -9,7 +9,7 @@ import (
 
 	"github.com/go-envx/envx/app/internal/config"
 	"github.com/go-envx/envx/app/internal/secrets"
-	"github.com/go-envx/envx/app/pkg/file"
+	"github.com/go-envx/envx/app/internal/utils/file"
 )
 
 // writeManifest creates a valid workspace manifest for encrypt action tests.

@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/go-envx/envx/app/pkg/file"
+	"github.com/go-envx/envx/app/internal/utils/file"
 	"github.com/go-envx/envx/app/pkg/yamlx"
 	"gopkg.in/yaml.v3"
 )

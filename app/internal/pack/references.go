@@ -4,7 +4,7 @@ import (
 	"fmt"
 
 	"github.com/go-envx/envx/app/internal/secrets"
-	"github.com/go-envx/envx/app/pkg/file"
+	"github.com/go-envx/envx/app/internal/utils/file"
 	"gopkg.in/yaml.v3"
 )
 

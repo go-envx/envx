@@ -12,7 +12,7 @@ import (
 	"github.com/go-envx/envx/app/internal/privatekey"
 	"github.com/go-envx/envx/app/internal/secrets/internal/envelope"
 	"github.com/go-envx/envx/app/internal/secrets/internal/store"
-	"github.com/go-envx/envx/app/pkg/file"
+	"github.com/go-envx/envx/app/internal/utils/file"
 )
 
 // GenerateKeypair creates a missing group identity and commits its public key
