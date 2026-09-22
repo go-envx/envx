@@ -13,7 +13,7 @@ import (
 	"github.com/go-envx/envx/app/internal/config"
 	engine "github.com/go-envx/envx/app/internal/emit"
 	"github.com/go-envx/envx/app/internal/fixtures"
-	"github.com/go-envx/envx/app/internal/printer"
+	"github.com/go-envx/envx/app/internal/utils/printer"
 )
 
 // discardPrinter returns a Printer whose streams are discarded, for the cases

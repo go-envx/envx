@@ -3,8 +3,8 @@ package validate
 import (
 	"fmt"
 
-	"github.com/go-envx/envx/app/internal/printer"
 	"github.com/go-envx/envx/app/internal/style"
+	"github.com/go-envx/envx/app/internal/utils/printer"
 	engine "github.com/go-envx/envx/app/internal/validate"
 )
 

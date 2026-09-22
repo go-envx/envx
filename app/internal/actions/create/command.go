@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/go-envx/envx/app/internal/printer"
+	"github.com/go-envx/envx/app/internal/utils/printer"
 	"github.com/go-envx/envx/app/internal/utils/str"
 	"github.com/spf13/cobra"
 )

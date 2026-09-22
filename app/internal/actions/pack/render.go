@@ -6,7 +6,7 @@ import (
 	"strings"
 
 	engine "github.com/go-envx/envx/app/internal/pack"
-	"github.com/go-envx/envx/app/internal/printer"
+	"github.com/go-envx/envx/app/internal/utils/printer"
 )
 
 // render writes a human summary of a completed pack through the shared printer:

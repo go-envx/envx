@@ -5,8 +5,8 @@ import (
 
 	"github.com/go-envx/envx/app/internal/config"
 	"github.com/go-envx/envx/app/internal/envmerge"
-	"github.com/go-envx/envx/app/internal/printer"
 	"github.com/go-envx/envx/app/internal/runner"
+	"github.com/go-envx/envx/app/internal/utils/printer"
 )
 
 // actionParams are the positional inputs to the run action.
