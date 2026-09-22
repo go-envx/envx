@@ -124,7 +124,6 @@ func NewCommand() *cobra.Command {
 		flags.WithDelimiter,
 		flags.WithOverload,
 		flags.WithReferencePattern,
-		flags.WithOSReferencePattern,
 	)
 
 	flags.BindString(cmd.Flags(), &target, &schema.EmitTarget)

@@ -6,8 +6,8 @@ import (
 )
 
 // getenv returns a getenv seam backed by the injected OS-environment snapshot, so
-// a {{@VAR}} reference resolves against the same environment used for source
-// selection. A nil snapshot is an empty environment.
+// a reference resolves against the same environment used for source selection. A
+// nil snapshot is an empty environment.
 func (m *Manager) getenv() func(name string) (string, bool) {
 	return func(name string) (string, bool) {
 		value, ok := m.params.OSEnvironment[name]

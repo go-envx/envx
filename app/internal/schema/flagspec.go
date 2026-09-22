@@ -160,13 +160,6 @@ var (
 		Usage: "replace the output directory if it already exists and is not empty",
 	}
 
-	// OSReferencePattern overrides the {{@VAR}} OS-reference syntax with a regex.
-	OSReferencePattern = FlagSpec{
-		Name:  "os-reference-pattern",
-		Env:   "ENVX_OS_REFERENCE_PATTERN",
-		Usage: "regex overriding the {{@VAR}} OS-reference syntax (group 1 is the name)",
-	}
-
 	// Overload lets file values override existing OS env vars.
 	Overload = FlagSpec{
 		Name:  "overload",
@@ -174,7 +167,7 @@ var (
 		Usage: "file values override OS env vars",
 	}
 
-	// ReferencePattern overrides the {{VAR}} internal-reference syntax with a regex.
+	// ReferencePattern overrides the {{VAR}} reference syntax with a regex.
 	ReferencePattern = FlagSpec{
 		Name:  "reference-pattern",
 		Env:   "ENVX_REFERENCE_PATTERN",

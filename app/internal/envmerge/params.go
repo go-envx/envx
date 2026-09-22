@@ -73,16 +73,11 @@ type Settings struct {
 	// (default) lets an OS value override a namespace key, true lets the namespace
 	// value win. It mirrors exactly the precedence a run child process sees.
 	Overload bool
-	// ReferencePattern overrides the internal {{VAR}} reference syntax with a custom
-	// regular expression whose first capture group is the variable name; an empty
-	// value keeps the built-in default. It is compiled and validated at Manager
+	// ReferencePattern overrides the {{VAR}} reference syntax with a custom regular
+	// expression whose first capture group is the variable name; an empty value
+	// keeps the built-in default. It is compiled and validated at Manager
 	// construction.
 	ReferencePattern string
-	// OSReferencePattern overrides the OS {{@VAR}} reference syntax with a custom
-	// regular expression whose first capture group is the variable name; an empty
-	// value keeps the built-in default. It is compiled and validated at Manager
-	// construction.
-	OSReferencePattern string
 }
 
 // normalizeParams applies envmerge's structural terminal defaults, copies the

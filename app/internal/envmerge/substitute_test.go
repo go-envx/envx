@@ -17,9 +17,9 @@ func fixedGetenv(env map[string]string) func(string) (string, bool) {
 // noGetenv is a getenv seam with no OS variables set.
 func noGetenv(string) (string, bool) { return "", false }
 
-// TestTokenize verifies the scanner splits literals from internal and OS
-// references, trims whitespace inside the braces, honors the \{{ escape, and
-// treats an unterminated opener as literal text.
+// TestTokenize verifies the scanner splits literals from references, trims
+// whitespace inside the braces, honors the \{{ escape, and treats an unterminated
+// opener as literal text.
 func TestTokenize(t *testing.T) {
 	t.Parallel()
 
@@ -34,34 +34,24 @@ func TestTokenize(t *testing.T) {
 			want:  []token{{tokenLiteral, "postgresql://db:5432"}},
 		},
 		{
-			name:  "internal reference",
+			name:  "reference",
 			value: "{{HOST}}",
-			want:  []token{{tokenInternalRef, "HOST"}},
-		},
-		{
-			name:  "os reference",
-			value: "{{@HOST}}",
-			want:  []token{{tokenOSRef, "HOST"}},
+			want:  []token{{tokenReference, "HOST"}},
 		},
 		{
 			name:  "trims whitespace",
 			value: "{{  HOST  }}",
-			want:  []token{{tokenInternalRef, "HOST"}},
-		},
-		{
-			name:  "trims whitespace after sigil",
-			value: "{{@ HOST }}",
-			want:  []token{{tokenOSRef, "HOST"}},
+			want:  []token{{tokenReference, "HOST"}},
 		},
 		{
 			name:  "multiple references and literals",
-			value: "{{SCHEME}}://{{@HOST}}:{{PORT}}",
+			value: "{{SCHEME}}://{{HOST}}:{{PORT}}",
 			want: []token{
-				{tokenInternalRef, "SCHEME"},
+				{tokenReference, "SCHEME"},
 				{tokenLiteral, "://"},
-				{tokenOSRef, "HOST"},
+				{tokenReference, "HOST"},
 				{tokenLiteral, ":"},
-				{tokenInternalRef, "PORT"},
+				{tokenReference, "PORT"},
 			},
 		},
 		{
@@ -74,7 +64,7 @@ func TestTokenize(t *testing.T) {
 			value: `\{{LITERAL}} {{HOST}}`,
 			want: []token{
 				{tokenLiteral, "{{LITERAL}} "},
-				{tokenInternalRef, "HOST"},
+				{tokenReference, "HOST"},
 			},
 		},
 		{
@@ -128,9 +118,8 @@ func TestResolveLiteralPassthrough(t *testing.T) {
 	}
 }
 
-// TestResolveInternalReference verifies a single internal reference composes the
-// referenced value.
-func TestResolveInternalReference(t *testing.T) {
+// TestResolveReference verifies a single reference composes the referenced value.
+func TestResolveReference(t *testing.T) {
 	t.Parallel()
 
 	table := map[string]string{
@@ -245,14 +234,14 @@ func TestResolveDiamondFanIn(t *testing.T) {
 	}
 }
 
-// TestResolveOSReferencePrecedence verifies {{@VAR}} takes the OS value by
+// TestResolveReferencePrecedence verifies a reference takes the OS value by
 // default and the namespace value under overload.
-func TestResolveOSReferencePrecedence(t *testing.T) {
+func TestResolveReferencePrecedence(t *testing.T) {
 	t.Parallel()
 
 	table := map[string]string{
 		"HOST": "ns-host",
-		"URL":  "{{@HOST}}",
+		"URL":  "{{HOST}}",
 	}
 	getenv := fixedGetenv(map[string]string{"HOST": "os-host"})
 
@@ -266,21 +255,21 @@ func TestResolveOSReferencePrecedence(t *testing.T) {
 	}
 }
 
-// TestResolveOSReferenceFallback verifies {{@VAR}} falls back to the namespace
+// TestResolveReferenceFallback verifies a reference falls back to the namespace
 // when the OS variable is unset, and to the OS variable under overload when the
 // namespace lacks the key.
-func TestResolveOSReferenceFallback(t *testing.T) {
+func TestResolveReferenceFallback(t *testing.T) {
 	t.Parallel()
 
 	// Default ordering: OS unset, namespace supplies the value.
-	nsTable := map[string]string{"HOST": "ns-host", "URL": "{{@HOST}}"}
+	nsTable := map[string]string{"HOST": "ns-host", "URL": "{{HOST}}"}
 	if got, err := newSubstituter(nsTable, noGetenv, false).resolve("URL"); err != nil ||
 		got != "ns-host" {
 		t.Errorf("default fallback resolve(URL) = %q, %v; want ns-host", got, err)
 	}
 
 	// Overload ordering: namespace lacks the key, OS supplies the value.
-	osTable := map[string]string{"URL": "{{@HOST}}"}
+	osTable := map[string]string{"URL": "{{HOST}}"}
 	getenv := fixedGetenv(map[string]string{"HOST": "os-host"})
 	if got, err := newSubstituter(osTable, getenv, true).resolve("URL"); err != nil ||
 		got != "os-host" {
@@ -288,13 +277,13 @@ func TestResolveOSReferenceFallback(t *testing.T) {
 	}
 }
 
-// TestResolveOSReferenceReentersGraph verifies an {{@VAR}} that resolves to a
+// TestResolveReferenceReentersGraph verifies a reference that resolves to a
 // namespace value composes that value's own references.
-func TestResolveOSReferenceReentersGraph(t *testing.T) {
+func TestResolveReferenceReentersGraph(t *testing.T) {
 	t.Parallel()
 
 	table := map[string]string{
-		"URL":    "{{@HOST}}",
+		"URL":    "{{HOST}}",
 		"HOST":   "{{REGION}}.db.local",
 		"REGION": "eu",
 	}
@@ -309,37 +298,18 @@ func TestResolveOSReferenceReentersGraph(t *testing.T) {
 	}
 }
 
-// TestResolveMissingInternalReference verifies a {{VAR}} naming no namespace key
-// is a typed error that names both variables and no value.
-func TestResolveMissingInternalReference(t *testing.T) {
+// TestResolveMissingReference verifies a reference resolving in neither the
+// namespace nor the OS environment is a typed error that names both variables and
+// no value.
+func TestResolveMissingReference(t *testing.T) {
 	t.Parallel()
 
 	table := map[string]string{"URL": "{{HOST}}"}
 	_, err := newSubstituter(table, noGetenv, false).resolve("URL")
 
-	var missing *missingInternalReferenceError
+	var missing *missingReferenceError
 	if !errors.As(err, &missing) {
-		t.Fatalf("resolve(URL) error = %v, want missingInternalReferenceError", err)
-	}
-	if missing.key != "URL" || missing.reference != "HOST" {
-		t.Errorf(
-			"error = {key:%q reference:%q}, want {URL HOST}",
-			missing.key, missing.reference,
-		)
-	}
-}
-
-// TestResolveMissingOSReference verifies a {{@VAR}} resolving in neither source
-// is a typed error that names both variables and no value.
-func TestResolveMissingOSReference(t *testing.T) {
-	t.Parallel()
-
-	table := map[string]string{"URL": "{{@HOST}}"}
-	_, err := newSubstituter(table, noGetenv, false).resolve("URL")
-
-	var missing *missingOSReferenceError
-	if !errors.As(err, &missing) {
-		t.Fatalf("resolve(URL) error = %v, want missingOSReferenceError", err)
+		t.Fatalf("resolve(URL) error = %v, want missingReferenceError", err)
 	}
 	if missing.key != "URL" || missing.reference != "HOST" {
 		t.Errorf(
@@ -404,14 +374,8 @@ func TestStatusDryRun(t *testing.T) {
 			want:  statusOK,
 		},
 		{
-			name:  "missing internal reference",
+			name:  "missing reference",
 			table: map[string]string{"A": "{{B}}"},
-			key:   "A",
-			want:  statusUnresolved,
-		},
-		{
-			name:  "missing os reference",
-			table: map[string]string{"A": "{{@B}}"},
 			key:   "A",
 			want:  statusUnresolved,
 		},

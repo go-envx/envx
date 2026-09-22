@@ -13,10 +13,9 @@ type tokenKind int
 const (
 	// tokenLiteral is verbatim text carried through untouched.
 	tokenLiteral tokenKind = iota
-	// tokenInternalRef is a {{VAR}} reference to a namespace variable.
-	tokenInternalRef
-	// tokenOSRef is a {{@VAR}} reference to an effective (OS-aware) variable.
-	tokenOSRef
+	// tokenReference is a {{VAR}} reference to a variable in the composed
+	// environment.
+	tokenReference
 )
 
 // token is one span of a scanned value: literal text, or a reference whose text
@@ -36,43 +35,26 @@ type substitutionStatus int
 const (
 	// statusOK marks a variable that composes successfully.
 	statusOK substitutionStatus = iota
-	// statusUnresolved marks a missing internal or OS reference.
+	// statusUnresolved marks a reference that resolves nowhere.
 	statusUnresolved
 	// statusCircular marks a reference cycle.
 	statusCircular
 )
 
-// missingInternalReferenceError reports a {{VAR}} that names no namespace
-// variable. It carries only key names, never a value.
-type missingInternalReferenceError struct {
-	// key is the variable whose value holds the dangling reference.
-	key string
-	// reference is the undefined variable name.
-	reference string
-}
-
-// Error describes the dangling internal reference without exposing any value.
-func (e *missingInternalReferenceError) Error() string {
-	return fmt.Sprintf(
-		"variable %q references undefined variable %q",
-		e.key, e.reference,
-	)
-}
-
-// missingOSReferenceError reports a {{@VAR}} that resolves in neither the OS
-// environment nor the namespace. It carries only names, never a value.
-type missingOSReferenceError struct {
+// missingReferenceError reports a {{VAR}} that resolves in neither the namespace
+// nor the OS environment. It carries only key names, never a value.
+type missingReferenceError struct {
 	// key is the variable whose value holds the dangling reference.
 	key string
 	// reference is the variable name that resolves nowhere.
 	reference string
 }
 
-// Error describes the dangling OS reference without exposing any value.
-func (e *missingOSReferenceError) Error() string {
+// Error describes the dangling reference without exposing any value.
+func (e *missingReferenceError) Error() string {
 	return fmt.Sprintf(
-		"variable %q references %q, which is set in neither the environment "+
-			"nor the namespace",
+		"variable %q references %q, which is set in neither the namespace "+
+			"nor the environment",
 		e.key, e.reference,
 	)
 }
@@ -90,7 +72,7 @@ func (e *circularReferenceError) Error() string {
 }
 
 // symbolTable is the substitution engine's view of the variable namespace. It
-// separates a cheap declared check from value resolution so an OS-first {{@VAR}}
+// separates a cheap declared check from value resolution so an OS-first reference
 // lookup never forces resolution of a namespace value the OS environment
 // supersedes, and it marks opaque OS values that must not be re-tokenized.
 type symbolTable struct {
@@ -126,9 +108,9 @@ type rawEntry struct {
 }
 
 // substituter composes variable references over an effective symbol table. It is
-// a string-in/string-out core: the symbol table supplies internal variables and
+// a string-in/string-out core: the symbol table supplies namespace variables and
 // their opacity, the getenv seam supplies OS variables, and overload orders the
-// {{@VAR}} fallback. A resolved-value cache makes each variable compose once
+// namespace/OS fallback. A resolved-value cache makes each variable compose once
 // regardless of fan-in, and a visiting stack detects cycles.
 type substituter struct {
 	// grammar is the compiled reference syntax the engine tokenizes values with.
@@ -137,7 +119,7 @@ type substituter struct {
 	symbols symbolTable
 	// getenv reads an OS variable, reporting whether it is set.
 	getenv func(name string) (string, bool)
-	// overload flips {{@VAR}} ordering: namespace-then-OS when true, OS-then-
+	// overload flips reference ordering: namespace-then-OS when true, OS-then-
 	// namespace when false.
 	overload bool
 	// cache memoizes each variable's composed value.
@@ -255,14 +237,8 @@ func (s *substituter) compose(value, key string) (string, error) {
 		switch tok.kind {
 		case tokenLiteral:
 			b.WriteString(tok.text)
-		case tokenInternalRef:
-			resolved, err := s.internal(tok.text, key)
-			if err != nil {
-				return "", err
-			}
-			b.WriteString(resolved)
-		case tokenOSRef:
-			resolved, err := s.effective(tok.text, key)
+		case tokenReference:
+			resolved, err := s.reference(tok.text, key)
 			if err != nil {
 				return "", err
 			}
@@ -272,21 +248,14 @@ func (s *substituter) compose(value, key string) (string, error) {
 	return b.String(), nil
 }
 
-// internal resolves a {{VAR}} reference against the namespace table, re-entering
-// the dependency graph so a referenced variable composes transitively.
-func (s *substituter) internal(name, key string) (string, error) {
-	if !s.symbols.declared(name) {
-		return "", &missingInternalReferenceError{key: key, reference: name}
-	}
-	return s.resolve(name)
-}
-
-// effective resolves a {{@VAR}} reference. Without overload the OS environment
-// wins and falls back to the namespace; under overload the namespace wins and
-// falls back to the OS environment. An OS value is an opaque leaf, while a
-// namespace hit re-enters the graph. The namespace value is materialized only
-// when it is actually chosen, so a superseded dangling reference never errors.
-func (s *substituter) effective(name, key string) (string, error) {
+// reference resolves a {{VAR}} reference against the composed environment. Without
+// overload the OS environment wins and falls back to the namespace; under overload
+// the namespace wins and falls back to the OS environment — the same precedence a
+// run child process sees. An OS value is an opaque leaf, while a namespace hit
+// re-enters the graph so a referenced variable composes transitively. The
+// namespace value is materialized only when it is actually chosen, so a superseded
+// dangling reference never errors.
+func (s *substituter) reference(name, key string) (string, error) {
 	declared := s.symbols.declared(name)
 
 	if s.overload {
@@ -296,7 +265,7 @@ func (s *substituter) effective(name, key string) (string, error) {
 		if value, ok := s.getenv(name); ok {
 			return value, nil
 		}
-		return "", &missingOSReferenceError{key: key, reference: name}
+		return "", &missingReferenceError{key: key, reference: name}
 	}
 
 	if value, ok := s.getenv(name); ok {
@@ -305,7 +274,7 @@ func (s *substituter) effective(name, key string) (string, error) {
 	if declared {
 		return s.resolve(name)
 	}
-	return "", &missingOSReferenceError{key: key, reference: name}
+	return "", &missingReferenceError{key: key, reference: name}
 }
 
 // cycleError builds a circular-reference error from the active resolution path,
