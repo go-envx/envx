@@ -5,7 +5,7 @@ import (
 	"strings"
 
 	"github.com/go-envx/envx/app/internal/printer"
-	"github.com/go-envx/envx/app/pkg/str"
+	"github.com/go-envx/envx/app/internal/utils/str"
 )
 
 // renderParams bundles the output sink and safe rotation result.

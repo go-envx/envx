@@ -6,7 +6,7 @@ import (
 	"github.com/go-envx/envx/app/internal/envmerge"
 	"github.com/go-envx/envx/app/internal/printer"
 	"github.com/go-envx/envx/app/internal/style"
-	"github.com/go-envx/envx/app/pkg/str"
+	"github.com/go-envx/envx/app/internal/utils/str"
 )
 
 // jsonStatus is the tagged view of a resolution outcome for JSON output.

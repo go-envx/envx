@@ -4,7 +4,7 @@ import (
 	"fmt"
 
 	"github.com/go-envx/envx/app/internal/printer"
-	"github.com/go-envx/envx/app/pkg/str"
+	"github.com/go-envx/envx/app/internal/utils/str"
 )
 
 // renderParams are the inputs to the set action renderer.

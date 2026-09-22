@@ -6,7 +6,7 @@ import (
 	"github.com/go-envx/envx/app/internal/actions/secrets/encrypt"
 	"github.com/go-envx/envx/app/internal/actions/secrets/get"
 	"github.com/go-envx/envx/app/internal/actions/secrets/set"
-	"github.com/go-envx/envx/app/pkg/str"
+	"github.com/go-envx/envx/app/internal/utils/str"
 	"github.com/spf13/cobra"
 )
 
