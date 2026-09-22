@@ -25,9 +25,20 @@ tasks:
       - go build -o "$HOME/.local/bin/envx" ./cmd/envx
 
   test:
-    desc: Run tests for the CLI
+    desc: Run the entire test suite for the CLI (unit and e2e)
+    cmds:
+      - task: test:unit
+      - task: test:e2e
+
+  test:unit:
+    desc: Run unit tests for the CLI
     cmds:
       - go test -race -coverpkg=./... -coverprofile=coverage.out ./...
+
+  test:e2e:
+    desc: Run end-to-end integration tests for the CLI
+    cmds:
+      - go test -race -tags=e2e ./test/...
 
   check:
     desc: Run formatting, static analysis, and vulnerability scanning
