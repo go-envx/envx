@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/go-envx/envx/app/internal/style"
+	"github.com/go-envx/envx/app/internal/utils/style"
 )
 
 // TestWriteTableAlignsPlain verifies column alignment with color disabled,

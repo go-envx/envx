@@ -6,7 +6,7 @@ import (
 	"strings"
 	"unicode/utf8"
 
-	"github.com/go-envx/envx/app/internal/style"
+	"github.com/go-envx/envx/app/internal/utils/style"
 )
 
 // columnGutter is the number of spaces separating adjacent table columns.
