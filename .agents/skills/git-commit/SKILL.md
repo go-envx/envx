@@ -11,7 +11,7 @@ Because this repo squash-merges, the **PR title and description become the commi
 
 This has one consequence that governs everything below:
 
-**Write the PR body as a git commit message, not as a markdown page.** Plain text, wrapped, terse, explaining *why*. Anything that reads like documentation — a test plan, a reviewer walkthrough, screenshots, a checklist — does not belong in the body, because it would land verbatim in `main`'s history. That material goes in a **separate PR comment** instead.
+**Write the PR body as a git commit message, not as a markdown page.** Plain text, terse, explaining *why*. Do not worry about line lengths or manual wrapping — GitHub automatically enters line breaks where needed when doing the squash merge. Anything that reads like documentation — a test plan, a reviewer walkthrough, screenshots, a checklist — does not belong in the body, because it would land verbatim in `main`'s history. That material goes in a **separate PR comment** instead.
 
 If you find yourself reaching for a `## Summary` heading, stop: that content is either a plain commit body or a PR comment.
 
@@ -63,7 +63,6 @@ If you find yourself reaching for a `## Summary` heading, stop: that content is 
 - `<description>` is a concise, active summary of the motivation and overall effect, usually one sentence or short paragraph.
 - The list names the important changes or outcomes, with one idea per bullet. Use concrete behavior rather than implementation trivia.
 - `[footer]` is optional and is reserved for issue references, breaking-change notices, or authorship metadata.
-- plain text, wrapped at ~72 characters
 - explain the motivation and the effect, not the mechanics — the diff already shows *how*
 - plain hyphen bullets are fine for enumerating a few distinct logical changes; keep them terse
 - **no** markdown headings, bold, tables, or `## Summary / ## Changes / ## Testing` sections
@@ -99,8 +98,7 @@ After the PR exists, post it as a comment:
 gh pr comment --body-file - <<'EOF'
 Testing
 - unit tests for token generation and expiry
-- manual QA: requested reset, followed the email link, set a new
-  password on Chrome and Firefox
+- manual QA: requested reset, followed the email link, set a new password on Chrome and Firefox
 
 Reviewers: the expiry logic in auth/tokens.ts is the part to scrutinize.
 EOF
@@ -116,8 +114,7 @@ Use a heredoc with `--body-file -` so the body stays plain and you avoid quote-e
 gh pr create \
   --title "feat(auth): add password reset flow" \
   --body-file - <<'EOF'
-Adds a password reset flow so users who forget their password can regain
-access without contacting support.
+Adds a password reset flow so users who forget their password can regain access without contacting support.
 
 - add a forgot-password form with email validation
 - generate and email single-use reset tokens
