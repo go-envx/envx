@@ -4,9 +4,9 @@ import (
 	"fmt"
 
 	"github.com/go-envx/envx/app/internal/envmerge"
-	"github.com/go-envx/envx/app/internal/printer"
-	"github.com/go-envx/envx/app/internal/style"
-	"github.com/go-envx/envx/app/pkg/str"
+	"github.com/go-envx/envx/app/internal/utils/printer"
+	"github.com/go-envx/envx/app/internal/utils/str"
+	"github.com/go-envx/envx/app/internal/utils/style"
 )
 
 // jsonStatus is the tagged view of a resolution outcome for JSON output.

@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/go-envx/envx/app/internal/printer"
+	"github.com/go-envx/envx/app/internal/utils/printer"
 )
 
 // renderParams bundles the output sink and structured keypair result.

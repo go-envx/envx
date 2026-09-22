@@ -3,7 +3,7 @@ package generate
 import (
 	"fmt"
 
-	"github.com/go-envx/envx/app/internal/printer"
+	"github.com/go-envx/envx/app/internal/utils/printer"
 )
 
 // renderParams bundles the output sink and safe generation result.

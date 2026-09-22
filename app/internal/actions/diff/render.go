@@ -3,8 +3,8 @@ package diff
 import (
 	"fmt"
 
-	"github.com/go-envx/envx/app/internal/printer"
-	"github.com/go-envx/envx/app/internal/style"
+	"github.com/go-envx/envx/app/internal/utils/printer"
+	"github.com/go-envx/envx/app/internal/utils/style"
 )
 
 // jsonChange is the exported, tagged view of a change used for JSON output.

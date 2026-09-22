@@ -12,8 +12,8 @@ import (
 	"github.com/go-envx/envx/app/internal/config"
 	engine "github.com/go-envx/envx/app/internal/emit"
 	"github.com/go-envx/envx/app/internal/envmerge"
-	"github.com/go-envx/envx/app/internal/printer"
-	"github.com/go-envx/envx/app/pkg/file"
+	"github.com/go-envx/envx/app/internal/utils/file"
+	"github.com/go-envx/envx/app/internal/utils/printer"
 )
 
 // actionParams are the inputs to the emit action.

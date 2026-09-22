@@ -9,7 +9,7 @@ import (
 
 	"github.com/go-envx/envx/app/internal/cipher"
 	"github.com/go-envx/envx/app/internal/config"
-	"github.com/go-envx/envx/app/pkg/file"
+	"github.com/go-envx/envx/app/internal/utils/file"
 )
 
 // TestExecuteUsesConfiguredCipher verifies print uses the manifest algorithm

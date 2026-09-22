@@ -11,7 +11,7 @@ import (
 	"github.com/go-envx/envx/app/internal/manifest"
 	"github.com/go-envx/envx/app/internal/schema"
 	"github.com/go-envx/envx/app/internal/secrets"
-	"github.com/go-envx/envx/app/pkg/file"
+	"github.com/go-envx/envx/app/internal/utils/file"
 )
 
 const (

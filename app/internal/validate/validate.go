@@ -7,7 +7,7 @@ import (
 
 	"github.com/go-envx/envx/app/internal/envmerge"
 	"github.com/go-envx/envx/app/internal/secrets"
-	"github.com/go-envx/envx/app/internal/status"
+	"github.com/go-envx/envx/app/internal/shared/status"
 )
 
 // ProjectManager pairs a project name with the envmerge Manager that resolves

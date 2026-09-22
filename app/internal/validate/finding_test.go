@@ -4,7 +4,7 @@ import (
 	"testing"
 
 	"github.com/go-envx/envx/app/internal/secrets"
-	"github.com/go-envx/envx/app/internal/status"
+	"github.com/go-envx/envx/app/internal/shared/status"
 )
 
 // TestReportAddTallies verifies add appends findings and counts them by severity.

@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/go-envx/envx/app/pkg/yamlx"
+	"github.com/go-envx/envx/app/internal/utils/yamlx"
 	"gopkg.in/yaml.v3"
 )
 

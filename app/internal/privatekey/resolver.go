@@ -6,7 +6,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/go-envx/envx/app/pkg/file"
+	"github.com/go-envx/envx/app/internal/utils/file"
 )
 
 const (

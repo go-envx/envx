@@ -8,8 +8,8 @@ import (
 	"os"
 
 	"github.com/go-envx/envx/app/internal/cli"
-	"github.com/go-envx/envx/app/internal/exitcode"
-	"github.com/go-envx/envx/app/internal/printer"
+	"github.com/go-envx/envx/app/internal/shared/exitcode"
+	"github.com/go-envx/envx/app/internal/utils/printer"
 )
 
 // Build metadata is injected at link time via -ldflags (see .goreleaser.yaml);

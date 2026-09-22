@@ -6,7 +6,7 @@ import (
 	"testing"
 
 	"github.com/go-envx/envx/app/internal/config"
-	"github.com/go-envx/envx/app/pkg/file"
+	"github.com/go-envx/envx/app/internal/utils/file"
 )
 
 // writeManifest creates the smallest valid workspace for management commands.

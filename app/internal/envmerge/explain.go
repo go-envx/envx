@@ -5,7 +5,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/go-envx/envx/app/internal/status"
+	"github.com/go-envx/envx/app/internal/shared/status"
 )
 
 // ExplainParams selects all keys or one case-insensitive key from an environment

@@ -4,10 +4,10 @@ import (
 	"errors"
 
 	"github.com/go-envx/envx/app/internal/flags"
-	"github.com/go-envx/envx/app/internal/printer"
 	"github.com/go-envx/envx/app/internal/schema"
+	"github.com/go-envx/envx/app/internal/utils/printer"
+	"github.com/go-envx/envx/app/internal/utils/str"
 	engine "github.com/go-envx/envx/app/internal/validate"
-	"github.com/go-envx/envx/app/pkg/str"
 	"github.com/spf13/cobra"
 )
 

@@ -2,10 +2,10 @@ package explain
 
 import (
 	"github.com/go-envx/envx/app/internal/flags"
-	"github.com/go-envx/envx/app/internal/printer"
 	"github.com/go-envx/envx/app/internal/schema"
-	"github.com/go-envx/envx/app/pkg/arg"
-	"github.com/go-envx/envx/app/pkg/str"
+	"github.com/go-envx/envx/app/internal/utils/arg"
+	"github.com/go-envx/envx/app/internal/utils/printer"
+	"github.com/go-envx/envx/app/internal/utils/str"
 	"github.com/spf13/cobra"
 )
 

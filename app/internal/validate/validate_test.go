@@ -3,7 +3,7 @@ package validate
 import (
 	"testing"
 
-	"github.com/go-envx/envx/app/internal/status"
+	"github.com/go-envx/envx/app/internal/shared/status"
 )
 
 // TestCollectReferences verifies only well-formed secret references are recorded,

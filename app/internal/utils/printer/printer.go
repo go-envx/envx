@@ -6,7 +6,7 @@ import (
 	"io"
 	"os"
 
-	"github.com/go-envx/envx/app/internal/style"
+	"github.com/go-envx/envx/app/internal/utils/style"
 	"golang.org/x/term"
 )
 

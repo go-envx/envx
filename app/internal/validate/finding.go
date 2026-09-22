@@ -1,6 +1,6 @@
 package validate
 
-import "github.com/go-envx/envx/app/internal/status"
+import "github.com/go-envx/envx/app/internal/shared/status"
 
 // Severity ranks a finding. It mirrors the envmerge severities so a resolution
 // outcome maps onto a finding without translation loss.

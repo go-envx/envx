@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/go-envx/envx/app/internal/status"
+	"github.com/go-envx/envx/app/internal/shared/status"
 )
 
 // fakeDiagnoser implements both ValueResolver and ValueDiagnoser for testing the

@@ -5,7 +5,7 @@ import (
 
 	"github.com/go-envx/envx/app/internal/cipher"
 	"github.com/go-envx/envx/app/internal/secrets"
-	"github.com/go-envx/envx/app/internal/status"
+	"github.com/go-envx/envx/app/internal/shared/status"
 )
 
 // WorkspaceProject pairs a project name with its resolved, build-ready Result so
