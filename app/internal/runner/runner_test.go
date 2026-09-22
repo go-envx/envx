@@ -7,7 +7,7 @@ import (
 	"syscall"
 	"testing"
 
-	"github.com/go-envx/envx/app/internal/exitcode"
+	"github.com/go-envx/envx/app/internal/shared/exitcode"
 )
 
 // TestRunInjectsEnv verifies the merged env is passed to the child and that only

@@ -8,7 +8,7 @@ import (
 	"os"
 
 	"github.com/go-envx/envx/app/internal/cli"
-	"github.com/go-envx/envx/app/internal/exitcode"
+	"github.com/go-envx/envx/app/internal/shared/exitcode"
 	"github.com/go-envx/envx/app/internal/utils/printer"
 )
 

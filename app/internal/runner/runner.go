@@ -8,7 +8,7 @@ import (
 	"os/signal"
 	"syscall"
 
-	"github.com/go-envx/envx/app/internal/exitcode"
+	"github.com/go-envx/envx/app/internal/shared/exitcode"
 )
 
 // forwardedSignals are the signals Run watches. Catching them keeps envx alive
