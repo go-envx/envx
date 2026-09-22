@@ -65,13 +65,11 @@ type Settings struct {
 	Delimiter *string `yaml:"delimiter"`
 	// Env is the target environment to load.
 	Env *string `yaml:"env"`
-	// OSReferencePattern overrides the {{@VAR}} OS-reference syntax with a regex.
-	OSReferencePattern *string `yaml:"os-reference-pattern"`
 	// Overload lets file values override existing OS env vars, if true.
 	Overload *bool `yaml:"overload"`
 	// Prefix is prepended to every resolved env-var key.
 	Prefix *string `yaml:"prefix"`
-	// ReferencePattern overrides the {{VAR}} internal-reference syntax with a regex.
+	// ReferencePattern overrides the {{VAR}} reference syntax with a regex.
 	ReferencePattern *string `yaml:"reference-pattern"`
 	// RequireOverlays requires every environment overlay file in the namespace to exist.
 	RequireOverlays *bool `yaml:"require-overlays"`

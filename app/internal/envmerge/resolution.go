@@ -9,7 +9,7 @@ const (
 	// KindSecretReference is a reference resolved from the secrets store.
 	KindSecretReference Kind = "secret"
 	// KindVariableSubstitution marks a value composed from the resolved values of
-	// other variables through {{VAR}} and {{@VAR}} references.
+	// other variables through {{VAR}} references.
 	KindVariableSubstitution Kind = "variable"
 )
 

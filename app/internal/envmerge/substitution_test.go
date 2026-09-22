@@ -21,9 +21,9 @@ func subManager(
 	})
 }
 
-// TestMaterializeSubstitutesInternalReference verifies Materialize composes a
-// transitive {{VAR}} chain over the effective environment.
-func TestMaterializeSubstitutesInternalReference(t *testing.T) {
+// TestMaterializeSubstitutesReference verifies Materialize composes a transitive
+// {{VAR}} chain over the effective environment.
+func TestMaterializeSubstitutesReference(t *testing.T) {
 	t.Parallel()
 
 	dir := t.TempDir()
@@ -37,13 +37,13 @@ func TestMaterializeSubstitutesInternalReference(t *testing.T) {
 	}
 }
 
-// TestMaterializeSubstitutesOSReference verifies a {{@VAR}} reference resolves
-// against the injected OS environment.
-func TestMaterializeSubstitutesOSReference(t *testing.T) {
+// TestMaterializeSubstitutesFromEnvironment verifies a reference to a variable
+// declared only in the OS environment resolves against it.
+func TestMaterializeSubstitutesFromEnvironment(t *testing.T) {
 	t.Parallel()
 
 	dir := t.TempDir()
-	writeYAML(t, dir, "app.yaml", "url: \"https://{{@API_HOST}}\"\n")
+	writeYAML(t, dir, "app.yaml", "url: \"https://{{API_HOST}}\"\n")
 
 	env := materializeEnv(
 		t, subManager(t, dir, nil, map[string]string{"API_HOST": "api.example"}), "",

@@ -59,15 +59,9 @@ func WithOverload(fs *pflag.FlagSet) {
 }
 
 // WithReferencePattern registers the --reference-pattern flag, overriding the
-// {{VAR}} internal-reference syntax with a custom regex.
+// {{VAR}} reference syntax with a custom regex.
 func WithReferencePattern(fs *pflag.FlagSet) {
 	registerString(fs, &schema.ReferencePattern)
-}
-
-// WithOSReferencePattern registers the --os-reference-pattern flag, overriding the
-// {{@VAR}} OS-reference syntax with a custom regex.
-func WithOSReferencePattern(fs *pflag.FlagSet) {
-	registerString(fs, &schema.OSReferencePattern)
 }
 
 // registerString registers spec as a dest-less string flag on fs, delegating to

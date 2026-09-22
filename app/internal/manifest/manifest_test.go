@@ -275,7 +275,6 @@ func TestLoadKebabSettingsKeys(t *testing.T) {
 
 	body := "environments: [development]\n" +
 		"settings:\n" +
-		"  os-reference-pattern: '@@(.+)@@'\n" +
 		"  reference-pattern: '<<(.+)>>'\n" +
 		"  require-overlays: true\n" +
 		"projects:\n  api:\n    includes: [env/x]\n"
@@ -285,9 +284,6 @@ func TestLoadKebabSettingsKeys(t *testing.T) {
 		t.Fatalf("Load: %v", err)
 	}
 	s := loaded.Content.Settings
-	if s.OSReferencePattern == nil || *s.OSReferencePattern != "@@(.+)@@" {
-		t.Errorf("OSReferencePattern = %v, want @@(.+)@@", s.OSReferencePattern)
-	}
 	if s.ReferencePattern == nil || *s.ReferencePattern != "<<(.+)>>" {
 		t.Errorf("ReferencePattern = %v, want <<(.+)>>", s.ReferencePattern)
 	}

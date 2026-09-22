@@ -249,18 +249,18 @@ func TestReferencePatternResolution(t *testing.T) {
 			t.Errorf("ReferencePattern = %q, want project", params.Settings.ReferencePattern)
 		}
 	})
-	t.Run("os pattern explicit flows through", func(t *testing.T) {
+	t.Run("reference pattern explicit flows through", func(t *testing.T) {
 		_, params, err := resolveManifest(
 			manifestContext{manifest: manifestWith(nil, nil), project: "api"},
-			&Input{OSReferencePattern: strPtr(`\$env\{([^}]*)\}`)},
+			&Input{ReferencePattern: strPtr(`\$env\{([^}]*)\}`)},
 		)
 		if err != nil {
 			t.Fatal(err)
 		}
-		if params.Settings.OSReferencePattern != `\$env\{([^}]*)\}` {
+		if params.Settings.ReferencePattern != `\$env\{([^}]*)\}` {
 			t.Errorf(
-				"OSReferencePattern = %q, want the custom regex",
-				params.Settings.OSReferencePattern,
+				"ReferencePattern = %q, want the custom regex",
+				params.Settings.ReferencePattern,
 			)
 		}
 	})

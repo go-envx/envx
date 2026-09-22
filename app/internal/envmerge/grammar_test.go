@@ -9,8 +9,8 @@ import (
 )
 
 // customPatternManager builds a Manager over a single "app" namespace in dir whose
-// reference syntaxes are redefined to ${VAR} (internal) and $env{VAR} (OS), so a
-// lifecycle test exercises a custom grammar through the real merge pipeline.
+// reference syntax is redefined to ${VAR}, so a lifecycle test exercises a custom
+// grammar through the real merge pipeline.
 func customPatternManager(
 	t *testing.T, dir string, osEnv map[string]string,
 ) *Manager {
@@ -19,27 +19,26 @@ func customPatternManager(
 		Includes:      []string{filepath.Join(dir, "app")},
 		OSEnvironment: osEnv,
 		Settings: Settings{
-			ReferencePattern:   `\$\{([^}]*)\}`,
-			OSReferencePattern: `\$env\{([^}]*)\}`,
+			ReferencePattern: `\$\{([^}]*)\}`,
 		},
 	})
 }
 
-// TestNewGrammarDefaults verifies empty patterns fall back to the built-in
-// grammar, tokenizing {{VAR}} and {{@VAR}} exactly as the default constants do.
+// TestNewGrammarDefaults verifies an empty pattern falls back to the built-in
+// grammar, tokenizing {{VAR}} exactly as the default constant does.
 func TestNewGrammarDefaults(t *testing.T) {
 	t.Parallel()
 
-	g, err := newGrammar("", "")
+	g, err := newGrammar("")
 	if err != nil {
-		t.Fatalf("newGrammar(defaults): %v", err)
+		t.Fatalf("newGrammar(default): %v", err)
 	}
 
-	got := g.tokenize("{{SCHEME}}://{{@HOST}}")
+	got := g.tokenize("{{SCHEME}}://{{HOST}}")
 	want := []token{
-		{tokenInternalRef, "SCHEME"},
+		{tokenReference, "SCHEME"},
 		{tokenLiteral, "://"},
-		{tokenOSRef, "HOST"},
+		{tokenReference, "HOST"},
 	}
 	if len(got) != len(want) {
 		t.Fatalf("tokenize = %v, want %v", got, want)
@@ -51,22 +50,22 @@ func TestNewGrammarDefaults(t *testing.T) {
 	}
 }
 
-// TestNewGrammarCustomPatterns verifies a workspace can redefine the reference
-// syntaxes and the engine composes values through the custom grammar.
-func TestNewGrammarCustomPatterns(t *testing.T) {
+// TestNewGrammarCustomPattern verifies a workspace can redefine the reference
+// syntax and the engine composes values through the custom grammar.
+func TestNewGrammarCustomPattern(t *testing.T) {
 	t.Parallel()
 
-	// Redefine internal references as ${VAR} and OS references as $env{VAR}.
-	g, err := newGrammar(`\$\{([^}]*)\}`, `\$env\{([^}]*)\}`)
+	// Redefine references as ${VAR}.
+	g, err := newGrammar(`\$\{([^}]*)\}`)
 	if err != nil {
 		t.Fatalf("newGrammar(custom): %v", err)
 	}
 
-	got := g.tokenize("${SCHEME}://$env{HOST}")
+	got := g.tokenize("${SCHEME}://${HOST}")
 	want := []token{
-		{tokenInternalRef, "SCHEME"},
+		{tokenReference, "SCHEME"},
 		{tokenLiteral, "://"},
-		{tokenOSRef, "HOST"},
+		{tokenReference, "HOST"},
 	}
 	if len(got) != len(want) {
 		t.Fatalf("tokenize = %v, want %v", got, want)
@@ -83,35 +82,14 @@ func TestNewGrammarCustomPatterns(t *testing.T) {
 	}
 }
 
-// TestGrammarCustomOSPrecedence verifies the OS pattern is tried before the
-// internal one, so an overlapping custom syntax resolves OS-first.
-func TestGrammarCustomOSPrecedence(t *testing.T) {
-	t.Parallel()
-
-	// Both patterns match "{{@X}}"; the OS pattern must win.
-	g, err := newGrammar(`\{\{@?([A-Z]+)\}\}`, `\{\{@([A-Z]+)\}\}`)
-	if err != nil {
-		t.Fatalf("newGrammar: %v", err)
-	}
-
-	got := g.tokenize("{{@HOST}}")
-	if len(got) != 1 || got[0].kind != tokenOSRef || got[0].text != "HOST" {
-		t.Errorf("tokenize = %v, want a single OS reference to HOST", got)
-	}
-}
-
 // TestNewGrammarInvalidPattern verifies an uncompilable pattern is a clear error
-// naming which pattern failed, so it fails at config time rather than at use.
+// naming the reference pattern, so it fails at config time rather than at use.
 func TestNewGrammarInvalidPattern(t *testing.T) {
 	t.Parallel()
 
-	if _, err := newGrammar(`(unterminated`, ""); err == nil ||
+	if _, err := newGrammar(`(unterminated`); err == nil ||
 		!strings.Contains(err.Error(), "reference pattern") {
-		t.Errorf("internal pattern error = %v, want a reference pattern error", err)
-	}
-	if _, err := newGrammar("", `(unterminated`); err == nil ||
-		!strings.Contains(err.Error(), "os reference pattern") {
-		t.Errorf("os pattern error = %v, want an os reference pattern error", err)
+		t.Errorf("pattern error = %v, want a reference pattern error", err)
 	}
 }
 
@@ -120,14 +98,14 @@ func TestNewGrammarInvalidPattern(t *testing.T) {
 func TestNewGrammarMissingCaptureGroup(t *testing.T) {
 	t.Parallel()
 
-	if _, err := newGrammar(`\{\{[^}]*\}\}`, ""); err == nil ||
+	if _, err := newGrammar(`\{\{[^}]*\}\}`); err == nil ||
 		!strings.Contains(err.Error(), "capture group") {
 		t.Errorf("error = %v, want a missing-capture-group error", err)
 	}
 }
 
-// TestCustomGrammarResolvesThroughManager verifies a Manager built with custom
-// patterns substitutes references written in the custom syntax, end to end.
+// TestCustomGrammarResolvesThroughManager verifies a Manager built with a custom
+// pattern substitutes references written in the custom syntax, end to end.
 func TestCustomGrammarResolvesThroughManager(t *testing.T) {
 	t.Parallel()
 
@@ -170,7 +148,7 @@ func TestNewManagerInvalidPatternFails(t *testing.T) {
 
 // TestMaterializeCustomPatternLifecycle verifies a custom grammar flows all the
 // way through the merge → materialize → substitute pipeline: ${VAR} composes a
-// transitive chain, $env{VAR} resolves against the OS environment, and the
+// transitive chain, resolves an OS-only value against the environment, and the
 // built-in {{VAR}} syntax is inert (carried through literally).
 func TestMaterializeCustomPatternLifecycle(t *testing.T) {
 	t.Parallel()
@@ -180,7 +158,7 @@ func TestMaterializeCustomPatternLifecycle(t *testing.T) {
 		"scheme: postgresql\n"+
 			"host: db.local\n"+
 			"url: \"${SCHEME}://${HOST}:5432\"\n"+
-			"api: \"https://$env{API_HOST}\"\n"+
+			"api: \"https://${API_HOST}\"\n"+
 			"inert: \"{{SCHEME}}\"\n",
 	)
 

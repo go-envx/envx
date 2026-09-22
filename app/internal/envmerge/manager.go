@@ -29,10 +29,7 @@ func New(params Params) (*Manager, error) {
 	if err != nil {
 		return nil, err
 	}
-	grammar, err := newGrammar(
-		normalized.Settings.ReferencePattern,
-		normalized.Settings.OSReferencePattern,
-	)
+	grammar, err := newGrammar(normalized.Settings.ReferencePattern)
 	if err != nil {
 		return nil, err
 	}
