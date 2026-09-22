@@ -3,7 +3,7 @@ package validate
 import (
 	"testing"
 
-	"github.com/go-envx/envx/app/internal/status"
+	"github.com/go-envx/envx/app/internal/shared/status"
 )
 
 // TestFlagNameMatchesConfigKey verifies a check's selection flag name is the

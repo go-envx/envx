@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"slices"
 
-	"github.com/go-envx/envx/app/internal/status"
+	"github.com/go-envx/envx/app/internal/shared/status"
 )
 
 // Manifest is the parsed, validated content of envx.yaml: the declared

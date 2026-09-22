@@ -3,7 +3,7 @@ package validate
 import (
 	"strings"
 
-	"github.com/go-envx/envx/app/internal/status"
+	"github.com/go-envx/envx/app/internal/shared/status"
 )
 
 // Group classifies a check by the files it reads, which is also its cost
