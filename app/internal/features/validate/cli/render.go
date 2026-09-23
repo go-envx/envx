@@ -1,10 +1,10 @@
-package validate
+package cli
 
 import (
 	"fmt"
 
+	engine "github.com/go-envx/envx/app/internal/features/validate"
 	"github.com/go-envx/envx/app/internal/utils/printer"
-	engine "github.com/go-envx/envx/app/internal/validate"
 )
 
 // jsonFinding is the exported, tagged view of a finding for JSON output (the

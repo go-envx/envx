@@ -1,13 +1,13 @@
-package validate
+package cli
 
 import (
 	"errors"
 
+	engine "github.com/go-envx/envx/app/internal/features/validate"
 	"github.com/go-envx/envx/app/internal/flags"
 	"github.com/go-envx/envx/app/internal/schema"
 	"github.com/go-envx/envx/app/internal/utils/printer"
 	"github.com/go-envx/envx/app/internal/utils/str"
-	engine "github.com/go-envx/envx/app/internal/validate"
 	"github.com/spf13/cobra"
 )
 
@@ -57,10 +57,10 @@ const (
 	`
 )
 
-// NewCommand builds the "validate" command. It resolves the whole workspace,
+// NewValidateCmd builds the "validate" command. It resolves the whole workspace,
 // runs the workspace-wide diagnosis, renders the findings, and returns a failure
 // error when the graded report fails so the process exits non-zero.
-func NewCommand() *cobra.Command {
+func NewValidateCmd() *cobra.Command {
 	var output string
 	var strict bool
 
@@ -126,6 +126,11 @@ func NewCommand() *cobra.Command {
 	registerSelectionFlags(cmd, selections)
 
 	return cmd
+}
+
+// NewCommand is an alias for NewValidateCmd.
+func NewCommand() *cobra.Command {
+	return NewValidateCmd()
 }
 
 // registerSelectionFlags adds one boolean selection flag per check, binding each

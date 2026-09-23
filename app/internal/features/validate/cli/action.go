@@ -1,8 +1,8 @@
-package validate
+package cli
 
 import (
 	"github.com/go-envx/envx/app/internal/config"
-	engine "github.com/go-envx/envx/app/internal/validate"
+	engine "github.com/go-envx/envx/app/internal/features/validate"
 )
 
 // actionParams are the inputs to the validate action.

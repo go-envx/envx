@@ -5,11 +5,11 @@ import (
 	"github.com/go-envx/envx/app/internal/actions/explain"
 	"github.com/go-envx/envx/app/internal/actions/get"
 	"github.com/go-envx/envx/app/internal/actions/set"
-	"github.com/go-envx/envx/app/internal/actions/validate"
 	emitcli "github.com/go-envx/envx/app/internal/features/emit/cli"
 	packcli "github.com/go-envx/envx/app/internal/features/pack/cli"
 	runnercli "github.com/go-envx/envx/app/internal/features/runner/cli"
 	secretscli "github.com/go-envx/envx/app/internal/features/secrets/cli"
+	validatecli "github.com/go-envx/envx/app/internal/features/validate/cli"
 	"github.com/go-envx/envx/app/internal/features/workspace"
 	workspacecli "github.com/go-envx/envx/app/internal/features/workspace/cli"
 	"github.com/go-envx/envx/app/internal/flags"
@@ -58,7 +58,7 @@ func NewRootCmd(info BuildInfo) *cobra.Command {
 		emitcli.NewEmitCmd(),
 		diff.NewCommand(),
 		secretscli.NewSecretsCmd(),
-		validate.NewCommand(),
+		validatecli.NewValidateCmd(),
 	)
 	return root
 }

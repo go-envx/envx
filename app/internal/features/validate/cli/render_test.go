@@ -1,4 +1,4 @@
-package validate
+package cli
 
 import (
 	"bytes"
@@ -6,9 +6,9 @@ import (
 	"strings"
 	"testing"
 
+	engine "github.com/go-envx/envx/app/internal/features/validate"
 	"github.com/go-envx/envx/app/internal/shared/status"
 	"github.com/go-envx/envx/app/internal/utils/printer"
-	engine "github.com/go-envx/envx/app/internal/validate"
 )
 
 // plainPrinter builds a printer over the given sinks with color forced off so
