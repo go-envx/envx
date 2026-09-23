@@ -1,8 +1,8 @@
-package pack
+package cli
 
 import (
 	"github.com/go-envx/envx/app/internal/config"
-	engine "github.com/go-envx/envx/app/internal/pack"
+	engine "github.com/go-envx/envx/app/internal/features/pack"
 )
 
 // actionParams are the inputs to the pack action.

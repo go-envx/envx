@@ -1,4 +1,4 @@
-package pack
+package cli
 
 import (
 	"github.com/go-envx/envx/app/internal/flags"
@@ -47,10 +47,10 @@ const (
 	`
 )
 
-// NewCommand builds the "pack" command, which selects an environment-scoped
+// NewPackCmd builds the "pack" command, which selects an environment-scoped
 // subset of the workspace, copies it into --out, and renders a summary of the
 // files written.
-func NewCommand() *cobra.Command {
+func NewPackCmd() *cobra.Command {
 	var (
 		out          string
 		environments []string
@@ -95,4 +95,9 @@ func NewCommand() *cobra.Command {
 	_ = cmd.MarkFlagRequired(schema.Out.Name)
 
 	return cmd
+}
+
+// NewCommand is an alias for NewPackCmd.
+func NewCommand() *cobra.Command {
+	return NewPackCmd()
 }

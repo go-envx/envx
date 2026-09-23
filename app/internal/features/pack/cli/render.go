@@ -1,11 +1,11 @@
-package pack
+package cli
 
 import (
 	"fmt"
 	"path/filepath"
 	"strings"
 
-	engine "github.com/go-envx/envx/app/internal/pack"
+	engine "github.com/go-envx/envx/app/internal/features/pack"
 	"github.com/go-envx/envx/app/internal/utils/printer"
 )
 
