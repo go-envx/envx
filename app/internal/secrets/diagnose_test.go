@@ -4,7 +4,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/go-envx/envx/app/internal/privatekey"
+	"github.com/go-envx/envx/app/internal/features/privatekey"
 	"github.com/go-envx/envx/app/internal/resources/cipher"
 	"github.com/go-envx/envx/app/internal/secrets/internal/envelope"
 	"github.com/go-envx/envx/app/internal/shared/status"

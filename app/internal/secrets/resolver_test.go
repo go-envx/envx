@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/go-envx/envx/app/internal/privatekey"
+	"github.com/go-envx/envx/app/internal/features/privatekey"
 )
 
 // newMaskingResolver builds a masking Resolver over an in-memory store. A masking

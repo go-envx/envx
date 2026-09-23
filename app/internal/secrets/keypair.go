@@ -9,7 +9,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/go-envx/envx/app/internal/privatekey"
+	"github.com/go-envx/envx/app/internal/features/privatekey"
 	"github.com/go-envx/envx/app/internal/secrets/internal/envelope"
 	"github.com/go-envx/envx/app/internal/secrets/internal/store"
 	"github.com/go-envx/envx/app/internal/utils/file"
