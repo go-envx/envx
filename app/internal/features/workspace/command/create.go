@@ -1,4 +1,4 @@
-package create
+package command
 
 import (
 	"embed"
@@ -18,14 +18,11 @@ import (
 //go:embed all:templates
 var templatesFS embed.FS
 
-// Template names, matching the subdirectories under templates/ and the "create"
-// subcommand names.
-const (
-	quickStart = "quick-start"
-)
+// QuickStartTemplate is the template name matching the quick-start subdirectory.
+const QuickStartTemplate = "quick-start"
 
-// actionParams are the inputs to the create action.
-type actionParams struct {
+// CreateWorkspaceCommand defines input parameters for scaffolding a workspace.
+type CreateWorkspaceCommand struct {
 	// Template is the template to scaffold (a subdirectory of templates/).
 	Template string
 	// TargetDir is the directory to scaffold into.
@@ -34,29 +31,47 @@ type actionParams struct {
 	Force bool
 }
 
-// actionResult is the data the create action returns.
-type actionResult struct {
+// CreateWorkspaceResult represents the result of scaffolding a workspace.
+type CreateWorkspaceResult struct {
 	// Written lists the destination paths written, in sorted order.
 	Written []string
 }
 
-// execute scaffolds p.Template into p.TargetDir. Without Force it refuses to
+// CreateWorkspaceHandler executes the workspace creation use case.
+type CreateWorkspaceHandler struct{}
+
+// NewCreateWorkspaceHandler constructs a new CreateWorkspaceHandler.
+func NewCreateWorkspaceHandler() *CreateWorkspaceHandler {
+	return &CreateWorkspaceHandler{}
+}
+
+// Execute scaffolds cmd.Template into cmd.TargetDir. Without Force it refuses to
 // overwrite any existing file, reporting every conflict at once so the caller can
 // resolve them before retrying.
-func execute(p actionParams) (actionResult, error) {
-	root, err := fs.Sub(templatesFS, "templates/"+p.Template)
+func (h *CreateWorkspaceHandler) Execute(
+	cmd CreateWorkspaceCommand,
+) (CreateWorkspaceResult, error) {
+	root, err := fs.Sub(templatesFS, "templates/"+cmd.Template)
 	if err != nil {
-		return actionResult{}, fmt.Errorf("locating template %q: %w", p.Template, err)
+		return CreateWorkspaceResult{}, fmt.Errorf(
+			"locating template %q: %w",
+			cmd.Template,
+			err,
+		)
 	}
 
 	rels, err := collectFiles(root)
 	if err != nil {
-		return actionResult{}, fmt.Errorf("reading template %q: %w", p.Template, err)
+		return CreateWorkspaceResult{}, fmt.Errorf(
+			"reading template %q: %w",
+			cmd.Template,
+			err,
+		)
 	}
 
-	if !p.Force {
-		if err := checkConflicts(p.TargetDir, rels); err != nil {
-			return actionResult{}, err
+	if !cmd.Force {
+		if err := checkConflicts(cmd.TargetDir, rels); err != nil {
+			return CreateWorkspaceResult{}, err
 		}
 	}
 
@@ -64,20 +79,28 @@ func execute(p actionParams) (actionResult, error) {
 	for _, rel := range rels {
 		data, err := fs.ReadFile(root, rel)
 		if err != nil {
-			return actionResult{}, fmt.Errorf("reading template file %q: %w", rel, err)
+			return CreateWorkspaceResult{}, fmt.Errorf(
+				"reading template file %q: %w",
+				rel,
+				err,
+			)
 		}
 
-		dest := filepath.Join(p.TargetDir, filepath.FromSlash(rel))
+		dest := filepath.Join(cmd.TargetDir, filepath.FromSlash(rel))
 		if err := os.MkdirAll(filepath.Dir(dest), 0o750); err != nil {
-			return actionResult{}, fmt.Errorf("creating directory for %s: %w", dest, err)
+			return CreateWorkspaceResult{}, fmt.Errorf(
+				"creating directory for %s: %w",
+				dest,
+				err,
+			)
 		}
 		if err := file.WriteAtomic(dest, data); err != nil {
-			return actionResult{}, err
+			return CreateWorkspaceResult{}, err
 		}
 		written = append(written, dest)
 	}
 
-	return actionResult{Written: written}, nil
+	return CreateWorkspaceResult{Written: written}, nil
 }
 
 // collectFiles returns every file path under src, relative to src and slash-separated,
