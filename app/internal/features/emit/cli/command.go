@@ -1,9 +1,9 @@
-package emit
+package cli
 
 import (
 	"fmt"
 
-	engine "github.com/go-envx/envx/app/internal/emit"
+	engine "github.com/go-envx/envx/app/internal/features/emit"
 	"github.com/go-envx/envx/app/internal/flags"
 	"github.com/go-envx/envx/app/internal/schema"
 	"github.com/go-envx/envx/app/internal/utils/printer"
@@ -53,10 +53,10 @@ const (
 	`
 )
 
-// NewCommand builds the "emit" command, which parses the project and flags,
+// NewEmitCmd builds the "emit" command, which parses the project and flags,
 // resolves and reveals the environment, and renders it to the selected target on
 // stdout or a chosen file.
-func NewCommand() *cobra.Command {
+func NewEmitCmd() *cobra.Command {
 	var (
 		target string
 		name   string
@@ -134,6 +134,11 @@ func NewCommand() *cobra.Command {
 	_ = cmd.MarkFlagRequired(schema.EmitTarget.Name)
 
 	return cmd
+}
+
+// NewCommand is an alias for NewEmitCmd.
+func NewCommand() *cobra.Command {
+	return NewEmitCmd()
 }
 
 // Slice values accepted by --only.

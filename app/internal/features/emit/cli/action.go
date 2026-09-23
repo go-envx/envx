@@ -1,4 +1,4 @@
-package emit
+package cli
 
 import (
 	"bytes"
@@ -10,8 +10,8 @@ import (
 	"strings"
 
 	"github.com/go-envx/envx/app/internal/config"
-	engine "github.com/go-envx/envx/app/internal/emit"
 	"github.com/go-envx/envx/app/internal/envmerge"
+	engine "github.com/go-envx/envx/app/internal/features/emit"
 	"github.com/go-envx/envx/app/internal/utils/file"
 	"github.com/go-envx/envx/app/internal/utils/printer"
 )

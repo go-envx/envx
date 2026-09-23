@@ -1,4 +1,4 @@
-package emit
+package cli
 
 import (
 	"bytes"
@@ -10,7 +10,7 @@ import (
 	"testing"
 
 	"github.com/go-envx/envx/app/internal/config"
-	engine "github.com/go-envx/envx/app/internal/emit"
+	engine "github.com/go-envx/envx/app/internal/features/emit"
 	"github.com/go-envx/envx/app/internal/fixtures"
 	"github.com/go-envx/envx/app/internal/resources/cipher"
 	"github.com/go-envx/envx/app/internal/utils/printer"
