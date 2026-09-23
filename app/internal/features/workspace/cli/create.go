@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/go-envx/envx/app/internal/features/workspace/command"
+	"github.com/go-envx/envx/app/internal/features/workspace"
 	"github.com/go-envx/envx/app/internal/utils/printer"
 	"github.com/go-envx/envx/app/internal/utils/str"
 	"github.com/spf13/cobra"
@@ -30,7 +30,7 @@ const (
 // CreateHandler defines the contract required by the create CLI command
 // to scaffold a workspace.
 type CreateHandler interface {
-	Execute(cmd command.CreateWorkspaceCommand) (command.CreateWorkspaceResult, error)
+	Execute(cmd workspace.CreateWorkspaceCommand) (workspace.CreateWorkspaceResult, error)
 }
 
 // CreateFlags holds CLI flags for the create command.
@@ -55,7 +55,7 @@ func NewCreateCmd(handler CreateHandler) *cobra.Command {
 	cmd.AddCommand(
 		newTemplateCmd(
 			handler,
-			command.QuickStartTemplate,
+			workspace.QuickStartTemplate,
 			quickStartShort,
 			quickStartLong,
 		),
@@ -78,7 +78,7 @@ func newTemplateCmd(
 		Long:  str.Dedent(long),
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			res, err := handler.Execute(command.CreateWorkspaceCommand{
+			res, err := handler.Execute(workspace.CreateWorkspaceCommand{
 				Template:  name,
 				TargetDir: flags.TargetDir,
 				Force:     flags.Force,

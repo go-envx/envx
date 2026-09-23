@@ -4,21 +4,21 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/go-envx/envx/app/internal/features/workspace"
 	"github.com/go-envx/envx/app/internal/features/workspace/cli"
-	"github.com/go-envx/envx/app/internal/features/workspace/command"
 )
 
 // mockCreateHandler implements cli.CreateHandler for unit testing.
 type mockCreateHandler struct {
-	result command.CreateWorkspaceResult
+	result workspace.CreateWorkspaceResult
 	err    error
 	called bool
-	cmd    command.CreateWorkspaceCommand
+	cmd    workspace.CreateWorkspaceCommand
 }
 
 func (m *mockCreateHandler) Execute(
-	cmd command.CreateWorkspaceCommand,
-) (command.CreateWorkspaceResult, error) {
+	cmd workspace.CreateWorkspaceCommand,
+) (workspace.CreateWorkspaceResult, error) {
 	m.called = true
 	m.cmd = cmd
 	return m.result, m.err
@@ -30,7 +30,7 @@ func TestNewCreateCmd(t *testing.T) {
 	t.Parallel()
 
 	mock := &mockCreateHandler{
-		result: command.CreateWorkspaceResult{
+		result: workspace.CreateWorkspaceResult{
 			Written: []string{"target/envx.yaml"},
 		},
 	}
@@ -44,8 +44,8 @@ func TestNewCreateCmd(t *testing.T) {
 	if !mock.called {
 		t.Fatal("expected mock handler to be called")
 	}
-	if mock.cmd.Template != command.QuickStartTemplate {
-		t.Errorf("Template = %q, want %q", mock.cmd.Template, command.QuickStartTemplate)
+	if mock.cmd.Template != workspace.QuickStartTemplate {
+		t.Errorf("Template = %q, want %q", mock.cmd.Template, workspace.QuickStartTemplate)
 	}
 	if mock.cmd.TargetDir != "custom-dir" {
 		t.Errorf("TargetDir = %q, want custom-dir", mock.cmd.TargetDir)
@@ -61,7 +61,7 @@ func TestSummary(t *testing.T) {
 	t.Parallel()
 
 	out := cli.Summary(
-		command.QuickStartTemplate,
+		workspace.QuickStartTemplate,
 		"workspace",
 		[]string{"workspace/envx.yaml"},
 	)

@@ -1,4 +1,4 @@
-package command_test
+package workspace_test
 
 import (
 	"os"
@@ -7,7 +7,7 @@ import (
 
 	"github.com/go-envx/envx/app/internal/config"
 	"github.com/go-envx/envx/app/internal/envmerge"
-	"github.com/go-envx/envx/app/internal/features/workspace/command"
+	"github.com/go-envx/envx/app/internal/features/workspace"
 )
 
 // TestExecuteScaffoldsFiles verifies each template writes its envx.yaml and nested
@@ -15,13 +15,13 @@ import (
 func TestExecuteScaffoldsFiles(t *testing.T) {
 	t.Parallel()
 
-	handler := command.NewCreateWorkspaceHandler()
-	for _, name := range []string{command.QuickStartTemplate} {
+	handler := workspace.NewCreateWorkspaceHandler()
+	for _, name := range []string{workspace.QuickStartTemplate} {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 
 			dir := t.TempDir()
-			res, err := handler.Execute(command.CreateWorkspaceCommand{
+			res, err := handler.Execute(workspace.CreateWorkspaceCommand{
 				Template:  name,
 				TargetDir: dir,
 			})
@@ -46,10 +46,10 @@ func TestExecuteScaffoldsFiles(t *testing.T) {
 func TestExecuteRefusesOverwrite(t *testing.T) {
 	t.Parallel()
 
-	handler := command.NewCreateWorkspaceHandler()
+	handler := workspace.NewCreateWorkspaceHandler()
 	dir := t.TempDir()
-	cmd := command.CreateWorkspaceCommand{
-		Template:  command.QuickStartTemplate,
+	cmd := workspace.CreateWorkspaceCommand{
+		Template:  workspace.QuickStartTemplate,
 		TargetDir: dir,
 	}
 	if _, err := handler.Execute(cmd); err != nil {
@@ -58,8 +58,8 @@ func TestExecuteRefusesOverwrite(t *testing.T) {
 	if _, err := handler.Execute(cmd); err == nil {
 		t.Fatal("expected a conflict error on the second scaffold without --force")
 	}
-	forced := command.CreateWorkspaceCommand{
-		Template:  command.QuickStartTemplate,
+	forced := workspace.CreateWorkspaceCommand{
+		Template:  workspace.QuickStartTemplate,
 		TargetDir: dir,
 		Force:     true,
 	}
@@ -74,10 +74,10 @@ func TestExecuteRefusesOverwrite(t *testing.T) {
 func TestQuickStartResolves(t *testing.T) {
 	t.Parallel()
 
-	handler := command.NewCreateWorkspaceHandler()
+	handler := workspace.NewCreateWorkspaceHandler()
 	dir := t.TempDir()
-	cmd := command.CreateWorkspaceCommand{
-		Template:  command.QuickStartTemplate,
+	cmd := workspace.CreateWorkspaceCommand{
+		Template:  workspace.QuickStartTemplate,
 		TargetDir: dir,
 	}
 	if _, err := handler.Execute(cmd); err != nil {

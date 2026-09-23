@@ -9,7 +9,6 @@ import (
 	"github.com/go-envx/envx/app/internal/cipher"
 	"github.com/go-envx/envx/app/internal/envmerge"
 	"github.com/go-envx/envx/app/internal/features/workspace"
-	"github.com/go-envx/envx/app/internal/features/workspace/infra"
 	"github.com/go-envx/envx/app/internal/schema"
 	"github.com/go-envx/envx/app/internal/secrets"
 	"github.com/go-envx/envx/app/internal/utils/file"
@@ -159,7 +158,7 @@ func ResolveWorkspace(in *Input) (*Result, error) {
 // are applied downstream, so an unset env stays empty here.
 func resolve(in *Input, project string) (*Result, envmerge.Params, error) {
 	// Bind the resolved manifest path and conventional filename into a loader.
-	manifestLoader, err := infra.NewManifestLoader(infra.ManifestLoaderParams{
+	manifestLoader, err := workspace.NewManifestLoader(workspace.ManifestLoaderParams{
 		Path:     resolveManifestPath(in),
 		Filename: defaultManifestFilename,
 	})

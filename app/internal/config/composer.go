@@ -4,7 +4,7 @@ import (
 	"fmt"
 
 	"github.com/go-envx/envx/app/internal/cipher"
-	"github.com/go-envx/envx/app/internal/features/workspace/infra"
+	"github.com/go-envx/envx/app/internal/features/workspace"
 	"github.com/go-envx/envx/app/internal/privatekey"
 	"github.com/go-envx/envx/app/internal/secrets"
 )
@@ -13,7 +13,7 @@ import (
 // or constructs the application's default cipher without a workspace.
 func NewConfiguredCipher(in *Input) (cipher.Cipher, error) {
 	// Bind the resolved manifest path and conventional filename into a loader.
-	manifestLoader, err := infra.NewManifestLoader(infra.ManifestLoaderParams{
+	manifestLoader, err := workspace.NewManifestLoader(workspace.ManifestLoaderParams{
 		Path:     resolveManifestPath(in),
 		Filename: defaultManifestFilename,
 	})

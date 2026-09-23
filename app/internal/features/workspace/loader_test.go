@@ -1,4 +1,4 @@
-package infra_test
+package workspace_test
 
 import (
 	"os"
@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/go-envx/envx/app/internal/features/workspace/infra"
+	"github.com/go-envx/envx/app/internal/features/workspace"
 	"github.com/go-envx/envx/app/internal/fixtures"
 )
 
@@ -23,9 +23,9 @@ func writeManifest(t *testing.T, body string) string {
 }
 
 // newLoader constructs a manifest loader for path using the conventional filename.
-func newLoader(t *testing.T, path string) *infra.ManifestLoader {
+func newLoader(t *testing.T, path string) *workspace.ManifestLoader {
 	t.Helper()
-	m, err := infra.NewManifestLoader(infra.ManifestLoaderParams{
+	m, err := workspace.NewManifestLoader(workspace.ManifestLoaderParams{
 		Path:     path,
 		Filename: "envx.yaml",
 	})
@@ -40,8 +40,8 @@ func newLoader(t *testing.T, path string) *infra.ManifestLoader {
 func TestNewRequiresFilename(t *testing.T) {
 	t.Parallel()
 
-	params := infra.ManifestLoaderParams{Path: "envx.yaml"}
-	if _, err := infra.NewManifestLoader(params); err == nil {
+	params := workspace.ManifestLoaderParams{Path: "envx.yaml"}
+	if _, err := workspace.NewManifestLoader(params); err == nil {
 		t.Error("expected error for empty filename")
 	}
 }
@@ -245,7 +245,7 @@ func TestLoadRejectsUnknownFields(t *testing.T) {
 			if strings.Contains(got, "schema.") || strings.Contains(got, "yaml:") {
 				t.Errorf("error %q should not leak internal decoder/type details", got)
 			}
-			if !strings.Contains(got, infra.SchemaDocsURL) {
+			if !strings.Contains(got, workspace.SchemaDocsURL) {
 				t.Errorf("error %q should point at the schema docs", got)
 			}
 		})

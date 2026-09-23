@@ -1,4 +1,4 @@
-package infra
+package workspace
 
 import (
 	"errors"
@@ -9,7 +9,6 @@ import (
 
 	"gopkg.in/yaml.v3"
 
-	"github.com/go-envx/envx/app/internal/features/workspace"
 	"github.com/go-envx/envx/app/internal/schema"
 	"github.com/go-envx/envx/app/internal/utils/file"
 	"github.com/go-envx/envx/app/internal/utils/yamlx"
@@ -77,7 +76,7 @@ func (m *ManifestLoader) Discover() (string, error) {
 
 // Load discovers the manifest (an explicit path, else a walk-up search), then
 // reads, parses, and validates it. It returns the parsed manifest entity.
-func (m *ManifestLoader) Load() (*workspace.Manifest, error) {
+func (m *ManifestLoader) Load() (*Manifest, error) {
 	path, err := m.discover()
 	if err != nil {
 		return nil, err
@@ -99,7 +98,7 @@ func (m *ManifestLoader) Load() (*workspace.Manifest, error) {
 // parse decodes raw YAML into a schema.Manifest, runs structural validation, and
 // detects the document's block indentation before the struct discards
 // formatting. The on-disk location is recorded separately by Load.
-func (m *ManifestLoader) parse(data []byte) (*workspace.Manifest, error) {
+func (m *ManifestLoader) parse(data []byte) (*Manifest, error) {
 	var node yaml.Node
 	if err := yaml.Unmarshal(data, &node); err != nil {
 		return nil, fmt.Errorf("parsing manifest: %w", err)
@@ -123,7 +122,7 @@ func (m *ManifestLoader) parse(data []byte) (*workspace.Manifest, error) {
 		indent = detected
 	}
 
-	return &workspace.Manifest{
+	return &Manifest{
 		Content: &manifest,
 		Indent:  indent,
 	}, nil

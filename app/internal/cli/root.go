@@ -11,8 +11,8 @@ import (
 	"github.com/go-envx/envx/app/internal/actions/secrets"
 	"github.com/go-envx/envx/app/internal/actions/set"
 	"github.com/go-envx/envx/app/internal/actions/validate"
+	"github.com/go-envx/envx/app/internal/features/workspace"
 	workspacecli "github.com/go-envx/envx/app/internal/features/workspace/cli"
-	workspacecmd "github.com/go-envx/envx/app/internal/features/workspace/command"
 	"github.com/go-envx/envx/app/internal/flags"
 	"github.com/spf13/cobra"
 )
@@ -49,7 +49,7 @@ func NewRootCmd(info BuildInfo) *cobra.Command {
 	)
 
 	root.AddCommand(
-		workspacecli.NewCreateCmd(workspacecmd.NewCreateWorkspaceHandler()),
+		workspacecli.NewCreateCmd(workspace.NewCreateWorkspaceHandler()),
 		get.NewCommand(),
 		keypair.NewCommand(),
 		pack.NewCommand(),
