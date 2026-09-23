@@ -1,11 +1,11 @@
-package run
+package cli
 
 import (
 	"io"
 
 	"github.com/go-envx/envx/app/internal/config"
 	"github.com/go-envx/envx/app/internal/envmerge"
-	"github.com/go-envx/envx/app/internal/runner"
+	"github.com/go-envx/envx/app/internal/features/runner"
 	"github.com/go-envx/envx/app/internal/utils/printer"
 )
 

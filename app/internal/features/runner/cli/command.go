@@ -1,4 +1,4 @@
-package run
+package cli
 
 import (
 	"errors"
@@ -37,10 +37,10 @@ const (
 	`
 )
 
-// NewCommand builds the "run" command, which parses args into the action's
+// NewRunCmd builds the "run" command, which parses args into the action's
 // params/config, executes the action, and runs the specified command with the
 // merged environment for a project.
-func NewCommand() *cobra.Command {
+func NewRunCmd() *cobra.Command {
 	var ignoreErrors bool
 
 	cmd := &cobra.Command{
@@ -85,6 +85,11 @@ func NewCommand() *cobra.Command {
 	flags.BindBool(cmd.Flags(), &ignoreErrors, &schema.IgnoreErrors)
 
 	return cmd
+}
+
+// NewCommand is an alias for NewRunCmd.
+func NewCommand() *cobra.Command {
+	return NewRunCmd()
 }
 
 // validateArgs enforces run's positional layout: exactly one project name, a

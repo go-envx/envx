@@ -6,9 +6,9 @@ import (
 	"github.com/go-envx/envx/app/internal/actions/explain"
 	"github.com/go-envx/envx/app/internal/actions/get"
 	"github.com/go-envx/envx/app/internal/actions/pack"
-	"github.com/go-envx/envx/app/internal/actions/run"
 	"github.com/go-envx/envx/app/internal/actions/set"
 	"github.com/go-envx/envx/app/internal/actions/validate"
+	runnercli "github.com/go-envx/envx/app/internal/features/runner/cli"
 	secretscli "github.com/go-envx/envx/app/internal/features/secrets/cli"
 	"github.com/go-envx/envx/app/internal/features/workspace"
 	workspacecli "github.com/go-envx/envx/app/internal/features/workspace/cli"
@@ -52,7 +52,7 @@ func NewRootCmd(info BuildInfo) *cobra.Command {
 		get.NewCommand(),
 		secretscli.NewKeypairCmd(),
 		pack.NewCommand(),
-		run.NewCommand(),
+		runnercli.NewRunCmd(),
 		set.NewCommand(),
 		explain.NewCommand(),
 		emit.NewCommand(),
