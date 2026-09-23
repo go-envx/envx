@@ -106,11 +106,7 @@ func (m *Manager) Explain(params ExplainParams) (*Explanation, error) {
 	if err != nil {
 		return nil, err
 	}
-	engine := newSymbolSubstituter(
-		m.grammar,
-		m.getSymbols(state, resolver, environment),
-		m.getenv(), m.params.Settings.Overload,
-	)
+	engine := m.newSubstituter(m.getSymbols(state, resolver, environment))
 
 	delimiter := m.params.Settings.Delimiter
 	entries := make([]ExplanationEntry, 0, len(keys))
@@ -195,7 +191,7 @@ func asDiagnoser(resolver ValueResolver) (ValueDiagnoser, error) {
 // other value is diagnosed as a plain config value or secret reference.
 func diagnoseEntry(
 	value leafValue, literal, key string,
-	diagnoser ValueDiagnoser, engine *substituter,
+	diagnoser ValueDiagnoser, engine *syntax.Substituter,
 	environment, delimiter string, reveal bool,
 ) Resolution {
 	refs := engine.Grammar().HasReferences(literal)
@@ -214,7 +210,7 @@ func diagnoseEntry(
 // materialized and retained only under reveal, so masked diagnosis never leaks
 // it.
 func diagnoseSubstitution(
-	engine *substituter, key string, reveal, variable bool,
+	engine *syntax.Substituter, key string, reveal, variable bool,
 ) Resolution {
 	kind := KindConfigValue
 	if variable {

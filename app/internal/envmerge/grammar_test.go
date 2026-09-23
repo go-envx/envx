@@ -35,15 +35,10 @@ func TestCustomGrammarResolvesThroughManager(t *testing.T) {
 		t.Fatalf("New: %v", err)
 	}
 
-	engine := newSymbolSubstituter(
-		m.grammar,
-		mapSymbols(
-			map[string]string{"HOST": "db.local", "URL": "postgresql://${HOST}"},
-			map[string]Origin{},
-		),
-		m.getenv(),
-		false,
-	)
+	engine := m.newSubstituter(mapSymbols(
+		map[string]string{"HOST": "db.local", "URL": "postgresql://${HOST}"},
+		map[string]Origin{},
+	))
 	got, err := engine.Resolve("URL")
 	if err != nil {
 		t.Fatalf("resolve(URL): %v", err)
