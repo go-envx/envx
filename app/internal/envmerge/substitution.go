@@ -3,6 +3,8 @@ package envmerge
 import (
 	"fmt"
 	"sort"
+
+	"github.com/go-envx/envx/app/internal/features/env/syntax"
 )
 
 // getenv returns a getenv seam backed by the injected OS-environment snapshot, so
@@ -27,7 +29,7 @@ func (m *Manager) substituteAll(
 	)
 	out := make(map[string]string, len(values))
 	for key := range values {
-		composed, err := engine.resolve(key)
+		composed, err := engine.Resolve(key)
 		if err != nil {
 			return nil, err
 		}
@@ -74,7 +76,7 @@ func (m *Manager) resolveEffectiveTolerant(
 	)
 	out := make(map[string]string, len(result.values))
 	for key := range result.values {
-		composed, err := engine.resolve(key)
+		composed, err := engine.Resolve(key)
 		if err != nil {
 			failures[key] = err
 			continue
@@ -124,12 +126,12 @@ func (m *Manager) downgradeFailures(
 func (m *Manager) getSymbols(
 	state *mergeState, resolver ValueResolver, environment string,
 ) symbolTable {
-	return symbolTable{
-		declared: func(name string) bool { _, ok := state.values[name]; return ok },
-		opaque: func(name string) bool {
+	return syntax.SymbolTable{
+		Declared: func(name string) bool { _, ok := state.values[name]; return ok },
+		Opaque: func(name string) bool {
 			return state.origins[name].Winner.File == osSource
 		},
-		value: func(name string) (string, error) {
+		Value: func(name string) (string, error) {
 			resolved, err := resolveLeaf(state.values[name], resolver, environment)
 			if err != nil {
 				return "", err

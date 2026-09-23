@@ -90,7 +90,7 @@ func (m *Manager) getValue(
 			m.getSymbols(state, resolver, environment),
 			m.getenv(), m.params.Settings.Overload,
 		)
-		return engine.resolve(key)
+		return engine.Resolve(key)
 	}
 
 	resolved, err := resolveLeaf(value, resolver, environment)

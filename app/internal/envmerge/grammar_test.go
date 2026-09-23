@@ -41,10 +41,10 @@ func TestCustomGrammarResolvesThroughManager(t *testing.T) {
 			map[string]string{"HOST": "db.local", "URL": "postgresql://${HOST}"},
 			map[string]Origin{},
 		),
-		noGetenv,
+		m.getenv(),
 		false,
 	)
-	got, err := engine.resolve("URL")
+	got, err := engine.Resolve("URL")
 	if err != nil {
 		t.Fatalf("resolve(URL): %v", err)
 	}

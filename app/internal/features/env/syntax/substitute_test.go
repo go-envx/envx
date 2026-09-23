@@ -1,8 +1,10 @@
-package envmerge
+package syntax_test
 
 import (
 	"errors"
 	"testing"
+
+	"github.com/go-envx/envx/app/internal/features/env/syntax"
 )
 
 // fixedGetenv returns a getenv seam backed by a fixed map so OS lookups are
@@ -17,6 +19,19 @@ func fixedGetenv(env map[string]string) func(string) (string, bool) {
 // noGetenv is a getenv seam with no OS variables set.
 func noGetenv(string) (string, bool) { return "", false }
 
+// newMapSubstituter is a test helper constructing a Substituter over a map.
+func newMapSubstituter(
+	table map[string]string,
+	getenv func(name string) (string, bool),
+	overload bool,
+) *syntax.Substituter {
+	return syntax.NewSubstituter(syntax.SubstituterParams{
+		Symbols:  syntax.MapSymbols(table),
+		Getenv:   getenv,
+		Overload: overload,
+	})
+}
+
 // TestResolveLiteralPassthrough verifies a value with no references, and an
 // escaped reference, are returned unchanged.
 func TestResolveLiteralPassthrough(t *testing.T) {
@@ -26,13 +41,13 @@ func TestResolveLiteralPassthrough(t *testing.T) {
 		"PLAIN":   "postgresql://db:5432",
 		"ESCAPED": `\{{HOST}}`,
 	}
-	s := newSubstituter(table, noGetenv, false)
+	s := newMapSubstituter(table, noGetenv, false)
 
-	if got, err := s.resolve("PLAIN"); err != nil || got != "postgresql://db:5432" {
-		t.Errorf("resolve(PLAIN) = %q, %v; want the literal value", got, err)
+	if got, err := s.Resolve("PLAIN"); err != nil || got != "postgresql://db:5432" {
+		t.Errorf("Resolve(PLAIN) = %q, %v; want the literal value", got, err)
 	}
-	if got, err := s.resolve("ESCAPED"); err != nil || got != "{{HOST}}" {
-		t.Errorf("resolve(ESCAPED) = %q, %v; want {{HOST}}", got, err)
+	if got, err := s.Resolve("ESCAPED"); err != nil || got != "{{HOST}}" {
+		t.Errorf("Resolve(ESCAPED) = %q, %v; want {{HOST}}", got, err)
 	}
 }
 
@@ -44,14 +59,14 @@ func TestResolveReference(t *testing.T) {
 		"HOST": "db.local",
 		"URL":  "postgresql://{{HOST}}:5432",
 	}
-	s := newSubstituter(table, noGetenv, false)
+	s := newMapSubstituter(table, noGetenv, false)
 
-	got, err := s.resolve("URL")
+	got, err := s.Resolve("URL")
 	if err != nil {
-		t.Fatalf("resolve(URL): %v", err)
+		t.Fatalf("Resolve(URL): %v", err)
 	}
 	if want := "postgresql://db.local:5432"; got != want {
-		t.Errorf("resolve(URL) = %q, want %q", got, want)
+		t.Errorf("Resolve(URL) = %q, want %q", got, want)
 	}
 }
 
@@ -66,14 +81,14 @@ func TestResolveMultipleReferencesPerValue(t *testing.T) {
 		"PORT":   "5432",
 		"URL":    "{{SCHEME}}://{{HOST}}:{{PORT}}",
 	}
-	s := newSubstituter(table, noGetenv, false)
+	s := newMapSubstituter(table, noGetenv, false)
 
-	got, err := s.resolve("URL")
+	got, err := s.Resolve("URL")
 	if err != nil {
-		t.Fatalf("resolve(URL): %v", err)
+		t.Fatalf("Resolve(URL): %v", err)
 	}
 	if want := "postgresql://db.local:5432"; got != want {
-		t.Errorf("resolve(URL) = %q, want %q", got, want)
+		t.Errorf("Resolve(URL) = %q, want %q", got, want)
 	}
 }
 
@@ -87,14 +102,14 @@ func TestResolveTransitiveChain(t *testing.T) {
 		"B": "{{C}}",
 		"C": "leaf",
 	}
-	s := newSubstituter(table, noGetenv, false)
+	s := newMapSubstituter(table, noGetenv, false)
 
-	got, err := s.resolve("A")
+	got, err := s.Resolve("A")
 	if err != nil {
-		t.Fatalf("resolve(A): %v", err)
+		t.Fatalf("Resolve(A): %v", err)
 	}
 	if got != "leaf" {
-		t.Errorf("resolve(A) = %q, want leaf", got)
+		t.Errorf("Resolve(A) = %q, want leaf", got)
 	}
 }
 
@@ -110,21 +125,19 @@ func TestResolveOrderIndependence(t *testing.T) {
 	}
 	want := map[string]string{"FIRST": "z-z", "SECOND": "z", "THIRD": "z"}
 
-	// Resolving in different orders over independent engines yields the same
-	// composed values.
 	for _, order := range [][]string{
 		{"FIRST", "SECOND", "THIRD"},
 		{"THIRD", "SECOND", "FIRST"},
 		{"SECOND", "FIRST", "THIRD"},
 	} {
-		s := newSubstituter(table, noGetenv, false)
+		s := newMapSubstituter(table, noGetenv, false)
 		for _, key := range order {
-			got, err := s.resolve(key)
+			got, err := s.Resolve(key)
 			if err != nil {
-				t.Fatalf("resolve(%s) order %v: %v", key, order, err)
+				t.Fatalf("Resolve(%s) order %v: %v", key, order, err)
 			}
 			if got != want[key] {
-				t.Errorf("resolve(%s) order %v = %q, want %q", key, order, got, want[key])
+				t.Errorf("Resolve(%s) order %v = %q, want %q", key, order, got, want[key])
 			}
 		}
 	}
@@ -141,14 +154,14 @@ func TestResolveDiamondFanIn(t *testing.T) {
 		"RIGHT": "{{BASE}}",
 		"BASE":  "shared",
 	}
-	s := newSubstituter(table, noGetenv, false)
+	s := newMapSubstituter(table, noGetenv, false)
 
-	got, err := s.resolve("TOP")
+	got, err := s.Resolve("TOP")
 	if err != nil {
-		t.Fatalf("resolve(TOP): %v", err)
+		t.Fatalf("Resolve(TOP): %v", err)
 	}
 	if want := "shared+shared"; got != want {
-		t.Errorf("resolve(TOP) = %q, want %q", got, want)
+		t.Errorf("Resolve(TOP) = %q, want %q", got, want)
 	}
 }
 
@@ -163,13 +176,13 @@ func TestResolveReferencePrecedence(t *testing.T) {
 	}
 	getenv := fixedGetenv(map[string]string{"HOST": "os-host"})
 
-	if got, err := newSubstituter(table, getenv, false).resolve("URL"); err != nil ||
+	if got, err := newMapSubstituter(table, getenv, false).Resolve("URL"); err != nil ||
 		got != "os-host" {
-		t.Errorf("default resolve(URL) = %q, %v; want os-host", got, err)
+		t.Errorf("default Resolve(URL) = %q, %v; want os-host", got, err)
 	}
-	if got, err := newSubstituter(table, getenv, true).resolve("URL"); err != nil ||
+	if got, err := newMapSubstituter(table, getenv, true).Resolve("URL"); err != nil ||
 		got != "ns-host" {
-		t.Errorf("overload resolve(URL) = %q, %v; want ns-host", got, err)
+		t.Errorf("overload Resolve(URL) = %q, %v; want ns-host", got, err)
 	}
 }
 
@@ -181,17 +194,19 @@ func TestResolveReferenceFallback(t *testing.T) {
 
 	// Default ordering: OS unset, namespace supplies the value.
 	nsTable := map[string]string{"HOST": "ns-host", "URL": "{{HOST}}"}
-	if got, err := newSubstituter(nsTable, noGetenv, false).resolve("URL"); err != nil ||
-		got != "ns-host" {
-		t.Errorf("default fallback resolve(URL) = %q, %v; want ns-host", got, err)
+	if got, err := newMapSubstituter(
+		nsTable, noGetenv, false,
+	).Resolve("URL"); err != nil || got != "ns-host" {
+		t.Errorf("default fallback Resolve(URL) = %q, %v; want ns-host", got, err)
 	}
 
 	// Overload ordering: namespace lacks the key, OS supplies the value.
 	osTable := map[string]string{"URL": "{{HOST}}"}
 	getenv := fixedGetenv(map[string]string{"HOST": "os-host"})
-	if got, err := newSubstituter(osTable, getenv, true).resolve("URL"); err != nil ||
-		got != "os-host" {
-		t.Errorf("overload fallback resolve(URL) = %q, %v; want os-host", got, err)
+	if got, err := newMapSubstituter(
+		osTable, getenv, true,
+	).Resolve("URL"); err != nil || got != "os-host" {
+		t.Errorf("overload fallback Resolve(URL) = %q, %v; want os-host", got, err)
 	}
 }
 
@@ -205,14 +220,14 @@ func TestResolveReferenceReentersGraph(t *testing.T) {
 		"HOST":   "{{REGION}}.db.local",
 		"REGION": "eu",
 	}
-	s := newSubstituter(table, noGetenv, false)
+	s := newMapSubstituter(table, noGetenv, false)
 
-	got, err := s.resolve("URL")
+	got, err := s.Resolve("URL")
 	if err != nil {
-		t.Fatalf("resolve(URL): %v", err)
+		t.Fatalf("Resolve(URL): %v", err)
 	}
 	if want := "eu.db.local"; got != want {
-		t.Errorf("resolve(URL) = %q, want %q", got, want)
+		t.Errorf("Resolve(URL) = %q, want %q", got, want)
 	}
 }
 
@@ -223,16 +238,16 @@ func TestResolveMissingReference(t *testing.T) {
 	t.Parallel()
 
 	table := map[string]string{"URL": "{{HOST}}"}
-	_, err := newSubstituter(table, noGetenv, false).resolve("URL")
+	_, err := newMapSubstituter(table, noGetenv, false).Resolve("URL")
 
-	var missing *missingReferenceError
+	var missing *syntax.MissingReferenceError
 	if !errors.As(err, &missing) {
-		t.Fatalf("resolve(URL) error = %v, want missingReferenceError", err)
+		t.Fatalf("Resolve(URL) error = %v, want MissingReferenceError", err)
 	}
-	if missing.key != "URL" || missing.reference != "HOST" {
+	if missing.Key != "URL" || missing.Reference != "HOST" {
 		t.Errorf(
-			"error = {key:%q reference:%q}, want {URL HOST}",
-			missing.key, missing.reference,
+			"error = {Key:%q Reference:%q}, want {URL HOST}",
+			missing.Key, missing.Reference,
 		)
 	}
 }
@@ -242,11 +257,11 @@ func TestResolveSelfCycle(t *testing.T) {
 	t.Parallel()
 
 	table := map[string]string{"A": "{{A}}"}
-	_, err := newSubstituter(table, noGetenv, false).resolve("A")
+	_, err := newMapSubstituter(table, noGetenv, false).Resolve("A")
 
-	var cyclic *circularReferenceError
+	var cyclic *syntax.CircularReferenceError
 	if !errors.As(err, &cyclic) {
-		t.Fatalf("resolve(A) error = %v, want circularReferenceError", err)
+		t.Fatalf("Resolve(A) error = %v, want CircularReferenceError", err)
 	}
 	if got, want := cyclic.Error(), "circular reference: A -> A"; got != want {
 		t.Errorf("error = %q, want %q", got, want)
@@ -263,11 +278,11 @@ func TestResolveMultiKeyCycle(t *testing.T) {
 		"B": "{{C}}",
 		"C": "{{A}}",
 	}
-	_, err := newSubstituter(table, noGetenv, false).resolve("A")
+	_, err := newMapSubstituter(table, noGetenv, false).Resolve("A")
 
-	var cyclic *circularReferenceError
+	var cyclic *syntax.CircularReferenceError
 	if !errors.As(err, &cyclic) {
-		t.Fatalf("resolve(A) error = %v, want circularReferenceError", err)
+		t.Fatalf("Resolve(A) error = %v, want CircularReferenceError", err)
 	}
 	if got, want := cyclic.Error(), "circular reference: A -> B -> C -> A"; got != want {
 		t.Errorf("error = %q, want %q", got, want)
@@ -283,25 +298,25 @@ func TestStatusDryRun(t *testing.T) {
 		name  string
 		table map[string]string
 		key   string
-		want  substitutionStatus
+		want  syntax.Resolution
 	}{
 		{
 			name:  "resolves",
 			table: map[string]string{"A": "{{B}}", "B": "leaf"},
 			key:   "A",
-			want:  statusOK,
+			want:  syntax.ResolutionOK,
 		},
 		{
 			name:  "missing reference",
 			table: map[string]string{"A": "{{B}}"},
 			key:   "A",
-			want:  statusUnresolved,
+			want:  syntax.ResolutionUnresolved,
 		},
 		{
 			name:  "circular reference",
 			table: map[string]string{"A": "{{B}}", "B": "{{A}}"},
 			key:   "A",
-			want:  statusCircular,
+			want:  syntax.ResolutionCircular,
 		},
 	}
 
@@ -309,10 +324,50 @@ func TestStatusDryRun(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			s := newSubstituter(tt.table, noGetenv, false)
-			if got := s.status(tt.key); got != tt.want {
-				t.Errorf("status(%s) = %d, want %d", tt.key, got, tt.want)
+			s := newMapSubstituter(tt.table, noGetenv, false)
+			if got := s.Status(tt.key); got != tt.want {
+				t.Errorf("Status(%s) = %d, want %d", tt.key, got, tt.want)
 			}
 		})
+	}
+}
+
+// TestOpaqueValueNotSubstituted verifies an opaque symbol is never evaluated for
+// references.
+func TestOpaqueValueNotSubstituted(t *testing.T) {
+	t.Parallel()
+
+	s := syntax.NewSubstituter(syntax.SubstituterParams{
+		Symbols: syntax.SymbolTable{
+			Declared: func(name string) bool { return name == "OPAQUE" },
+			Opaque:   func(name string) bool { return name == "OPAQUE" },
+			Value:    func(string) (string, error) { return "{{DOES_NOT_EXIST}}", nil },
+		},
+	})
+
+	got, err := s.Resolve("OPAQUE")
+	if err != nil {
+		t.Fatalf("Resolve(OPAQUE): %v", err)
+	}
+	if got != "{{DOES_NOT_EXIST}}" {
+		t.Errorf("Resolve(OPAQUE) = %q, want verbatim opaque value", got)
+	}
+}
+
+// TestResolutionString verifies the String() method on Resolution.
+func TestResolutionString(t *testing.T) {
+	t.Parallel()
+
+	if got := syntax.ResolutionOK.String(); got != "ok" {
+		t.Errorf("ResolutionOK.String() = %q, want ok", got)
+	}
+	if got := syntax.ResolutionUnresolved.String(); got != "unresolved" {
+		t.Errorf("ResolutionUnresolved.String() = %q, want unresolved", got)
+	}
+	if got := syntax.ResolutionCircular.String(); got != "circular" {
+		t.Errorf("ResolutionCircular.String() = %q, want circular", got)
+	}
+	if got := syntax.Resolution(99).String(); got != "Resolution(99)" {
+		t.Errorf("Resolution(99).String() = %q, want Resolution(99)", got)
 	}
 }

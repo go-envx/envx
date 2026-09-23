@@ -5,6 +5,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/go-envx/envx/app/internal/features/env/syntax"
 	"github.com/go-envx/envx/app/internal/shared/status"
 )
 
@@ -197,8 +198,8 @@ func diagnoseEntry(
 	diagnoser ValueDiagnoser, engine *substituter,
 	environment, delimiter string, reveal bool,
 ) Resolution {
-	refs := engine.grammar.HasReferences(literal)
-	if !value.opaque && (refs || engine.grammar.HasEscape(literal)) {
+	refs := engine.Grammar().HasReferences(literal)
+	if !value.opaque && (refs || engine.Grammar().HasEscape(literal)) {
 		return diagnoseSubstitution(engine, key, reveal, refs)
 	}
 	return diagnoseLeaf(value, diagnoser, environment, delimiter, reveal)
@@ -220,20 +221,20 @@ func diagnoseSubstitution(
 		kind = KindVariableSubstitution
 	}
 	resolution := Resolution{Kind: kind, Severity: SeverityOK, Code: status.OK}
-	switch engine.status(key) {
-	case statusCircular:
+	switch engine.Status(key) {
+	case syntax.ResolutionCircular:
 		resolution.Severity = SeverityError
 		resolution.Code = status.CircularVariableReference
 		resolution.Message = "reference cycle detected"
-	case statusUnresolved:
+	case syntax.ResolutionUnresolved:
 		resolution.Severity = SeverityError
 		resolution.Code = status.UnresolvedVariableReference
 		resolution.Message = "references an undefined variable"
-	case statusOK:
+	case syntax.ResolutionOK:
 		if reveal {
 			// status already composed the value successfully; resolve returns the
 			// cached result, so no work is repeated and no error is possible here.
-			composed, _ := engine.resolve(key)
+			composed, _ := engine.Resolve(key)
 			resolution.Resolved = composed
 			resolution.HasResolved = true
 		}

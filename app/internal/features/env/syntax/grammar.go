@@ -11,12 +11,12 @@ import (
 // backslash, so a value can carry an untouched template or sigil.
 const escape = '\\'
 
-// DefaultReferencePattern is the built-in reference grammar. It matches {{VAR}}
+// defaultReferencePattern is the built-in reference grammar. It matches {{VAR}}
 // for a variable reference; the first capture group is the variable name, which
 // the tokenizer trims. It stops at the first "}}" so a value can hold literal text
 // after the reference. A workspace overrides the pattern via settings; the exact
 // sigil is therefore not load-bearing.
-const DefaultReferencePattern = `\{\{([^}]*)\}\}`
+const defaultReferencePattern = `\{\{([^}]*)\}\}`
 
 // Grammar is the compiled reference syntax the tokenizer scans with: one pattern
 // for variable references. It is anchored, so a match is only ever accepted at
@@ -29,13 +29,13 @@ type Grammar struct {
 // DefaultGrammar is the built-in reference syntax, used by callers that configure
 // no custom pattern and by package-level tokenizer helpers.
 var DefaultGrammar = mustNewGrammar(GrammarParams{
-	ReferencePattern: DefaultReferencePattern,
+	ReferencePattern: defaultReferencePattern,
 })
 
 // GrammarParams specifies the input parameters for compiling a Grammar.
 type GrammarParams struct {
 	// ReferencePattern is the regular expression matching variable references.
-	// When empty, DefaultReferencePattern is used.
+	// When empty, the built-in default pattern matching {{VAR}} is used.
 	ReferencePattern string
 }
 
@@ -46,7 +46,7 @@ type GrammarParams struct {
 // group is taken as the variable name.
 func NewGrammar(params GrammarParams) (*Grammar, error) {
 	reference, err := compileReferencePattern(
-		params.ReferencePattern, DefaultReferencePattern,
+		params.ReferencePattern, defaultReferencePattern,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("reference pattern: %w", err)
