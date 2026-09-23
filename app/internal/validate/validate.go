@@ -6,7 +6,7 @@ import (
 	"strings"
 
 	"github.com/go-envx/envx/app/internal/envmerge"
-	"github.com/go-envx/envx/app/internal/secrets"
+	"github.com/go-envx/envx/app/internal/features/secrets"
 	"github.com/go-envx/envx/app/internal/shared/status"
 )
 

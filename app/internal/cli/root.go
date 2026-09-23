@@ -5,12 +5,11 @@ import (
 	"github.com/go-envx/envx/app/internal/actions/emit"
 	"github.com/go-envx/envx/app/internal/actions/explain"
 	"github.com/go-envx/envx/app/internal/actions/get"
-	"github.com/go-envx/envx/app/internal/actions/keypair"
 	"github.com/go-envx/envx/app/internal/actions/pack"
 	"github.com/go-envx/envx/app/internal/actions/run"
-	"github.com/go-envx/envx/app/internal/actions/secrets"
 	"github.com/go-envx/envx/app/internal/actions/set"
 	"github.com/go-envx/envx/app/internal/actions/validate"
+	secretscli "github.com/go-envx/envx/app/internal/features/secrets/cli"
 	"github.com/go-envx/envx/app/internal/features/workspace"
 	workspacecli "github.com/go-envx/envx/app/internal/features/workspace/cli"
 	"github.com/go-envx/envx/app/internal/flags"
@@ -51,14 +50,14 @@ func NewRootCmd(info BuildInfo) *cobra.Command {
 	root.AddCommand(
 		workspacecli.NewCreateCmd(workspace.NewCreateWorkspaceHandler()),
 		get.NewCommand(),
-		keypair.NewCommand(),
+		secretscli.NewKeypairCmd(),
 		pack.NewCommand(),
 		run.NewCommand(),
 		set.NewCommand(),
 		explain.NewCommand(),
 		emit.NewCommand(),
 		diff.NewCommand(),
-		secrets.NewCommand(),
+		secretscli.NewSecretsCmd(),
 		validate.NewCommand(),
 	)
 	return root

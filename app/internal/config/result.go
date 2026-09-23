@@ -5,8 +5,8 @@ import (
 	"path/filepath"
 
 	"github.com/go-envx/envx/app/internal/envmerge"
+	"github.com/go-envx/envx/app/internal/features/secrets"
 	"github.com/go-envx/envx/app/internal/resources/cipher"
-	"github.com/go-envx/envx/app/internal/secrets"
 )
 
 // Result is the aggregate config produces from one manifest load and one
