@@ -7,7 +7,7 @@ import (
 	"strings"
 	"unicode"
 
-	"github.com/go-envx/envx/app/internal/cipher"
+	"github.com/go-envx/envx/app/internal/resources/cipher"
 )
 
 const ciphertextPrefix = "encrypted-"

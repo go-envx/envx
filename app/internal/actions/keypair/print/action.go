@@ -3,8 +3,8 @@ package print
 import (
 	"fmt"
 
-	"github.com/go-envx/envx/app/internal/cipher"
 	"github.com/go-envx/envx/app/internal/config"
+	"github.com/go-envx/envx/app/internal/resources/cipher"
 )
 
 // actionResult contains the explicitly requested ephemeral keypair.

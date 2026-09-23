@@ -9,9 +9,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/go-envx/envx/app/internal/cipher"
 	"github.com/go-envx/envx/app/internal/config"
 	"github.com/go-envx/envx/app/internal/fixtures"
+	"github.com/go-envx/envx/app/internal/resources/cipher"
 )
 
 // TestExecuteInjectsEnv verifies the resolved environment reaches the child

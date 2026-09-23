@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/go-envx/envx/app/internal/cipher"
+	"github.com/go-envx/envx/app/internal/resources/cipher"
 )
 
 // TestRoundTrip verifies algorithm metadata and native bytes survive the

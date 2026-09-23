@@ -5,8 +5,8 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/go-envx/envx/app/internal/cipher"
 	"github.com/go-envx/envx/app/internal/privatekey"
+	"github.com/go-envx/envx/app/internal/resources/cipher"
 )
 
 // writeStore writes body to a secrets.yaml in a fresh temp dir and returns its path.

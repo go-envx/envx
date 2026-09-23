@@ -9,10 +9,10 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/go-envx/envx/app/internal/cipher"
 	"github.com/go-envx/envx/app/internal/config"
 	engine "github.com/go-envx/envx/app/internal/emit"
 	"github.com/go-envx/envx/app/internal/fixtures"
+	"github.com/go-envx/envx/app/internal/resources/cipher"
 	"github.com/go-envx/envx/app/internal/utils/printer"
 )
 

@@ -4,8 +4,8 @@ import (
 	"errors"
 	"strings"
 
-	"github.com/go-envx/envx/app/internal/cipher"
 	"github.com/go-envx/envx/app/internal/privatekey"
+	"github.com/go-envx/envx/app/internal/resources/cipher"
 )
 
 // Params supplies paths and dependencies for a Manager.
