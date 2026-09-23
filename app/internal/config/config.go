@@ -8,7 +8,7 @@ import (
 
 	"github.com/go-envx/envx/app/internal/cipher"
 	"github.com/go-envx/envx/app/internal/envmerge"
-	"github.com/go-envx/envx/app/internal/manifest"
+	"github.com/go-envx/envx/app/internal/features/workspace/infra"
 	"github.com/go-envx/envx/app/internal/schema"
 	"github.com/go-envx/envx/app/internal/secrets"
 	"github.com/go-envx/envx/app/internal/utils/file"
@@ -157,8 +157,8 @@ func ResolveWorkspace(in *Input) (*Result, error) {
 // "project not found" error). Terminal fallbacks (e.g. the default environment)
 // are applied downstream, so an unset env stays empty here.
 func resolve(in *Input, project string) (*Result, envmerge.Params, error) {
-	// Bind the resolved manifest path and conventional filename into a manager.
-	manifestManager, err := manifest.New(manifest.Params{
+	// Bind the resolved manifest path and conventional filename into a loader.
+	manifestLoader, err := infra.NewManifestLoader(infra.ManifestLoaderParams{
 		Path:     resolveManifestPath(in),
 		Filename: defaultManifestFilename,
 	})
@@ -167,7 +167,7 @@ func resolve(in *Input, project string) (*Result, envmerge.Params, error) {
 	}
 
 	// Load the manifest from the resolved manifest path.
-	manifestDocument, err := manifestManager.Load()
+	manifestDocument, err := manifestLoader.Load()
 	if err != nil {
 		return nil, envmerge.Params{}, err
 	}

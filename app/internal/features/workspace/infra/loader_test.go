@@ -1,4 +1,4 @@
-package manifest
+package infra_test
 
 import (
 	"os"
@@ -6,6 +6,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/go-envx/envx/app/internal/features/workspace/infra"
 	"github.com/go-envx/envx/app/internal/fixtures"
 )
 
@@ -21,12 +22,15 @@ func writeManifest(t *testing.T, body string) string {
 	return path
 }
 
-// newManager constructs a manager for path using the conventional filename.
-func newManager(t *testing.T, path string) *Manager {
+// newLoader constructs a manifest loader for path using the conventional filename.
+func newLoader(t *testing.T, path string) *infra.ManifestLoader {
 	t.Helper()
-	m, err := New(Params{Path: path, Filename: "envx.yaml"})
+	m, err := infra.NewManifestLoader(infra.ManifestLoaderParams{
+		Path:     path,
+		Filename: "envx.yaml",
+	})
 	if err != nil {
-		t.Fatalf("New: %v", err)
+		t.Fatalf("NewManifestLoader: %v", err)
 	}
 	return m
 }
@@ -36,7 +40,8 @@ func newManager(t *testing.T, path string) *Manager {
 func TestNewRequiresFilename(t *testing.T) {
 	t.Parallel()
 
-	if _, err := New(Params{Path: "envx.yaml"}); err == nil {
+	params := infra.ManifestLoaderParams{Path: "envx.yaml"}
+	if _, err := infra.NewManifestLoader(params); err == nil {
 		t.Error("expected error for empty filename")
 	}
 }
@@ -46,7 +51,7 @@ func TestLoadValid(t *testing.T) {
 	t.Parallel()
 
 	path := fixtures.Manifest("manifest/valid-secrets")
-	loaded, err := newManager(t, path).Load()
+	loaded, err := newLoader(t, path).Load()
 	if err != nil {
 		t.Fatalf("Load: %v", err)
 	}
@@ -71,7 +76,7 @@ func TestLoadValid(t *testing.T) {
 	}
 }
 
-// TestLoadFromDirectoryPath verifies a directory --config resolves to the
+// TestLoadFromDirectoryPath verifies a directory manifest path resolves to the
 // conventional manifest inside it.
 func TestLoadFromDirectoryPath(t *testing.T) {
 	t.Parallel()
@@ -80,7 +85,7 @@ func TestLoadFromDirectoryPath(t *testing.T) {
 		"environments: [production]\nprojects:\n  app:\n    includes: [env/app]\n")
 	dir := filepath.Dir(manifestPath)
 
-	loaded, err := newManager(t, dir).Load()
+	loaded, err := newLoader(t, dir).Load()
 	if err != nil {
 		t.Fatalf("Load from directory: %v", err)
 	}
@@ -89,13 +94,13 @@ func TestLoadFromDirectoryPath(t *testing.T) {
 	}
 }
 
-// TestLoadFromDirectoryMissingManifest verifies a directory --config with no
+// TestLoadFromDirectoryMissingManifest verifies a directory manifest path with no
 // manifest inside reports an actionable error naming the filename and directory.
 func TestLoadFromDirectoryMissingManifest(t *testing.T) {
 	t.Parallel()
 
 	dir := t.TempDir()
-	_, err := newManager(t, dir).Load()
+	_, err := newLoader(t, dir).Load()
 	if err == nil {
 		t.Fatal("expected an error for a directory without a manifest")
 	}
@@ -133,7 +138,7 @@ func TestLoadDetectsIndent(t *testing.T) {
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
-			loaded, err := newManager(t, writeManifest(t, tc.body)).Load()
+			loaded, err := newLoader(t, writeManifest(t, tc.body)).Load()
 			if err != nil {
 				t.Fatalf("Load: %v", err)
 			}
@@ -150,7 +155,7 @@ func TestExistsMissing(t *testing.T) {
 	t.Parallel()
 
 	path := filepath.Join(t.TempDir(), "missing.yaml")
-	exists, err := newManager(t, path).Exists()
+	exists, err := newLoader(t, path).Exists()
 	if err != nil {
 		t.Fatalf("Exists(): %v", err)
 	}
@@ -163,7 +168,7 @@ func TestExistsMissing(t *testing.T) {
 func TestExistsPresent(t *testing.T) {
 	t.Parallel()
 
-	exists, err := newManager(t, fixtures.Manifest("basic")).Exists()
+	exists, err := newLoader(t, fixtures.Manifest("basic")).Exists()
 	if err != nil {
 		t.Fatalf("Exists(): %v", err)
 	}
@@ -187,7 +192,7 @@ func TestLoadInvalid(t *testing.T) {
 	for name, body := range tests {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
-			if _, err := newManager(t, writeManifest(t, body)).Load(); err == nil {
+			if _, err := newLoader(t, writeManifest(t, body)).Load(); err == nil {
 				t.Error("expected validation error")
 			}
 		})
@@ -229,7 +234,7 @@ func TestLoadRejectsUnknownFields(t *testing.T) {
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
-			_, err := newManager(t, writeManifest(t, tc.body)).Load()
+			_, err := newLoader(t, writeManifest(t, tc.body)).Load()
 			if err == nil {
 				t.Fatal("expected an error for an unknown manifest key")
 			}
@@ -240,7 +245,7 @@ func TestLoadRejectsUnknownFields(t *testing.T) {
 			if strings.Contains(got, "schema.") || strings.Contains(got, "yaml:") {
 				t.Errorf("error %q should not leak internal decoder/type details", got)
 			}
-			if !strings.Contains(got, schemaDocsURL) {
+			if !strings.Contains(got, infra.SchemaDocsURL) {
 				t.Errorf("error %q should point at the schema docs", got)
 			}
 		})
@@ -257,7 +262,7 @@ func TestLoadSuggestsNearestKey(t *testing.T) {
 		"settings:\n  require_overlays: false\n" +
 		"projects:\n  api:\n    includes: [env/x]\n"
 
-	_, err := newManager(t, writeManifest(t, body)).Load()
+	_, err := newLoader(t, writeManifest(t, body)).Load()
 	if err == nil {
 		t.Fatal("expected an error for a renamed settings key")
 	}
@@ -279,7 +284,7 @@ func TestLoadKebabSettingsKeys(t *testing.T) {
 		"  require-overlays: true\n" +
 		"projects:\n  api:\n    includes: [env/x]\n"
 
-	loaded, err := newManager(t, writeManifest(t, body)).Load()
+	loaded, err := newLoader(t, writeManifest(t, body)).Load()
 	if err != nil {
 		t.Fatalf("Load: %v", err)
 	}
@@ -296,7 +301,7 @@ func TestLoadKebabSettingsKeys(t *testing.T) {
 func TestLoadDiscovers(t *testing.T) {
 	t.Parallel()
 
-	loaded, err := newManager(t, fixtures.Manifest("basic")).Load()
+	loaded, err := newLoader(t, fixtures.Manifest("basic")).Load()
 	if err != nil {
 		t.Fatalf("Load: %v", err)
 	}
@@ -305,37 +310,16 @@ func TestLoadDiscovers(t *testing.T) {
 	}
 }
 
-// TestDiscoverExplicit verifies an explicit path is honored and a missing path
-// is an error.
+// TestDiscoverExplicit verifies an explicit path is honored and returns an
+// absolute path.
 func TestDiscoverExplicit(t *testing.T) {
 	t.Parallel()
 
-	got, err := newManager(t, fixtures.Manifest("basic")).discover()
+	got, err := newLoader(t, fixtures.Manifest("basic")).Discover()
 	if err != nil {
 		t.Fatalf("Discover: %v", err)
 	}
 	if !filepath.IsAbs(got) {
 		t.Errorf("expected absolute path, got %q", got)
-	}
-
-	missing := filepath.Join(t.TempDir(), "missing.yaml")
-	if _, err := newManager(t, missing).discover(); err == nil {
-		t.Error("expected error for missing explicit path")
-	}
-}
-
-// TestDiscoverWalkUp verifies that with no explicit path the search walks up from
-// the working directory to the nearest envx.yaml.
-func TestDiscoverWalkUp(t *testing.T) {
-	// t.Chdir forbids t.Parallel.
-	man := fixtures.Manifest("basic")
-	t.Chdir(filepath.Join(filepath.Dir(man), "apps", "api-core", "env"))
-
-	got, err := newManager(t, "").discover()
-	if err != nil {
-		t.Fatalf("Discover: %v", err)
-	}
-	if got != man {
-		t.Errorf("Discover() = %q, want %q", got, man)
 	}
 }

@@ -4,7 +4,7 @@ import (
 	"fmt"
 
 	"github.com/go-envx/envx/app/internal/cipher"
-	"github.com/go-envx/envx/app/internal/manifest"
+	"github.com/go-envx/envx/app/internal/features/workspace/infra"
 	"github.com/go-envx/envx/app/internal/privatekey"
 	"github.com/go-envx/envx/app/internal/secrets"
 )
@@ -12,8 +12,8 @@ import (
 // NewConfiguredCipher resolves the workspace cipher when a manifest is present,
 // or constructs the application's default cipher without a workspace.
 func NewConfiguredCipher(in *Input) (cipher.Cipher, error) {
-	// Bind the resolved manifest path and conventional filename into a manager.
-	manifestManager, err := manifest.New(manifest.Params{
+	// Bind the resolved manifest path and conventional filename into a loader.
+	manifestLoader, err := infra.NewManifestLoader(infra.ManifestLoaderParams{
 		Path:     resolveManifestPath(in),
 		Filename: defaultManifestFilename,
 	})
@@ -22,7 +22,7 @@ func NewConfiguredCipher(in *Input) (cipher.Cipher, error) {
 	}
 
 	// Detect an optional manifest so standalone commands can use the default cipher.
-	manifestExists, err := manifestManager.Exists()
+	manifestExists, err := manifestLoader.Exists()
 	if err != nil {
 		return nil, err
 	}
@@ -30,7 +30,7 @@ func NewConfiguredCipher(in *Input) (cipher.Cipher, error) {
 	// Replace the default with the manifest's algorithm when a workspace exists.
 	cipherParams := cipher.Params{Algorithm: defaultCipherAlgorithm}
 	if manifestExists {
-		manifestDocument, err := manifestManager.Load()
+		manifestDocument, err := manifestLoader.Load()
 		if err != nil {
 			return nil, err
 		}
