@@ -10,8 +10,8 @@ import (
 	"strings"
 
 	"github.com/go-envx/envx/app/internal/config"
-	"github.com/go-envx/envx/app/internal/envmerge"
 	engine "github.com/go-envx/envx/app/internal/features/emit"
+	"github.com/go-envx/envx/app/internal/features/env"
 	"github.com/go-envx/envx/app/internal/utils/file"
 	"github.com/go-envx/envx/app/internal/utils/printer"
 )
@@ -85,7 +85,7 @@ func execute(
 	// Reveal and classify every winning value. Explain never aborts on a per-key
 	// failure — it carries the status instead — so emit enforces its own
 	// fail-closed contract in entriesFromExplanation below.
-	explanation, err := resolved.Envmerge.Explain(envmerge.ExplainParams{Reveal: true})
+	explanation, err := resolved.Envmerge.Explain(env.ExplainParams{Reveal: true})
 	if err != nil {
 		return err
 	}
@@ -201,7 +201,7 @@ func outputCarriesSecrets(p actionParams, entries []engine.Entry) bool {
 // plaintext it returns an error naming every unresolved key and no entries, so
 // the caller emits nothing. A value classified as a secret reference becomes a
 // secret-derived entry, which the Kubernetes split routes into a Secret.
-func entriesFromExplanation(explanation *envmerge.Explanation) ([]engine.Entry, error) {
+func entriesFromExplanation(explanation *env.Explanation) ([]engine.Entry, error) {
 	entries := make([]engine.Entry, 0, len(explanation.Entries))
 	var unresolved []string
 	for i := range explanation.Entries {
@@ -213,7 +213,7 @@ func entriesFromExplanation(explanation *envmerge.Explanation) ([]engine.Entry, 
 		entries = append(entries, engine.Entry{
 			Key:    e.Key,
 			Value:  e.Resolution.Resolved,
-			Secret: e.Resolution.Kind == envmerge.KindSecretReference,
+			Secret: e.Resolution.Kind == env.KindSecretReference,
 		})
 	}
 	if len(unresolved) > 0 {

@@ -5,7 +5,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/go-envx/envx/app/internal/envmerge"
+	"github.com/go-envx/envx/app/internal/features/env"
 	"github.com/go-envx/envx/app/internal/features/secrets"
 	"github.com/go-envx/envx/app/internal/shared/status"
 )
@@ -17,7 +17,7 @@ type ProjectManager struct {
 	// Name is the manifest project name, used to attribute findings.
 	Name string
 	// Manager resolves and diagnoses the project's environments.
-	Manager *envmerge.Manager
+	Manager *env.Manager
 }
 
 // Workspace is the resolved input Validate iterates: one manager per project,
@@ -91,7 +91,7 @@ func diagnoseEnvironment(
 	project ProjectManager,
 	environment string,
 ) error {
-	explanation, err := project.Manager.Explain(envmerge.ExplainParams{
+	explanation, err := project.Manager.Explain(env.ExplainParams{
 		Environment: environment,
 		Reveal:      false,
 	})
@@ -118,7 +118,7 @@ func diagnoseEnvironment(
 			})
 		}
 
-		if entry.Resolution.Severity == envmerge.SeverityOK {
+		if entry.Resolution.Severity == env.SeverityOK {
 			continue
 		}
 		// The resolution group reports only resolution-structure codes; a store-owned
@@ -144,7 +144,7 @@ func diagnoseEnvironment(
 // so the base is no longer the single catalog of every key and an overlay-key
 // typo would silently create a new key. Any base source among the winner or the
 // shadowed sources satisfies the check.
-func declaredInBase(origin envmerge.Origin, environment string) bool {
+func declaredInBase(origin env.Origin, environment string) bool {
 	if isBaseSource(origin.Winner, environment) {
 		return true
 	}
@@ -160,7 +160,7 @@ func declaredInBase(origin envmerge.Origin, environment string) bool {
 // (<name>.yaml) rather than an environment overlay (<name>.<env>.yaml) or the OS
 // environment. The overlay for this environment ends with ".<env>.yaml", so a
 // real YAML file that does not is a base declaration.
-func isBaseSource(source envmerge.Source, environment string) bool {
+func isBaseSource(source env.Source, environment string) bool {
 	if !strings.HasSuffix(source.File, ".yaml") {
 		return false
 	}

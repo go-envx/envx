@@ -3,7 +3,7 @@ package validate
 import (
 	"testing"
 
-	"github.com/go-envx/envx/app/internal/envmerge"
+	"github.com/go-envx/envx/app/internal/features/env"
 )
 
 // TestDeclaredInBase verifies a key is declared in base when any of its sources
@@ -11,33 +11,33 @@ import (
 func TestDeclaredInBase(t *testing.T) {
 	t.Parallel()
 
-	base := envmerge.Source{File: "/ws/env/app.yaml", Key: "name"}
-	overlay := envmerge.Source{File: "/ws/env/app.production.yaml", Key: "name"}
-	osSource := envmerge.Source{File: "OS environment", Key: "NAME"}
+	base := env.Source{File: "/ws/env/app.yaml", Key: "name"}
+	overlay := env.Source{File: "/ws/env/app.production.yaml", Key: "name"}
+	osSource := env.Source{File: "OS environment", Key: "NAME"}
 
 	cases := []struct {
 		name   string
-		origin envmerge.Origin
+		origin env.Origin
 		want   bool
 	}{
 		{
 			name:   "base winner",
-			origin: envmerge.Origin{Winner: base},
+			origin: env.Origin{Winner: base},
 			want:   true,
 		},
 		{
 			name:   "overlay winner shadows base",
-			origin: envmerge.Origin{Winner: overlay, Shadowed: []envmerge.Source{base}},
+			origin: env.Origin{Winner: overlay, Shadowed: []env.Source{base}},
 			want:   true,
 		},
 		{
 			name:   "overlay only",
-			origin: envmerge.Origin{Winner: overlay},
+			origin: env.Origin{Winner: overlay},
 			want:   false,
 		},
 		{
 			name:   "os winner over overlay only",
-			origin: envmerge.Origin{Winner: osSource, Shadowed: []envmerge.Source{overlay}},
+			origin: env.Origin{Winner: osSource, Shadowed: []env.Source{overlay}},
 			want:   false,
 		},
 	}

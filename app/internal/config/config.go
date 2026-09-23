@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/go-envx/envx/app/internal/envmerge"
+	"github.com/go-envx/envx/app/internal/features/env"
 	"github.com/go-envx/envx/app/internal/features/secrets"
 	"github.com/go-envx/envx/app/internal/features/workspace"
 	"github.com/go-envx/envx/app/internal/resources/cipher"
@@ -103,7 +103,7 @@ func ResolveProject(in *Input, project string) (*Result, error) {
 
 	// Construct the Manager from the resolved params. New validates and copies the
 	// params without reading namespace files or opening the store.
-	manager, err := envmerge.New(params)
+	manager, err := env.New(params)
 	if err != nil {
 		return nil, err
 	}
@@ -116,7 +116,7 @@ func ResolveProject(in *Input, project string) (*Result, error) {
 // construction params, so no store I/O, cipher construction, or private-key
 // resolution happens until an operation asks for a resolver — keeping the store
 // snapshot and private-key cache operation-scoped. It is the config-owned adapter
-// that implements envmerge.ValueResolverFactory, preserving the dependency
+// that implements env.ValueResolverFactory, preserving the dependency
 // direction in which envmerge defines the consumed interface and config composes
 // the provider.
 type resolverFactory struct {
@@ -128,7 +128,7 @@ type resolverFactory struct {
 
 // Resolver constructs a fresh secrets manager and opens an operation-scoped
 // resolver under the reveal policy.
-func (f resolverFactory) Resolver(reveal bool) (envmerge.ValueResolver, error) {
+func (f resolverFactory) Resolver(reveal bool) (env.ValueResolver, error) {
 	manager, err := NewSecretsManager(f.secrets, f.cipher)
 	if err != nil {
 		return nil, err
@@ -156,20 +156,20 @@ func ResolveWorkspace(in *Input) (*Result, error) {
 // resolves the global context only (no project layer, no includes, and no
 // "project not found" error). Terminal fallbacks (e.g. the default environment)
 // are applied downstream, so an unset env stays empty here.
-func resolve(in *Input, project string) (*Result, envmerge.Params, error) {
+func resolve(in *Input, project string) (*Result, env.Params, error) {
 	// Bind the resolved manifest path and conventional filename into a loader.
 	manifestLoader, err := workspace.NewManifestLoader(workspace.ManifestLoaderParams{
 		Path:     resolveManifestPath(in),
 		Filename: defaultManifestFilename,
 	})
 	if err != nil {
-		return nil, envmerge.Params{}, err
+		return nil, env.Params{}, err
 	}
 
 	// Load the manifest from the resolved manifest path.
 	manifestDocument, err := manifestLoader.Load()
 	if err != nil {
-		return nil, envmerge.Params{}, err
+		return nil, env.Params{}, err
 	}
 
 	// Get the absolute directory of the manifest so project includes can be joined.
@@ -207,11 +207,11 @@ func resolveManifestPath(in *Input) string {
 // envmerge params alongside the Result so ResolveProject can construct the
 // Manager while ResolveWorkspace discards them. It is split from resolve so the
 // precedence stays unit-testable with an in-memory manifest.
-func resolveManifest(mc manifestContext, in *Input) (*Result, envmerge.Params, error) {
+func resolveManifest(mc manifestContext, in *Input) (*Result, env.Params, error) {
 	// Compute the project layer (settings + includes) from the manifest context.
 	pl, err := resolveProjectLayer(mc)
 	if err != nil {
-		return nil, envmerge.Params{}, err
+		return nil, env.Params{}, err
 	}
 
 	// Resolve the envmerge params; ResolveProject builds a Manager from them.
@@ -265,9 +265,9 @@ func resolveEnvmergeParams(
 	mc manifestContext,
 	in *Input,
 	pl projectLayer,
-) envmerge.Params {
+) env.Params {
 	proj, global := pl.settings, mc.manifest.Settings
-	return envmerge.Params{
+	return env.Params{
 		Includes:     pl.includes,
 		Environments: mc.manifest.Environments,
 		DefaultEnvironment: workspace.PrecedenceString(&schema.Env,
@@ -275,7 +275,7 @@ func resolveEnvmergeParams(
 			proj.Env,
 			global.Env,
 		),
-		Settings: envmerge.Settings{
+		Settings: env.Settings{
 			RequireOverlays: workspace.PrecedenceBool(&schema.RequireOverlays,
 				in.RequireOverlays,
 				proj.RequireOverlays,

@@ -4,7 +4,7 @@ import (
 	"io"
 
 	"github.com/go-envx/envx/app/internal/config"
-	"github.com/go-envx/envx/app/internal/envmerge"
+	"github.com/go-envx/envx/app/internal/features/env"
 	"github.com/go-envx/envx/app/internal/features/runner"
 	"github.com/go-envx/envx/app/internal/utils/printer"
 )
@@ -28,7 +28,7 @@ type streams struct {
 	Stderr io.Writer
 }
 
-// execute is the imperative shell: resolve the input into an envmerge.Manager,
+// execute is the imperative shell: resolve the input into an env.Manager,
 // materialize the complete effective environment, then run the child process with
 // it. Overload and OS composition are settled inside Materialize, so the runner
 // receives a ready environment.
@@ -45,7 +45,7 @@ func execute(p actionParams, in *config.Input, s streams) error {
 	// downgraded to a stderr warning and its key is omitted instead, so the child
 	// still starts and inherits the omitted key from the ambient environment.
 	// Structural failures stay fatal in both modes.
-	result, err := resolved.Envmerge.Materialize(envmerge.MaterializeParams{
+	result, err := resolved.Envmerge.Materialize(env.MaterializeParams{
 		IgnoreErrors: p.IgnoreErrors,
 	})
 	if err != nil {
