@@ -8,6 +8,7 @@ import (
 
 	"github.com/go-envx/envx/app/internal/cipher"
 	"github.com/go-envx/envx/app/internal/envmerge"
+	"github.com/go-envx/envx/app/internal/features/workspace"
 	"github.com/go-envx/envx/app/internal/features/workspace/infra"
 	"github.com/go-envx/envx/app/internal/schema"
 	"github.com/go-envx/envx/app/internal/secrets"
@@ -270,38 +271,38 @@ func resolveEnvmergeParams(
 	return envmerge.Params{
 		Includes:     pl.includes,
 		Environments: mc.manifest.Environments,
-		DefaultEnvironment: precedenceString(&schema.Env,
+		DefaultEnvironment: workspace.PrecedenceString(&schema.Env,
 			in.Env,
 			proj.Env,
 			global.Env,
 		),
 		Settings: envmerge.Settings{
-			RequireOverlays: precedenceBool(&schema.RequireOverlays,
+			RequireOverlays: workspace.PrecedenceBool(&schema.RequireOverlays,
 				in.RequireOverlays,
 				proj.RequireOverlays,
 				global.RequireOverlays,
 			),
-			Prefix: precedenceString(&schema.Prefix,
+			Prefix: workspace.PrecedenceString(&schema.Prefix,
 				in.Prefix,
 				proj.Prefix,
 				global.Prefix,
 			),
-			Suffix: precedenceString(&schema.Suffix,
+			Suffix: workspace.PrecedenceString(&schema.Suffix,
 				in.Suffix,
 				proj.Suffix,
 				global.Suffix,
 			),
-			Delimiter: precedenceString(&schema.Delimiter,
+			Delimiter: workspace.PrecedenceString(&schema.Delimiter,
 				in.Delimiter,
 				proj.Delimiter,
 				global.Delimiter,
 			),
-			Overload: precedenceBool(&schema.Overload,
+			Overload: workspace.PrecedenceBool(&schema.Overload,
 				in.Overload,
 				proj.Overload,
 				global.Overload,
 			),
-			ReferencePattern: precedenceString(&schema.ReferencePattern,
+			ReferencePattern: workspace.PrecedenceString(&schema.ReferencePattern,
 				in.ReferencePattern,
 				proj.ReferencePattern,
 				global.ReferencePattern,
