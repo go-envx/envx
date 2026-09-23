@@ -60,11 +60,12 @@ func TestValueStructure(t *testing.T) {
 	v := value.Value{
 		Kind: value.KindVariable,
 		Raw:  "{{HOST}}:5432",
-		Resolution: value.Resolution{
-			Severity:   severity.OK,
-			Status:     "OK",
-			Value:      "db.local:5432",
-			IsResolved: true,
+		Evaluation: value.Evaluation{
+			Severity:      severity.OK,
+			Status:        "OK",
+			StatusMessage: "ok",
+			Value:         "db.local:5432",
+			IsResolved:    true,
 		},
 	}
 
@@ -74,10 +75,48 @@ func TestValueStructure(t *testing.T) {
 	if v.Raw != "{{HOST}}:5432" {
 		t.Errorf("Raw = %q, want {{HOST}}:5432", v.Raw)
 	}
-	if !v.Resolution.IsResolved {
+	if !v.Evaluation.IsResolved {
 		t.Error("expected IsResolved to be true")
 	}
-	if v.Resolution.Value != "db.local:5432" {
-		t.Errorf("Resolution.Value = %q, want db.local:5432", v.Resolution.Value)
+	if v.Evaluation.Value != "db.local:5432" {
+		t.Errorf("Evaluation.Value = %q, want db.local:5432", v.Evaluation.Value)
+	}
+}
+
+type staticResolver struct{}
+
+func (s staticResolver) Resolve(raw, _ string) (string, error) {
+	return "resolved:" + raw, nil
+}
+
+type staticEvaluator struct{}
+
+func (s staticEvaluator) Evaluate(raw, _ string) value.Evaluation {
+	return value.Evaluation{
+		Kind:          value.KindConfig,
+		Severity:      severity.OK,
+		Status:        "OK",
+		StatusMessage: "success",
+		Value:         raw,
+		IsResolved:    true,
+	}
+}
+
+func TestInterfaces(t *testing.T) {
+	t.Parallel()
+
+	var _ value.Resolver = staticResolver{}
+	var _ value.Evaluator = staticEvaluator{}
+
+	r := staticResolver{}
+	val, err := r.Resolve("test", "dev")
+	if err != nil || val != "resolved:test" {
+		t.Errorf("Resolve = (%q, %v), want (resolved:test, nil)", val, err)
+	}
+
+	e := staticEvaluator{}
+	eval := e.Evaluate("test", "dev")
+	if eval.Value != "test" || !eval.IsResolved {
+		t.Errorf("Evaluate = %+v, want resolved test", eval)
 	}
 }

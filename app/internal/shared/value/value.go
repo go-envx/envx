@@ -68,13 +68,13 @@ func (k *Kind) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
-// Resolution represents the outcome of evaluating or dry-running a value.
+// Evaluation represents the outcome of evaluating or dry-running a value.
 // It carries the classification status, severity, human-readable diagnostics,
 // and optional materialized value.
-type Resolution struct {
+type Evaluation struct {
 	// Kind classifies how the value is defined (config, secret, or variable).
 	Kind Kind
-	// Severity ranks the resolution outcome: None, OK, Warn, or Error.
+	// Severity ranks the outcome: None, OK, Warn, or Error.
 	Severity severity.Level
 	// Status is a stable, machine-classifiable status identifier (e.g. "OK",
 	// "SECRET_REFERENCE_NOT_FOUND").
@@ -100,21 +100,36 @@ type Resolution struct {
 	HasResolved bool
 }
 
+// Resolution aliases Evaluation for backwards compatibility during migration.
+// TODO: remove after caller migration.
+type Resolution = Evaluation
+
 // Value pairs a raw environment entry with its syntactic classification and
-// resolution outcome.
+// evaluation outcome.
 type Value struct {
 	// Kind classifies how the value is defined (config, secret, or variable).
 	Kind Kind
 	// Raw is the un-substituted literal string from the source file.
 	Raw string
-	// Resolution holds the outcome of resolving the value.
-	Resolution Resolution
+	// Evaluation holds the outcome of evaluating the value.
+	Evaluation Evaluation
+	// Resolution aliases Evaluation for backwards compatibility during migration.
+	// TODO: remove after caller migration.
+	Resolution Evaluation
+}
+
+// Resolver resolves a raw value directly into its materialized string at runtime,
+// or returns an error if resolution fails.
+type Resolver interface {
+	// Resolve returns raw with any recognized reference or expression resolved
+	// into plaintext, or an error if resolution fails.
+	Resolve(raw, environment string) (string, error)
 }
 
 // Evaluator evaluates raw values in a dry-run fashion without aborting,
-// classifying their syntactic kind and reporting a structured Resolution.
+// classifying their syntactic kind and reporting a structured Evaluation.
 type Evaluator interface {
 	// Evaluate classifies raw in the given environment and reports its non-fatal
-	// resolution outcome.
-	Evaluate(raw, environment string) Resolution
+	// evaluation outcome.
+	Evaluate(raw, environment string) Evaluation
 }

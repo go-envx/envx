@@ -18,12 +18,17 @@ import (
 // sentinels a diagnosis reuses for the remaining failure modes.
 var ErrSecretNotFound = errors.New("secret not found")
 
+var (
+	_ value.Resolver  = (*Resolver)(nil)
+	_ value.Evaluator = (*Resolver)(nil)
+)
+
 // Evaluate implements value.Evaluator, reporting a value's kind and dry-run
 // resolution without materializing plaintext unless the resolver reveals. It
-// never returns an error; a failure is reported through the Resolution's
+// never returns an error; a failure is reported through the Evaluation's
 // severity and status code, and no private-key or resolved-secret material
-// appears in Status or Message.
-func (r *Resolver) Evaluate(val, _ string) value.Resolution {
+// appears in Status or StatusMessage.
+func (r *Resolver) Evaluate(val, _ string) value.Evaluation {
 	// Unescape a literal that starts with the reserved scheme by dropping only the
 	// leading backslash, matching Resolve so its literal is "secret://...".
 	if strings.HasPrefix(val, `\`+scheme) {
@@ -50,14 +55,14 @@ func (r *Resolver) Evaluate(val, _ string) value.Resolution {
 }
 
 // Diagnose preserves backwards compatibility during migration, delegating to Evaluate.
-func (r *Resolver) Diagnose(val, env string) value.Resolution {
+func (r *Resolver) Diagnose(val, env string) value.Evaluation {
 	return r.Evaluate(val, env)
 }
 
 // configValueResolution reports an ok config value, attaching its resolved form
 // only when the resolver reveals.
-func (r *Resolver) configValueResolution(val string) value.Resolution {
-	res := value.Resolution{
+func (r *Resolver) configValueResolution(val string) value.Evaluation {
+	res := value.Evaluation{
 		Kind:     value.KindConfig,
 		Severity: severity.OK,
 		Status:   status.OK,
@@ -75,14 +80,15 @@ func (r *Resolver) configValueResolution(val string) value.Resolution {
 // diagnoseReference classifies a well-formed reference by attempting decryption
 // for status only. It discards any plaintext unless the resolver reveals, and
 // maps typed cipher and private-key failures onto stable status codes.
-func (r *Resolver) diagnoseReference(ref reference) value.Resolution {
-	res := value.Resolution{Kind: value.KindSecret}
+func (r *Resolver) diagnoseReference(ref reference) value.Evaluation {
+	res := value.Evaluation{Kind: value.KindSecret}
 
 	ciphertext, ok := r.values[ref]
 	if !ok {
 		res.Severity = severity.Error
 		res.Status = status.SecretReferenceNotFound
 		res.Code = status.SecretReferenceNotFound
+		res.StatusMessage = "no stored value for this reference"
 		res.Message = "no stored value for this reference"
 		return res
 	}
@@ -92,6 +98,7 @@ func (r *Resolver) diagnoseReference(ref reference) value.Resolution {
 		res.Severity = severity.Error
 		res.Status = status.SecretIsNotEncrypted
 		res.Code = status.SecretIsNotEncrypted
+		res.StatusMessage = "the stored value is not encrypted"
 		res.Message = "the stored value is not encrypted"
 		return res
 	}
@@ -99,10 +106,11 @@ func (r *Resolver) diagnoseReference(ref reference) value.Resolution {
 		res.Severity = severity.Error
 		res.Status = status.SecretAlgorithmMismatch
 		res.Code = status.SecretAlgorithmMismatch
-		res.Message = fmt.Sprintf(
+		res.StatusMessage = fmt.Sprintf(
 			"stored with %q, but the configured cipher is %q",
 			algorithm, r.cipher.Algorithm(),
 		)
+		res.Message = res.StatusMessage
 		return res
 	}
 
@@ -118,7 +126,8 @@ func (r *Resolver) diagnoseReference(ref reference) value.Resolution {
 		res.Severity = severity.Error
 		res.Status = status.PrivateKeyIsInvalid
 		res.Code = status.PrivateKeyIsInvalid
-		res.Message = "the private key for this group does not decrypt the value"
+		res.StatusMessage = "the private key for this group does not decrypt the value"
+		res.Message = res.StatusMessage
 		return res
 	}
 
@@ -137,25 +146,28 @@ func (r *Resolver) diagnoseReference(ref reference) value.Resolution {
 // referenceKeyResolution maps a private-key resolution failure onto a status: an
 // absent key is a warning, while a present but malformed key is an error.
 func referenceKeyResolution(
-	res value.Resolution, err error,
-) value.Resolution {
+	res value.Evaluation, err error,
+) value.Evaluation {
 	if errors.Is(err, privatekey.ErrNotAvailable) {
 		res.Severity = severity.Warn
 		res.Status = status.PrivateKeyIsUnavailable
 		res.Code = status.PrivateKeyIsUnavailable
-		res.Message = "no private key for this group in this context"
+		res.StatusMessage = "no private key for this group in this context"
+		res.Message = res.StatusMessage
 		return res
 	}
 	if errors.Is(err, privatekey.ErrInvalidKey) || errors.Is(err, cipher.ErrInvalidKey) {
 		res.Severity = severity.Error
 		res.Status = status.PrivateKeyIsInvalid
 		res.Code = status.PrivateKeyIsInvalid
-		res.Message = "the private key for this group is malformed"
+		res.StatusMessage = "the private key for this group is malformed"
+		res.Message = res.StatusMessage
 		return res
 	}
 	res.Severity = severity.Error
 	res.Status = status.PrivateKeyIsInvalid
 	res.Code = status.PrivateKeyIsInvalid
-	res.Message = "the private key for this group could not be resolved"
+	res.StatusMessage = "the private key for this group could not be resolved"
+	res.Message = res.StatusMessage
 	return res
 }
