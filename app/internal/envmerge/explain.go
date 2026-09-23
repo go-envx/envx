@@ -7,6 +7,8 @@ import (
 
 	"github.com/go-envx/envx/app/internal/features/env/syntax"
 	"github.com/go-envx/envx/app/internal/shared/status"
+	"github.com/go-envx/envx/app/internal/shared/value"
+	"github.com/go-envx/envx/app/internal/utils/severity"
 )
 
 // ExplainParams selects all keys or one case-insensitive key from an environment
@@ -112,10 +114,10 @@ func (m *Manager) Explain(params ExplainParams) (*Explanation, error) {
 	entries := make([]ExplanationEntry, 0, len(keys))
 	var summary ExplanationSummary
 	for _, key := range keys {
-		value := state.values[key]
-		literal := literalValue(value, delimiter)
+		val := state.values[key]
+		literal := literalValue(val, delimiter)
 		resolution := diagnoseEntry(
-			value, literal, key, diagnoser, engine, environment, delimiter,
+			val, literal, key, diagnoser, engine, environment, delimiter,
 			params.Reveal,
 		)
 		switch resolution.Severity {
@@ -123,12 +125,12 @@ func (m *Manager) Explain(params ExplainParams) (*Explanation, error) {
 			summary.Errors++
 		case SeverityWarning:
 			summary.Warnings++
-		case SeverityOK:
+		case SeverityOK, severity.None:
 		}
 		entries = append(entries, ExplanationEntry{
 			Key:        key,
 			Literal:    literal,
-			Items:      itemsOf(value),
+			Items:      itemsOf(val),
 			Origin:     state.origins[key],
 			Resolution: resolution,
 		})
@@ -140,12 +142,12 @@ func (m *Manager) Explain(params ExplainParams) (*Explanation, error) {
 // itemsOf returns a copy of a leaf's raw pre-resolution items, or nil for an
 // opaque OS value that is never dereferenced. Copying keeps the caller from
 // aliasing the manager's merge state.
-func itemsOf(value leafValue) []string {
-	if value.opaque {
+func itemsOf(leaf leafValue) []string {
+	if leaf.opaque {
 		return nil
 	}
-	items := make([]string, len(value.items))
-	copy(items, value.items)
+	items := make([]string, len(leaf.items))
+	copy(items, leaf.items)
 	return items
 }
 
@@ -169,20 +171,30 @@ func explainKeys(state *mergeState, key string) ([]string, error) {
 	return keys, nil
 }
 
-// asDiagnoser adapts an opened resolver into a ValueDiagnoser. A nil resolver
-// yields a nil diagnoser, which diagnoseLeaf treats as plain config-value
-// identity. A resolver that does not also implement ValueDiagnoser is an
+// asDiagnoser adapts an opened resolver into a ValueDiagnoser (or value.Evaluator).
+// A nil resolver yields a nil diagnoser, which diagnoseLeaf treats as plain
+// config-value identity. A resolver that does not also implement ValueDiagnoser is an
 // operation error, so a reference is never silently classified as a plain config
 // value.
 func asDiagnoser(resolver ValueResolver) (ValueDiagnoser, error) {
 	if resolver == nil {
 		return nil, nil
 	}
-	diagnoser, ok := resolver.(ValueDiagnoser)
-	if !ok {
-		return nil, fmt.Errorf("configured resolver does not support diagnosis")
+	if diagnoser, ok := resolver.(ValueDiagnoser); ok {
+		return diagnoser, nil
 	}
-	return diagnoser, nil
+	if evaluator, ok := resolver.(value.Evaluator); ok {
+		return evaluatorAdapter{evaluator: evaluator}, nil
+	}
+	return nil, fmt.Errorf("configured resolver does not support diagnosis")
+}
+
+type evaluatorAdapter struct {
+	evaluator value.Evaluator
+}
+
+func (a evaluatorAdapter) Diagnose(raw, env string) Resolution {
+	return a.evaluator.Evaluate(raw, env)
 }
 
 // diagnoseEntry classifies one winning value. A non-opaque value touched by the
@@ -190,15 +202,15 @@ func asDiagnoser(resolver ValueResolver) (ValueDiagnoser, error) {
 // diagnosed through the engine so its revealed value matches run and get; every
 // other value is diagnosed as a plain config value or secret reference.
 func diagnoseEntry(
-	value leafValue, literal, key string,
+	leaf leafValue, literal, key string,
 	diagnoser ValueDiagnoser, engine *syntax.Substituter,
 	environment, delimiter string, reveal bool,
 ) Resolution {
 	refs := engine.Grammar().HasReferences(literal)
-	if !value.opaque && (refs || engine.Grammar().HasEscape(literal)) {
+	if !leaf.opaque && (refs || engine.Grammar().HasEscape(literal)) {
 		return diagnoseSubstitution(engine, key, reveal, refs)
 	}
-	return diagnoseLeaf(value, diagnoser, environment, delimiter, reveal)
+	return diagnoseLeaf(leaf, diagnoser, environment, delimiter, reveal)
 }
 
 // diagnoseSubstitution classifies a substitution-stage value in dry-run mode. It
@@ -216,14 +228,21 @@ func diagnoseSubstitution(
 	if variable {
 		kind = KindVariableSubstitution
 	}
-	resolution := Resolution{Kind: kind, Severity: SeverityOK, Code: status.OK}
+	resolution := Resolution{
+		Kind:     kind,
+		Severity: SeverityOK,
+		Status:   status.OK,
+		Code:     status.OK,
+	}
 	switch engine.Status(key) {
 	case syntax.ResolutionCircular:
 		resolution.Severity = SeverityError
+		resolution.Status = status.CircularVariableReference
 		resolution.Code = status.CircularVariableReference
 		resolution.Message = "reference cycle detected"
 	case syntax.ResolutionUnresolved:
 		resolution.Severity = SeverityError
+		resolution.Status = status.UnresolvedVariableReference
 		resolution.Code = status.UnresolvedVariableReference
 		resolution.Message = "references an undefined variable"
 	case syntax.ResolutionOK:
@@ -231,7 +250,9 @@ func diagnoseSubstitution(
 			// status already composed the value successfully; resolve returns the
 			// cached result, so no work is repeated and no error is possible here.
 			composed, _ := engine.Resolve(key)
+			resolution.Value = composed
 			resolution.Resolved = composed
+			resolution.IsResolved = true
 			resolution.HasResolved = true
 		}
 	}
@@ -244,48 +265,71 @@ func diagnoseSubstitution(
 // plain config value. The resolved plaintext is populated only when every item
 // materialized, and list items are rejoined with the delimiter.
 func diagnoseLeaf(
-	value leafValue, diagnoser ValueDiagnoser, environment, delimiter string,
+	leaf leafValue, diagnoser ValueDiagnoser, environment, delimiter string,
 	reveal bool,
 ) Resolution {
 	// An opaque OS value is a plain config value that resolves to itself; its
 	// plaintext is retained only under reveal, mirroring a plain config value.
-	if value.opaque {
+	if leaf.opaque {
 		resolution := Resolution{
-			Kind: KindConfigValue, Severity: SeverityOK, Code: status.OK,
+			Kind:     KindConfigValue,
+			Severity: SeverityOK,
+			Status:   status.OK,
+			Code:     status.OK,
 		}
 		if reveal {
-			resolution.Resolved = literalValue(value, delimiter)
+			lit := literalValue(leaf, delimiter)
+			resolution.Value = lit
+			resolution.Resolved = lit
+			resolution.IsResolved = true
 			resolution.HasResolved = true
 		}
 		return resolution
 	}
 
 	if diagnoser == nil {
-		return Resolution{Kind: KindConfigValue, Severity: SeverityOK, Code: status.OK}
+		return Resolution{
+			Kind:     KindConfigValue,
+			Severity: SeverityOK,
+			Status:   status.OK,
+			Code:     status.OK,
+		}
 	}
 
-	agg := Resolution{Kind: KindConfigValue, Severity: SeverityOK, Code: status.OK}
-	resolvedItems := make([]string, len(value.items))
-	allResolved := len(value.items) > 0
-	for i, item := range value.items {
+	agg := Resolution{
+		Kind:     KindConfigValue,
+		Severity: SeverityOK,
+		Status:   status.OK,
+		Code:     status.OK,
+	}
+	resolvedItems := make([]string, len(leaf.items))
+	allResolved := len(leaf.items) > 0
+	for i, item := range leaf.items {
 		outcome := diagnoser.Diagnose(item, environment)
 		if outcome.Kind == KindSecretReference {
 			agg.Kind = KindSecretReference
 		}
 		if severityRank(outcome.Severity) > severityRank(agg.Severity) {
 			agg.Severity = outcome.Severity
+			agg.Status = outcome.Status
 			agg.Code = outcome.Code
 			agg.Message = outcome.Message
 		}
-		if outcome.HasResolved {
+		if outcome.HasResolved || outcome.IsResolved {
 			resolvedItems[i] = outcome.Resolved
+			if resolvedItems[i] == "" {
+				resolvedItems[i] = outcome.Value
+			}
 		} else {
 			allResolved = false
 		}
 	}
 
 	if allResolved {
-		agg.Resolved = strings.Join(resolvedItems, delimiter)
+		joined := strings.Join(resolvedItems, delimiter)
+		agg.Value = joined
+		agg.Resolved = joined
+		agg.IsResolved = true
 		agg.HasResolved = true
 	}
 	return agg

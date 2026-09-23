@@ -1,18 +1,21 @@
 package envmerge
 
-import "github.com/go-envx/envx/app/internal/utils/severity"
+import (
+	"github.com/go-envx/envx/app/internal/shared/value"
+	"github.com/go-envx/envx/app/internal/utils/severity"
+)
 
 // Kind classifies how a value is materialized.
-type Kind string
+type Kind = value.Kind
 
 const (
 	// KindConfigValue is a plain configuration value with no dereferencing.
-	KindConfigValue Kind = "config"
+	KindConfigValue = value.KindConfig
 	// KindSecretReference is a reference resolved from the secrets store.
-	KindSecretReference Kind = "secret"
+	KindSecretReference = value.KindSecret
 	// KindVariableSubstitution marks a value composed from the resolved values of
 	// other variables through {{VAR}} references.
-	KindVariableSubstitution Kind = "variable"
+	KindVariableSubstitution = value.KindVariable
 )
 
 // Severity ranks a resolution outcome.
@@ -28,28 +31,15 @@ const (
 )
 
 // Resolution is the non-fatal, dry-run outcome of materializing one value.
-// Resolved carries plaintext only when reveal was requested and succeeded, and
-// Code and Message stay free of private-key or secret material.
-type Resolution struct {
-	// Kind classifies how the value is materialized.
-	Kind Kind
-	// Severity ranks the outcome.
-	Severity Severity
-	// Code is a stable, machine-classifiable status identifier.
-	Code string
-	// Message is a human-readable status description free of secret material.
-	Message string
-	// Resolved carries plaintext only when reveal was requested and succeeded.
-	Resolved string
-	// HasResolved reports whether Resolved holds a materialized value.
-	HasResolved bool
-}
+// It aliases value.Resolution to preserve backwards compatibility while decoupling
+// features via internal/shared/value.
+type Resolution = value.Resolution
 
-// ValueDiagnoser augments a ValueResolver with structured dry-run resolution. It
-// classifies a value and reports status without aborting, discarding any
-// materialized plaintext unless reveal was requested.
+// Value pairs a raw value with its resolution outcome.
+type Value = value.Value
+
+// ValueDiagnoser augments a ValueResolver with structured dry-run resolution.
+// It aliases value.Evaluator so implementations can fulfill either contract.
 type ValueDiagnoser interface {
-	// Diagnose classifies value in the active environment and reports its
-	// non-fatal resolution outcome.
-	Diagnose(value, environment string) Resolution
+	Diagnose(raw, environment string) Resolution
 }

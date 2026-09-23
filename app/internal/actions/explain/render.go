@@ -92,7 +92,7 @@ func renderJSON(p *printer.Printer, res actionResult) error {
 		e := &res.Entries[i]
 		entries = append(entries, jsonEntry{
 			Key:       e.Key,
-			Type:      string(e.Resolution.Kind),
+			Type:      e.Resolution.Kind.String(),
 			Value:     e.Literal,
 			Source:    e.Source,
 			SourceKey: e.SourceKey,
@@ -145,7 +145,7 @@ func renderTable(p *printer.Printer, res actionResult, reveal bool) error {
 		e := &res.Entries[i]
 		row := []printer.Cell{
 			{Text: e.Key},
-			{Text: string(e.Resolution.Kind)},
+			{Text: e.Resolution.Kind.String()},
 			{Text: e.Literal},
 			{Text: e.Source},
 			{
