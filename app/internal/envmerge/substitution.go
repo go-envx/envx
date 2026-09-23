@@ -3,6 +3,8 @@ package envmerge
 import (
 	"fmt"
 	"sort"
+
+	"github.com/go-envx/envx/app/internal/features/env/syntax"
 )
 
 // getenv returns a getenv seam backed by the injected OS-environment snapshot, so
@@ -15,6 +17,31 @@ func (m *Manager) getenv() func(name string) (string, bool) {
 	}
 }
 
+// mapSymbols builds a syntax.SymbolTable over a fully resolved value map keyed
+// the same as its origins.
+func mapSymbols(
+	values map[string]string, origins map[string]Origin,
+) syntax.SymbolTable {
+	return syntax.SymbolTable{
+		Declared: func(name string) bool { _, ok := values[name]; return ok },
+		Opaque: func(name string) bool {
+			return origins[name].Winner.File == osSource
+		},
+		Value: func(name string) (string, error) { return values[name], nil },
+	}
+}
+
+// newSubstituter builds a syntax.Substituter over the provided symbol table,
+// wired to the manager's grammar, OS environment getter, and overload setting.
+func (m *Manager) newSubstituter(symbols syntax.SymbolTable) *syntax.Substituter {
+	return syntax.NewSubstituter(syntax.SubstituterParams{
+		Grammar:  m.grammar,
+		Symbols:  symbols,
+		Getenv:   m.getenv(),
+		Overload: m.params.Settings.Overload,
+	})
+}
+
 // substituteAll composes every {{ }} reference over a fully resolved effective
 // environment, transitively, returning the substituted values. An OS-sourced
 // value is opaque and passes through untouched. A missing reference or a
@@ -22,12 +49,10 @@ func (m *Manager) getenv() func(name string) (string, bool) {
 func (m *Manager) substituteAll(
 	values map[string]string, origins map[string]Origin,
 ) (map[string]string, error) {
-	engine := newSymbolSubstituter(
-		m.grammar, mapSymbols(values, origins), m.getenv(), m.params.Settings.Overload,
-	)
+	engine := m.newSubstituter(mapSymbols(values, origins))
 	out := make(map[string]string, len(values))
 	for key := range values {
-		composed, err := engine.resolve(key)
+		composed, err := engine.Resolve(key)
 		if err != nil {
 			return nil, err
 		}
@@ -66,15 +91,10 @@ func (m *Manager) resolveEffectiveTolerant(
 	// failures forward and add any substitution failure to them.
 	failures := result.errs
 
-	engine := newSymbolSubstituter(
-		m.grammar,
-		mapSymbols(result.values, result.origins),
-		m.getenv(),
-		m.params.Settings.Overload,
-	)
+	engine := m.newSubstituter(mapSymbols(result.values, result.origins))
 	out := make(map[string]string, len(result.values))
 	for key := range result.values {
-		composed, err := engine.resolve(key)
+		composed, err := engine.Resolve(key)
 		if err != nil {
 			failures[key] = err
 			continue
@@ -116,20 +136,20 @@ func (m *Manager) downgradeFailures(
 	return warnings
 }
 
-// getSymbols builds a lazy symbolTable over a merged state that resolves each
+// getSymbols builds a lazy syntax.SymbolTable over a merged state that resolves each
 // referenced key's leaf on demand under the call's reveal policy. Only the keys
 // reachable from the requested key are materialized, so an unrelated dangling
 // reference never blocks the read while a dangling reference behind a referenced
 // key surfaces its real error.
 func (m *Manager) getSymbols(
 	state *mergeState, resolver ValueResolver, environment string,
-) symbolTable {
-	return symbolTable{
-		declared: func(name string) bool { _, ok := state.values[name]; return ok },
-		opaque: func(name string) bool {
+) syntax.SymbolTable {
+	return syntax.SymbolTable{
+		Declared: func(name string) bool { _, ok := state.values[name]; return ok },
+		Opaque: func(name string) bool {
 			return state.origins[name].Winner.File == osSource
 		},
-		value: func(name string) (string, error) {
+		Value: func(name string) (string, error) {
 			resolved, err := resolveLeaf(state.values[name], resolver, environment)
 			if err != nil {
 				return "", err

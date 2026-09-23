@@ -85,12 +85,8 @@ func (m *Manager) getValue(
 	origin Origin,
 ) (string, error) {
 	if reveal {
-		engine := newSymbolSubstituter(
-			m.grammar,
-			m.getSymbols(state, resolver, environment),
-			m.getenv(), m.params.Settings.Overload,
-		)
-		return engine.resolve(key)
+		engine := m.newSubstituter(m.getSymbols(state, resolver, environment))
+		return engine.Resolve(key)
 	}
 
 	resolved, err := resolveLeaf(value, resolver, environment)

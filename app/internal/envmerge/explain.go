@@ -5,6 +5,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/go-envx/envx/app/internal/features/env/syntax"
 	"github.com/go-envx/envx/app/internal/shared/status"
 )
 
@@ -105,11 +106,7 @@ func (m *Manager) Explain(params ExplainParams) (*Explanation, error) {
 	if err != nil {
 		return nil, err
 	}
-	engine := newSymbolSubstituter(
-		m.grammar,
-		m.getSymbols(state, resolver, environment),
-		m.getenv(), m.params.Settings.Overload,
-	)
+	engine := m.newSubstituter(m.getSymbols(state, resolver, environment))
 
 	delimiter := m.params.Settings.Delimiter
 	entries := make([]ExplanationEntry, 0, len(keys))
@@ -194,11 +191,11 @@ func asDiagnoser(resolver ValueResolver) (ValueDiagnoser, error) {
 // other value is diagnosed as a plain config value or secret reference.
 func diagnoseEntry(
 	value leafValue, literal, key string,
-	diagnoser ValueDiagnoser, engine *substituter,
+	diagnoser ValueDiagnoser, engine *syntax.Substituter,
 	environment, delimiter string, reveal bool,
 ) Resolution {
-	refs := engine.grammar.hasReferences(literal)
-	if !value.opaque && (refs || engine.grammar.hasEscape(literal)) {
+	refs := engine.Grammar().HasReferences(literal)
+	if !value.opaque && (refs || engine.Grammar().HasEscape(literal)) {
 		return diagnoseSubstitution(engine, key, reveal, refs)
 	}
 	return diagnoseLeaf(value, diagnoser, environment, delimiter, reveal)
@@ -213,27 +210,27 @@ func diagnoseEntry(
 // materialized and retained only under reveal, so masked diagnosis never leaks
 // it.
 func diagnoseSubstitution(
-	engine *substituter, key string, reveal, variable bool,
+	engine *syntax.Substituter, key string, reveal, variable bool,
 ) Resolution {
 	kind := KindConfigValue
 	if variable {
 		kind = KindVariableSubstitution
 	}
 	resolution := Resolution{Kind: kind, Severity: SeverityOK, Code: status.OK}
-	switch engine.status(key) {
-	case statusCircular:
+	switch engine.Status(key) {
+	case syntax.ResolutionCircular:
 		resolution.Severity = SeverityError
 		resolution.Code = status.CircularVariableReference
 		resolution.Message = "reference cycle detected"
-	case statusUnresolved:
+	case syntax.ResolutionUnresolved:
 		resolution.Severity = SeverityError
 		resolution.Code = status.UnresolvedVariableReference
 		resolution.Message = "references an undefined variable"
-	case statusOK:
+	case syntax.ResolutionOK:
 		if reveal {
 			// status already composed the value successfully; resolve returns the
 			// cached result, so no work is repeated and no error is possible here.
-			composed, _ := engine.resolve(key)
+			composed, _ := engine.Resolve(key)
 			resolution.Resolved = composed
 			resolution.HasResolved = true
 		}
