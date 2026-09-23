@@ -1,9 +1,10 @@
-package create
+package cli
 
 import (
 	"fmt"
 	"strings"
 
+	"github.com/go-envx/envx/app/internal/features/workspace"
 	"github.com/go-envx/envx/app/internal/utils/printer"
 	"github.com/go-envx/envx/app/internal/utils/str"
 	"github.com/spf13/cobra"
@@ -26,9 +27,23 @@ const (
 	`
 )
 
-// NewCommand builds the "create" command and its per-template subcommands. create
+// CreateHandler defines the contract required by the create CLI command
+// to scaffold a workspace.
+type CreateHandler interface {
+	Execute(cmd workspace.CreateWorkspaceCommand) (workspace.CreateWorkspaceResult, error)
+}
+
+// CreateFlags holds CLI flags for the create command.
+type CreateFlags struct {
+	// TargetDir is the directory to scaffold into.
+	TargetDir string
+	// Force overwrites existing files instead of stopping on conflicts.
+	Force bool
+}
+
+// NewCreateCmd builds the "create" command and its per-template subcommands. create
 // itself takes no action; each subcommand scaffolds one named template.
-func NewCommand() *cobra.Command {
+func NewCreateCmd(handler CreateHandler) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   createUsage,
 		Short: createShort,
@@ -38,7 +53,12 @@ func NewCommand() *cobra.Command {
 		},
 	}
 	cmd.AddCommand(
-		newTemplateCmd(quickStart, quickStartShort, quickStartLong),
+		newTemplateCmd(
+			handler,
+			workspace.QuickStartTemplate,
+			quickStartShort,
+			quickStartLong,
+		),
 	)
 	return cmd
 }
@@ -46,9 +66,11 @@ func NewCommand() *cobra.Command {
 // newTemplateCmd builds one "create <template>" subcommand. Each scaffolds its
 // named template into --target-dir (defaulting to a directory of the same name),
 // refusing to overwrite existing files unless --force is set.
-func newTemplateCmd(name, short, long string) *cobra.Command {
-	var targetDir string
-	var force bool
+func newTemplateCmd(
+	handler CreateHandler,
+	name, short, long string,
+) *cobra.Command {
+	var flags CreateFlags
 
 	cmd := &cobra.Command{
 		Use:   name,
@@ -56,33 +78,48 @@ func newTemplateCmd(name, short, long string) *cobra.Command {
 		Long:  str.Dedent(long),
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			res, err := execute(actionParams{
+			res, err := handler.Execute(workspace.CreateWorkspaceCommand{
 				Template:  name,
-				TargetDir: targetDir,
-				Force:     force,
+				TargetDir: flags.TargetDir,
+				Force:     flags.Force,
 			})
 			if err != nil {
 				return err
 			}
 
-			// render the scaffold summary through the shared printer
+			// Render the scaffold summary through the shared printer.
 			pr := printer.New(printer.Options{
 				Out: cmd.OutOrStdout(),
 				Err: cmd.ErrOrStderr(),
 			})
-			return pr.LogMessage(summary(name, targetDir, res.Written))
+			return pr.LogMessage(Summary(name, flags.TargetDir, res.Written))
 		},
 	}
-	cmd.Flags().StringVar(&targetDir, "target-dir", name, "directory to scaffold into")
-	cmd.Flags().BoolVar(&force, "force", false, "overwrite existing files")
+	cmd.Flags().StringVar(
+		&flags.TargetDir,
+		"target-dir",
+		name,
+		"directory to scaffold into",
+	)
+	cmd.Flags().BoolVar(
+		&flags.Force,
+		"force",
+		false,
+		"overwrite existing files",
+	)
 	return cmd
 }
 
-// summary reports the scaffolded files and the first command to try, so the user
+// Summary reports the scaffolded files and the first command to try, so the user
 // can start exploring immediately.
-func summary(name, targetDir string, written []string) string {
+func Summary(name, targetDir string, written []string) string {
 	lines := []string{
-		fmt.Sprintf("Scaffolded %s into %s/ (%d files):", name, targetDir, len(written)),
+		fmt.Sprintf(
+			"Scaffolded %s into %s/ (%d files):",
+			name,
+			targetDir,
+			len(written),
+		),
 	}
 	for _, f := range written {
 		lines = append(lines, "  "+f)

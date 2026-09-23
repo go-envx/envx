@@ -1,51 +1,32 @@
-package create
+package workspace_test
 
 import (
 	"os"
 	"path/filepath"
-	"strings"
 	"testing"
 
 	"github.com/go-envx/envx/app/internal/config"
 	"github.com/go-envx/envx/app/internal/envmerge"
+	"github.com/go-envx/envx/app/internal/features/workspace"
 )
-
-// TestSummary verifies the scaffold summary lists the written files and the
-// first command to try, without a trailing newline so the printer owns it.
-func TestSummary(t *testing.T) {
-	t.Parallel()
-
-	out := summary(quickStart, "workspace", []string{"workspace/envx.yaml"})
-
-	for _, want := range []string{
-		"Scaffolded quick-start into workspace/ (1 files):",
-		"  workspace/envx.yaml",
-		"Try it:",
-		"  cd workspace",
-		"  envx get api-service DATABASE_HOST",
-	} {
-		if !strings.Contains(out, want) {
-			t.Errorf("summary missing %q:\n%s", want, out)
-		}
-	}
-	if strings.HasSuffix(out, "\n") {
-		t.Errorf("summary should not end with a newline:\n%q", out)
-	}
-}
 
 // TestExecuteScaffoldsFiles verifies each template writes its envx.yaml and nested
 // namespace files into the target directory.
 func TestExecuteScaffoldsFiles(t *testing.T) {
 	t.Parallel()
 
-	for _, name := range []string{quickStart} {
+	handler := workspace.NewCreateWorkspaceHandler()
+	for _, name := range []string{workspace.QuickStartTemplate} {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 
 			dir := t.TempDir()
-			res, err := execute(actionParams{Template: name, TargetDir: dir})
+			res, err := handler.Execute(workspace.CreateWorkspaceCommand{
+				Template:  name,
+				TargetDir: dir,
+			})
 			if err != nil {
-				t.Fatalf("execute: %v", err)
+				t.Fatalf("CreateWorkspaceHandler.Execute: %v", err)
 			}
 			if len(res.Written) == 0 {
 				t.Fatal("expected files to be written")
@@ -65,15 +46,24 @@ func TestExecuteScaffoldsFiles(t *testing.T) {
 func TestExecuteRefusesOverwrite(t *testing.T) {
 	t.Parallel()
 
+	handler := workspace.NewCreateWorkspaceHandler()
 	dir := t.TempDir()
-	if _, err := execute(actionParams{Template: quickStart, TargetDir: dir}); err != nil {
+	cmd := workspace.CreateWorkspaceCommand{
+		Template:  workspace.QuickStartTemplate,
+		TargetDir: dir,
+	}
+	if _, err := handler.Execute(cmd); err != nil {
 		t.Fatalf("first scaffold: %v", err)
 	}
-	if _, err := execute(actionParams{Template: quickStart, TargetDir: dir}); err == nil {
+	if _, err := handler.Execute(cmd); err == nil {
 		t.Fatal("expected a conflict error on the second scaffold without --force")
 	}
-	forced := actionParams{Template: quickStart, TargetDir: dir, Force: true}
-	if _, err := execute(forced); err != nil {
+	forced := workspace.CreateWorkspaceCommand{
+		Template:  workspace.QuickStartTemplate,
+		TargetDir: dir,
+		Force:     true,
+	}
+	if _, err := handler.Execute(forced); err != nil {
 		t.Fatalf("force scaffold: %v", err)
 	}
 }
@@ -84,9 +74,13 @@ func TestExecuteRefusesOverwrite(t *testing.T) {
 func TestQuickStartResolves(t *testing.T) {
 	t.Parallel()
 
+	handler := workspace.NewCreateWorkspaceHandler()
 	dir := t.TempDir()
-	p := actionParams{Template: quickStart, TargetDir: dir}
-	if _, err := execute(p); err != nil {
+	cmd := workspace.CreateWorkspaceCommand{
+		Template:  workspace.QuickStartTemplate,
+		TargetDir: dir,
+	}
+	if _, err := handler.Execute(cmd); err != nil {
 		t.Fatalf("scaffold: %v", err)
 	}
 

@@ -1,4 +1,4 @@
-package manifest
+package workspace
 
 import (
 	"bytes"
@@ -13,10 +13,10 @@ import (
 	"github.com/go-envx/envx/app/internal/schema"
 )
 
-// schemaDocsURL is the manifest schema reference pointed to when a key is
+// SchemaDocsURL is the manifest schema reference pointed to when a key is
 // rejected, so a user gets the authoritative key list without the error naming
 // internal Go types.
-const schemaDocsURL = "https://go-envx.github.io/envx/configuration/schema/"
+const SchemaDocsURL = "https://go-envx.github.io/envx/configuration/schema/"
 
 // suggestionThreshold is the largest edit distance at which a rejected key is
 // still close enough to a valid one to offer as a "did you mean" correction.
@@ -97,7 +97,7 @@ func decodeError(err error) error {
 		lines = append(lines, described...)
 	}
 	if sawUnknownField {
-		lines = append(lines, "See "+schemaDocsURL)
+		lines = append(lines, "See "+SchemaDocsURL)
 	}
 
 	return fmt.Errorf("manifest: %s", strings.Join(lines, continuationIndent))

@@ -4,6 +4,7 @@ import (
 	"sort"
 
 	"github.com/go-envx/envx/app/internal/cipher"
+	"github.com/go-envx/envx/app/internal/features/workspace"
 	"github.com/go-envx/envx/app/internal/secrets"
 	"github.com/go-envx/envx/app/internal/shared/status"
 )
@@ -42,35 +43,12 @@ type WorkspaceProjects struct {
 
 // WorkspaceLayout is the file-level view of a resolved workspace: the manifest
 // location, the shared secrets and private-key paths, the declared environments,
-// and each project's includes as declared in the manifest. Unlike
-// WorkspaceProjects it constructs no envmerge Manager and opens no secrets store,
-// because pack only selects and copies files — it never resolves or decrypts.
-type WorkspaceLayout struct {
-	// ManifestPath is the absolute path the manifest was loaded from.
-	ManifestPath string
-	// Root is the absolute workspace directory every relative path resolves against.
-	Root string
-	// SecretsPath is the absolute path of the workspace secrets store.
-	SecretsPath string
-	// KeysPath is the absolute path of the workspace private-key file, which pack
-	// deliberately excludes from the bundle.
-	KeysPath string
-	// Environments is the manifest's declared environment list.
-	Environments []string
-	// Projects is every declared project's includes, sorted by name for
-	// deterministic iteration and output.
-	Projects []ProjectIncludes
-}
+// and each project's includes as declared in the manifest.
+type WorkspaceLayout = workspace.Layout
 
 // ProjectIncludes pairs a project name with its includes as declared in the
 // manifest (relative prefixes, not yet joined against the workspace directory).
-type ProjectIncludes struct {
-	// Name is the manifest project name.
-	Name string
-	// Includes lists the project's ordered namespace prefixes, verbatim from the
-	// manifest so pack can preserve their relative layout in the bundle.
-	Includes []string
-}
+type ProjectIncludes = workspace.ProjectRef
 
 // ResolveWorkspaceLayout resolves the manifest into the file-level view pack
 // needs to select and copy a bundle. It loads the manifest once, reads the

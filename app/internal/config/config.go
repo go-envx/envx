@@ -8,7 +8,7 @@ import (
 
 	"github.com/go-envx/envx/app/internal/cipher"
 	"github.com/go-envx/envx/app/internal/envmerge"
-	"github.com/go-envx/envx/app/internal/manifest"
+	"github.com/go-envx/envx/app/internal/features/workspace"
 	"github.com/go-envx/envx/app/internal/schema"
 	"github.com/go-envx/envx/app/internal/secrets"
 	"github.com/go-envx/envx/app/internal/utils/file"
@@ -157,8 +157,8 @@ func ResolveWorkspace(in *Input) (*Result, error) {
 // "project not found" error). Terminal fallbacks (e.g. the default environment)
 // are applied downstream, so an unset env stays empty here.
 func resolve(in *Input, project string) (*Result, envmerge.Params, error) {
-	// Bind the resolved manifest path and conventional filename into a manager.
-	manifestManager, err := manifest.New(manifest.Params{
+	// Bind the resolved manifest path and conventional filename into a loader.
+	manifestLoader, err := workspace.NewManifestLoader(workspace.ManifestLoaderParams{
 		Path:     resolveManifestPath(in),
 		Filename: defaultManifestFilename,
 	})
@@ -167,7 +167,7 @@ func resolve(in *Input, project string) (*Result, envmerge.Params, error) {
 	}
 
 	// Load the manifest from the resolved manifest path.
-	manifestDocument, err := manifestManager.Load()
+	manifestDocument, err := manifestLoader.Load()
 	if err != nil {
 		return nil, envmerge.Params{}, err
 	}
@@ -270,38 +270,38 @@ func resolveEnvmergeParams(
 	return envmerge.Params{
 		Includes:     pl.includes,
 		Environments: mc.manifest.Environments,
-		DefaultEnvironment: precedenceString(&schema.Env,
+		DefaultEnvironment: workspace.PrecedenceString(&schema.Env,
 			in.Env,
 			proj.Env,
 			global.Env,
 		),
 		Settings: envmerge.Settings{
-			RequireOverlays: precedenceBool(&schema.RequireOverlays,
+			RequireOverlays: workspace.PrecedenceBool(&schema.RequireOverlays,
 				in.RequireOverlays,
 				proj.RequireOverlays,
 				global.RequireOverlays,
 			),
-			Prefix: precedenceString(&schema.Prefix,
+			Prefix: workspace.PrecedenceString(&schema.Prefix,
 				in.Prefix,
 				proj.Prefix,
 				global.Prefix,
 			),
-			Suffix: precedenceString(&schema.Suffix,
+			Suffix: workspace.PrecedenceString(&schema.Suffix,
 				in.Suffix,
 				proj.Suffix,
 				global.Suffix,
 			),
-			Delimiter: precedenceString(&schema.Delimiter,
+			Delimiter: workspace.PrecedenceString(&schema.Delimiter,
 				in.Delimiter,
 				proj.Delimiter,
 				global.Delimiter,
 			),
-			Overload: precedenceBool(&schema.Overload,
+			Overload: workspace.PrecedenceBool(&schema.Overload,
 				in.Overload,
 				proj.Overload,
 				global.Overload,
 			),
-			ReferencePattern: precedenceString(&schema.ReferencePattern,
+			ReferencePattern: workspace.PrecedenceString(&schema.ReferencePattern,
 				in.ReferencePattern,
 				proj.ReferencePattern,
 				global.ReferencePattern,
