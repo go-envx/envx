@@ -292,13 +292,6 @@ func diagnoseLeaf(
 }
 
 // severityRank orders severities so aggregation can select the worst outcome.
-func severityRank(severity Severity) int {
-	switch severity {
-	case SeverityError:
-		return 2
-	case SeverityWarning:
-		return 1
-	default:
-		return 0
-	}
+func severityRank(sev Severity) int {
+	return sev.Rank()
 }

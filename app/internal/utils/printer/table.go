@@ -6,6 +6,7 @@ import (
 	"strings"
 	"unicode/utf8"
 
+	"github.com/go-envx/envx/app/internal/utils/severity"
 	"github.com/go-envx/envx/app/internal/utils/style"
 )
 
@@ -26,8 +27,8 @@ type Table struct {
 type Cell struct {
 	// Text is the cell's displayed content.
 	Text string
-	// Severity colors the cell; style.SeverityNone leaves it unstyled.
-	Severity style.Severity
+	// Severity colors the cell; severity.None leaves it unstyled.
+	Severity severity.Level
 	// Color sets an explicit foreground color, overriding Severity when not
 	// style.ColorNone. Used for content whose meaning is not a severity, such as
 	// diff signs.

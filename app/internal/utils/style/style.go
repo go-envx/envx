@@ -1,5 +1,7 @@
 package style
 
+import "github.com/go-envx/envx/app/internal/utils/severity"
+
 // ANSI control sequences used to open and close styling.
 const (
 	escape = "\033["
@@ -34,22 +36,6 @@ const (
 	ColorCyan
 	// ColorMuted renders text in a dim gray.
 	ColorMuted
-)
-
-// Severity classifies a value's resolution outcome so it can be colored
-// consistently. The zero value, SeverityNone, leaves text unstyled.
-type Severity int
-
-const (
-	// SeverityNone applies no color.
-	SeverityNone Severity = iota
-	// SeverityOK marks a successful outcome (cyan, chosen over green so it stays
-	// distinguishable from SeverityError under red-green color blindness).
-	SeverityOK
-	// SeverityWarning marks a recoverable concern (yellow).
-	SeverityWarning
-	// SeverityError marks a failure (red).
-	SeverityError
 )
 
 // Styler applies ANSI styling to strings, emitting escape codes only when
@@ -128,16 +114,16 @@ func (s Styler) Color(c Color, text string) string {
 	}
 }
 
-// Severity colors text according to sev. SeverityNone leaves it unstyled.
-func (s Styler) Severity(sev Severity, text string) string {
-	switch sev {
-	case SeverityOK:
+// Severity colors text according to level. severity.None leaves it unstyled.
+func (s Styler) Severity(level severity.Level, text string) string {
+	switch level {
+	case severity.OK:
 		return s.Cyan(text)
-	case SeverityWarning:
+	case severity.Warn:
 		return s.Yellow(text)
-	case SeverityError:
+	case severity.Error:
 		return s.Red(text)
-	case SeverityNone:
+	case severity.None:
 		return text
 	default:
 		return text

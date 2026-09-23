@@ -1,18 +1,20 @@
 package validate
 
-import "github.com/go-envx/envx/app/internal/shared/status"
+import (
+	"github.com/go-envx/envx/app/internal/shared/status"
+	"github.com/go-envx/envx/app/internal/utils/severity"
+)
 
-// Severity ranks a finding. It mirrors the envmerge severities so a resolution
-// outcome maps onto a finding without translation loss.
-type Severity string
+// Severity ranks a finding.
+type Severity = severity.Level
 
 const (
 	// SeverityWarning marks a non-fatal finding, such as an unavailable key or an
 	// orphaned store value.
-	SeverityWarning Severity = "warning"
+	SeverityWarning = severity.Warn
 	// SeverityError marks a failing finding, such as a dangling reference or a
 	// plaintext store value.
-	SeverityError Severity = "error"
+	SeverityError = severity.Error
 )
 
 // Finding is one validation problem. Reference findings carry the project and
@@ -55,11 +57,11 @@ type Params struct {
 // if present, else the code's built-in default. An unknown code defaults to
 // error so a new, unmapped code fails loudly rather than passing silently.
 func (p Params) level(code string) status.Severity {
-	if severity, ok := p.Severity[code]; ok {
-		return severity
+	if s, ok := p.Severity[code]; ok {
+		return s
 	}
-	if severity, ok := status.DefaultSeverity(code); ok {
-		return severity
+	if s, ok := status.DefaultSeverity(code); ok {
+		return s
 	}
 	return status.Error
 }

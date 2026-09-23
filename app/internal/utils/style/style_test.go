@@ -3,6 +3,8 @@ package style
 import (
 	"strings"
 	"testing"
+
+	"github.com/go-envx/envx/app/internal/utils/severity"
 )
 
 // TestStylerDisabled verifies a disabled Styler returns text unchanged for every
@@ -60,20 +62,20 @@ func TestStylerEnabled(t *testing.T) {
 }
 
 // TestStylerSeverity verifies severity levels map to the expected color and that
-// SeverityNone leaves text unstyled even when enabled.
+// severity.None leaves text unstyled even when enabled.
 func TestStylerSeverity(t *testing.T) {
 	t.Parallel()
 
 	s := New(true)
 	tests := []struct {
 		name string
-		sev  Severity
+		sev  severity.Level
 		want string
 	}{
-		{"ok", SeverityOK, s.Cyan("v")},
-		{"warning", SeverityWarning, s.Yellow("v")},
-		{"error", SeverityError, s.Red("v")},
-		{"none", SeverityNone, "v"},
+		{"ok", severity.OK, s.Cyan("v")},
+		{"warning", severity.Warn, s.Yellow("v")},
+		{"error", severity.Error, s.Red("v")},
+		{"none", severity.None, "v"},
 	}
 	for _, tt := range tests {
 		if got := s.Severity(tt.sev, "v"); got != tt.want {
@@ -88,10 +90,10 @@ func TestStylerSeverityDisabled(t *testing.T) {
 	t.Parallel()
 
 	s := New(false)
-	if got := s.Severity(SeverityError, "v"); got != "v" {
+	if got := s.Severity(severity.Error, "v"); got != "v" {
 		t.Errorf("Severity(error) = %q, want %q", got, "v")
 	}
-	if strings.Contains(s.Severity(SeverityOK, "v"), "\033") {
+	if strings.Contains(s.Severity(severity.OK, "v"), "\033") {
 		t.Error("disabled Severity emitted an escape code")
 	}
 }

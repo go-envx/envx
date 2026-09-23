@@ -5,6 +5,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/go-envx/envx/app/internal/utils/severity"
 	"github.com/go-envx/envx/app/internal/utils/style"
 )
 
@@ -18,8 +19,8 @@ func TestWriteTableAlignsPlain(t *testing.T) {
 	table := Table{
 		Headers: []string{"KEY", "STATUS"},
 		Rows: [][]Cell{
-			{{Text: "API_KEY"}, {Text: "OK", Severity: style.SeverityOK}},
-			{{Text: "BAD"}, {Text: "ERROR", Severity: style.SeverityError}},
+			{{Text: "API_KEY"}, {Text: "OK", Severity: severity.OK}},
+			{{Text: "BAD"}, {Text: "ERROR", Severity: severity.Error}},
 		},
 	}
 	if err := p.WriteTable(table); err != nil {
@@ -47,7 +48,7 @@ func TestWriteTableStylesWhenEnabled(t *testing.T) {
 	table := Table{
 		Headers: []string{"KEY", "STATUS"},
 		Rows: [][]Cell{
-			{{Text: "API_KEY"}, {Text: "OK", Severity: style.SeverityOK}},
+			{{Text: "API_KEY"}, {Text: "OK", Severity: severity.OK}},
 		},
 	}
 	if err := p.WriteTable(table); err != nil {
@@ -169,7 +170,7 @@ func TestWriteTableCellColor(t *testing.T) {
 	p := newTestPrinter(&out, &errStream, true)
 	table := Table{
 		Rows: [][]Cell{
-			{{Text: "+", Color: style.ColorGreen, Severity: style.SeverityError}},
+			{{Text: "+", Color: style.ColorGreen, Severity: severity.Error}},
 		},
 	}
 	if err := p.WriteTable(table); err != nil {
