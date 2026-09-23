@@ -4,7 +4,6 @@ import (
 	"fmt"
 
 	"github.com/go-envx/envx/app/internal/utils/printer"
-	"github.com/go-envx/envx/app/internal/utils/style"
 	engine "github.com/go-envx/envx/app/internal/validate"
 )
 
@@ -76,7 +75,7 @@ func renderJSON(p *printer.Printer, report engine.Report) error {
 	findings := make([]jsonFinding, 0, len(report.Findings))
 	for _, f := range report.Findings {
 		findings = append(findings, jsonFinding{
-			Severity:    string(f.Severity),
+			Severity:    f.Severity.DisplayString(),
 			Project:     f.Project,
 			Environment: f.Environment,
 			Key:         f.Key,
@@ -111,7 +110,7 @@ func renderTable(p *printer.Printer, report engine.Report) error {
 		rows = append(rows, []printer.Cell{
 			{Text: scope(f)},
 			{Text: f.Key},
-			{Text: f.Code, Severity: toStyleSeverity(f.Severity)},
+			{Text: f.Code, Severity: f.Severity},
 			{Text: f.Message},
 		})
 	}
@@ -162,17 +161,4 @@ func renderBanner(p *printer.Printer, report engine.Report) error {
 		}
 	}
 	return p.LogBlank()
-}
-
-// toStyleSeverity maps a validate severity onto a style severity, keeping the
-// style package a dependency-free leaf that never imports validate.
-func toStyleSeverity(s engine.Severity) style.Severity {
-	switch s {
-	case engine.SeverityError:
-		return style.SeverityError
-	case engine.SeverityWarning:
-		return style.SeverityWarning
-	default:
-		return style.SeverityNone
-	}
 }

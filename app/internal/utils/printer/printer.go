@@ -1,7 +1,6 @@
 package printer
 
 import (
-	"encoding/json"
 	"fmt"
 	"io"
 	"os"
@@ -63,6 +62,13 @@ func New(opts Options) *Printer {
 	}
 }
 
+// LogBlank writes an empty line to standard error, separating a banner or
+// warning from the output that follows on standard output.
+func (p *Printer) LogBlank() error {
+	_, err := fmt.Fprintln(p.err)
+	return err
+}
+
 // LogMessage writes a plain informational line to standard output.
 func (p *Printer) LogMessage(message string) error {
 	_, err := fmt.Fprintln(p.out, message)
@@ -94,26 +100,11 @@ func (p *Printer) LogError(message string) error {
 	return err
 }
 
-// LogBlank writes an empty line to standard error, separating a banner or
-// warning from the output that follows on standard output.
-func (p *Printer) LogBlank() error {
-	_, err := fmt.Fprintln(p.err)
-	return err
-}
-
 // LogNote writes a muted, non-severity hint to standard error, for guidance that
 // accompanies but is not part of the primary output (which stays on stdout).
 func (p *Printer) LogNote(message string) error {
 	_, err := fmt.Fprintln(p.err, p.errStyle.Muted(message))
 	return err
-}
-
-// WriteJSON writes value as indented JSON to standard output. It is never
-// colored so the output stays machine-readable.
-func (p *Printer) WriteJSON(value any) error {
-	enc := json.NewEncoder(p.out)
-	enc.SetIndent("", "  ")
-	return enc.Encode(value)
 }
 
 // colorEnabled decides whether to style a stream: an explicit override wins,

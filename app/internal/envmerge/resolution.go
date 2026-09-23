@@ -1,5 +1,7 @@
 package envmerge
 
+import "github.com/go-envx/envx/app/internal/utils/severity"
+
 // Kind classifies how a value is materialized.
 type Kind string
 
@@ -14,15 +16,15 @@ const (
 )
 
 // Severity ranks a resolution outcome.
-type Severity string
+type Severity = severity.Level
 
 const (
 	// SeverityOK marks a value that resolved successfully.
-	SeverityOK Severity = "ok"
+	SeverityOK = severity.OK
 	// SeverityWarning marks a non-fatal outcome, such as an unavailable key.
-	SeverityWarning Severity = "warning"
+	SeverityWarning = severity.Warn
 	// SeverityError marks a failed outcome, such as a dangling reference.
-	SeverityError Severity = "error"
+	SeverityError = severity.Error
 )
 
 // Resolution is the non-fatal, dry-run outcome of materializing one value.

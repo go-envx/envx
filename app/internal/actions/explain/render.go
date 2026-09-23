@@ -6,7 +6,6 @@ import (
 	"github.com/go-envx/envx/app/internal/envmerge"
 	"github.com/go-envx/envx/app/internal/utils/printer"
 	"github.com/go-envx/envx/app/internal/utils/str"
-	"github.com/go-envx/envx/app/internal/utils/style"
 )
 
 // jsonStatus is the tagged view of a resolution outcome for JSON output.
@@ -99,7 +98,7 @@ func renderJSON(p *printer.Printer, res actionResult) error {
 			SourceKey: e.SourceKey,
 			Shadowed:  e.Shadowed,
 			Status: jsonStatus{
-				Severity: string(e.Resolution.Severity),
+				Severity: e.Resolution.Severity.DisplayString(),
 				Code:     e.Resolution.Code,
 				Message:  e.Resolution.Message,
 			},
@@ -109,7 +108,7 @@ func renderJSON(p *printer.Printer, res actionResult) error {
 
 	out := jsonResult{
 		Summary: jsonSummary{
-			Severity: string(res.Summary.Severity()),
+			Severity: res.Summary.Severity().DisplayString(),
 			Errors:   res.Summary.Errors,
 			Warnings: res.Summary.Warnings,
 		},
@@ -151,7 +150,7 @@ func renderTable(p *printer.Printer, res actionResult, reveal bool) error {
 			{Text: e.Source},
 			{
 				Text:     e.Resolution.Code,
-				Severity: toStyleSeverity(e.Resolution.Severity),
+				Severity: e.Resolution.Severity,
 			},
 		}
 		if reveal {
@@ -187,19 +186,4 @@ func renderBanner(p *printer.Printer, s envmerge.ExplanationSummary) error {
 		}
 	}
 	return p.LogBlank()
-}
-
-// toStyleSeverity maps an envmerge severity onto a style severity, keeping the
-// style package a dependency-free leaf that never imports envmerge.
-func toStyleSeverity(s envmerge.Severity) style.Severity {
-	switch s {
-	case envmerge.SeverityOK:
-		return style.SeverityOK
-	case envmerge.SeverityWarning:
-		return style.SeverityWarning
-	case envmerge.SeverityError:
-		return style.SeverityError
-	default:
-		return style.SeverityNone
-	}
 }
