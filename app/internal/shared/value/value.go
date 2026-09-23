@@ -79,18 +79,24 @@ type Resolution struct {
 	// Status is a stable, machine-classifiable status identifier (e.g. "OK",
 	// "SECRET_REFERENCE_NOT_FOUND").
 	Status string
-	// Code preserves backwards compatibility during migration, aliasing Status.
+	// Code aliases Status during refactoring.
+	// TODO: remove after caller migration.
 	Code string
-	// Message is a human-readable status description free of secret material.
+	// StatusMessage is a human-readable explanation of status, free of secret material.
+	StatusMessage string
+	// Message aliases StatusMessage during refactoring.
+	// TODO: remove after caller migration.
 	Message string
 	// Value holds the materialized plaintext when resolution succeeds and
 	// reveal is enabled.
 	Value string
-	// Resolved preserves backwards compatibility during migration, aliasing Value.
+	// Resolved aliases Value during refactoring.
+	// TODO: remove after caller migration.
 	Resolved string
 	// IsResolved reports whether Value holds a materialized string.
 	IsResolved bool
-	// HasResolved preserves backwards compatibility during migration, aliasing IsResolved.
+	// HasResolved aliases IsResolved during refactoring.
+	// TODO: remove after caller migration.
 	HasResolved bool
 }
 
