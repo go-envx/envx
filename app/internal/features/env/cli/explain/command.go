@@ -92,9 +92,9 @@ func NewCommand() *cobra.Command {
 		env.WithReferencePattern,
 	)
 
-	flags.BindString(cmd.Flags(), &output, &flags.Output)
-	flags.BindBool(cmd.Flags(), &reveal, &flags.Reveal)
-	flags.BindBool(cmd.Flags(), &absolute, &flags.Absolute)
+	flags.Bind(cmd.Flags(), &output, &flags.Output)
+	flags.Bind(cmd.Flags(), &reveal, &env.Reveal)
+	flags.Bind(cmd.Flags(), &absolute, &env.Absolute)
 
 	return cmd
 }

@@ -71,9 +71,9 @@ func NewCommand() *cobra.Command {
 		},
 	}
 
-	flags.BindString(cmd.Flags(), &group, &secrets.Group)
-	flags.BindString(cmd.Flags(), &key, &secrets.Key)
-	flags.BindBool(cmd.Flags(), &verbose, &flags.Verbose)
+	flags.Bind(cmd.Flags(), &group, &secrets.Group)
+	flags.Bind(cmd.Flags(), &key, &secrets.Key)
+	flags.Bind(cmd.Flags(), &verbose, &flags.Verbose)
 
 	return cmd
 }

@@ -16,12 +16,12 @@ func TestSpecHelpText(t *testing.T) {
 
 	tests := []struct {
 		name string
-		spec flags.Spec
+		spec flags.Spec[string]
 		want string
 	}{
 		{
 			name: "with env var",
-			spec: flags.Spec{
+			spec: flags.Spec[string]{
 				Name:  "env",
 				Env:   "ENVX_ENV",
 				Usage: "target environment",
@@ -30,7 +30,7 @@ func TestSpecHelpText(t *testing.T) {
 		},
 		{
 			name: "without env var",
-			spec: flags.Spec{
+			spec: flags.Spec[string]{
 				Name:  "output",
 				Usage: "output format: table|json",
 			},
@@ -48,58 +48,56 @@ func TestSpecHelpText(t *testing.T) {
 	}
 }
 
-func TestBindString(t *testing.T) {
+func TestBind(t *testing.T) {
 	t.Parallel()
 
-	var output string
-	spec := flags.Spec{
-		Name:  "output",
-		Short: "o",
-		Usage: "output format",
-	}
-	fs := newFlags()
-	flags.BindString(fs, &output, &spec)
-	if err := fs.Parse([]string{"--output", "json"}); err != nil {
-		t.Fatalf("parse: %v", err)
-	}
-	if output != "json" {
-		t.Errorf("output = %q, want json", output)
-	}
-}
+	t.Run("string", func(t *testing.T) {
+		var output string
+		spec := flags.Spec[string]{
+			Name:  "output",
+			Short: "o",
+			Usage: "output format",
+		}
+		fs := newFlags()
+		flags.Bind(fs, &output, &spec)
+		if err := fs.Parse([]string{"--output", "json"}); err != nil {
+			t.Fatalf("parse: %v", err)
+		}
+		if output != "json" {
+			t.Errorf("output = %q, want json", output)
+		}
+	})
 
-func TestBindBool(t *testing.T) {
-	t.Parallel()
+	t.Run("bool", func(t *testing.T) {
+		var verbose bool
+		spec := flags.Spec[bool]{
+			Name:  "verbose",
+			Short: "v",
+			Usage: "verbose output",
+		}
+		fs := newFlags()
+		flags.Bind(fs, &verbose, &spec)
+		if err := fs.Parse([]string{"--verbose"}); err != nil {
+			t.Fatalf("parse: %v", err)
+		}
+		if !verbose {
+			t.Error("verbose = false, want true")
+		}
+	})
 
-	var verbose bool
-	spec := flags.Spec{
-		Name:  "verbose",
-		Short: "v",
-		Usage: "verbose output",
-	}
-	fs := newFlags()
-	flags.BindBool(fs, &verbose, &spec)
-	if err := fs.Parse([]string{"--verbose"}); err != nil {
-		t.Fatalf("parse: %v", err)
-	}
-	if !verbose {
-		t.Error("verbose = false, want true")
-	}
-}
-
-func TestBindStringSlice(t *testing.T) {
-	t.Parallel()
-
-	var items []string
-	spec := flags.Spec{
-		Name:  "item",
-		Usage: "items list",
-	}
-	fs := newFlags()
-	flags.BindStringSlice(fs, &items, &spec)
-	if err := fs.Parse([]string{"--item", "a", "--item", "b"}); err != nil {
-		t.Fatalf("parse: %v", err)
-	}
-	if len(items) != 2 || items[0] != "a" || items[1] != "b" {
-		t.Errorf("items = %v, want [a b]", items)
-	}
+	t.Run("string slice", func(t *testing.T) {
+		var items []string
+		spec := flags.Spec[[]string]{
+			Name:  "item",
+			Usage: "items list",
+		}
+		fs := newFlags()
+		flags.Bind(fs, &items, &spec)
+		if err := fs.Parse([]string{"--item", "a", "--item", "b"}); err != nil {
+			t.Fatalf("parse: %v", err)
+		}
+		if len(items) != 2 || items[0] != "a" || items[1] != "b" {
+			t.Errorf("items = %v, want [a b]", items)
+		}
+	})
 }

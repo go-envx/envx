@@ -121,8 +121,8 @@ func NewValidateCmd() *cobra.Command {
 		env.WithReferencePattern,
 	)
 
-	flags.BindString(cmd.Flags(), &output, &flags.Output)
-	flags.BindBool(cmd.Flags(), &strict, &Strict)
+	flags.Bind(cmd.Flags(), &output, &flags.Output)
+	flags.Bind(cmd.Flags(), &strict, &Strict)
 
 	registerSelectionFlags(cmd, selections)
 

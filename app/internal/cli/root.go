@@ -40,7 +40,7 @@ func NewRootCmd(info BuildInfo) *cobra.Command {
 		},
 	}
 
-	flags.BindString(root.PersistentFlags(), new(string), &workspace.ConfigFlag)
+	flags.Bind(root.PersistentFlags(), new(string), &workspace.ConfigFlag)
 
 	root.AddCommand(
 		workspacecli.NewCreateCmd(workspace.NewCreateWorkspaceHandler()),

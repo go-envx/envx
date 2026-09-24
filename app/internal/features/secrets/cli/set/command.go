@@ -71,7 +71,7 @@ func NewCommand() *cobra.Command {
 		},
 	}
 
-	flags.BindBool(cmd.Flags(), &noConfirm, &secrets.NoConfirm)
+	flags.Bind(cmd.Flags(), &noConfirm, &secrets.NoConfirm)
 
 	return cmd
 }

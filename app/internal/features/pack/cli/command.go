@@ -88,10 +88,10 @@ func NewPackCmd() *cobra.Command {
 		},
 	}
 
-	flags.BindString(cmd.Flags(), &out, &Out)
-	flags.BindStringSlice(cmd.Flags(), &environments, &Env)
-	flags.BindStringSlice(cmd.Flags(), &projects, &Project)
-	flags.BindBool(cmd.Flags(), &force, &Force)
+	flags.Bind(cmd.Flags(), &out, &Out)
+	flags.Bind(cmd.Flags(), &environments, &Env)
+	flags.Bind(cmd.Flags(), &projects, &Project)
+	flags.Bind(cmd.Flags(), &force, &Force)
 	_ = cmd.MarkFlagRequired(Out.Name)
 
 	return cmd

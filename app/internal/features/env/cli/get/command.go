@@ -76,7 +76,7 @@ func NewCommand() *cobra.Command {
 		env.WithReferencePattern,
 	)
 
-	flags.BindBool(cmd.Flags(), &reveal, &flags.Reveal)
+	flags.Bind(cmd.Flags(), &reveal, &env.Reveal)
 
 	return cmd
 }

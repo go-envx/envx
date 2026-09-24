@@ -83,7 +83,7 @@ func NewRunCmd() *cobra.Command {
 
 	// --ignore-errors is a command-local flag, not a precedence-resolved setting,
 	// so it binds directly rather than through RegisterFlags.
-	flags.BindBool(cmd.Flags(), &ignoreErrors, &IgnoreErrors)
+	flags.Bind(cmd.Flags(), &ignoreErrors, &IgnoreErrors)
 
 	return cmd
 }

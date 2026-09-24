@@ -26,7 +26,7 @@ func GetInput(fs *pflag.FlagSet) *Input {
 
 // optString returns a pointer to the flag's value when the user explicitly set it,
 // and nil otherwise (including when the flag was never registered).
-func optString(fs *pflag.FlagSet, s *flags.Spec) *string {
+func optString(fs *pflag.FlagSet, s *flags.Spec[string]) *string {
 	if !fs.Changed(s.Name) {
 		return nil
 	}
@@ -36,7 +36,7 @@ func optString(fs *pflag.FlagSet, s *flags.Spec) *string {
 
 // optBool returns a pointer to the flag's value when the user explicitly set it,
 // and nil otherwise (including when the flag was never registered).
-func optBool(fs *pflag.FlagSet, s *flags.Spec) *bool {
+func optBool(fs *pflag.FlagSet, s *flags.Spec[bool]) *bool {
 	if !fs.Changed(s.Name) {
 		return nil
 	}

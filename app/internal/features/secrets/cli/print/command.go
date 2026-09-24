@@ -56,7 +56,7 @@ func NewCommand() *cobra.Command {
 		},
 	}
 
-	flags.BindString(cmd.Flags(), &cipherName, &secrets.Cipher)
+	flags.Bind(cmd.Flags(), &cipherName, &secrets.Cipher)
 
 	return cmd
 }

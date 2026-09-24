@@ -127,11 +127,11 @@ func NewEmitCmd() *cobra.Command {
 		env.WithReferencePattern,
 	)
 
-	flags.BindString(cmd.Flags(), &target, &Target)
-	flags.BindString(cmd.Flags(), &name, &Name)
-	flags.BindString(cmd.Flags(), &output, &Output)
-	flags.BindString(cmd.Flags(), &only, &Only)
-	flags.BindString(cmd.Flags(), &key, &Key)
+	flags.Bind(cmd.Flags(), &target, &Target)
+	flags.Bind(cmd.Flags(), &name, &Name)
+	flags.Bind(cmd.Flags(), &output, &Output)
+	flags.Bind(cmd.Flags(), &only, &Only)
+	flags.Bind(cmd.Flags(), &key, &Key)
 	_ = cmd.MarkFlagRequired(Target.Name)
 
 	return cmd
