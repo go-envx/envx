@@ -11,9 +11,9 @@ The application layout established in Phase 6 and Phase 7 organized domain code 
 
 The objective of Phase 8 is to enforce strict Dependency Injection (DI) and Clean Architecture boundaries:
 1. **Consumer-Defined Interfaces**: Domain services declare the exact repository and adapter interfaces they require within the feature package root.
-2. **Dedicated Repository Subpackages**: Concrete filesystem implementations live in isolated subpackages (such as `filestore/`) under each feature.
-3. **Strict Parameter Separation**: Feature constructors take only domain dependencies (interfaces and domain values); `filestore` constructors take filesystem configuration (paths, permissions, indentation).
-4. **Pure Composition Root**: [app/internal/core](app/internal/core) acts as the sole DI container and assembler, instantiating `filestore` repositories and injecting them into domain services.
+2. **Dedicated Repository Subpackages**: Concrete filesystem implementations live in isolated subpackages (such as a filestore subpackage) under each feature.
+3. **Strict Parameter Separation**: Feature constructors take only domain dependencies (interfaces and domain values); filestore constructors take filesystem configuration (paths, permissions, indentation).
+4. **Pure Composition Root**: [app/internal/core](app/internal/core) acts as the sole DI container and assembler, instantiating filestore repositories and injecting them into domain services.
 
 ## Architectural Principles & Design Patterns
 
@@ -73,8 +73,8 @@ type Repository interface {
 }
 ```
 
-#### Filestore Subpackage (`internal/features/privatekey/filestore`)
-Move key file parsing logic from [app/internal/features/privatekey/keyfile.go](app/internal/features/privatekey/keyfile.go) and atomic writes from [app/internal/features/privatekey/destinationFile.go](app/internal/features/privatekey/destinationFile.go) into `filestore`:
+#### Filestore Subpackage
+Move key file parsing logic from [app/internal/features/privatekey/keyfile.go](app/internal/features/privatekey/keyfile.go) and atomic writes from [app/internal/features/privatekey/destinationFile.go](app/internal/features/privatekey/destinationFile.go) into a new filestore subpackage:
 ```go
 package filestore
 
@@ -95,7 +95,8 @@ func (s *Store) Path() string
 func (s *Store) Write(group, privateKey string) error
 ```
 
-#### Service Decoupling (`internal/features/privatekey/resolver.go`)
+#### Service Decoupling
+Refactor [app/internal/features/privatekey/resolver.go](app/internal/features/privatekey/resolver.go):
 ```go
 // ResolverParams configures private key resolution across env vars and repository.
 type ResolverParams struct {
@@ -110,14 +111,15 @@ func NewResolver(params ResolverParams) Resolver
 
 ---
 
-### 2. Feature: Secrets (`internal/features/secrets`)
+### 2. Feature: Secrets
 
 The secrets feature manages keypairs, secret encryption, store inspection, and reference resolution.
 
 #### Current Friction
 [app/internal/features/secrets/manager.go](app/internal/features/secrets/manager.go#L11-L26) accepts `SecretsPath`, `KeysPath`, and `DefaultIndent`. It directly instantiates store documents from [app/internal/features/secrets/internal/store](app/internal/features/secrets/internal/store).
 
-#### Proposed Consumer Interface (`internal/features/secrets/repository.go`)
+#### Proposed Consumer Interface
+Defined in the secrets package root:
 ```go
 package secrets
 
@@ -162,8 +164,8 @@ type Repository interface {
 }
 ```
 
-#### Filestore Subpackage (`internal/features/secrets/filestore`)
-Elevate and refactor [app/internal/features/secrets/internal/store](app/internal/features/secrets/internal/store) into `internal/features/secrets/filestore`:
+#### Filestore Subpackage
+Elevate and refactor [app/internal/features/secrets/internal/store](app/internal/features/secrets/internal/store) into a filestore subpackage under secrets:
 ```go
 package filestore
 
@@ -182,7 +184,8 @@ type Store struct {
 func New(params Params) (*Store, error)
 ```
 
-#### Service Decoupling (`internal/features/secrets/manager.go`)
+#### Service Decoupling
+Refactor [app/internal/features/secrets/manager.go](app/internal/features/secrets/manager.go):
 ```go
 // Params configures the secrets manager with pure dependencies.
 type Params struct {
@@ -197,14 +200,15 @@ func New(params Params) (*Manager, error)
 
 ---
 
-### 3. Feature: Workspace (`internal/features/workspace`)
+### 3. Feature: Workspace
 
 The workspace feature manages manifest discovery, strict YAML parsing, and workspace scaffolding.
 
 #### Current Friction
 [app/internal/features/workspace/loader.go](app/internal/features/workspace/loader.go#L20-L40) handles walk-up filesystem search, existence checks, and raw byte reading combined with parsing and strict schema validation.
 
-#### Proposed Consumer Interface (`internal/features/workspace/repository.go`)
+#### Proposed Consumer Interface
+Defined in the workspace package root:
 ```go
 package workspace
 
@@ -219,7 +223,8 @@ type ManifestRepository interface {
 }
 ```
 
-#### Filestore Subpackage (`internal/features/workspace/filestore`)
+#### Filestore Subpackage
+Create a filestore subpackage under workspace:
 ```go
 package filestore
 
@@ -238,7 +243,8 @@ type ManifestStore struct {
 func NewManifestStore(params ManifestParams) (*ManifestStore, error)
 ```
 
-#### Service Decoupling (`internal/features/workspace/loader.go`)
+#### Service Decoupling
+Refactor [app/internal/features/workspace/loader.go](app/internal/features/workspace/loader.go):
 ```go
 // ManifestLoaderParams provides dependencies to the manifest loader.
 type ManifestLoaderParams struct {
@@ -250,14 +256,15 @@ func NewManifestLoader(params ManifestLoaderParams) (*ManifestLoader, error)
 
 ---
 
-### 4. Feature: Environment & Namespace (`internal/features/env`)
+### 4. Feature: Environment & Namespace
 
 The environment feature executes overlay merges, flattening, and variable expression substitution.
 
 #### Current Friction
-[app/internal/features/env/merge.go](app/internal/features/env/merge.go#L70-L98) and [app/internal/features/env/load.go](app/internal/features/env/load.go#L10-L30) perform direct disk reads for base files (`<name>.yaml`) and overlays (`<name>.<env>.yaml`), parsing them with YAML decoders inside the merge logic.
+[app/internal/features/env/merge.go](app/internal/features/env/merge.go#L70-L98) and [app/internal/features/env/load.go](app/internal/features/env/load.go#L10-L30) perform direct disk reads for base files and overlays, parsing them with YAML decoders inside the merge logic.
 
-#### Proposed Consumer Interface (`internal/features/env/repository.go`)
+#### Proposed Consumer Interface
+Defined in the env package root:
 ```go
 package env
 
@@ -276,7 +283,8 @@ type NamespaceRepository interface {
 }
 ```
 
-#### Filestore Subpackage (`internal/features/env/filestore`)
+#### Filestore Subpackage
+Create a filestore subpackage under env:
 ```go
 package filestore
 
@@ -289,7 +297,8 @@ type Store struct{}
 func New(params Params) *Store
 ```
 
-#### Service Decoupling (`internal/features/env/params.go`)
+#### Service Decoupling
+Refactor [app/internal/features/env/params.go](app/internal/features/env/params.go):
 ```go
 // Params configures the environment manager with pure domain dependencies.
 type Params struct {
@@ -305,16 +314,16 @@ type Params struct {
 
 ---
 
-### 5. Other Features (`runner`, `emit`, `pack`, `validate`)
+### 5. Other Features
 
-- **`features/runner`**: Already adheres to clean DI. It accepts [app/internal/features/runner/params.go](app/internal/features/runner/params.go#L10-L24) containing `io.Writer` interfaces and an in-memory `Env` map. No persistence repository required.
-- **`features/emit`**: Operates on resolved in-memory entries and writes to `io.Writer`. Already decoupled from storage.
-- **`features/pack`**: Operates on the domain model `WorkspaceLayout`. It uses filesystem copy helpers to assemble isolated bundles.
-- **`features/validate`**: Operates on `WorkspaceProjects` and `secrets.Manager`. With `secrets.Manager` and `env.Manager` decoupled from persistence, validation runs against pure domain interfaces.
+- **Runner**: Already adheres to clean DI. It accepts [app/internal/features/runner/params.go](app/internal/features/runner/params.go#L10-L24) containing `io.Writer` interfaces and an in-memory `Env` map. No persistence repository required.
+- **Emit**: Operates on resolved in-memory entries and writes to `io.Writer`. Already decoupled from storage.
+- **Pack**: Operates on the domain model `WorkspaceLayout`. It uses filesystem copy helpers to assemble isolated bundles.
+- **Validate**: Operates on `WorkspaceProjects` and `secrets.Manager`. With `secrets.Manager` and `env.Manager` decoupled from persistence, validation runs against pure domain interfaces.
 
 ---
 
-## Composition Root Architecture (`internal/core`)
+## Composition Root Architecture
 
 [app/internal/core](app/internal/core) serves as the composition root, wiring storage adapters to domain services.
 
@@ -325,10 +334,10 @@ flowchart TD
     end
 
     subgraph Adapters["Storage Adapters (filestores)"]
-        WSStore["workspace/filestore.ManifestStore"]
-        PKStore["privatekey/filestore.Store"]
-        SecStore["secrets/filestore.Store"]
-        EnvStore["env/filestore.Store"]
+        WSStore["workspace filestore"]
+        PKStore["privatekey filestore"]
+        SecStore["secrets filestore"]
+        EnvStore["env filestore"]
     end
 
     subgraph DomainServices["Domain Services (features)"]
@@ -353,7 +362,7 @@ flowchart TD
     SecMgr -. ResolverFactory .-> EnvMgr
 ```
 
-### Composition Wiring Example in `internal/core/composer.go`
+### Composition Wiring Example in [app/internal/core/composer.go](app/internal/core/composer.go)
 ```go
 // NewSecretsManager composes the configured cipher, filestores, and domain services.
 func NewSecretsManager(secretsPath, keysPath string, cipherParams cipher.Params, indent int) (*secrets.Manager, error) {
@@ -401,49 +410,49 @@ flowchart LR
     Sub85 --> Sub86["8.6: Polish<br/>(Mocks & Verification)"]
 ```
 
-### Phase 8.1: `features/privatekey` DI Refactoring (Lighthouse)
-1. **Define `privatekey.Repository` interface**: Create `repository.go` in `features/privatekey/` declaring `GetPrivateKey`, `SetPrivateKey`, and `Path`.
-2. **Create `features/privatekey/filestore` subpackage**: Move `keyfile.go` parsing and `destinationFile.go` atomic persistence into `filestore/store.go`.
-3. **Decouple `Resolver`**: Update `ResolverParams` to accept `Repository` instead of `KeysPath`.
-4. **Update `core` and callers**: Wire `pkfilestore.New` in `internal/core/composer.go` and `internal/core/config.go`.
-5. **Update tests & verify**: Update unit tests to test `filestore` directly and use in-memory fake repositories for `Resolver`. Run `task envx:test`.
+### Phase 8.1: Private Key DI Refactoring (Lighthouse)
+1. **Define repository interface**: Declare `GetPrivateKey`, `SetPrivateKey`, and `Path` in the privatekey package root.
+2. **Create privatekey filestore subpackage**: Move keyfile parsing and atomic persistence into the filestore subpackage.
+3. **Decouple Resolver**: Update `ResolverParams` to accept `Repository` instead of `KeysPath`.
+4. **Update core and callers**: Wire the privatekey filestore in [app/internal/core/composer.go](app/internal/core/composer.go) and [app/internal/core/config.go](app/internal/core/config.go).
+5. **Update tests & verify**: Update unit tests to test filestore directly and use in-memory fake repositories for `Resolver`. Run `task envx:test`.
 
-### Phase 8.2: `features/workspace` DI Refactoring
-1. **Define `workspace.ManifestRepository` interface**: Declare `Exists`, `Discover`, and `Read` in `features/workspace/repository.go`.
-2. **Create `features/workspace/filestore` subpackage**: Implement `ManifestStore` encapsulating walk-up discovery and file I/O.
-3. **Refactor `ManifestLoader`**: Decouple `ManifestLoader` from `file.Read` and path discovery; accept `ManifestRepository`.
-4. **Wire in `internal/core`**: Update `internal/core/config.go` and `internal/core/composer.go` to instantiate `ManifestStore` and inject into `ManifestLoader`.
+### Phase 8.2: Workspace DI Refactoring
+1. **Define workspace repository interface**: Declare `Exists`, `Discover`, and `Read` in the workspace package root.
+2. **Create workspace filestore subpackage**: Implement manifest store encapsulating walk-up discovery and file I/O.
+3. **Refactor ManifestLoader**: Decouple `ManifestLoader` from `file.Read` and path discovery; accept `ManifestRepository`.
+4. **Wire in core**: Update [app/internal/core/config.go](app/internal/core/config.go) and [app/internal/core/composer.go](app/internal/core/composer.go) to instantiate the manifest store and inject into `ManifestLoader`.
 5. **Update tests & verify**: Run `task envx:test`.
 
-### Phase 8.3: `features/secrets` DI Refactoring
-1. **Define `secrets.Repository` interface**: Declare CRUD operations for public keys, keypairs, and secrets in `features/secrets/repository.go`.
-2. **Elevate `internal/store` to `features/secrets/filestore`**: Convert the internal YAML store into the public subpackage `filestore/`, implementing `secrets.Repository`.
-3. **Refactor `secrets.Params` and `Manager`**: Remove `SecretsPath`, `KeysPath`, and `DefaultIndent` from `secrets.Params`. Inject `secrets.Repository`.
-4. **Update `core` composition**: Update `NewSecretsManager` in `internal/core/composer.go` and `internal/core/config.go` to construct `secfilestore.Store`.
-5. **Update tests & verify**: Update unit tests in `features/secrets/` to mock `Repository` where appropriate. Run `task envx:test`.
+### Phase 8.3: Secrets DI Refactoring
+1. **Define secrets repository interface**: Declare CRUD operations for public keys, keypairs, and secrets in the secrets package root.
+2. **Elevate internal store to secrets filestore**: Convert the internal YAML store into a public filestore subpackage, implementing the secrets repository interface.
+3. **Refactor secrets Params and Manager**: Remove `SecretsPath`, `KeysPath`, and `DefaultIndent` from `secrets.Params`. Inject `secrets.Repository`.
+4. **Update core composition**: Update `NewSecretsManager` in [app/internal/core/composer.go](app/internal/core/composer.go) and [app/internal/core/config.go](app/internal/core/config.go) to construct the secrets filestore.
+5. **Update tests & verify**: Update unit tests in secrets to mock the repository where appropriate. Run `task envx:test`.
 
-### Phase 8.4: `features/env` DI Refactoring
-1. **Define `env.NamespaceRepository` interface**: Declare `LoadBase` and `LoadOverlay` in `features/env/repository.go`.
-2. **Create `features/env/filestore` subpackage**: Implement `Store` handling YAML file reading, unmarshaling, and error wrapping.
-3. **Refactor `env.Manager`**: Remove direct calls to `file.Read` and `yaml.Unmarshal`. Supply `NamespaceRepository` via `env.Params`.
-4. **Wire in `internal/core`**: Update `ResolveProject` in `internal/core/config.go` to construct and inject `envfilestore.Store`.
+### Phase 8.4: Environment & Namespace DI Refactoring
+1. **Define env namespace repository interface**: Declare `LoadBase` and `LoadOverlay` in the env package root.
+2. **Create env filestore subpackage**: Implement store handling YAML file reading, unmarshaling, and error wrapping.
+3. **Refactor env Manager**: Remove direct calls to `file.Read` and `yaml.Unmarshal`. Supply `NamespaceRepository` via `env.Params`.
+4. **Wire in core**: Update `ResolveProject` in [app/internal/core/config.go](app/internal/core/config.go) to construct and inject the env filestore.
 5. **Update tests & verify**: Run `task envx:test`.
 
 ### Phase 8.5: Core Composition Root Streamlining
-1. **Consolidate builder methods**: Review and simplify builder functions across `internal/core/config.go`, `internal/core/composer.go`, and `internal/core/workspace.go`.
+1. **Consolidate builder methods**: Review and simplify builder functions across [app/internal/core/config.go](app/internal/core/config.go), [app/internal/core/composer.go](app/internal/core/composer.go), and [app/internal/core/workspace.go](app/internal/core/workspace.go).
 2. **Enforce clean lifecycle boundaries**: Ensure no store I/O occurs prematurely during workspace discovery.
-3. **Verify CLI commands**: Ensure all Cobra commands under `internal/features/*/cli` interact with cleanly assembled domain handlers.
+3. **Verify CLI commands**: Ensure all Cobra commands under feature cli subpackages interact with cleanly assembled domain handlers.
 4. **Run full verification**: Execute `task envx:check` and `task envx:test`.
 
 ### Phase 8.6: Standards Alignment & Test Fixtures Polish
-1. **Harmonize test doubles**: Provide reusable in-memory fake repositories in `_test.go` files for fast unit testing.
+1. **Harmonize test doubles**: Provide reusable in-memory fake repositories in test files for fast unit testing.
 2. **Audit doc comments**: Verify that all new interfaces and constructors have complete-sentence, symbol-first doc comments.
 3. **Verify E2E test suite**: Run `task envx:test:e2e` to confirm full CLI and workflow compatibility against testdata fixtures.
 4. **Final clean build**: Run `task envx:all`.
 
 ## Testing Strategy
 
-- **Unit Tests (`*_test.go`)**: Use lightweight in-memory fake implementations of consumer-defined interfaces to test domain logic in isolation from disk I/O.
-- **Repository Tests (`filestore/*_test.go`)**: Validate real filesystem operations (atomic writes, permission modes `0600`/`0750`, YAML formatting preservation) using `t.TempDir()`.
-- **Composition Tests (`internal/core/*_test.go`)**: Verify that `internal/core` correctly wires real filestores to domain services and resolves manifests.
-- **End-to-End Tests (`app/test/e2e/`)**: Run complete user workflows (CLI executions) against real files to ensure zero regressions across releases.
+- **Unit Tests**: Use lightweight in-memory fake implementations of consumer-defined interfaces to test domain logic in isolation from disk I/O.
+- **Repository Tests**: Validate real filesystem operations (atomic writes, permission modes `0600`/`0750`, YAML formatting preservation) using `t.TempDir()`.
+- **Composition Tests**: Verify that [app/internal/core](app/internal/core) correctly wires real filestores to domain services and resolves manifests.
+- **End-to-End Tests**: Run complete user workflows (CLI executions) against real files to ensure zero regressions across releases.
