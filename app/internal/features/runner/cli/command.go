@@ -6,7 +6,7 @@ import (
 
 	"github.com/go-envx/envx/app/internal/core"
 	"github.com/go-envx/envx/app/internal/features/env"
-	"github.com/go-envx/envx/app/internal/utils/cliflags"
+	"github.com/go-envx/envx/app/internal/shared/flags"
 	"github.com/go-envx/envx/app/internal/utils/str"
 	"github.com/spf13/cobra"
 )
@@ -83,7 +83,7 @@ func NewRunCmd() *cobra.Command {
 
 	// --ignore-errors is a command-local flag, not a precedence-resolved setting,
 	// so it binds directly rather than through RegisterFlags.
-	cliflags.BindBool(cmd.Flags(), &ignoreErrors, &IgnoreErrors)
+	flags.BindBool(cmd.Flags(), &ignoreErrors, &IgnoreErrors)
 
 	return cmd
 }

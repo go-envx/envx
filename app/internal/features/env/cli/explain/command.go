@@ -3,9 +3,8 @@ package explain
 import (
 	"github.com/go-envx/envx/app/internal/core"
 	"github.com/go-envx/envx/app/internal/features/env"
-	sharedflags "github.com/go-envx/envx/app/internal/shared/flags"
+	"github.com/go-envx/envx/app/internal/shared/flags"
 	"github.com/go-envx/envx/app/internal/utils/arg"
-	"github.com/go-envx/envx/app/internal/utils/cliflags"
 	"github.com/go-envx/envx/app/internal/utils/printer"
 	"github.com/go-envx/envx/app/internal/utils/str"
 	"github.com/spf13/cobra"
@@ -93,9 +92,9 @@ func NewCommand() *cobra.Command {
 		env.WithReferencePattern,
 	)
 
-	cliflags.BindString(cmd.Flags(), &output, &sharedflags.Output)
-	cliflags.BindBool(cmd.Flags(), &reveal, &sharedflags.Reveal)
-	cliflags.BindBool(cmd.Flags(), &absolute, &sharedflags.Absolute)
+	flags.BindString(cmd.Flags(), &output, &flags.Output)
+	flags.BindBool(cmd.Flags(), &reveal, &flags.Reveal)
+	flags.BindBool(cmd.Flags(), &absolute, &flags.Absolute)
 
 	return cmd
 }

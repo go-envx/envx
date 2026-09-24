@@ -3,7 +3,7 @@ package set
 import (
 	"github.com/go-envx/envx/app/internal/core"
 	"github.com/go-envx/envx/app/internal/features/secrets"
-	"github.com/go-envx/envx/app/internal/utils/cliflags"
+	"github.com/go-envx/envx/app/internal/shared/flags"
 	"github.com/go-envx/envx/app/internal/utils/printer"
 	"github.com/go-envx/envx/app/internal/utils/str"
 	"github.com/spf13/cobra"
@@ -71,7 +71,7 @@ func NewCommand() *cobra.Command {
 		},
 	}
 
-	cliflags.BindBool(cmd.Flags(), &noConfirm, &secrets.NoConfirm)
+	flags.BindBool(cmd.Flags(), &noConfirm, &secrets.NoConfirm)
 
 	return cmd
 }

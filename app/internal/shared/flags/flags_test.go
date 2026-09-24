@@ -1,9 +1,9 @@
-package cliflags_test
+package flags_test
 
 import (
 	"testing"
 
-	"github.com/go-envx/envx/app/internal/utils/cliflags"
+	"github.com/go-envx/envx/app/internal/shared/flags"
 	"github.com/spf13/pflag"
 )
 
@@ -16,12 +16,12 @@ func TestSpecHelpText(t *testing.T) {
 
 	tests := []struct {
 		name string
-		spec cliflags.FlagSpec
+		spec flags.Spec
 		want string
 	}{
 		{
 			name: "with env var",
-			spec: cliflags.FlagSpec{
+			spec: flags.Spec{
 				Name:  "env",
 				Env:   "ENVX_ENV",
 				Usage: "target environment",
@@ -30,7 +30,7 @@ func TestSpecHelpText(t *testing.T) {
 		},
 		{
 			name: "without env var",
-			spec: cliflags.FlagSpec{
+			spec: flags.Spec{
 				Name:  "output",
 				Usage: "output format: table|json",
 			},
@@ -52,13 +52,13 @@ func TestBindString(t *testing.T) {
 	t.Parallel()
 
 	var output string
-	spec := cliflags.FlagSpec{
+	spec := flags.Spec{
 		Name:  "output",
 		Short: "o",
 		Usage: "output format",
 	}
 	fs := newFlags()
-	cliflags.BindString(fs, &output, &spec)
+	flags.BindString(fs, &output, &spec)
 	if err := fs.Parse([]string{"--output", "json"}); err != nil {
 		t.Fatalf("parse: %v", err)
 	}
@@ -71,13 +71,13 @@ func TestBindBool(t *testing.T) {
 	t.Parallel()
 
 	var verbose bool
-	spec := cliflags.FlagSpec{
+	spec := flags.Spec{
 		Name:  "verbose",
 		Short: "v",
 		Usage: "verbose output",
 	}
 	fs := newFlags()
-	cliflags.BindBool(fs, &verbose, &spec)
+	flags.BindBool(fs, &verbose, &spec)
 	if err := fs.Parse([]string{"--verbose"}); err != nil {
 		t.Fatalf("parse: %v", err)
 	}
@@ -90,12 +90,12 @@ func TestBindStringSlice(t *testing.T) {
 	t.Parallel()
 
 	var items []string
-	spec := cliflags.FlagSpec{
+	spec := flags.Spec{
 		Name:  "item",
 		Usage: "items list",
 	}
 	fs := newFlags()
-	cliflags.BindStringSlice(fs, &items, &spec)
+	flags.BindStringSlice(fs, &items, &spec)
 	if err := fs.Parse([]string{"--item", "a", "--item", "b"}); err != nil {
 		t.Fatalf("parse: %v", err)
 	}

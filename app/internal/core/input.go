@@ -3,7 +3,7 @@ package core
 import (
 	"github.com/go-envx/envx/app/internal/features/env"
 	"github.com/go-envx/envx/app/internal/features/workspace"
-	"github.com/go-envx/envx/app/internal/utils/cliflags"
+	"github.com/go-envx/envx/app/internal/shared/flags"
 	"github.com/spf13/pflag"
 )
 
@@ -26,7 +26,7 @@ func GetInput(fs *pflag.FlagSet) *Input {
 
 // optString returns a pointer to the flag's value when the user explicitly set it,
 // and nil otherwise (including when the flag was never registered).
-func optString(fs *pflag.FlagSet, s *cliflags.FlagSpec) *string {
+func optString(fs *pflag.FlagSet, s *flags.Spec) *string {
 	if !fs.Changed(s.Name) {
 		return nil
 	}
@@ -36,7 +36,7 @@ func optString(fs *pflag.FlagSet, s *cliflags.FlagSpec) *string {
 
 // optBool returns a pointer to the flag's value when the user explicitly set it,
 // and nil otherwise (including when the flag was never registered).
-func optBool(fs *pflag.FlagSet, s *cliflags.FlagSpec) *bool {
+func optBool(fs *pflag.FlagSet, s *flags.Spec) *bool {
 	if !fs.Changed(s.Name) {
 		return nil
 	}

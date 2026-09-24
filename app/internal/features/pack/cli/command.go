@@ -2,7 +2,7 @@ package cli
 
 import (
 	"github.com/go-envx/envx/app/internal/core"
-	"github.com/go-envx/envx/app/internal/utils/cliflags"
+	"github.com/go-envx/envx/app/internal/shared/flags"
 	"github.com/go-envx/envx/app/internal/utils/printer"
 	"github.com/go-envx/envx/app/internal/utils/str"
 	"github.com/spf13/cobra"
@@ -88,10 +88,10 @@ func NewPackCmd() *cobra.Command {
 		},
 	}
 
-	cliflags.BindString(cmd.Flags(), &out, &Out)
-	cliflags.BindStringSlice(cmd.Flags(), &environments, &Env)
-	cliflags.BindStringSlice(cmd.Flags(), &projects, &Project)
-	cliflags.BindBool(cmd.Flags(), &force, &Force)
+	flags.BindString(cmd.Flags(), &out, &Out)
+	flags.BindStringSlice(cmd.Flags(), &environments, &Env)
+	flags.BindStringSlice(cmd.Flags(), &projects, &Project)
+	flags.BindBool(cmd.Flags(), &force, &Force)
 	_ = cmd.MarkFlagRequired(Out.Name)
 
 	return cmd

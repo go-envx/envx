@@ -6,7 +6,7 @@ import (
 	"github.com/go-envx/envx/app/internal/core"
 	engine "github.com/go-envx/envx/app/internal/features/emit"
 	"github.com/go-envx/envx/app/internal/features/env"
-	"github.com/go-envx/envx/app/internal/utils/cliflags"
+	"github.com/go-envx/envx/app/internal/shared/flags"
 	"github.com/go-envx/envx/app/internal/utils/printer"
 	"github.com/go-envx/envx/app/internal/utils/str"
 	"github.com/spf13/cobra"
@@ -127,11 +127,11 @@ func NewEmitCmd() *cobra.Command {
 		env.WithReferencePattern,
 	)
 
-	cliflags.BindString(cmd.Flags(), &target, &Target)
-	cliflags.BindString(cmd.Flags(), &name, &Name)
-	cliflags.BindString(cmd.Flags(), &output, &Output)
-	cliflags.BindString(cmd.Flags(), &only, &Only)
-	cliflags.BindString(cmd.Flags(), &key, &Key)
+	flags.BindString(cmd.Flags(), &target, &Target)
+	flags.BindString(cmd.Flags(), &name, &Name)
+	flags.BindString(cmd.Flags(), &output, &Output)
+	flags.BindString(cmd.Flags(), &only, &Only)
+	flags.BindString(cmd.Flags(), &key, &Key)
 	_ = cmd.MarkFlagRequired(Target.Name)
 
 	return cmd

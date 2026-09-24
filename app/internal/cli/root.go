@@ -9,7 +9,7 @@ import (
 	validatecli "github.com/go-envx/envx/app/internal/features/validate/cli"
 	"github.com/go-envx/envx/app/internal/features/workspace"
 	workspacecli "github.com/go-envx/envx/app/internal/features/workspace/cli"
-	"github.com/go-envx/envx/app/internal/utils/cliflags"
+	"github.com/go-envx/envx/app/internal/shared/flags"
 	"github.com/spf13/cobra"
 )
 
@@ -40,7 +40,7 @@ func NewRootCmd(info BuildInfo) *cobra.Command {
 		},
 	}
 
-	cliflags.BindString(root.PersistentFlags(), new(string), &workspace.ConfigFlag)
+	flags.BindString(root.PersistentFlags(), new(string), &workspace.ConfigFlag)
 
 	root.AddCommand(
 		workspacecli.NewCreateCmd(workspace.NewCreateWorkspaceHandler()),

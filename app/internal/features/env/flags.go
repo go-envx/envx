@@ -4,14 +4,14 @@ import (
 	"os"
 	"strconv"
 
-	"github.com/go-envx/envx/app/internal/utils/cliflags"
+	"github.com/go-envx/envx/app/internal/shared/flags"
 	"github.com/spf13/pflag"
 )
 
 // Environment synthesis and resolution flag definitions.
 var (
 	// Env selects the target environment.
-	Env = cliflags.FlagSpec{
+	Env = flags.Spec{
 		Name:  "env",
 		Short: "E",
 		Env:   "ENVX_ENV",
@@ -19,42 +19,42 @@ var (
 	}
 
 	// RequireOverlays requires every environment overlay file in the namespace to exist.
-	RequireOverlays = cliflags.FlagSpec{
+	RequireOverlays = flags.Spec{
 		Name:  "require-overlays",
 		Env:   "ENVX_REQUIRE_OVERLAYS",
 		Usage: "require all environment overlay files to exist",
 	}
 
 	// Prefix is prepended to every resolved env-var key.
-	Prefix = cliflags.FlagSpec{
+	Prefix = flags.Spec{
 		Name:  "prefix",
 		Env:   "ENVX_PREFIX",
 		Usage: "prefix prepended to every key",
 	}
 
 	// Suffix is appended to every resolved env-var key.
-	Suffix = cliflags.FlagSpec{
+	Suffix = flags.Spec{
 		Name:  "suffix",
 		Env:   "ENVX_SUFFIX",
 		Usage: "suffix appended to every key",
 	}
 
 	// Delimiter joins a list-valued leaf into a single env var.
-	Delimiter = cliflags.FlagSpec{
+	Delimiter = flags.Spec{
 		Name:  "delimiter",
 		Env:   "ENVX_DELIMITER",
 		Usage: `string used to join list values (default ",")`,
 	}
 
 	// Overload lets file values override existing OS env vars.
-	Overload = cliflags.FlagSpec{
+	Overload = flags.Spec{
 		Name:  "overload",
 		Env:   "ENVX_OVERLOAD",
 		Usage: "file values override OS env vars",
 	}
 
 	// ReferencePattern overrides the {{VAR}} reference syntax with a regex.
-	ReferencePattern = cliflags.FlagSpec{
+	ReferencePattern = flags.Spec{
 		Name:  "reference-pattern",
 		Env:   "ENVX_REFERENCE_PATTERN",
 		Usage: "regex overriding the {{VAR}} reference syntax (group 1 is the name)",
@@ -73,44 +73,44 @@ func RegisterFlags(fs *pflag.FlagSet, opts ...Option) {
 
 // WithEnv registers the --env flag on fs.
 func WithEnv(fs *pflag.FlagSet) {
-	cliflags.BindString(fs, new(string), &Env)
+	flags.BindString(fs, new(string), &Env)
 }
 
 // WithRequireOverlays registers the --require-overlays flag on fs.
 func WithRequireOverlays(fs *pflag.FlagSet) {
-	cliflags.BindBool(fs, new(bool), &RequireOverlays)
+	flags.BindBool(fs, new(bool), &RequireOverlays)
 }
 
 // WithPrefix registers the --prefix flag on fs.
 func WithPrefix(fs *pflag.FlagSet) {
-	cliflags.BindString(fs, new(string), &Prefix)
+	flags.BindString(fs, new(string), &Prefix)
 }
 
 // WithSuffix registers the --suffix flag on fs.
 func WithSuffix(fs *pflag.FlagSet) {
-	cliflags.BindString(fs, new(string), &Suffix)
+	flags.BindString(fs, new(string), &Suffix)
 }
 
 // WithDelimiter registers the --delimiter flag on fs.
 func WithDelimiter(fs *pflag.FlagSet) {
-	cliflags.BindString(fs, new(string), &Delimiter)
+	flags.BindString(fs, new(string), &Delimiter)
 }
 
 // WithOverload registers the --overload flag on fs.
 func WithOverload(fs *pflag.FlagSet) {
-	cliflags.BindBool(fs, new(bool), &Overload)
+	flags.BindBool(fs, new(bool), &Overload)
 }
 
 // WithReferencePattern registers the --reference-pattern flag on fs.
 func WithReferencePattern(fs *pflag.FlagSet) {
-	cliflags.BindString(fs, new(string), &ReferencePattern)
+	flags.BindString(fs, new(string), &ReferencePattern)
 }
 
 // PrecedenceString resolves a string setting: the explicit value wins when present,
 // then the ENVX_* var, then the first non-empty layer (e.g. project then
 // global default), and finally "". Nil and empty layers are both skipped.
 func PrecedenceString(
-	s *cliflags.FlagSpec,
+	s *flags.Spec,
 	explicit *string,
 	layers ...*string,
 ) string {
@@ -133,7 +133,7 @@ func PrecedenceString(
 // PrecedenceBool resolves a boolean setting: the explicit value wins when present,
 // then the ENVX_* var (parsed), then the first non-nil layer (e.g. project then
 // global setting), and finally false.
-func PrecedenceBool(s *cliflags.FlagSpec, explicit *bool, layers ...*bool) bool {
+func PrecedenceBool(s *flags.Spec, explicit *bool, layers ...*bool) bool {
 	if explicit != nil {
 		return *explicit
 	}

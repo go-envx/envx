@@ -6,8 +6,7 @@ import (
 	"github.com/go-envx/envx/app/internal/core"
 	"github.com/go-envx/envx/app/internal/features/env"
 	engine "github.com/go-envx/envx/app/internal/features/validate"
-	sharedflags "github.com/go-envx/envx/app/internal/shared/flags"
-	"github.com/go-envx/envx/app/internal/utils/cliflags"
+	"github.com/go-envx/envx/app/internal/shared/flags"
 	"github.com/go-envx/envx/app/internal/utils/printer"
 	"github.com/go-envx/envx/app/internal/utils/str"
 	"github.com/spf13/cobra"
@@ -122,8 +121,8 @@ func NewValidateCmd() *cobra.Command {
 		env.WithReferencePattern,
 	)
 
-	cliflags.BindString(cmd.Flags(), &output, &sharedflags.Output)
-	cliflags.BindBool(cmd.Flags(), &strict, &Strict)
+	flags.BindString(cmd.Flags(), &output, &flags.Output)
+	flags.BindBool(cmd.Flags(), &strict, &Strict)
 
 	registerSelectionFlags(cmd, selections)
 
