@@ -1,8 +1,8 @@
 package get
 
 import (
+	"github.com/go-envx/envx/app/internal/core"
 	"github.com/go-envx/envx/app/internal/flags"
-	"github.com/go-envx/envx/app/internal/schema"
 	"github.com/go-envx/envx/app/internal/utils/str"
 	"github.com/spf13/cobra"
 )
@@ -49,7 +49,7 @@ func NewCommand() *cobra.Command {
 
 			// get the flag inputs
 			flagset := cmd.Flags()
-			input := flags.GetInput(flagset)
+			input := core.GetInput(flagset)
 
 			// execute the action
 			res, err := execute(p, input)
@@ -75,7 +75,7 @@ func NewCommand() *cobra.Command {
 		flags.WithReferencePattern,
 	)
 
-	flags.BindBool(cmd.Flags(), &reveal, &schema.Reveal)
+	flags.BindBool(cmd.Flags(), &reveal, &flags.Reveal)
 
 	return cmd
 }

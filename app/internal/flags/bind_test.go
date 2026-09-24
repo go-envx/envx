@@ -3,8 +3,13 @@ package flags
 import (
 	"testing"
 
-	"github.com/go-envx/envx/app/internal/schema"
+	"github.com/spf13/pflag"
 )
+
+// newFlags returns an empty flag set suitable for registering onto in tests.
+func newFlags() *pflag.FlagSet {
+	return pflag.NewFlagSet("test", pflag.ContinueOnError)
+}
 
 // TestBindString verifies BindString binds a string flag and writes the parsed
 // value into the destination.
@@ -13,7 +18,7 @@ func TestBindString(t *testing.T) {
 
 	var output string
 	fs := newFlags()
-	BindString(fs, &output, &schema.Output)
+	BindString(fs, &output, &Output)
 	if err := fs.Parse([]string{"--output", "json"}); err != nil {
 		t.Fatalf("parse: %v", err)
 	}
@@ -29,7 +34,7 @@ func TestBindBool(t *testing.T) {
 
 	var requireOverlays bool
 	fs := newFlags()
-	BindBool(fs, &requireOverlays, &schema.RequireOverlays)
+	BindBool(fs, &requireOverlays, &RequireOverlays)
 	if err := fs.Parse([]string{"--require-overlays"}); err != nil {
 		t.Fatalf("parse: %v", err)
 	}

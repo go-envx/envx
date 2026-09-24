@@ -3,9 +3,10 @@ package cli
 import (
 	"errors"
 
+	"github.com/go-envx/envx/app/internal/core"
+
 	engine "github.com/go-envx/envx/app/internal/features/validate"
 	"github.com/go-envx/envx/app/internal/flags"
-	"github.com/go-envx/envx/app/internal/schema"
 	"github.com/go-envx/envx/app/internal/utils/printer"
 	"github.com/go-envx/envx/app/internal/utils/str"
 	"github.com/spf13/cobra"
@@ -78,7 +79,7 @@ func NewValidateCmd() *cobra.Command {
 		Args:    cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			// get the flag inputs
-			input := flags.GetInput(cmd.Flags())
+			input := core.GetInput(cmd.Flags())
 
 			// execute the action, selecting only the checks whose flags were set
 			report, err := execute(actionParams{
@@ -120,8 +121,8 @@ func NewValidateCmd() *cobra.Command {
 		flags.WithReferencePattern,
 	)
 
-	flags.BindString(cmd.Flags(), &output, &schema.Output)
-	flags.BindBool(cmd.Flags(), &strict, &schema.Strict)
+	flags.BindString(cmd.Flags(), &output, &flags.Output)
+	flags.BindBool(cmd.Flags(), &strict, &flags.Strict)
 
 	registerSelectionFlags(cmd, selections)
 

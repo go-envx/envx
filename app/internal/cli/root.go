@@ -19,7 +19,7 @@ const (
 )
 
 // NewRootCmd builds the command tree. It registers the persistent --config flag,
-// which every action reads back through flags.GetInput to locate the manifest.
+// which every action reads back through core.GetInput to locate the manifest.
 // The build metadata in info is rendered by the --version flag.
 func NewRootCmd(info BuildInfo) *cobra.Command {
 	root := &cobra.Command{

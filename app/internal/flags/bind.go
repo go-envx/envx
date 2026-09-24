@@ -1,7 +1,6 @@
 package flags
 
 import (
-	"github.com/go-envx/envx/app/internal/schema"
 	"github.com/spf13/pflag"
 )
 
@@ -10,18 +9,18 @@ import (
 // (name, shorthand, default, help) is applied in exactly one place. A command
 // chooses the scope by which flag set it passes: cmd.Flags() for a local flag,
 // cmd.PersistentFlags() for one inherited by subcommands.
-func BindString(fs *pflag.FlagSet, dst *string, spec *schema.FlagSpec) {
+func BindString(fs *pflag.FlagSet, dst *string, spec *FlagSpec) {
 	fs.StringVarP(dst, spec.Name, spec.Short, spec.DefaultString, spec.HelpText())
 }
 
 // BindBool is BindString's boolean counterpart.
-func BindBool(fs *pflag.FlagSet, dst *bool, spec *schema.FlagSpec) {
+func BindBool(fs *pflag.FlagSet, dst *bool, spec *FlagSpec) {
 	fs.BoolVarP(dst, spec.Name, spec.Short, spec.DefaultBool, spec.HelpText())
 }
 
 // BindStringSlice registers spec as a repeatable string flag on fs, accumulating
 // each occurrence into dst. It backs command-consumed multi-value flags (such as
 // pack's --env) that select rather than resolve, so it takes no default.
-func BindStringSlice(fs *pflag.FlagSet, dst *[]string, spec *schema.FlagSpec) {
+func BindStringSlice(fs *pflag.FlagSet, dst *[]string, spec *FlagSpec) {
 	fs.StringSliceVarP(dst, spec.Name, spec.Short, nil, spec.HelpText())
 }

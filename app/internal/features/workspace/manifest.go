@@ -1,12 +1,10 @@
 package workspace
 
-import "github.com/go-envx/envx/app/internal/schema"
-
-// Manifest is a parsed, validated manifest together with the location it
+// ManifestDoc is a parsed, validated manifest together with the location it
 // was read from and the block indentation detected in the source document.
-type Manifest struct {
+type ManifestDoc struct {
 	// Content is the parsed, validated manifest content.
-	Content *schema.Manifest
+	Content *Manifest
 	// Path is the absolute path the manifest was read from.
 	Path string
 	// Indent is the detected block indentation width, defaulting to two spaces
@@ -16,7 +14,7 @@ type Manifest struct {
 
 // DefaultEnvironment returns the first declared environment, or an empty string
 // if no environments are declared.
-func (m *Manifest) DefaultEnvironment() string {
+func (m *ManifestDoc) DefaultEnvironment() string {
 	if m == nil || m.Content == nil {
 		return ""
 	}
@@ -24,7 +22,7 @@ func (m *Manifest) DefaultEnvironment() string {
 }
 
 // HasEnvironment reports whether env is declared in the manifest environments list.
-func (m *Manifest) HasEnvironment(env string) bool {
+func (m *ManifestDoc) HasEnvironment(env string) bool {
 	if m == nil || m.Content == nil {
 		return false
 	}
@@ -32,7 +30,7 @@ func (m *Manifest) HasEnvironment(env string) bool {
 }
 
 // HasInclude reports whether any project declares includePath in its include list.
-func (m *Manifest) HasInclude(includePath string) bool {
+func (m *ManifestDoc) HasInclude(includePath string) bool {
 	if m == nil || m.Content == nil {
 		return false
 	}
@@ -40,9 +38,9 @@ func (m *Manifest) HasInclude(includePath string) bool {
 }
 
 // LookupProject finds a project by name, returning its definition and if one was found.
-func (m *Manifest) LookupProject(name string) (schema.Project, bool) {
+func (m *ManifestDoc) LookupProject(name string) (Project, bool) {
 	if m == nil || m.Content == nil {
-		return schema.Project{}, false
+		return Project{}, false
 	}
 	return m.Content.LookupProject(name)
 }

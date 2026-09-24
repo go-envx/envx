@@ -1,8 +1,8 @@
 package diff
 
 import (
+	"github.com/go-envx/envx/app/internal/core"
 	"github.com/go-envx/envx/app/internal/flags"
-	"github.com/go-envx/envx/app/internal/schema"
 	"github.com/go-envx/envx/app/internal/utils/printer"
 	"github.com/go-envx/envx/app/internal/utils/str"
 	"github.com/spf13/cobra"
@@ -52,7 +52,7 @@ func NewCommand() *cobra.Command {
 
 			// get the flag inputs
 			flagset := cmd.Flags()
-			input := flags.GetInput(flagset)
+			input := core.GetInput(flagset)
 
 			// execute the action
 			res, err := execute(p, input)
@@ -82,8 +82,8 @@ func NewCommand() *cobra.Command {
 		flags.WithReferencePattern,
 	)
 
-	flags.BindString(cmd.Flags(), &output, &schema.Output)
-	flags.BindBool(cmd.Flags(), &reveal, &schema.Reveal)
+	flags.BindString(cmd.Flags(), &output, &flags.Output)
+	flags.BindBool(cmd.Flags(), &reveal, &flags.Reveal)
 
 	return cmd
 }

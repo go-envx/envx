@@ -1,11 +1,10 @@
-package workspace_test
+package flags_test
 
 import (
 	"os"
 	"testing"
 
-	"github.com/go-envx/envx/app/internal/features/workspace"
-	"github.com/go-envx/envx/app/internal/schema"
+	"github.com/go-envx/envx/app/internal/flags"
 )
 
 // strPtr returns a pointer to the string s.
@@ -32,25 +31,25 @@ func unsetEnv(t *testing.T, key string) {
 // TestPrecedenceString verifies the string precedence chain: explicit input wins,
 // then the ENVX_* var, then the first non-empty layer.
 func TestPrecedenceString(t *testing.T) {
-	spec := schema.Prefix
+	spec := flags.Prefix
 
 	t.Run("explicit wins", func(t *testing.T) {
 		t.Setenv(spec.Env, "from-env")
-		got := workspace.PrecedenceString(&spec, strPtr("from-flag"), strPtr("layer"))
+		got := flags.PrecedenceString(&spec, strPtr("from-flag"), strPtr("layer"))
 		if got != "from-flag" {
 			t.Errorf("got %q, want from-flag", got)
 		}
 	})
 	t.Run("env wins over layers", func(t *testing.T) {
 		t.Setenv(spec.Env, "from-env")
-		got := workspace.PrecedenceString(&spec, nil, strPtr("layer"))
+		got := flags.PrecedenceString(&spec, nil, strPtr("layer"))
 		if got != "from-env" {
 			t.Errorf("got %q, want from-env", got)
 		}
 	})
 	t.Run("first non-empty layer", func(t *testing.T) {
 		unsetEnv(t, spec.Env)
-		got := workspace.PrecedenceString(&spec, nil, strPtr(""), strPtr("layer2"))
+		got := flags.PrecedenceString(&spec, nil, strPtr(""), strPtr("layer2"))
 		if got != "layer2" {
 			t.Errorf("got %q, want layer2", got)
 		}
@@ -60,29 +59,29 @@ func TestPrecedenceString(t *testing.T) {
 // TestPrecedenceBool verifies the boolean precedence chain including pointer
 // layers.
 func TestPrecedenceBool(t *testing.T) {
-	spec := schema.RequireOverlays
+	spec := flags.RequireOverlays
 
 	t.Run("explicit wins", func(t *testing.T) {
 		t.Setenv(spec.Env, "false")
-		if !workspace.PrecedenceBool(&spec, boolPtr(true), boolPtr(true)) {
+		if !flags.PrecedenceBool(&spec, boolPtr(true), boolPtr(true)) {
 			t.Error("expected explicit value true to win")
 		}
 	})
 	t.Run("env parsed", func(t *testing.T) {
 		t.Setenv(spec.Env, "true")
-		if !workspace.PrecedenceBool(&spec, nil) {
+		if !flags.PrecedenceBool(&spec, nil) {
 			t.Error("expected env value true")
 		}
 	})
 	t.Run("layer pointer", func(t *testing.T) {
 		unsetEnv(t, spec.Env)
-		if !workspace.PrecedenceBool(&spec, nil, nil, boolPtr(true)) {
+		if !flags.PrecedenceBool(&spec, nil, nil, boolPtr(true)) {
 			t.Error("expected first non-nil layer true")
 		}
 	})
 	t.Run("default false", func(t *testing.T) {
 		unsetEnv(t, spec.Env)
-		if workspace.PrecedenceBool(&spec, nil, nil) {
+		if flags.PrecedenceBool(&spec, nil, nil) {
 			t.Error("expected default false")
 		}
 	})

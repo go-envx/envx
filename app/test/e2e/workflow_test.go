@@ -9,8 +9,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/go-envx/envx/app/internal/fixtures"
 	"github.com/go-envx/envx/app/internal/utils/file"
+	"github.com/go-envx/envx/app/test/fixtures"
 )
 
 // copyTree recursively copies the directory tree at src into dst.

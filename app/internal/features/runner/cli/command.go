@@ -4,8 +4,9 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/go-envx/envx/app/internal/core"
+
 	"github.com/go-envx/envx/app/internal/flags"
-	"github.com/go-envx/envx/app/internal/schema"
 	"github.com/go-envx/envx/app/internal/utils/str"
 	"github.com/spf13/cobra"
 )
@@ -60,7 +61,7 @@ func NewRunCmd() *cobra.Command {
 
 			// get the flag inputs
 			flagset := cmd.Flags()
-			input := flags.GetInput(flagset)
+			input := core.GetInput(flagset)
 
 			// execute the action
 			return execute(p, input, streams{
@@ -82,7 +83,7 @@ func NewRunCmd() *cobra.Command {
 
 	// --ignore-errors is a command-local flag, not a precedence-resolved setting,
 	// so it binds directly rather than through flags.Register.
-	flags.BindBool(cmd.Flags(), &ignoreErrors, &schema.IgnoreErrors)
+	flags.BindBool(cmd.Flags(), &ignoreErrors, &flags.IgnoreErrors)
 
 	return cmd
 }

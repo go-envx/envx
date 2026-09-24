@@ -1,8 +1,10 @@
-package flags
+package flags_test
 
 import (
 	"testing"
 
+	"github.com/go-envx/envx/app/internal/core"
+	"github.com/go-envx/envx/app/internal/flags"
 	"github.com/spf13/pflag"
 )
 
@@ -17,13 +19,19 @@ func TestRegisterAndGetInput(t *testing.T) {
 	t.Parallel()
 
 	fs := newFlags()
-	Register(fs, WithEnv, WithRequireOverlays, WithPrefix, WithSuffix)
+	flags.Register(
+		fs,
+		flags.WithEnv,
+		flags.WithRequireOverlays,
+		flags.WithPrefix,
+		flags.WithSuffix,
+	)
 	args := []string{"--env", "production", "--prefix", "APP", "--require-overlays"}
 	if err := fs.Parse(args); err != nil {
 		t.Fatalf("parse: %v", err)
 	}
 
-	in := GetInput(fs)
+	in := core.GetInput(fs)
 	if in.Env == nil || *in.Env != "production" {
 		t.Errorf("Env = %v, want production", in.Env)
 	}

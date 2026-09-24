@@ -1,8 +1,8 @@
 package set
 
 import (
+	"github.com/go-envx/envx/app/internal/core"
 	"github.com/go-envx/envx/app/internal/flags"
-	"github.com/go-envx/envx/app/internal/schema"
 	"github.com/go-envx/envx/app/internal/utils/printer"
 	"github.com/go-envx/envx/app/internal/utils/str"
 	"github.com/spf13/cobra"
@@ -47,7 +47,7 @@ func NewCommand() *cobra.Command {
 
 			// load command flags
 			flagset := cmd.Flags()
-			in := flags.GetInput(flagset)
+			in := core.GetInput(flagset)
 
 			// execute the action
 			result, err := execute(p, in, readerParams{
@@ -70,7 +70,7 @@ func NewCommand() *cobra.Command {
 		},
 	}
 
-	flags.BindBool(cmd.Flags(), &noConfirm, &schema.NoConfirm)
+	flags.BindBool(cmd.Flags(), &noConfirm, &flags.NoConfirm)
 
 	return cmd
 }

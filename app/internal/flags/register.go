@@ -1,7 +1,6 @@
 package flags
 
 import (
-	"github.com/go-envx/envx/app/internal/schema"
 	"github.com/spf13/pflag"
 )
 
@@ -22,57 +21,57 @@ func Register(fs *pflag.FlagSet, opts ...Option) {
 // WithConfig registers the --config flag selecting the manifest. Root registers it
 // on its persistent flag set so every subcommand inherits it.
 func WithConfig(fs *pflag.FlagSet) {
-	registerString(fs, &schema.Config)
+	registerString(fs, &Config)
 }
 
 // WithEnv registers the --env flag, the target environment to resolve.
 func WithEnv(fs *pflag.FlagSet) {
-	registerString(fs, &schema.Env)
+	registerString(fs, &Env)
 }
 
 // WithRequireOverlays registers the --require-overlays flag, requiring every
 // overlay file to exist.
 func WithRequireOverlays(fs *pflag.FlagSet) {
-	registerBool(fs, &schema.RequireOverlays)
+	registerBool(fs, &RequireOverlays)
 }
 
 // WithPrefix registers the --prefix flag, prepended to every resolved key.
 func WithPrefix(fs *pflag.FlagSet) {
-	registerString(fs, &schema.Prefix)
+	registerString(fs, &Prefix)
 }
 
 // WithSuffix registers the --suffix flag, appended to every resolved key.
 func WithSuffix(fs *pflag.FlagSet) {
-	registerString(fs, &schema.Suffix)
+	registerString(fs, &Suffix)
 }
 
 // WithDelimiter registers the --delimiter flag, the string used to join a
 // list-valued setting into a single env var.
 func WithDelimiter(fs *pflag.FlagSet) {
-	registerString(fs, &schema.Delimiter)
+	registerString(fs, &Delimiter)
 }
 
 // WithOverload registers the --overload flag, letting file values win over OS env
 // vars; only run hands the merged environment to the runner.
 func WithOverload(fs *pflag.FlagSet) {
-	registerBool(fs, &schema.Overload)
+	registerBool(fs, &Overload)
 }
 
 // WithReferencePattern registers the --reference-pattern flag, overriding the
 // {{VAR}} reference syntax with a custom regex.
 func WithReferencePattern(fs *pflag.FlagSet) {
-	registerString(fs, &schema.ReferencePattern)
+	registerString(fs, &ReferencePattern)
 }
 
 // registerString registers spec as a dest-less string flag on fs, delegating to
 // BindString and discarding the destination since GetInput reads the value back
 // from the flag set.
-func registerString(fs *pflag.FlagSet, spec *schema.FlagSpec) {
+func registerString(fs *pflag.FlagSet, spec *FlagSpec) {
 	BindString(fs, new(string), spec)
 }
 
 // registerBool registers spec as a dest-less bool flag on fs, the boolean
 // counterpart to registerString.
-func registerBool(fs *pflag.FlagSet, spec *schema.FlagSpec) {
+func registerBool(fs *pflag.FlagSet, spec *FlagSpec) {
 	BindBool(fs, new(bool), spec)
 }

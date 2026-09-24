@@ -5,7 +5,7 @@ import (
 	"testing"
 
 	"github.com/go-envx/envx/app/internal/core"
-	"github.com/go-envx/envx/app/internal/fixtures"
+	"github.com/go-envx/envx/app/test/fixtures"
 )
 
 // executeBasic runs the get action against the shared "basic" fixture for the

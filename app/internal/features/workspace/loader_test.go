@@ -7,7 +7,7 @@ import (
 	"testing"
 
 	"github.com/go-envx/envx/app/internal/features/workspace"
-	"github.com/go-envx/envx/app/internal/fixtures"
+	"github.com/go-envx/envx/app/test/fixtures"
 )
 
 // writeManifest writes a manifest file into a fresh temp dir and returns its

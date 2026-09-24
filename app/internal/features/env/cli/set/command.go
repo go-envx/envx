@@ -1,6 +1,7 @@
 package set
 
 import (
+	"github.com/go-envx/envx/app/internal/core"
 	"github.com/go-envx/envx/app/internal/flags"
 	"github.com/go-envx/envx/app/internal/utils/printer"
 	"github.com/go-envx/envx/app/internal/utils/str"
@@ -47,7 +48,7 @@ func NewCommand() *cobra.Command {
 			}
 
 			// execute the action
-			in := flags.GetInput(cmd.Flags())
+			in := core.GetInput(cmd.Flags())
 			result, err := execute(p, in)
 			if err != nil {
 				return err

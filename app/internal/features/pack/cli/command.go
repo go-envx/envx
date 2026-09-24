@@ -1,8 +1,8 @@
 package cli
 
 import (
+	"github.com/go-envx/envx/app/internal/core"
 	"github.com/go-envx/envx/app/internal/flags"
-	"github.com/go-envx/envx/app/internal/schema"
 	"github.com/go-envx/envx/app/internal/utils/printer"
 	"github.com/go-envx/envx/app/internal/utils/str"
 	"github.com/spf13/cobra"
@@ -66,7 +66,7 @@ func NewPackCmd() *cobra.Command {
 		Args:    cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			// resolve the manifest path from the inherited --config flag
-			input := flags.GetInput(cmd.Flags())
+			input := core.GetInput(cmd.Flags())
 
 			// copy the selected environments' and projects' files into --out
 			result, err := execute(actionParams{
@@ -88,11 +88,11 @@ func NewPackCmd() *cobra.Command {
 		},
 	}
 
-	flags.BindString(cmd.Flags(), &out, &schema.Out)
-	flags.BindStringSlice(cmd.Flags(), &environments, &schema.PackEnv)
-	flags.BindStringSlice(cmd.Flags(), &projects, &schema.PackProject)
-	flags.BindBool(cmd.Flags(), &force, &schema.PackForce)
-	_ = cmd.MarkFlagRequired(schema.Out.Name)
+	flags.BindString(cmd.Flags(), &out, &flags.Out)
+	flags.BindStringSlice(cmd.Flags(), &environments, &flags.PackEnv)
+	flags.BindStringSlice(cmd.Flags(), &projects, &flags.PackProject)
+	flags.BindBool(cmd.Flags(), &force, &flags.PackForce)
+	_ = cmd.MarkFlagRequired(flags.Out.Name)
 
 	return cmd
 }

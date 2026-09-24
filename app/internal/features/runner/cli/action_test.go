@@ -10,8 +10,8 @@ import (
 	"testing"
 
 	"github.com/go-envx/envx/app/internal/core"
-	"github.com/go-envx/envx/app/internal/fixtures"
 	"github.com/go-envx/envx/app/internal/resources/cipher"
+	"github.com/go-envx/envx/app/test/fixtures"
 )
 
 // TestExecuteInjectsEnv verifies the resolved environment reaches the child

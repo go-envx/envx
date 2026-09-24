@@ -9,9 +9,9 @@ import (
 	"github.com/go-envx/envx/app/internal/core"
 	"github.com/go-envx/envx/app/internal/features/secrets"
 	engine "github.com/go-envx/envx/app/internal/features/validate"
-	"github.com/go-envx/envx/app/internal/fixtures"
 	"github.com/go-envx/envx/app/internal/resources/cipher"
 	"github.com/go-envx/envx/app/internal/shared/status"
+	"github.com/go-envx/envx/app/test/fixtures"
 )
 
 // executeManifest runs the validate action over the manifest at path.
