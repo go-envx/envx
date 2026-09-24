@@ -1,7 +1,7 @@
 package get
 
 import (
-	"github.com/go-envx/envx/app/internal/config"
+	"github.com/go-envx/envx/app/internal/core"
 	"github.com/go-envx/envx/app/internal/features/env"
 )
 
@@ -26,9 +26,9 @@ type actionResult struct {
 // execute is the imperative shell: resolve the project configuration and look up
 // the single requested key through the constructed manager. Secret references are
 // masked unless p.Reveal is set.
-func execute(p actionParams, in *config.Input) (actionResult, error) {
+func execute(p actionParams, in *core.Input) (actionResult, error) {
 	// resolve the input config
-	resolved, err := config.ResolveProject(in, p.Project)
+	resolved, err := core.ResolveProject(in, p.Project)
 	if err != nil {
 		return actionResult{}, err
 	}

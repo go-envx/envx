@@ -3,9 +3,10 @@ package cli
 import (
 	"errors"
 
+	"github.com/go-envx/envx/app/internal/core"
+	"github.com/go-envx/envx/app/internal/features/env"
 	engine "github.com/go-envx/envx/app/internal/features/validate"
-	"github.com/go-envx/envx/app/internal/flags"
-	"github.com/go-envx/envx/app/internal/schema"
+	"github.com/go-envx/envx/app/internal/shared/flags"
 	"github.com/go-envx/envx/app/internal/utils/printer"
 	"github.com/go-envx/envx/app/internal/utils/str"
 	"github.com/spf13/cobra"
@@ -78,7 +79,7 @@ func NewValidateCmd() *cobra.Command {
 		Args:    cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			// get the flag inputs
-			input := flags.GetInput(cmd.Flags())
+			input := core.GetInput(cmd.Flags())
 
 			// execute the action, selecting only the checks whose flags were set
 			report, err := execute(actionParams{
@@ -111,17 +112,17 @@ func NewValidateCmd() *cobra.Command {
 		},
 	}
 
-	flags.Register(cmd.Flags(),
-		flags.WithRequireOverlays,
-		flags.WithPrefix,
-		flags.WithSuffix,
-		flags.WithDelimiter,
-		flags.WithOverload,
-		flags.WithReferencePattern,
+	env.RegisterFlags(cmd.Flags(),
+		env.WithRequireOverlays,
+		env.WithPrefix,
+		env.WithSuffix,
+		env.WithDelimiter,
+		env.WithOverload,
+		env.WithReferencePattern,
 	)
 
-	flags.BindString(cmd.Flags(), &output, &schema.Output)
-	flags.BindBool(cmd.Flags(), &strict, &schema.Strict)
+	flags.Bind(cmd.Flags(), &output, &flags.Output)
+	flags.Bind(cmd.Flags(), &strict, &Strict)
 
 	registerSelectionFlags(cmd, selections)
 

@@ -1,13 +1,13 @@
-package config
+package core
 
 import (
 	"path/filepath"
 	"testing"
 
 	"github.com/go-envx/envx/app/internal/features/env"
-	"github.com/go-envx/envx/app/internal/fixtures"
+	"github.com/go-envx/envx/app/internal/features/workspace"
 	"github.com/go-envx/envx/app/internal/resources/cipher"
-	"github.com/go-envx/envx/app/internal/schema"
+	"github.com/go-envx/envx/app/test/fixtures"
 )
 
 // strPtr returns a pointer to s, for building optional Input values in tests.
@@ -18,14 +18,14 @@ func boolPtr(b bool) *bool { return &b }
 
 // testManifest builds an in-memory manifest with global and project-level env
 // settings for exercising the precedence chain.
-func testManifest() *schema.Manifest {
-	return &schema.Manifest{
+func testManifest() *workspace.Manifest {
+	return &workspace.Manifest{
 		Environments: []string{"development", "staging", "production"},
-		Settings:     schema.Settings{Env: strPtr("staging")},
-		Projects: map[string]schema.Project{
+		Settings:     workspace.Settings{Env: strPtr("staging")},
+		Projects: map[string]workspace.Project{
 			"api": {
 				Includes: []string{"env/x"},
-				Settings: schema.Settings{Env: strPtr("production")},
+				Settings: workspace.Settings{Env: strPtr("production")},
 			},
 			"web": {Includes: []string{"env/y"}},
 		},
@@ -75,9 +75,9 @@ func TestResolveManifest(t *testing.T) {
 		}
 	})
 	t.Run("env left empty for envmerge default", func(t *testing.T) {
-		bare := &schema.Manifest{
+		bare := &workspace.Manifest{
 			Environments: []string{"development"},
-			Projects: map[string]schema.Project{
+			Projects: map[string]workspace.Project{
 				"api": {Includes: []string{"env/x"}},
 			},
 		}
@@ -149,14 +149,14 @@ func TestResolveManifest(t *testing.T) {
 func TestOverloadResolution(t *testing.T) {
 	t.Parallel()
 
-	manifestWith := func(global, project *bool) *schema.Manifest {
-		return &schema.Manifest{
+	manifestWith := func(global, project *bool) *workspace.Manifest {
+		return &workspace.Manifest{
 			Environments: []string{"development"},
-			Settings:     schema.Settings{Overload: global},
-			Projects: map[string]schema.Project{
+			Settings:     workspace.Settings{Overload: global},
+			Projects: map[string]workspace.Project{
 				"api": {
 					Includes: []string{"env/x"},
-					Settings: schema.Settings{Overload: project},
+					Settings: workspace.Settings{Overload: project},
 				},
 			},
 		}
@@ -209,14 +209,14 @@ func TestOverloadResolution(t *testing.T) {
 func TestReferencePatternResolution(t *testing.T) {
 	t.Parallel()
 
-	manifestWith := func(global, project *string) *schema.Manifest {
-		return &schema.Manifest{
+	manifestWith := func(global, project *string) *workspace.Manifest {
+		return &workspace.Manifest{
 			Environments: []string{"development"},
-			Settings:     schema.Settings{ReferencePattern: global},
-			Projects: map[string]schema.Project{
+			Settings:     workspace.Settings{ReferencePattern: global},
+			Projects: map[string]workspace.Project{
 				"api": {
 					Includes: []string{"env/x"},
-					Settings: schema.Settings{ReferencePattern: project},
+					Settings: workspace.Settings{ReferencePattern: project},
 				},
 			},
 		}
@@ -475,21 +475,21 @@ func TestResolveProjectDanglingSecretReference(t *testing.T) {
 // then ENVX_CONFIG, then empty (which defers to the manifest walk-up).
 func TestManifestPath(t *testing.T) {
 	t.Run("flag wins over env", func(t *testing.T) {
-		t.Setenv(schema.Config.Env, "from-env")
+		t.Setenv(workspace.ConfigFlag.Env, "from-env")
 		flag := "from-flag"
 		if got := resolveManifestPath(&Input{ConfigPath: &flag}); got != "from-flag" {
 			t.Errorf("got %q, want from-flag", got)
 		}
 	})
 	t.Run("env when flag empty", func(t *testing.T) {
-		t.Setenv(schema.Config.Env, "from-env")
+		t.Setenv(workspace.ConfigFlag.Env, "from-env")
 		empty := ""
 		if got := resolveManifestPath(&Input{ConfigPath: &empty}); got != "from-env" {
 			t.Errorf("got %q, want from-env", got)
 		}
 	})
 	t.Run("empty when neither set", func(t *testing.T) {
-		t.Setenv(schema.Config.Env, "")
+		t.Setenv(workspace.ConfigFlag.Env, "")
 		if got := resolveManifestPath(&Input{}); got != "" {
 			t.Errorf("got %q, want empty", got)
 		}

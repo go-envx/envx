@@ -1,8 +1,9 @@
 package encrypt
 
 import (
-	"github.com/go-envx/envx/app/internal/flags"
-	"github.com/go-envx/envx/app/internal/schema"
+	"github.com/go-envx/envx/app/internal/core"
+	"github.com/go-envx/envx/app/internal/features/secrets"
+	"github.com/go-envx/envx/app/internal/shared/flags"
 	"github.com/go-envx/envx/app/internal/utils/printer"
 	"github.com/go-envx/envx/app/internal/utils/str"
 	"github.com/spf13/cobra"
@@ -43,7 +44,7 @@ func NewCommand() *cobra.Command {
 			p := actionParams{Group: group, Key: key}
 
 			// load command flags
-			in := flags.GetInput(cmd.Flags())
+			in := core.GetInput(cmd.Flags())
 
 			// execute the action
 			result, err := execute(p, in)
@@ -64,9 +65,9 @@ func NewCommand() *cobra.Command {
 		},
 	}
 
-	flags.BindString(cmd.Flags(), &group, &schema.Group)
-	flags.BindString(cmd.Flags(), &key, &schema.Key)
-	flags.BindBool(cmd.Flags(), &verbose, &schema.Verbose)
+	flags.Bind(cmd.Flags(), &group, &secrets.Group)
+	flags.Bind(cmd.Flags(), &key, &secrets.Key)
+	flags.Bind(cmd.Flags(), &verbose, &flags.Verbose)
 
 	return cmd
 }

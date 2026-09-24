@@ -1,7 +1,7 @@
 package delete
 
 import (
-	"github.com/go-envx/envx/app/internal/flags"
+	"github.com/go-envx/envx/app/internal/core"
 	"github.com/go-envx/envx/app/internal/utils/printer"
 	"github.com/go-envx/envx/app/internal/utils/str"
 	"github.com/spf13/cobra"
@@ -37,7 +37,7 @@ func NewCommand() *cobra.Command {
 			}
 
 			// load command flags
-			in := flags.GetInput(cmd.Flags())
+			in := core.GetInput(cmd.Flags())
 
 			// execute the action
 			result, err := execute(p, in)

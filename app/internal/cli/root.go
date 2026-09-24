@@ -9,7 +9,7 @@ import (
 	validatecli "github.com/go-envx/envx/app/internal/features/validate/cli"
 	"github.com/go-envx/envx/app/internal/features/workspace"
 	workspacecli "github.com/go-envx/envx/app/internal/features/workspace/cli"
-	"github.com/go-envx/envx/app/internal/flags"
+	"github.com/go-envx/envx/app/internal/shared/flags"
 	"github.com/spf13/cobra"
 )
 
@@ -19,7 +19,7 @@ const (
 )
 
 // NewRootCmd builds the command tree. It registers the persistent --config flag,
-// which every action reads back through flags.GetInput to locate the manifest.
+// which every action reads back through core.GetInput to locate the manifest.
 // The build metadata in info is rendered by the --version flag.
 func NewRootCmd(info BuildInfo) *cobra.Command {
 	root := &cobra.Command{
@@ -40,9 +40,7 @@ func NewRootCmd(info BuildInfo) *cobra.Command {
 		},
 	}
 
-	flags.Register(root.PersistentFlags(),
-		flags.WithConfig,
-	)
+	flags.Bind(root.PersistentFlags(), new(string), &workspace.ConfigFlag)
 
 	root.AddCommand(
 		workspacecli.NewCreateCmd(workspace.NewCreateWorkspaceHandler()),

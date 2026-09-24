@@ -1,10 +1,10 @@
-package config
+package core
 
 import (
 	"path/filepath"
 	"testing"
 
-	"github.com/go-envx/envx/app/internal/fixtures"
+	"github.com/go-envx/envx/app/test/fixtures"
 )
 
 // TestOverlayPath verifies the set action's overlay resolution from a project-less

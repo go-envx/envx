@@ -6,18 +6,18 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/go-envx/envx/app/internal/config"
+	"github.com/go-envx/envx/app/internal/core"
 	"github.com/go-envx/envx/app/internal/features/secrets"
 	engine "github.com/go-envx/envx/app/internal/features/validate"
-	"github.com/go-envx/envx/app/internal/fixtures"
 	"github.com/go-envx/envx/app/internal/resources/cipher"
 	"github.com/go-envx/envx/app/internal/shared/status"
+	"github.com/go-envx/envx/app/test/fixtures"
 )
 
 // executeManifest runs the validate action over the manifest at path.
 func executeManifest(t *testing.T, path string, p actionParams) engine.Report {
 	t.Helper()
-	report, err := execute(p, &config.Input{ConfigPath: &path})
+	report, err := execute(p, &core.Input{ConfigPath: &path})
 	if err != nil {
 		t.Fatalf("execute: %v", err)
 	}
@@ -268,7 +268,7 @@ func TestExecuteStoreOnlySelectionSkipsMerge(t *testing.T) {
 		"secrets:\n  db:\n    leaked: just-plaintext\n")
 
 	// A full run reaches the merge and aborts on the malformed base file.
-	_, err := execute(actionParams{}, &config.Input{ConfigPath: &manifestPath})
+	_, err := execute(actionParams{}, &core.Input{ConfigPath: &manifestPath})
 	if err == nil {
 		t.Fatal("a full run must fail on the malformed base file")
 	}
@@ -299,7 +299,7 @@ func writeWarningOnlyWorkspace(t *testing.T) string {
 
 	// A valid keypair keeps the store readable; "shared" is available and produces
 	// no finding.
-	manager, err := config.NewSecretsManager(
+	manager, err := core.NewSecretsManager(
 		secrets.Params{
 			SecretsPath:   secretsPath,
 			KeysPath:      filepath.Join(dir, "envx.keys"),

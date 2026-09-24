@@ -3,8 +3,8 @@ package diff
 import (
 	"testing"
 
-	"github.com/go-envx/envx/app/internal/config"
-	"github.com/go-envx/envx/app/internal/fixtures"
+	"github.com/go-envx/envx/app/internal/core"
+	"github.com/go-envx/envx/app/test/fixtures"
 )
 
 // executeBasic runs the diff action against the shared "basic" fixture for the
@@ -14,7 +14,7 @@ func executeBasic(t *testing.T, envA, envB string) (actionResult, error) {
 	path := fixtures.Manifest("basic")
 	return execute(
 		actionParams{Project: "api-core", EnvA: envA, EnvB: envB},
-		&config.Input{ConfigPath: &path},
+		&core.Input{ConfigPath: &path},
 	)
 }
 

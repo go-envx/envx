@@ -5,7 +5,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/go-envx/envx/app/internal/config"
+	"github.com/go-envx/envx/app/internal/core"
 	"github.com/go-envx/envx/app/internal/features/env"
 	"github.com/go-envx/envx/app/internal/features/workspace"
 )
@@ -85,8 +85,8 @@ func TestQuickStartResolves(t *testing.T) {
 	}
 
 	manifestPath := filepath.Join(dir, "envx.yaml")
-	in := &config.Input{ConfigPath: &manifestPath}
-	resolved, err := config.ResolveProject(in, "api-service")
+	in := &core.Input{ConfigPath: &manifestPath}
+	resolved, err := core.ResolveProject(in, "api-service")
 	if err != nil {
 		t.Fatalf("resolve: %v", err)
 	}

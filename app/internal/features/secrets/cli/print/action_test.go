@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/go-envx/envx/app/internal/config"
+	"github.com/go-envx/envx/app/internal/core"
 	"github.com/go-envx/envx/app/internal/resources/cipher"
 	"github.com/go-envx/envx/app/internal/utils/file"
 )
@@ -42,7 +42,7 @@ func TestExecuteUsesConfiguredCipher(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	result, err := execute(&config.Input{ConfigPath: &manifest}, "")
+	result, err := execute(&core.Input{ConfigPath: &manifest}, "")
 	if err != nil {
 		t.Fatalf("execute(): %v", err)
 	}
@@ -79,7 +79,7 @@ func TestExecuteUsesEmptyCipherAsFallback(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	result, err := execute(&config.Input{ConfigPath: &manifest}, "")
+	result, err := execute(&core.Input{ConfigPath: &manifest}, "")
 	if err != nil {
 		t.Fatalf("execute(): %v", err)
 	}
@@ -99,7 +99,7 @@ func TestExecuteUsesExplicitCipher(t *testing.T) {
 	missingManifest := filepath.Join(t.TempDir(), "missing.yaml")
 	cipherName := string(cipher.NaClBox)
 	result, err := execute(
-		&config.Input{ConfigPath: &missingManifest},
+		&core.Input{ConfigPath: &missingManifest},
 		cipherName,
 	)
 	if err != nil {
@@ -117,7 +117,7 @@ func TestExecuteUsesDefaultCipherWithoutManifest(t *testing.T) {
 
 	missingManifest := filepath.Join(t.TempDir(), "missing.yaml")
 	result, err := execute(
-		&config.Input{ConfigPath: &missingManifest},
+		&core.Input{ConfigPath: &missingManifest},
 		"",
 	)
 	if err != nil {

@@ -1,7 +1,7 @@
 package cli
 
 import (
-	"github.com/go-envx/envx/app/internal/config"
+	"github.com/go-envx/envx/app/internal/core"
 	engine "github.com/go-envx/envx/app/internal/features/validate"
 )
 
@@ -19,15 +19,15 @@ type actionParams struct {
 // the shared secrets manager, and run the workspace-wide diagnosis. It never
 // materializes plaintext; the engine diagnoses references through the masked
 // dry-run path. The returned report is sorted for stable output.
-func execute(p actionParams, in *config.Input) (engine.Report, error) {
+func execute(p actionParams, in *core.Input) (engine.Report, error) {
 	// Resolve every declared project into a build-ready configuration.
-	workspace, err := config.ResolveWorkspaceProjects(in)
+	workspace, err := core.ResolveWorkspaceProjects(in)
 	if err != nil {
 		return engine.Report{}, err
 	}
 
 	// Compose the shared secrets manager for the store-level findings.
-	manager, err := config.NewSecretsManager(workspace.Secrets, workspace.Cipher)
+	manager, err := core.NewSecretsManager(workspace.Secrets, workspace.Cipher)
 	if err != nil {
 		return engine.Report{}, err
 	}

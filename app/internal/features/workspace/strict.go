@@ -9,8 +9,6 @@ import (
 	"strings"
 
 	"gopkg.in/yaml.v3"
-
-	"github.com/go-envx/envx/app/internal/schema"
 )
 
 // SchemaDocsURL is the manifest schema reference pointed to when a key is
@@ -28,19 +26,19 @@ const suggestionThreshold = 3
 // which the printer prefixes with the "ERROR:" label.
 const continuationIndent = "\n   "
 
-// strictDecode decodes data into a schema.Manifest with unknown-field rejection
+// strictDecode decodes data into a Manifest with unknown-field rejection
 // so a removed, renamed, or misspelled manifest key fails loudly rather than
 // being silently dropped. yaml.Node.Decode has no strict mode, so a dedicated
 // decoder runs over the raw bytes; the caller keeps the node round-trip only for
 // indentation detection. A rejected key is reported in manifest-domain terms —
 // the key, its line, the nearest valid key, and the schema docs — rather than
 // leaking yaml's internal type names.
-func strictDecode(data []byte) (schema.Manifest, error) {
-	var manifest schema.Manifest
+func strictDecode(data []byte) (Manifest, error) {
+	var manifest Manifest
 	dec := yaml.NewDecoder(bytes.NewReader(data))
 	dec.KnownFields(true)
 	if err := dec.Decode(&manifest); err != nil {
-		return schema.Manifest{}, decodeError(err)
+		return Manifest{}, decodeError(err)
 	}
 	return manifest, nil
 }
@@ -64,13 +62,13 @@ type fieldContext struct {
 // appears in yaml.v3's diagnostic) to the label and type used to describe and
 // correct a rejected key within it.
 var manifestFieldContexts = map[string]fieldContext{
-	"schema.Manifest": {label: "manifest key", typ: reflect.TypeOf(schema.Manifest{})},
-	"schema.Settings": {label: "setting", typ: reflect.TypeOf(schema.Settings{})},
-	"schema.SecretsConfig": {
+	"workspace.Manifest": {label: "manifest key", typ: reflect.TypeOf(Manifest{})},
+	"workspace.Settings": {label: "setting", typ: reflect.TypeOf(Settings{})},
+	"workspace.SecretsConfig": {
 		label: "secrets setting",
-		typ:   reflect.TypeOf(schema.SecretsConfig{}),
+		typ:   reflect.TypeOf(SecretsConfig{}),
 	},
-	"schema.Project": {label: "project key", typ: reflect.TypeOf(schema.Project{})},
+	"workspace.Project": {label: "project key", typ: reflect.TypeOf(Project{})},
 }
 
 // decodeError translates a yaml decode failure into a manifest-domain error.

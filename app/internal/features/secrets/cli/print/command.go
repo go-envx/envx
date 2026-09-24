@@ -1,8 +1,9 @@
 package print
 
 import (
-	"github.com/go-envx/envx/app/internal/flags"
-	"github.com/go-envx/envx/app/internal/schema"
+	"github.com/go-envx/envx/app/internal/core"
+	"github.com/go-envx/envx/app/internal/features/secrets"
+	"github.com/go-envx/envx/app/internal/shared/flags"
 	"github.com/go-envx/envx/app/internal/utils/printer"
 	"github.com/go-envx/envx/app/internal/utils/str"
 	"github.com/spf13/cobra"
@@ -35,7 +36,7 @@ func NewCommand() *cobra.Command {
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			// load command flags
 			flagset := cmd.Flags()
-			in := flags.GetInput(flagset)
+			in := core.GetInput(flagset)
 
 			// execute the action
 			result, err := execute(in, cipherName)
@@ -55,7 +56,7 @@ func NewCommand() *cobra.Command {
 		},
 	}
 
-	flags.BindString(cmd.Flags(), &cipherName, &schema.Cipher)
+	flags.Bind(cmd.Flags(), &cipherName, &secrets.Cipher)
 
 	return cmd
 }

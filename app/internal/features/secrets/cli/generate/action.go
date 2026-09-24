@@ -1,7 +1,7 @@
 package generate
 
 import (
-	"github.com/go-envx/envx/app/internal/config"
+	"github.com/go-envx/envx/app/internal/core"
 	"github.com/go-envx/envx/app/internal/features/secrets"
 )
 
@@ -22,13 +22,13 @@ type actionResult struct {
 }
 
 // execute runs the manager's safe missing-identity workflow.
-func execute(p actionParams, in *config.Input) (actionResult, error) {
-	resolved, err := config.ResolveWorkspace(in)
+func execute(p actionParams, in *core.Input) (actionResult, error) {
+	resolved, err := core.ResolveWorkspace(in)
 	if err != nil {
 		return actionResult{}, err
 	}
 
-	secretManager, err := config.NewSecretsManager(
+	secretManager, err := core.NewSecretsManager(
 		resolved.Secrets,
 		resolved.Cipher,
 	)

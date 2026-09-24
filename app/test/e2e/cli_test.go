@@ -11,7 +11,7 @@ import (
 	"testing"
 
 	"github.com/go-envx/envx/app/internal/cli"
-	"github.com/go-envx/envx/app/internal/fixtures"
+	"github.com/go-envx/envx/app/test/fixtures"
 )
 
 // execCmd builds a root command wired to fresh stdout/stderr buffers, sets the

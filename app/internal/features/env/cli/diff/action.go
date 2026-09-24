@@ -1,7 +1,7 @@
 package diff
 
 import (
-	"github.com/go-envx/envx/app/internal/config"
+	"github.com/go-envx/envx/app/internal/core"
 	"github.com/go-envx/envx/app/internal/features/env"
 )
 
@@ -42,9 +42,9 @@ type actionResultChange struct {
 // the two declared environments through the constructed manager. Masked, diff
 // compares declarations and never decrypts; revealed, it resolves and
 // substitutes each side before comparing.
-func execute(p actionParams, in *config.Input) (actionResult, error) {
+func execute(p actionParams, in *core.Input) (actionResult, error) {
 	// resolve the shared config.
-	resolved, err := config.ResolveProject(in, p.Project)
+	resolved, err := core.ResolveProject(in, p.Project)
 	if err != nil {
 		return actionResult{}, err
 	}

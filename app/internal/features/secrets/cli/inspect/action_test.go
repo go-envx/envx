@@ -5,7 +5,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/go-envx/envx/app/internal/config"
+	"github.com/go-envx/envx/app/internal/core"
 	"github.com/go-envx/envx/app/internal/utils/file"
 )
 
@@ -25,12 +25,12 @@ func writeManifest(t *testing.T) string {
 // private-key material.
 func TestExecuteAndRender(t *testing.T) {
 	manifest := writeManifest(t)
-	in := &config.Input{ConfigPath: &manifest}
-	resolved, err := config.ResolveWorkspace(in)
+	in := &core.Input{ConfigPath: &manifest}
+	resolved, err := core.ResolveWorkspace(in)
 	if err != nil {
 		t.Fatalf("ResolveWorkspace(): %v", err)
 	}
-	secretManager, err := config.NewSecretsManager(
+	secretManager, err := core.NewSecretsManager(
 		resolved.Secrets,
 		resolved.Cipher,
 	)

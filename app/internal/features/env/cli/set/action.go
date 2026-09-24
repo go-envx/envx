@@ -6,7 +6,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/go-envx/envx/app/internal/config"
+	"github.com/go-envx/envx/app/internal/core"
 	"github.com/go-envx/envx/app/internal/utils/file"
 	"github.com/go-envx/envx/app/internal/utils/yamlx"
 	"gopkg.in/yaml.v3"
@@ -35,9 +35,9 @@ type actionResult struct {
 // applies the pure edit, and writes the result back atomically. Editing the node
 // tree in place preserves the file's comments, key order, and formatting; set
 // never invokes envmerge since no project means there is nothing to merge.
-func execute(p actionParams, in *config.Input) (actionResult, error) {
+func execute(p actionParams, in *core.Input) (actionResult, error) {
 	// resolve the workspace (no project) and derive the target overlay file
-	resolved, err := config.ResolveWorkspace(in)
+	resolved, err := core.ResolveWorkspace(in)
 	if err != nil {
 		return actionResult{}, err
 	}

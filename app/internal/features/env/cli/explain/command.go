@@ -1,8 +1,9 @@
 package explain
 
 import (
-	"github.com/go-envx/envx/app/internal/flags"
-	"github.com/go-envx/envx/app/internal/schema"
+	"github.com/go-envx/envx/app/internal/core"
+	"github.com/go-envx/envx/app/internal/features/env"
+	"github.com/go-envx/envx/app/internal/shared/flags"
 	"github.com/go-envx/envx/app/internal/utils/arg"
 	"github.com/go-envx/envx/app/internal/utils/printer"
 	"github.com/go-envx/envx/app/internal/utils/str"
@@ -59,7 +60,7 @@ func NewCommand() *cobra.Command {
 
 			// get the flag inputs
 			flagset := cmd.Flags()
-			input := flags.GetInput(flagset)
+			input := core.GetInput(flagset)
 
 			// execute the action
 			res, err := execute(p, input)
@@ -81,19 +82,19 @@ func NewCommand() *cobra.Command {
 		},
 	}
 
-	flags.Register(cmd.Flags(),
-		flags.WithEnv,
-		flags.WithRequireOverlays,
-		flags.WithPrefix,
-		flags.WithSuffix,
-		flags.WithDelimiter,
-		flags.WithOverload,
-		flags.WithReferencePattern,
+	env.RegisterFlags(cmd.Flags(),
+		env.WithEnv,
+		env.WithRequireOverlays,
+		env.WithPrefix,
+		env.WithSuffix,
+		env.WithDelimiter,
+		env.WithOverload,
+		env.WithReferencePattern,
 	)
 
-	flags.BindString(cmd.Flags(), &output, &schema.Output)
-	flags.BindBool(cmd.Flags(), &reveal, &schema.Reveal)
-	flags.BindBool(cmd.Flags(), &absolute, &schema.Absolute)
+	flags.Bind(cmd.Flags(), &output, &flags.Output)
+	flags.Bind(cmd.Flags(), &reveal, &env.Reveal)
+	flags.Bind(cmd.Flags(), &absolute, &env.Absolute)
 
 	return cmd
 }

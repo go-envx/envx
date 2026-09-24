@@ -9,7 +9,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/go-envx/envx/app/internal/config"
+	"github.com/go-envx/envx/app/internal/core"
 	engine "github.com/go-envx/envx/app/internal/features/emit"
 	"github.com/go-envx/envx/app/internal/features/env"
 	"github.com/go-envx/envx/app/internal/utils/file"
@@ -44,7 +44,7 @@ type actionParams struct {
 // fails. When a file target's output carries secret material it warns through
 // the printer, since the written file is unencrypted and must not be committed.
 func execute(
-	p actionParams, in *config.Input, stdout io.Writer, pr *printer.Printer,
+	p actionParams, in *core.Input, stdout io.Writer, pr *printer.Printer,
 ) error {
 	// The slice flags are additive filters, so selecting neither is the same as
 	// selecting both — emit everything. Normalizing here keeps the whole action
@@ -77,7 +77,7 @@ func execute(
 		return err
 	}
 
-	resolved, err := config.ResolveProject(in, p.Project)
+	resolved, err := core.ResolveProject(in, p.Project)
 	if err != nil {
 		return err
 	}

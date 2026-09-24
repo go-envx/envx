@@ -1,9 +1,9 @@
-package config
+package core
 
 import (
 	"testing"
 
-	"github.com/go-envx/envx/app/internal/fixtures"
+	"github.com/go-envx/envx/app/test/fixtures"
 )
 
 // TestResolveWorkspaceProjects verifies every declared project is resolved into a

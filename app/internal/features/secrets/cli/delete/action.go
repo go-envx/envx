@@ -3,7 +3,7 @@ package delete
 import (
 	"strings"
 
-	"github.com/go-envx/envx/app/internal/config"
+	"github.com/go-envx/envx/app/internal/core"
 )
 
 // actionParams identifies the one secret being removed.
@@ -26,14 +26,14 @@ type actionResult struct {
 
 // execute removes one stored secret and delegates the mutation to the root
 // secrets manager. The group's keypair and remaining values are preserved.
-func execute(p actionParams, in *config.Input) (actionResult, error) {
+func execute(p actionParams, in *core.Input) (actionResult, error) {
 	// Resolve the workspace configuration and encryption settings.
-	c, err := config.ResolveWorkspace(in)
+	c, err := core.ResolveWorkspace(in)
 	if err != nil {
 		return actionResult{}, err
 	}
 	// Create the manager responsible for encrypted secret storage.
-	manager, err := config.NewSecretsManager(c.Secrets, c.Cipher)
+	manager, err := core.NewSecretsManager(c.Secrets, c.Cipher)
 	if err != nil {
 		return actionResult{}, err
 	}

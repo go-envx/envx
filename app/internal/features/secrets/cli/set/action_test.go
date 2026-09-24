@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/go-envx/envx/app/internal/config"
+	"github.com/go-envx/envx/app/internal/core"
 	"github.com/go-envx/envx/app/internal/utils/file"
 )
 
@@ -29,12 +29,12 @@ func TestExecuteEncryptsAndStoresSafeMetadata(t *testing.T) {
 	t.Parallel()
 
 	manifest := writeManifest(t)
-	input := &config.Input{ConfigPath: &manifest}
-	resolved, err := config.ResolveWorkspace(input)
+	input := &core.Input{ConfigPath: &manifest}
+	resolved, err := core.ResolveWorkspace(input)
 	if err != nil {
 		t.Fatalf("ResolveWorkspace(): %v", err)
 	}
-	manager, err := config.NewSecretsManager(resolved.Secrets, resolved.Cipher)
+	manager, err := core.NewSecretsManager(resolved.Secrets, resolved.Cipher)
 	if err != nil {
 		t.Fatalf("NewSecretsManager(): %v", err)
 	}
@@ -110,12 +110,12 @@ func TestExecuteRejectsUnconfirmedTerminalInputWithoutMutation(t *testing.T) {
 	t.Parallel()
 
 	manifest := writeManifest(t)
-	input := &config.Input{ConfigPath: &manifest}
-	resolved, err := config.ResolveWorkspace(input)
+	input := &core.Input{ConfigPath: &manifest}
+	resolved, err := core.ResolveWorkspace(input)
 	if err != nil {
 		t.Fatalf("ResolveWorkspace(): %v", err)
 	}
-	manager, err := config.NewSecretsManager(resolved.Secrets, resolved.Cipher)
+	manager, err := core.NewSecretsManager(resolved.Secrets, resolved.Cipher)
 	if err != nil {
 		t.Fatalf("NewSecretsManager(): %v", err)
 	}
