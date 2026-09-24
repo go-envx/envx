@@ -6,7 +6,7 @@ import (
 	"testing"
 
 	"github.com/go-envx/envx/app/internal/config"
-	"github.com/go-envx/envx/app/internal/envmerge"
+	"github.com/go-envx/envx/app/internal/features/env"
 	"github.com/go-envx/envx/app/internal/features/workspace"
 )
 
@@ -90,7 +90,7 @@ func TestQuickStartResolves(t *testing.T) {
 	if err != nil {
 		t.Fatalf("resolve: %v", err)
 	}
-	entry, err := resolved.Envmerge.Get(envmerge.GetParams{Key: "DATABASE_HOST"})
+	entry, err := resolved.Envmerge.Get(env.GetParams{Key: "DATABASE_HOST"})
 	if err != nil {
 		t.Fatalf("get: %v", err)
 	}

@@ -1,16 +1,12 @@
 package cli
 
 import (
-	"github.com/go-envx/envx/app/internal/actions/diff"
-	"github.com/go-envx/envx/app/internal/actions/emit"
-	"github.com/go-envx/envx/app/internal/actions/explain"
-	"github.com/go-envx/envx/app/internal/actions/get"
-	"github.com/go-envx/envx/app/internal/actions/keypair"
-	"github.com/go-envx/envx/app/internal/actions/pack"
-	"github.com/go-envx/envx/app/internal/actions/run"
-	"github.com/go-envx/envx/app/internal/actions/secrets"
-	"github.com/go-envx/envx/app/internal/actions/set"
-	"github.com/go-envx/envx/app/internal/actions/validate"
+	emitcli "github.com/go-envx/envx/app/internal/features/emit/cli"
+	envcli "github.com/go-envx/envx/app/internal/features/env/cli"
+	packcli "github.com/go-envx/envx/app/internal/features/pack/cli"
+	runnercli "github.com/go-envx/envx/app/internal/features/runner/cli"
+	secretscli "github.com/go-envx/envx/app/internal/features/secrets/cli"
+	validatecli "github.com/go-envx/envx/app/internal/features/validate/cli"
 	"github.com/go-envx/envx/app/internal/features/workspace"
 	workspacecli "github.com/go-envx/envx/app/internal/features/workspace/cli"
 	"github.com/go-envx/envx/app/internal/flags"
@@ -50,16 +46,16 @@ func NewRootCmd(info BuildInfo) *cobra.Command {
 
 	root.AddCommand(
 		workspacecli.NewCreateCmd(workspace.NewCreateWorkspaceHandler()),
-		get.NewCommand(),
-		keypair.NewCommand(),
-		pack.NewCommand(),
-		run.NewCommand(),
-		set.NewCommand(),
-		explain.NewCommand(),
-		emit.NewCommand(),
-		diff.NewCommand(),
-		secrets.NewCommand(),
-		validate.NewCommand(),
+		envcli.NewGetCmd(),
+		secretscli.NewKeypairCmd(),
+		packcli.NewPackCmd(),
+		runnercli.NewRunCmd(),
+		envcli.NewSetCmd(),
+		envcli.NewExplainCmd(),
+		emitcli.NewEmitCmd(),
+		envcli.NewDiffCmd(),
+		secretscli.NewSecretsCmd(),
+		validatecli.NewValidateCmd(),
 	)
 	return root
 }

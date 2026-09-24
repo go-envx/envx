@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"path/filepath"
 
-	"github.com/go-envx/envx/app/internal/cipher"
-	"github.com/go-envx/envx/app/internal/envmerge"
-	"github.com/go-envx/envx/app/internal/secrets"
+	"github.com/go-envx/envx/app/internal/features/env"
+	"github.com/go-envx/envx/app/internal/features/secrets"
+	"github.com/go-envx/envx/app/internal/resources/cipher"
 )
 
 // Result is the aggregate config produces from one manifest load and one
@@ -15,7 +15,7 @@ import (
 type Result struct {
 	// Envmerge is the constructed envmerge Manager the environment-building actions
 	// operate through. ResolveProject builds it; ResolveWorkspace leaves it nil.
-	Envmerge *envmerge.Manager
+	Envmerge *env.Manager
 
 	// Secrets locates the workspace secrets store and private-key file.
 	// ResolveProject binds these into the resolver factory the Manager opens on
@@ -48,18 +48,18 @@ func (r *Result) WorkspaceDir() string {
 // against the workspace directory. It targets a single overlay file without
 // merging an environment, so it never builds an envmerge result.
 func (r *Result) OverlayPath(includePath string) (string, error) {
-	env := r.defaultEnvironment
-	if env == "" {
-		env = r.manifest.DefaultEnvironment()
+	targetEnv := r.defaultEnvironment
+	if targetEnv == "" {
+		targetEnv = r.manifest.DefaultEnvironment()
 	}
-	if !r.manifest.HasEnvironment(env) {
+	if !r.manifest.HasEnvironment(targetEnv) {
 		return "", fmt.Errorf(
 			"environment %q is not declared in the manifest (available: %v)",
-			env, r.manifest.Environments,
+			targetEnv, r.manifest.Environments,
 		)
 	}
 	if !r.manifest.HasInclude(includePath) {
 		return "", fmt.Errorf("include %q not found in manifest", includePath)
 	}
-	return filepath.Join(r.dir, includePath) + "." + env + ".yaml", nil
+	return filepath.Join(r.dir, includePath) + "." + targetEnv + ".yaml", nil
 }

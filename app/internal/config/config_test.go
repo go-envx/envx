@@ -4,9 +4,9 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/go-envx/envx/app/internal/cipher"
-	"github.com/go-envx/envx/app/internal/envmerge"
+	"github.com/go-envx/envx/app/internal/features/env"
 	"github.com/go-envx/envx/app/internal/fixtures"
+	"github.com/go-envx/envx/app/internal/resources/cipher"
 	"github.com/go-envx/envx/app/internal/schema"
 )
 
@@ -34,7 +34,7 @@ func testManifest() *schema.Manifest {
 
 // TestResolveManifest verifies project lookup, the env precedence (explicit >
 // project > global), setting layering, and pass-through of includes/environments
-// into the envmerge.Params against an in-memory manifest. An empty project
+// into the env.Params against an in-memory manifest. An empty project
 // resolves the global context only. Terminal defaults are left to envmerge, so an
 // unset env stays empty here.
 func TestResolveManifest(t *testing.T) {
@@ -280,7 +280,7 @@ func TestResolveProject(t *testing.T) {
 	if r.Envmerge == nil {
 		t.Fatal("expected a constructed manager")
 	}
-	entry, err := r.Envmerge.Get(envmerge.GetParams{Key: "APP_NAME"})
+	entry, err := r.Envmerge.Get(env.GetParams{Key: "APP_NAME"})
 	if err != nil {
 		t.Fatalf("Get APP_NAME: %v", err)
 	}
@@ -411,14 +411,14 @@ func TestResolveProjectMasksSecretReference(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ResolveProject: %v", err)
 	}
-	password, err := resolved.Envmerge.Get(envmerge.GetParams{Key: "PASSWORD"})
+	password, err := resolved.Envmerge.Get(env.GetParams{Key: "PASSWORD"})
 	if err != nil {
 		t.Fatalf("Get PASSWORD: %v", err)
 	}
 	if password.Value != "secret://development/api_key" {
 		t.Errorf("PASSWORD = %q, want masked development reference", password.Value)
 	}
-	token, err := resolved.Envmerge.Get(envmerge.GetParams{Key: "TOKEN"})
+	token, err := resolved.Envmerge.Get(env.GetParams{Key: "TOKEN"})
 	if err != nil {
 		t.Fatalf("Get TOKEN: %v", err)
 	}
@@ -456,7 +456,7 @@ func TestResolveProjectDanglingSecretReference(t *testing.T) {
 	}
 
 	// Masked: the dangling reference resolves to its own canonical text.
-	entry, err := resolved.Envmerge.Get(envmerge.GetParams{Key: "PASSWORD"})
+	entry, err := resolved.Envmerge.Get(env.GetParams{Key: "PASSWORD"})
 	if err != nil {
 		t.Fatalf("Get masked: %v", err)
 	}
@@ -466,7 +466,7 @@ func TestResolveProjectDanglingSecretReference(t *testing.T) {
 
 	// Revealed: materializing the environment fails loudly on the dangling
 	// reference, so a child process never receives an unresolved reference.
-	if _, err := resolved.Envmerge.Materialize(envmerge.MaterializeParams{}); err == nil {
+	if _, err := resolved.Envmerge.Materialize(env.MaterializeParams{}); err == nil {
 		t.Fatal("expected dangling reference error when materialized")
 	}
 }

@@ -3,9 +3,9 @@ package config
 import (
 	"sort"
 
-	"github.com/go-envx/envx/app/internal/cipher"
+	"github.com/go-envx/envx/app/internal/features/secrets"
 	"github.com/go-envx/envx/app/internal/features/workspace"
-	"github.com/go-envx/envx/app/internal/secrets"
+	"github.com/go-envx/envx/app/internal/resources/cipher"
 	"github.com/go-envx/envx/app/internal/shared/status"
 )
 
