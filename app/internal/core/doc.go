@@ -1,4 +1,4 @@
-// Package config is the resolution pipeline: it meshes the user's optional input
+// Package core is the resolution pipeline: it meshes the user's optional input
 // values, ENVX_* environment variables, and the loaded manifest into a single
 // resolved *Result, applying the precedence explicit > ENVX_* > project >
 // global. It exposes two entry points for the two workflows actions need:
@@ -15,4 +15,4 @@
 // rather than any flag-set handle, so the same pipeline serves a future API. It
 // owns the precedence layering and deliberately leaves terminal defaults (such as
 // the first-declared environment) unset.
-package config
+package core

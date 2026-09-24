@@ -5,7 +5,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/go-envx/envx/app/internal/config"
+	"github.com/go-envx/envx/app/internal/core"
 )
 
 // writeManifest creates a valid workspace manifest for get action tests.
@@ -21,13 +21,13 @@ func writeManifest(t *testing.T) string {
 }
 
 // seedSecret generates a group keypair and stores one secret for get tests.
-func seedSecret(t *testing.T, input *config.Input, group, key, plaintext string) {
+func seedSecret(t *testing.T, input *core.Input, group, key, plaintext string) {
 	t.Helper()
-	resolved, err := config.ResolveWorkspace(input)
+	resolved, err := core.ResolveWorkspace(input)
 	if err != nil {
 		t.Fatalf("ResolveWorkspace(): %v", err)
 	}
-	manager, err := config.NewSecretsManager(resolved.Secrets, resolved.Cipher)
+	manager, err := core.NewSecretsManager(resolved.Secrets, resolved.Cipher)
 	if err != nil {
 		t.Fatalf("NewSecretsManager(): %v", err)
 	}
@@ -46,7 +46,7 @@ func TestExecuteDecryptsStoredSecret(t *testing.T) {
 	t.Parallel()
 
 	manifest := writeManifest(t)
-	input := &config.Input{ConfigPath: &manifest}
+	input := &core.Input{ConfigPath: &manifest}
 	const plaintext = "database-password"
 	seedSecret(t, input, "production", "database_password", plaintext)
 
@@ -67,7 +67,7 @@ func TestExecuteMissingSecretFails(t *testing.T) {
 	t.Parallel()
 
 	manifest := writeManifest(t)
-	input := &config.Input{ConfigPath: &manifest}
+	input := &core.Input{ConfigPath: &manifest}
 	seedSecret(t, input, "production", "database_password", "database-password")
 
 	if _, err := execute(

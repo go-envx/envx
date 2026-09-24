@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/go-envx/envx/app/internal/config"
+	"github.com/go-envx/envx/app/internal/core"
 	"github.com/go-envx/envx/app/internal/features/secrets"
 	"github.com/go-envx/envx/app/internal/utils/file"
 )
@@ -26,13 +26,13 @@ func writeManifest(t *testing.T) string {
 
 // seedPlaintext generates a group keypair and injects one plaintext value into
 // the store so encrypt has something to encrypt. It returns the store path.
-func seedPlaintext(t *testing.T, input *config.Input, group, key, value string) string {
+func seedPlaintext(t *testing.T, input *core.Input, group, key, value string) string {
 	t.Helper()
-	resolved, err := config.ResolveWorkspace(input)
+	resolved, err := core.ResolveWorkspace(input)
 	if err != nil {
 		t.Fatalf("ResolveWorkspace(): %v", err)
 	}
-	manager, err := config.NewSecretsManager(resolved.Secrets, resolved.Cipher)
+	manager, err := core.NewSecretsManager(resolved.Secrets, resolved.Cipher)
 	if err != nil {
 		t.Fatalf("NewSecretsManager(): %v", err)
 	}
@@ -60,7 +60,7 @@ func TestExecuteEncryptsPlaintext(t *testing.T) {
 	t.Parallel()
 
 	manifest := writeManifest(t)
-	input := &config.Input{ConfigPath: &manifest}
+	input := &core.Input{ConfigPath: &manifest}
 	storePath := seedPlaintext(t, input, "production", "api_key", "plain-value")
 
 	result, err := execute(actionParams{}, input)
@@ -90,7 +90,7 @@ func TestExecuteSelectorMatchingNothingFails(t *testing.T) {
 	t.Parallel()
 
 	manifest := writeManifest(t)
-	input := &config.Input{ConfigPath: &manifest}
+	input := &core.Input{ConfigPath: &manifest}
 	seedPlaintext(t, input, "production", "api_key", "plain-value")
 
 	if _, err := execute(actionParams{Group: "missing"}, input); err == nil {

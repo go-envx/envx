@@ -9,7 +9,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/go-envx/envx/app/internal/config"
+	"github.com/go-envx/envx/app/internal/core"
 	"github.com/go-envx/envx/app/internal/fixtures"
 	"github.com/go-envx/envx/app/internal/resources/cipher"
 )
@@ -21,7 +21,7 @@ func TestExecuteInjectsEnv(t *testing.T) {
 
 	path := fixtures.Manifest("basic")
 	var stdout bytes.Buffer
-	in := &config.Input{ConfigPath: &path}
+	in := &core.Input{ConfigPath: &path}
 	err := execute(actionParams{
 		Project:  "api-core",
 		ExecArgs: []string{"printenv", "APP_NAME"},
@@ -42,7 +42,7 @@ func TestExecuteOverloadFromEnv(t *testing.T) {
 
 	path := fixtures.Manifest("basic")
 	var stdout bytes.Buffer
-	in := &config.Input{ConfigPath: &path}
+	in := &core.Input{ConfigPath: &path}
 	err := execute(actionParams{
 		Project:  "api-core",
 		ExecArgs: []string{"printenv", "APP_NAME"},
@@ -63,7 +63,7 @@ func TestExecuteUnionsOSKeys(t *testing.T) {
 
 	path := fixtures.Manifest("basic")
 	var stdout bytes.Buffer
-	in := &config.Input{ConfigPath: &path}
+	in := &core.Input{ConfigPath: &path}
 	err := execute(actionParams{
 		Project:  "api-core",
 		ExecArgs: []string{"printenv", "OS_ONLY_VAR"},
@@ -112,7 +112,7 @@ func TestExecuteRevealFailurePreventsChildStartup(t *testing.T) {
 	err = execute(actionParams{
 		Project:  "api",
 		ExecArgs: []string{"printenv", "PASSWORD"},
-	}, &config.Input{ConfigPath: &cfgPath}, streams{Stdout: &stdout, Stderr: io.Discard})
+	}, &core.Input{ConfigPath: &cfgPath}, streams{Stdout: &stdout, Stderr: io.Discard})
 	if err == nil {
 		t.Fatal("expected the reveal failure to prevent child-process startup")
 	}
@@ -139,7 +139,7 @@ func TestExecuteIgnoreErrorsFailsClosedByDefault(t *testing.T) {
 	err := execute(actionParams{
 		Project:  "api",
 		ExecArgs: []string{"printenv", "GOOD"},
-	}, &config.Input{ConfigPath: &cfgPath}, streams{Stdout: &stdout, Stderr: io.Discard})
+	}, &core.Input{ConfigPath: &cfgPath}, streams{Stdout: &stdout, Stderr: io.Discard})
 	if err == nil {
 		t.Fatal("expected the missing reference to abort the run")
 	}
@@ -166,7 +166,7 @@ func TestExecuteIgnoreErrorsStartsChild(t *testing.T) {
 		Project:      "api",
 		ExecArgs:     []string{"sh", "-c", "echo GOOD=$GOOD; echo BROKEN=${BROKEN-<unset>}"},
 		IgnoreErrors: true,
-	}, &config.Input{ConfigPath: &cfgPath}, streams{Stdout: &stdout, Stderr: &stderr})
+	}, &core.Input{ConfigPath: &cfgPath}, streams{Stdout: &stdout, Stderr: &stderr})
 	if err != nil {
 		t.Fatalf("execute: %v", err)
 	}
@@ -200,7 +200,7 @@ func TestExecuteIgnoreErrorsKeepsAmbientValue(t *testing.T) {
 		Project:      "api",
 		ExecArgs:     []string{"sh", "-c", "echo BROKEN=$BROKEN"},
 		IgnoreErrors: true,
-	}, &config.Input{ConfigPath: &cfgPath}, streams{Stdout: &stdout, Stderr: &stderr})
+	}, &core.Input{ConfigPath: &cfgPath}, streams{Stdout: &stdout, Stderr: &stderr})
 	if err != nil {
 		t.Fatalf("execute: %v", err)
 	}

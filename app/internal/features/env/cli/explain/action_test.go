@@ -4,7 +4,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/go-envx/envx/app/internal/config"
+	"github.com/go-envx/envx/app/internal/core"
 	"github.com/go-envx/envx/app/internal/features/env"
 	"github.com/go-envx/envx/app/internal/fixtures"
 )
@@ -15,7 +15,7 @@ func executeBasic(t *testing.T, p actionParams) actionResult {
 	t.Helper()
 	path := fixtures.Manifest("basic")
 	p.Project = "api-core"
-	res, err := execute(p, &config.Input{ConfigPath: &path})
+	res, err := execute(p, &core.Input{ConfigPath: &path})
 	if err != nil {
 		t.Fatalf("execute: %v", err)
 	}
@@ -97,7 +97,7 @@ func TestExecuteMissingKey(t *testing.T) {
 	path := fixtures.Manifest("basic")
 	_, err := execute(
 		actionParams{Project: "api-core", Key: "nope"},
-		&config.Input{ConfigPath: &path},
+		&core.Input{ConfigPath: &path},
 	)
 	if err == nil {
 		t.Fatal("expected error for missing key")

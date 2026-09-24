@@ -3,7 +3,7 @@ package cli
 import (
 	"io"
 
-	"github.com/go-envx/envx/app/internal/config"
+	"github.com/go-envx/envx/app/internal/core"
 	"github.com/go-envx/envx/app/internal/features/env"
 	"github.com/go-envx/envx/app/internal/features/runner"
 	"github.com/go-envx/envx/app/internal/utils/printer"
@@ -32,9 +32,9 @@ type streams struct {
 // materialize the complete effective environment, then run the child process with
 // it. Overload and OS composition are settled inside Materialize, so the runner
 // receives a ready environment.
-func execute(p actionParams, in *config.Input, s streams) error {
+func execute(p actionParams, in *core.Input, s streams) error {
 	// resolve the input config
-	resolved, err := config.ResolveProject(in, p.Project)
+	resolved, err := core.ResolveProject(in, p.Project)
 	if err != nil {
 		return err
 	}

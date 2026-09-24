@@ -1,7 +1,7 @@
 package decrypt
 
 import (
-	"github.com/go-envx/envx/app/internal/config"
+	"github.com/go-envx/envx/app/internal/core"
 	"github.com/go-envx/envx/app/internal/features/secrets"
 )
 
@@ -26,14 +26,14 @@ type actionResult struct {
 
 // execute decrypts the selected ciphertext store entries in place and delegates
 // the mutation to the root secrets manager.
-func execute(p actionParams, in *config.Input) (actionResult, error) {
+func execute(p actionParams, in *core.Input) (actionResult, error) {
 	// Resolve the workspace configuration and encryption settings.
-	c, err := config.ResolveWorkspace(in)
+	c, err := core.ResolveWorkspace(in)
 	if err != nil {
 		return actionResult{}, err
 	}
 	// Create the manager responsible for encrypted secret storage.
-	manager, err := config.NewSecretsManager(c.Secrets, c.Cipher)
+	manager, err := core.NewSecretsManager(c.Secrets, c.Cipher)
 	if err != nil {
 		return actionResult{}, err
 	}

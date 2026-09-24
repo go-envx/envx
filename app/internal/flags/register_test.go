@@ -12,7 +12,7 @@ func newFlags() *pflag.FlagSet {
 }
 
 // TestRegisterAndGetInput verifies Register + GetInput round-trip the explicitly-set
-// option flags into a *config.Input, leaving unset and unregistered flags nil.
+// option flags into a *core.Input, leaving unset and unregistered flags nil.
 func TestRegisterAndGetInput(t *testing.T) {
 	t.Parallel()
 

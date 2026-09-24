@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/go-envx/envx/app/internal/config"
+	"github.com/go-envx/envx/app/internal/core"
 	"github.com/go-envx/envx/app/internal/utils/file"
 )
 
@@ -28,7 +28,7 @@ func TestExecuteAndRender(t *testing.T) {
 	manifest := writeManifest(t)
 	result, err := execute(
 		actionParams{Group: "Production"},
-		&config.Input{ConfigPath: &manifest},
+		&core.Input{ConfigPath: &manifest},
 	)
 	if err != nil {
 		t.Fatalf("execute(): %v", err)
@@ -64,7 +64,7 @@ func TestExecuteUsesConfiguredCipher(t *testing.T) {
 
 	result, err := execute(
 		actionParams{Group: "production"},
-		&config.Input{ConfigPath: &manifest},
+		&core.Input{ConfigPath: &manifest},
 	)
 	if err != nil {
 		t.Fatalf("execute(): %v", err)

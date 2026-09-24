@@ -9,7 +9,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/go-envx/envx/app/internal/config"
+	"github.com/go-envx/envx/app/internal/core"
 	engine "github.com/go-envx/envx/app/internal/features/emit"
 	"github.com/go-envx/envx/app/internal/fixtures"
 	"github.com/go-envx/envx/app/internal/resources/cipher"
@@ -144,7 +144,7 @@ func TestExecuteDotenv(t *testing.T) {
 	err := execute(actionParams{
 		Project: "api-core",
 		Target:  engine.TargetDotenv,
-	}, &config.Input{ConfigPath: &path}, &stdout, discardPrinter())
+	}, &core.Input{ConfigPath: &path}, &stdout, discardPrinter())
 	if err != nil {
 		t.Fatalf("execute: %v", err)
 	}
@@ -163,7 +163,7 @@ func TestExecuteJSON(t *testing.T) {
 	err := execute(actionParams{
 		Project: "api-core",
 		Target:  engine.TargetJSON,
-	}, &config.Input{ConfigPath: &path}, &stdout, discardPrinter())
+	}, &core.Input{ConfigPath: &path}, &stdout, discardPrinter())
 	if err != nil {
 		t.Fatalf("execute: %v", err)
 	}
@@ -188,7 +188,7 @@ func TestExecuteFailsClosedOnUnresolved(t *testing.T) {
 	err := execute(actionParams{
 		Project: "api",
 		Target:  engine.TargetDotenv,
-	}, &config.Input{ConfigPath: &cfgPath}, &stdout, discardPrinter())
+	}, &core.Input{ConfigPath: &cfgPath}, &stdout, discardPrinter())
 	if err == nil {
 		t.Fatal("expected an unresolved value to abort emit")
 	}
@@ -246,7 +246,7 @@ func TestExecuteK8sSecretRevealsOnlySecrets(t *testing.T) {
 		Target:         engine.TargetK8s,
 		Name:           "api-secrets",
 		IncludeSecrets: true,
-	}, &config.Input{ConfigPath: &cfgPath}, &stdout, discardPrinter())
+	}, &core.Input{ConfigPath: &cfgPath}, &stdout, discardPrinter())
 	if err != nil {
 		t.Fatalf("execute: %v", err)
 	}
@@ -282,7 +282,7 @@ func TestExecuteK8sConfigMapExcludesSecrets(t *testing.T) {
 		Target:        engine.TargetK8s,
 		Name:          "api-config",
 		IncludeConfig: true,
-	}, &config.Input{ConfigPath: &cfgPath}, &stdout, discardPrinter())
+	}, &core.Input{ConfigPath: &cfgPath}, &stdout, discardPrinter())
 	if err != nil {
 		t.Fatalf("execute: %v", err)
 	}
@@ -314,7 +314,7 @@ func TestExecuteMissingKeyAborts(t *testing.T) {
 		Target:         engine.TargetK8s,
 		Name:           "api-secrets",
 		IncludeSecrets: true,
-	}, &config.Input{ConfigPath: &cfgPath}, &stdout, discardPrinter())
+	}, &core.Input{ConfigPath: &cfgPath}, &stdout, discardPrinter())
 	if err == nil {
 		t.Fatal("expected emit to fail when the private key is unavailable")
 	}
@@ -335,7 +335,7 @@ func TestExecuteWritesFile(t *testing.T) {
 		Project:    "api-core",
 		Target:     engine.TargetDotenv,
 		OutputPath: outPath,
-	}, &config.Input{ConfigPath: &path}, &stdout, discardPrinter())
+	}, &core.Input{ConfigPath: &path}, &stdout, discardPrinter())
 	if err != nil {
 		t.Fatalf("execute: %v", err)
 	}
@@ -377,7 +377,7 @@ func TestExecuteWarnsOnSecretFile(t *testing.T) {
 		Project:    "api",
 		Target:     engine.TargetDotenv,
 		OutputPath: outPath,
-	}, &config.Input{ConfigPath: &cfgPath}, &stdout, pr); err != nil {
+	}, &core.Input{ConfigPath: &cfgPath}, &stdout, pr); err != nil {
 		t.Fatalf("execute: %v", err)
 	}
 	// The confirmation is normal output (stdout); the caution is a stderr warning.
@@ -401,7 +401,7 @@ func TestExecuteWarnsOnSecretFile(t *testing.T) {
 		Name:          "api-config",
 		IncludeConfig: true,
 		OutputPath:    cfgOut,
-	}, &config.Input{ConfigPath: &cfgPath}, &stdout, pr); err != nil {
+	}, &core.Input{ConfigPath: &cfgPath}, &stdout, pr); err != nil {
 		t.Fatalf("execute: %v", err)
 	}
 	if got := stdout.String(); !strings.Contains(got, "Wrote api config to") {
@@ -424,7 +424,7 @@ func TestExecuteStdoutStaysQuiet(t *testing.T) {
 		Project:       "api",
 		Target:        engine.TargetK8sBundle,
 		IncludeConfig: true,
-	}, &config.Input{ConfigPath: &cfgPath}, &stdout, pr); err != nil {
+	}, &core.Input{ConfigPath: &cfgPath}, &stdout, pr); err != nil {
 		t.Fatalf("execute: %v", err)
 	}
 	if stderr.Len() != 0 {
@@ -444,7 +444,7 @@ func TestExecuteMissingOutputDir(t *testing.T) {
 		Project:    "api-core",
 		Target:     engine.TargetDotenv,
 		OutputPath: missing,
-	}, &config.Input{ConfigPath: &path}, &stdout, discardPrinter())
+	}, &core.Input{ConfigPath: &path}, &stdout, discardPrinter())
 	if err == nil {
 		t.Fatal("expected an error for a missing output directory")
 	}

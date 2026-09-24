@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/go-envx/envx/app/internal/config"
+	"github.com/go-envx/envx/app/internal/core"
 	"github.com/go-envx/envx/app/internal/utils/file"
 )
 
@@ -23,13 +23,13 @@ func writeManifest(t *testing.T) string {
 }
 
 // seedSecret generates a group keypair and stores one secret for delete tests.
-func seedSecret(t *testing.T, input *config.Input, group, key, plaintext string) {
+func seedSecret(t *testing.T, input *core.Input, group, key, plaintext string) {
 	t.Helper()
-	resolved, err := config.ResolveWorkspace(input)
+	resolved, err := core.ResolveWorkspace(input)
 	if err != nil {
 		t.Fatalf("ResolveWorkspace(): %v", err)
 	}
-	manager, err := config.NewSecretsManager(resolved.Secrets, resolved.Cipher)
+	manager, err := core.NewSecretsManager(resolved.Secrets, resolved.Cipher)
 	if err != nil {
 		t.Fatalf("NewSecretsManager(): %v", err)
 	}
@@ -49,7 +49,7 @@ func TestExecuteRemovesStoredSecret(t *testing.T) {
 	t.Parallel()
 
 	manifest := writeManifest(t)
-	input := &config.Input{ConfigPath: &manifest}
+	input := &core.Input{ConfigPath: &manifest}
 	seedSecret(t, input, "production", "database_password", "database-password")
 
 	result, err := execute(
@@ -63,11 +63,11 @@ func TestExecuteRemovesStoredSecret(t *testing.T) {
 		t.Errorf("result = %+v", result)
 	}
 
-	resolved, err := config.ResolveWorkspace(input)
+	resolved, err := core.ResolveWorkspace(input)
 	if err != nil {
 		t.Fatalf("ResolveWorkspace(): %v", err)
 	}
-	manager, err := config.NewSecretsManager(resolved.Secrets, resolved.Cipher)
+	manager, err := core.NewSecretsManager(resolved.Secrets, resolved.Cipher)
 	if err != nil {
 		t.Fatalf("NewSecretsManager(): %v", err)
 	}
@@ -93,7 +93,7 @@ func TestExecuteMissingSecretFails(t *testing.T) {
 	t.Parallel()
 
 	manifest := writeManifest(t)
-	input := &config.Input{ConfigPath: &manifest}
+	input := &core.Input{ConfigPath: &manifest}
 	seedSecret(t, input, "production", "database_password", "database-password")
 
 	if _, err := execute(

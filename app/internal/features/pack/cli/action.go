@@ -1,7 +1,7 @@
 package cli
 
 import (
-	"github.com/go-envx/envx/app/internal/config"
+	"github.com/go-envx/envx/app/internal/core"
 	engine "github.com/go-envx/envx/app/internal/features/pack"
 )
 
@@ -21,9 +21,9 @@ type actionParams struct {
 // the engine's Workspace, and copy the environment-scoped file set into the
 // output directory. It resolves and decrypts nothing; the engine only selects
 // and copies files.
-func execute(p actionParams, in *config.Input) (engine.Result, error) {
+func execute(p actionParams, in *core.Input) (engine.Result, error) {
 	// Resolve the manifest into the file-level layout the bundle is built from.
-	layout, err := config.ResolveWorkspaceLayout(in)
+	layout, err := core.ResolveWorkspaceLayout(in)
 	if err != nil {
 		return engine.Result{}, err
 	}

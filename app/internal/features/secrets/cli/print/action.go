@@ -3,7 +3,7 @@ package print
 import (
 	"fmt"
 
-	"github.com/go-envx/envx/app/internal/config"
+	"github.com/go-envx/envx/app/internal/core"
 	"github.com/go-envx/envx/app/internal/resources/cipher"
 )
 
@@ -15,7 +15,7 @@ type actionResult struct {
 
 // execute generates a keypair through the selected cipher without opening or
 // mutating the workspace store or private-key file.
-func execute(in *config.Input, cipherName string) (actionResult, error) {
+func execute(in *core.Input, cipherName string) (actionResult, error) {
 	selectedCipher, err := resolveCipher(in, cipherName)
 	if err != nil {
 		return actionResult{}, err
@@ -29,9 +29,9 @@ func execute(in *config.Input, cipherName string) (actionResult, error) {
 
 // resolveCipher prefers the explicit command flag, then uses workspace
 // configuration and finally the application's default through config.
-func resolveCipher(in *config.Input, cipherName string) (cipher.Cipher, error) {
+func resolveCipher(in *core.Input, cipherName string) (cipher.Cipher, error) {
 	if cipherName == "" {
-		return config.NewConfiguredCipher(in)
+		return core.NewConfiguredCipher(in)
 	}
 	selectedCipher, err := cipher.New(cipher.Params{
 		Algorithm: cipher.Algorithm(cipherName),

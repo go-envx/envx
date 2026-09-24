@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/go-envx/envx/app/internal/config"
+	"github.com/go-envx/envx/app/internal/core"
 	"github.com/go-envx/envx/app/internal/features/secrets"
 	"github.com/go-envx/envx/app/internal/utils/file"
 )
@@ -26,14 +26,14 @@ func writeManifest(t *testing.T) string {
 // seedSecret generates a group keypair and stores one encrypted secret so
 // decrypt has something to decrypt. It returns the store path.
 func seedSecret(
-	t *testing.T, input *config.Input, group, key, plaintext string,
+	t *testing.T, input *core.Input, group, key, plaintext string,
 ) string {
 	t.Helper()
-	resolved, err := config.ResolveWorkspace(input)
+	resolved, err := core.ResolveWorkspace(input)
 	if err != nil {
 		t.Fatalf("ResolveWorkspace(): %v", err)
 	}
-	manager, err := config.NewSecretsManager(resolved.Secrets, resolved.Cipher)
+	manager, err := core.NewSecretsManager(resolved.Secrets, resolved.Cipher)
 	if err != nil {
 		t.Fatalf("NewSecretsManager(): %v", err)
 	}
@@ -54,7 +54,7 @@ func TestExecuteDecryptsCiphertext(t *testing.T) {
 	t.Parallel()
 
 	manifest := writeManifest(t)
-	input := &config.Input{ConfigPath: &manifest}
+	input := &core.Input{ConfigPath: &manifest}
 	storePath := seedSecret(t, input, "production", "api_key", "plain-value")
 
 	result, err := execute(actionParams{}, input)
@@ -84,7 +84,7 @@ func TestExecuteSelectorMatchingNothingFails(t *testing.T) {
 	t.Parallel()
 
 	manifest := writeManifest(t)
-	input := &config.Input{ConfigPath: &manifest}
+	input := &core.Input{ConfigPath: &manifest}
 	seedSecret(t, input, "production", "api_key", "plain-value")
 
 	if _, err := execute(actionParams{Group: "missing"}, input); err == nil {
@@ -98,7 +98,7 @@ func TestExecuteSkipsUnavailableKey(t *testing.T) {
 	t.Parallel()
 
 	manifest := writeManifest(t)
-	input := &config.Input{ConfigPath: &manifest}
+	input := &core.Input{ConfigPath: &manifest}
 	storePath := seedSecret(t, input, "production", "api_key", "plain-value")
 
 	// Remove the local private-key file so the group's key is unavailable.

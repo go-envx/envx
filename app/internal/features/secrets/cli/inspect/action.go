@@ -1,7 +1,7 @@
 package inspect
 
 import (
-	"github.com/go-envx/envx/app/internal/config"
+	"github.com/go-envx/envx/app/internal/core"
 	"github.com/go-envx/envx/app/internal/features/secrets"
 )
 
@@ -12,12 +12,12 @@ type actionParams struct {
 }
 
 // execute runs the manager's non-mutating keypair inspection workflow.
-func execute(p actionParams, in *config.Input) (secrets.KeypairMetadata, error) {
-	resolved, err := config.ResolveWorkspace(in)
+func execute(p actionParams, in *core.Input) (secrets.KeypairMetadata, error) {
+	resolved, err := core.ResolveWorkspace(in)
 	if err != nil {
 		return secrets.KeypairMetadata{}, err
 	}
-	secretManager, err := config.NewSecretsManager(
+	secretManager, err := core.NewSecretsManager(
 		resolved.Secrets,
 		resolved.Cipher,
 	)

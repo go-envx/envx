@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/go-envx/envx/app/internal/config"
+	"github.com/go-envx/envx/app/internal/core"
 	"github.com/go-envx/envx/app/internal/features/secrets"
 	"github.com/go-envx/envx/app/internal/utils/file"
 )
@@ -24,13 +24,13 @@ func writeManifest(t *testing.T) string {
 }
 
 // managerFor builds a secrets manager for the resolved workspace of in.
-func managerFor(t *testing.T, in *config.Input) *secrets.Manager {
+func managerFor(t *testing.T, in *core.Input) *secrets.Manager {
 	t.Helper()
-	resolved, err := config.ResolveWorkspace(in)
+	resolved, err := core.ResolveWorkspace(in)
 	if err != nil {
 		t.Fatalf("ResolveWorkspace(): %v", err)
 	}
-	manager, err := config.NewSecretsManager(resolved.Secrets, resolved.Cipher)
+	manager, err := core.NewSecretsManager(resolved.Secrets, resolved.Cipher)
 	if err != nil {
 		t.Fatalf("NewSecretsManager(): %v", err)
 	}
@@ -41,7 +41,7 @@ func managerFor(t *testing.T, in *config.Input) *secrets.Manager {
 // manager and reports safe metadata without private-key bytes.
 func TestExecuteRotatesGroup(t *testing.T) {
 	manifest := writeManifest(t)
-	in := &config.Input{ConfigPath: &manifest}
+	in := &core.Input{ConfigPath: &manifest}
 	manager := managerFor(t, in)
 
 	if _, err := manager.GenerateKeypair("production"); err != nil {
@@ -91,7 +91,7 @@ func TestExecuteFailsForMissingGroup(t *testing.T) {
 
 	_, err := execute(
 		actionParams{Group: "production"},
-		&config.Input{ConfigPath: &manifest},
+		&core.Input{ConfigPath: &manifest},
 	)
 	if err == nil {
 		t.Fatal("execute() succeeded for a missing group")

@@ -4,7 +4,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/go-envx/envx/app/internal/config"
+	"github.com/go-envx/envx/app/internal/core"
 	"github.com/go-envx/envx/app/internal/features/env"
 )
 
@@ -49,9 +49,9 @@ type actionResultEntry struct {
 // execute is the imperative shell: resolve the project configuration and run the
 // non-aborting diagnostic explanation through the constructed manager. Secret
 // status is always computed; plaintext is materialized only under Reveal.
-func execute(p actionParams, in *config.Input) (actionResult, error) {
+func execute(p actionParams, in *core.Input) (actionResult, error) {
 	// resolve the input config
-	resolved, err := config.ResolveProject(in, p.Project)
+	resolved, err := core.ResolveProject(in, p.Project)
 	if err != nil {
 		return actionResult{}, err
 	}

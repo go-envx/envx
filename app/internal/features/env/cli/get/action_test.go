@@ -4,7 +4,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/go-envx/envx/app/internal/config"
+	"github.com/go-envx/envx/app/internal/core"
 	"github.com/go-envx/envx/app/internal/fixtures"
 )
 
@@ -15,7 +15,7 @@ func executeBasic(t *testing.T, key string) (actionResult, error) {
 	path := fixtures.Manifest("basic")
 	return execute(
 		actionParams{Project: "api-core", Key: key},
-		&config.Input{ConfigPath: &path},
+		&core.Input{ConfigPath: &path},
 	)
 }
 
