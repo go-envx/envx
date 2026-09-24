@@ -2,7 +2,8 @@ package print
 
 import (
 	"github.com/go-envx/envx/app/internal/core"
-	"github.com/go-envx/envx/app/internal/flags"
+	"github.com/go-envx/envx/app/internal/features/secrets"
+	"github.com/go-envx/envx/app/internal/utils/cliflags"
 	"github.com/go-envx/envx/app/internal/utils/printer"
 	"github.com/go-envx/envx/app/internal/utils/str"
 	"github.com/spf13/cobra"
@@ -55,7 +56,7 @@ func NewCommand() *cobra.Command {
 		},
 	}
 
-	flags.BindString(cmd.Flags(), &cipherName, &flags.Cipher)
+	cliflags.BindString(cmd.Flags(), &cipherName, &secrets.Cipher)
 
 	return cmd
 }

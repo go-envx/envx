@@ -4,9 +4,10 @@ import (
 	"errors"
 
 	"github.com/go-envx/envx/app/internal/core"
-
+	"github.com/go-envx/envx/app/internal/features/env"
 	engine "github.com/go-envx/envx/app/internal/features/validate"
-	"github.com/go-envx/envx/app/internal/flags"
+	sharedflags "github.com/go-envx/envx/app/internal/shared/flags"
+	"github.com/go-envx/envx/app/internal/utils/cliflags"
 	"github.com/go-envx/envx/app/internal/utils/printer"
 	"github.com/go-envx/envx/app/internal/utils/str"
 	"github.com/spf13/cobra"
@@ -112,17 +113,17 @@ func NewValidateCmd() *cobra.Command {
 		},
 	}
 
-	flags.Register(cmd.Flags(),
-		flags.WithRequireOverlays,
-		flags.WithPrefix,
-		flags.WithSuffix,
-		flags.WithDelimiter,
-		flags.WithOverload,
-		flags.WithReferencePattern,
+	env.RegisterFlags(cmd.Flags(),
+		env.WithRequireOverlays,
+		env.WithPrefix,
+		env.WithSuffix,
+		env.WithDelimiter,
+		env.WithOverload,
+		env.WithReferencePattern,
 	)
 
-	flags.BindString(cmd.Flags(), &output, &flags.Output)
-	flags.BindBool(cmd.Flags(), &strict, &flags.Strict)
+	cliflags.BindString(cmd.Flags(), &output, &sharedflags.Output)
+	cliflags.BindBool(cmd.Flags(), &strict, &Strict)
 
 	registerSelectionFlags(cmd, selections)
 

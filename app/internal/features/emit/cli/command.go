@@ -4,9 +4,9 @@ import (
 	"fmt"
 
 	"github.com/go-envx/envx/app/internal/core"
-
 	engine "github.com/go-envx/envx/app/internal/features/emit"
-	"github.com/go-envx/envx/app/internal/flags"
+	"github.com/go-envx/envx/app/internal/features/env"
+	"github.com/go-envx/envx/app/internal/utils/cliflags"
 	"github.com/go-envx/envx/app/internal/utils/printer"
 	"github.com/go-envx/envx/app/internal/utils/str"
 	"github.com/spf13/cobra"
@@ -79,11 +79,11 @@ func NewEmitCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			nameSet := cmd.Flags().Changed(flags.EmitName.Name)
+			nameSet := cmd.Flags().Changed(Name.Name)
 			if err := validateNameUsage(parsedTarget, nameSet); err != nil {
 				return err
 			}
-			keySet := cmd.Flags().Changed(flags.EmitKey.Name)
+			keySet := cmd.Flags().Changed(Key.Name)
 			if err := validateKeyUsage(parsedTarget, key, keySet); err != nil {
 				return err
 			}
@@ -117,22 +117,22 @@ func NewEmitCmd() *cobra.Command {
 		},
 	}
 
-	flags.Register(cmd.Flags(),
-		flags.WithEnv,
-		flags.WithRequireOverlays,
-		flags.WithPrefix,
-		flags.WithSuffix,
-		flags.WithDelimiter,
-		flags.WithOverload,
-		flags.WithReferencePattern,
+	env.RegisterFlags(cmd.Flags(),
+		env.WithEnv,
+		env.WithRequireOverlays,
+		env.WithPrefix,
+		env.WithSuffix,
+		env.WithDelimiter,
+		env.WithOverload,
+		env.WithReferencePattern,
 	)
 
-	flags.BindString(cmd.Flags(), &target, &flags.EmitTarget)
-	flags.BindString(cmd.Flags(), &name, &flags.EmitName)
-	flags.BindString(cmd.Flags(), &output, &flags.EmitOutput)
-	flags.BindString(cmd.Flags(), &only, &flags.EmitOnly)
-	flags.BindString(cmd.Flags(), &key, &flags.EmitKey)
-	_ = cmd.MarkFlagRequired(flags.EmitTarget.Name)
+	cliflags.BindString(cmd.Flags(), &target, &Target)
+	cliflags.BindString(cmd.Flags(), &name, &Name)
+	cliflags.BindString(cmd.Flags(), &output, &Output)
+	cliflags.BindString(cmd.Flags(), &only, &Only)
+	cliflags.BindString(cmd.Flags(), &key, &Key)
+	_ = cmd.MarkFlagRequired(Target.Name)
 
 	return cmd
 }

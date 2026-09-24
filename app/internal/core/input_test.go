@@ -4,7 +4,9 @@ import (
 	"testing"
 
 	"github.com/go-envx/envx/app/internal/core"
-	"github.com/go-envx/envx/app/internal/flags"
+	"github.com/go-envx/envx/app/internal/features/env"
+	"github.com/go-envx/envx/app/internal/features/workspace"
+	"github.com/go-envx/envx/app/internal/utils/cliflags"
 	"github.com/spf13/pflag"
 )
 
@@ -18,8 +20,8 @@ func TestGetInputUnregisteredStaysNil(t *testing.T) {
 	t.Parallel()
 
 	fs := newFlags()
-	flags.Register(fs, flags.WithRequireOverlays, flags.WithPrefix, flags.WithSuffix)
-	if fs.Lookup(flags.Env.Name) != nil {
+	env.RegisterFlags(fs, env.WithRequireOverlays, env.WithPrefix, env.WithSuffix)
+	if fs.Lookup(env.Env.Name) != nil {
 		t.Fatal("--env should not be registered without WithEnv")
 	}
 	if err := fs.Parse(nil); err != nil {
@@ -37,14 +39,14 @@ func TestGetInputCapturesEveryOption(t *testing.T) {
 	t.Parallel()
 
 	fs := newFlags()
-	flags.Register(fs,
-		flags.WithConfig,
-		flags.WithEnv,
-		flags.WithRequireOverlays,
-		flags.WithPrefix,
-		flags.WithSuffix,
-		flags.WithDelimiter,
-		flags.WithOverload,
+	cliflags.BindString(fs, new(string), &workspace.ConfigFlag)
+	env.RegisterFlags(fs,
+		env.WithEnv,
+		env.WithRequireOverlays,
+		env.WithPrefix,
+		env.WithSuffix,
+		env.WithDelimiter,
+		env.WithOverload,
 	)
 	args := []string{
 		"--config", "envx.yaml", "--env", "prod", "--require-overlays", "--prefix", "P",
@@ -69,7 +71,7 @@ func TestGetInputConfigPath(t *testing.T) {
 
 	t.Run("reads --config", func(t *testing.T) {
 		fs := newFlags()
-		flags.Register(fs, flags.WithConfig)
+		cliflags.BindString(fs, new(string), &workspace.ConfigFlag)
 		if err := fs.Parse([]string{"--config", "envx.yaml"}); err != nil {
 			t.Fatalf("parse: %v", err)
 		}
@@ -80,7 +82,7 @@ func TestGetInputConfigPath(t *testing.T) {
 	})
 	t.Run("nil when unset", func(t *testing.T) {
 		fs := newFlags()
-		flags.Register(fs, flags.WithConfig)
+		cliflags.BindString(fs, new(string), &workspace.ConfigFlag)
 		if err := fs.Parse(nil); err != nil {
 			t.Fatalf("parse: %v", err)
 		}

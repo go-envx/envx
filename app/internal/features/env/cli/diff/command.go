@@ -2,7 +2,9 @@ package diff
 
 import (
 	"github.com/go-envx/envx/app/internal/core"
-	"github.com/go-envx/envx/app/internal/flags"
+	"github.com/go-envx/envx/app/internal/features/env"
+	sharedflags "github.com/go-envx/envx/app/internal/shared/flags"
+	"github.com/go-envx/envx/app/internal/utils/cliflags"
 	"github.com/go-envx/envx/app/internal/utils/printer"
 	"github.com/go-envx/envx/app/internal/utils/str"
 	"github.com/spf13/cobra"
@@ -73,17 +75,17 @@ func NewCommand() *cobra.Command {
 		},
 	}
 
-	flags.Register(cmd.Flags(),
-		flags.WithRequireOverlays,
-		flags.WithPrefix,
-		flags.WithSuffix,
-		flags.WithDelimiter,
-		flags.WithOverload,
-		flags.WithReferencePattern,
+	env.RegisterFlags(cmd.Flags(),
+		env.WithRequireOverlays,
+		env.WithPrefix,
+		env.WithSuffix,
+		env.WithDelimiter,
+		env.WithOverload,
+		env.WithReferencePattern,
 	)
 
-	flags.BindString(cmd.Flags(), &output, &flags.Output)
-	flags.BindBool(cmd.Flags(), &reveal, &flags.Reveal)
+	cliflags.BindString(cmd.Flags(), &output, &sharedflags.Output)
+	cliflags.BindBool(cmd.Flags(), &reveal, &sharedflags.Reveal)
 
 	return cmd
 }

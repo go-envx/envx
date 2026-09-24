@@ -1,7 +1,9 @@
 package core
 
 import (
-	"github.com/go-envx/envx/app/internal/flags"
+	"github.com/go-envx/envx/app/internal/features/env"
+	"github.com/go-envx/envx/app/internal/features/workspace"
+	"github.com/go-envx/envx/app/internal/utils/cliflags"
 	"github.com/spf13/pflag"
 )
 
@@ -11,20 +13,20 @@ import (
 // to nil and falls through to the ENVX_* var and manifest layers.
 func GetInput(fs *pflag.FlagSet) *Input {
 	return &Input{
-		ConfigPath:       optString(fs, &flags.Config),
-		Env:              optString(fs, &flags.Env),
-		RequireOverlays:  optBool(fs, &flags.RequireOverlays),
-		Prefix:           optString(fs, &flags.Prefix),
-		Suffix:           optString(fs, &flags.Suffix),
-		Delimiter:        optString(fs, &flags.Delimiter),
-		Overload:         optBool(fs, &flags.Overload),
-		ReferencePattern: optString(fs, &flags.ReferencePattern),
+		ConfigPath:       optString(fs, &workspace.ConfigFlag),
+		Env:              optString(fs, &env.Env),
+		RequireOverlays:  optBool(fs, &env.RequireOverlays),
+		Prefix:           optString(fs, &env.Prefix),
+		Suffix:           optString(fs, &env.Suffix),
+		Delimiter:        optString(fs, &env.Delimiter),
+		Overload:         optBool(fs, &env.Overload),
+		ReferencePattern: optString(fs, &env.ReferencePattern),
 	}
 }
 
 // optString returns a pointer to the flag's value when the user explicitly set it,
 // and nil otherwise (including when the flag was never registered).
-func optString(fs *pflag.FlagSet, s *flags.FlagSpec) *string {
+func optString(fs *pflag.FlagSet, s *cliflags.FlagSpec) *string {
 	if !fs.Changed(s.Name) {
 		return nil
 	}
@@ -34,7 +36,7 @@ func optString(fs *pflag.FlagSet, s *flags.FlagSpec) *string {
 
 // optBool returns a pointer to the flag's value when the user explicitly set it,
 // and nil otherwise (including when the flag was never registered).
-func optBool(fs *pflag.FlagSet, s *flags.FlagSpec) *bool {
+func optBool(fs *pflag.FlagSet, s *cliflags.FlagSpec) *bool {
 	if !fs.Changed(s.Name) {
 		return nil
 	}

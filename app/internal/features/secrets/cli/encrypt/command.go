@@ -2,7 +2,9 @@ package encrypt
 
 import (
 	"github.com/go-envx/envx/app/internal/core"
-	"github.com/go-envx/envx/app/internal/flags"
+	"github.com/go-envx/envx/app/internal/features/secrets"
+	sharedflags "github.com/go-envx/envx/app/internal/shared/flags"
+	"github.com/go-envx/envx/app/internal/utils/cliflags"
 	"github.com/go-envx/envx/app/internal/utils/printer"
 	"github.com/go-envx/envx/app/internal/utils/str"
 	"github.com/spf13/cobra"
@@ -64,9 +66,9 @@ func NewCommand() *cobra.Command {
 		},
 	}
 
-	flags.BindString(cmd.Flags(), &group, &flags.Group)
-	flags.BindString(cmd.Flags(), &key, &flags.Key)
-	flags.BindBool(cmd.Flags(), &verbose, &flags.Verbose)
+	cliflags.BindString(cmd.Flags(), &group, &secrets.Group)
+	cliflags.BindString(cmd.Flags(), &key, &secrets.Key)
+	cliflags.BindBool(cmd.Flags(), &verbose, &sharedflags.Verbose)
 
 	return cmd
 }
