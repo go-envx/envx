@@ -9,7 +9,7 @@ import (
 
 	"github.com/go-envx/envx/app/internal/core"
 	"github.com/go-envx/envx/app/internal/features/secrets"
-	"github.com/go-envx/envx/app/internal/utils/file"
+	"github.com/go-envx/envx/app/internal/utils/filex"
 )
 
 // writeManifest creates a valid workspace manifest for encrypt action tests.
@@ -41,7 +41,7 @@ func seedPlaintext(t *testing.T, input *core.Input, group, key, value string) st
 	}
 
 	storePath := resolved.Secrets.SecretsPath
-	data, err := file.Read(storePath)
+	data, err := filex.Read(storePath)
 	if err != nil {
 		t.Fatalf("Read(): %v", err)
 	}
@@ -72,7 +72,7 @@ func TestExecuteEncryptsPlaintext(t *testing.T) {
 		t.Fatalf("changed = %+v, want production/api_key", result.Changed)
 	}
 
-	data, err := file.Read(storePath)
+	data, err := filex.Read(storePath)
 	if err != nil {
 		t.Fatalf("Read(): %v", err)
 	}

@@ -4,7 +4,7 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/go-envx/envx/app/internal/utils/file"
+	"github.com/go-envx/envx/app/internal/utils/filex"
 	"github.com/go-envx/envx/app/internal/utils/yamlx"
 	"gopkg.in/yaml.v3"
 )
@@ -100,7 +100,7 @@ func (d *Document) SaveTo(path string, defaultIndent int) error {
 		return fmt.Errorf("encoding secrets %s: %w", path, err)
 	}
 	data = yamlx.PreserveBlankLines(d.source, data)
-	if err := file.WriteAtomicPrivate(path, data); err != nil {
+	if err := filex.WriteAtomicPrivate(path, data); err != nil {
 		return fmt.Errorf("writing secrets %s: %w", path, err)
 	}
 	return nil

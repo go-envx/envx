@@ -10,7 +10,7 @@ import (
 	"github.com/go-envx/envx/app/internal/features/secrets"
 	"github.com/go-envx/envx/app/internal/features/workspace"
 	"github.com/go-envx/envx/app/internal/resources/cipher"
-	"github.com/go-envx/envx/app/internal/utils/file"
+	"github.com/go-envx/envx/app/internal/utils/filex"
 )
 
 const (
@@ -335,7 +335,7 @@ func resolveSecretsParams(mc manifestContext) secrets.Params {
 	if secretsPath == "" {
 		secretsPath = defaultSecretsFilename
 	}
-	resolvedSecretsPath := file.ResolvePath(mc.dir, secretsPath)
+	resolvedSecretsPath := filex.ResolvePath(mc.dir, secretsPath)
 
 	// Look up the private-key path in the manifest; default beside the resolved
 	// secrets store and resolve explicit relative paths beside the manifest.
@@ -343,7 +343,7 @@ func resolveSecretsParams(mc manifestContext) secrets.Params {
 	if keysPath == "" {
 		keysPath = filepath.Join(filepath.Dir(resolvedSecretsPath), defaultKeysFilename)
 	} else {
-		keysPath = file.ResolvePath(mc.dir, keysPath)
+		keysPath = filex.ResolvePath(mc.dir, keysPath)
 	}
 
 	// Resolve the secrets default indent from the manifest's own detected

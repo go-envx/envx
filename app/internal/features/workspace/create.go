@@ -9,7 +9,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/go-envx/envx/app/internal/utils/file"
+	"github.com/go-envx/envx/app/internal/utils/filex"
 )
 
 // templatesFS embeds the create templates. Each subdirectory of templates/ is one
@@ -94,7 +94,7 @@ func (h *CreateWorkspaceHandler) Execute(
 				err,
 			)
 		}
-		if err := file.WriteAtomic(dest, data); err != nil {
+		if err := filex.WriteAtomic(dest, data); err != nil {
 			return CreateWorkspaceResult{}, err
 		}
 		written = append(written, dest)

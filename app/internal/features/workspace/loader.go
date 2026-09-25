@@ -9,7 +9,7 @@ import (
 
 	"gopkg.in/yaml.v3"
 
-	"github.com/go-envx/envx/app/internal/utils/file"
+	"github.com/go-envx/envx/app/internal/utils/filex"
 	"github.com/go-envx/envx/app/internal/utils/yamlx"
 )
 
@@ -59,7 +59,7 @@ func NewLoader(params ManifestLoaderParams) (*ManifestLoader, error) {
 // workspace.
 func (m *ManifestLoader) Exists() (bool, error) {
 	if _, err := m.discover(); err != nil {
-		if errors.Is(err, file.ErrNotFound) || errors.Is(err, os.ErrNotExist) {
+		if errors.Is(err, filex.ErrNotFound) || errors.Is(err, os.ErrNotExist) {
 			return false, nil
 		}
 		return false, err
@@ -81,7 +81,7 @@ func (m *ManifestLoader) Load() (*ManifestDoc, error) {
 		return nil, err
 	}
 
-	data, err := file.Read(path)
+	data, err := filex.Read(path)
 	if err != nil {
 		return nil, fmt.Errorf("reading manifest: %w", err)
 	}
@@ -136,7 +136,7 @@ func (m *ManifestLoader) parse(data []byte) (*ManifestDoc, error) {
 //     or the search reaches the git repository root or filesystem root.
 func (m *ManifestLoader) discover() (string, error) {
 	if m.params.Path != "" {
-		abs, err := file.AbsExisting(m.params.Path)
+		abs, err := filex.AbsExisting(m.params.Path)
 		if err != nil {
 			return "", fmt.Errorf("manifest not found at %q: %w", m.params.Path, err)
 		}
@@ -146,7 +146,7 @@ func (m *ManifestLoader) discover() (string, error) {
 			return "", fmt.Errorf("manifest not found at %q: %w", m.params.Path, err)
 		}
 		if info.IsDir() {
-			manifestPath, err := file.AbsExisting(filepath.Join(abs, m.params.Filename))
+			manifestPath, err := filex.AbsExisting(filepath.Join(abs, m.params.Filename))
 			if err != nil {
 				return "", fmt.Errorf(
 					"%s not found in directory %q: %w",
@@ -163,8 +163,8 @@ func (m *ManifestLoader) discover() (string, error) {
 		return "", fmt.Errorf("manifest discovery: %w", err)
 	}
 
-	found, err := file.FindUp(cwd, m.params.Filename, ".git")
-	if errors.Is(err, file.ErrNotFound) {
+	found, err := filex.FindUp(cwd, m.params.Filename, ".git")
+	if errors.Is(err, filex.ErrNotFound) {
 		return "", fmt.Errorf(
 			"%s not found (searched from cwd to git/filesystem root): %w",
 			m.params.Filename,

@@ -12,7 +12,7 @@ import (
 	"github.com/go-envx/envx/app/internal/features/privatekey"
 	"github.com/go-envx/envx/app/internal/features/secrets/internal/envelope"
 	"github.com/go-envx/envx/app/internal/features/secrets/internal/store"
-	"github.com/go-envx/envx/app/internal/utils/file"
+	"github.com/go-envx/envx/app/internal/utils/filex"
 )
 
 // GenerateKeypair creates a missing group identity and commits its public key
@@ -325,7 +325,7 @@ func (m *Manager) prepareRotationRollback() (string, error) {
 		return "", err
 	}
 
-	data, err := file.Read(m.params.KeysPath)
+	data, err := filex.Read(m.params.KeysPath)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
 			return "", nil
@@ -337,7 +337,7 @@ func (m *Manager) prepareRotationRollback() (string, error) {
 	if err := ensureGitIgnored(backupPath); err != nil {
 		return "", err
 	}
-	if err := file.WriteAtomicPrivate(backupPath, data); err != nil {
+	if err := filex.WriteAtomicPrivate(backupPath, data); err != nil {
 		return "", fmt.Errorf(
 			"preserving previous private key at %s: %w", backupPath, err,
 		)
@@ -403,7 +403,7 @@ func ensureGitIgnored(keysPath string) error {
 
 	// Read the local ignore file before adding a rule.
 	ignorePath := filepath.Join(dir, ".gitignore")
-	data, err := file.Read(ignorePath)
+	data, err := filex.Read(ignorePath)
 	if err != nil && !errors.Is(err, os.ErrNotExist) {
 		return fmt.Errorf("reading %s: %w", ignorePath, err)
 	}
@@ -417,7 +417,7 @@ func ensureGitIgnored(keysPath string) error {
 		content += "\n"
 	}
 	content += filepath.Base(keysPath) + "\n"
-	if err := file.WriteAtomic(ignorePath, []byte(content)); err != nil {
+	if err := filex.WriteAtomic(ignorePath, []byte(content)); err != nil {
 		return fmt.Errorf("protecting private-key file with %s: %w", ignorePath, err)
 	}
 	return nil

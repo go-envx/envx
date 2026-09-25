@@ -7,7 +7,7 @@ import (
 	"testing"
 
 	"github.com/go-envx/envx/app/internal/core"
-	"github.com/go-envx/envx/app/internal/utils/file"
+	"github.com/go-envx/envx/app/internal/utils/filex"
 )
 
 // writeManifest creates the smallest valid workspace for management commands.
@@ -40,7 +40,7 @@ func TestExecuteAndRender(t *testing.T) {
 		t.Errorf("PrivateKeyStatus = %q, want valid", result.Metadata.PrivateKeyStatus)
 	}
 
-	privateData, err := file.Read(result.KeysPath)
+	privateData, err := filex.Read(result.KeysPath)
 	if err != nil {
 		t.Fatalf("read private-key file: %v", err)
 	}
@@ -72,7 +72,7 @@ func TestExecuteUsesConfiguredCipher(t *testing.T) {
 	if !strings.HasPrefix(result.Metadata.PublicKey, "nacl-box-public-key:") {
 		t.Errorf("public key = %q, want NaCl Box key", result.Metadata.PublicKey)
 	}
-	privateData, err := file.Read(result.KeysPath)
+	privateData, err := filex.Read(result.KeysPath)
 	if err != nil {
 		t.Fatalf("read private-key file: %v", err)
 	}

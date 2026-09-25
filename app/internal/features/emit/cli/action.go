@@ -12,7 +12,7 @@ import (
 	"github.com/go-envx/envx/app/internal/core"
 	engine "github.com/go-envx/envx/app/internal/features/emit"
 	"github.com/go-envx/envx/app/internal/features/env"
-	"github.com/go-envx/envx/app/internal/utils/file"
+	"github.com/go-envx/envx/app/internal/utils/filex"
 	"github.com/go-envx/envx/app/internal/utils/printer"
 )
 
@@ -118,7 +118,7 @@ func execute(
 
 	// The render may carry plaintext secrets, so persist it with private
 	// permissions rather than the world-readable default.
-	if err := file.WriteAtomicPrivate(p.OutputPath, buffer.Bytes()); err != nil {
+	if err := filex.WriteAtomicPrivate(p.OutputPath, buffer.Bytes()); err != nil {
 		return err
 	}
 	// Confirm where the file landed as normal output — the summary, then (for a

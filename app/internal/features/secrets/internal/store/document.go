@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/go-envx/envx/app/internal/utils/file"
+	"github.com/go-envx/envx/app/internal/utils/filex"
 	"github.com/go-envx/envx/app/internal/utils/yamlx"
 	"gopkg.in/yaml.v3"
 )
@@ -34,7 +34,7 @@ type Document struct {
 // Open reads a secrets document and binds it to path. A missing file produces
 // an empty document; malformed YAML or an invalid known document field fails.
 func Open(path string) (*Document, error) {
-	data, err := file.Read(path)
+	data, err := filex.Read(path)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
 			return newEmptyDocument(path), nil
@@ -76,7 +76,7 @@ func (d *Document) Save(defaultIndent int) error {
 		return fmt.Errorf("encoding secrets %s: %w", d.path, err)
 	}
 	data = yamlx.PreserveBlankLines(d.source, data)
-	if err := file.WriteAtomic(d.path, data); err != nil {
+	if err := filex.WriteAtomic(d.path, data); err != nil {
 		return fmt.Errorf("writing secrets %s: %w", d.path, err)
 	}
 	return nil

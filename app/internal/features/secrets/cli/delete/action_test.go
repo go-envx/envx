@@ -7,7 +7,7 @@ import (
 	"testing"
 
 	"github.com/go-envx/envx/app/internal/core"
-	"github.com/go-envx/envx/app/internal/utils/file"
+	"github.com/go-envx/envx/app/internal/utils/filex"
 )
 
 // writeManifest creates a valid workspace manifest for delete action tests.
@@ -79,7 +79,7 @@ func TestExecuteRemovesStoredSecret(t *testing.T) {
 		t.Error("execute() left the removed secret in the store")
 	}
 
-	data, err := file.Read(resolved.Secrets.SecretsPath)
+	data, err := filex.Read(resolved.Secrets.SecretsPath)
 	if err != nil {
 		t.Fatalf("Read(): %v", err)
 	}

@@ -8,7 +8,7 @@ import (
 
 	"github.com/go-envx/envx/app/internal/core"
 	"github.com/go-envx/envx/app/internal/features/secrets"
-	"github.com/go-envx/envx/app/internal/utils/file"
+	"github.com/go-envx/envx/app/internal/utils/filex"
 )
 
 // writeManifest creates a valid workspace manifest for decrypt action tests.
@@ -66,7 +66,7 @@ func TestExecuteDecryptsCiphertext(t *testing.T) {
 		t.Fatalf("changed = %+v, want production/api_key", result.Changed)
 	}
 
-	data, err := file.Read(storePath)
+	data, err := filex.Read(storePath)
 	if err != nil {
 		t.Fatalf("Read(): %v", err)
 	}
@@ -118,7 +118,7 @@ func TestExecuteSkipsUnavailableKey(t *testing.T) {
 		t.Errorf("unavailable = %v, want [production]", result.Unavailable)
 	}
 
-	data, err := file.Read(storePath)
+	data, err := filex.Read(storePath)
 	if err != nil {
 		t.Fatalf("Read(): %v", err)
 	}

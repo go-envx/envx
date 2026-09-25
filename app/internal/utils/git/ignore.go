@@ -9,7 +9,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	filex "github.com/go-envx/envx/app/internal/utils/file"
+	"github.com/go-envx/envx/app/internal/utils/filex"
 )
 
 // EnsureIgnored verifies targetPath is ignored by Git or adds a local .gitignore

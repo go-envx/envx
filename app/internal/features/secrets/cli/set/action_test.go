@@ -8,7 +8,7 @@ import (
 	"testing"
 
 	"github.com/go-envx/envx/app/internal/core"
-	"github.com/go-envx/envx/app/internal/utils/file"
+	"github.com/go-envx/envx/app/internal/utils/filex"
 )
 
 // writeManifest creates a valid workspace manifest for set action tests.
@@ -58,7 +58,7 @@ func TestExecuteEncryptsAndStoresSafeMetadata(t *testing.T) {
 		t.Errorf("result = %+v", result)
 	}
 
-	data, err := file.Read(resolved.Secrets.SecretsPath)
+	data, err := filex.Read(resolved.Secrets.SecretsPath)
 	if err != nil {
 		t.Fatalf("Read(): %v", err)
 	}
@@ -122,7 +122,7 @@ func TestExecuteRejectsUnconfirmedTerminalInputWithoutMutation(t *testing.T) {
 	if _, err := manager.GenerateKeypair("production"); err != nil {
 		t.Fatalf("GenerateKeypair(): %v", err)
 	}
-	before, err := file.Read(resolved.Secrets.SecretsPath)
+	before, err := filex.Read(resolved.Secrets.SecretsPath)
 	if err != nil {
 		t.Fatalf("Read() before execute: %v", err)
 	}
@@ -153,7 +153,7 @@ func TestExecuteRejectsUnconfirmedTerminalInputWithoutMutation(t *testing.T) {
 	if err == nil || err.Error() != "secret was not confirmed" {
 		t.Fatalf("execute() error = %v, want mismatch error", err)
 	}
-	after, err := file.Read(resolved.Secrets.SecretsPath)
+	after, err := filex.Read(resolved.Secrets.SecretsPath)
 	if err != nil {
 		t.Fatalf("Read() after execute: %v", err)
 	}
