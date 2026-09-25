@@ -8,6 +8,12 @@ import (
 	"github.com/go-envx/envx/app/internal/resources/cipher"
 )
 
+// PrivateKeyService defines the contract secrets consumes from the private key domain.
+type PrivateKeyService interface {
+	Resolve(group string) (privatekey.PrivateKey, error)
+	Set(group, privateKey string) error
+}
+
 // Params supplies paths and dependencies for a Manager.
 type Params struct {
 	// SecretsPath is the absolute path of the secrets store.
@@ -19,10 +25,8 @@ type Params struct {
 	DefaultIndent int
 	// Cipher performs key generation and keypair validation.
 	Cipher cipher.Cipher
-	// PrivateKeyResolver resolves private-key material for read operations.
-	PrivateKeyResolver privatekey.Resolver
-	// PrivateKeyDestination receives newly generated private-key material.
-	PrivateKeyDestination privatekey.Destination
+	// PrivateKeyService resolves and persists private-key material.
+	PrivateKeyService PrivateKeyService
 }
 
 // Manager coordinates secret workflows over the store and key-material ports.
@@ -49,14 +53,9 @@ func New(params Params) (*Manager, error) {
 		return nil, errors.New("cipher is nil")
 	}
 
-	// Require the private-key resolver from the composition layer.
-	if params.PrivateKeyResolver == nil {
-		return nil, errors.New("private-key resolver is nil")
-	}
-
-	// Require the private-key destination from the composition layer.
-	if params.PrivateKeyDestination == nil {
-		return nil, errors.New("private-key destination is nil")
+	// Require the private-key service from the composition layer.
+	if params.PrivateKeyService == nil {
+		return nil, errors.New("private-key service is nil")
 	}
 
 	// Require a valid default indentation from the configuration layer.

@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/go-envx/envx/app/internal/features/privatekey"
 	"github.com/go-envx/envx/app/internal/features/secrets/internal/envelope"
 	"github.com/go-envx/envx/app/internal/features/secrets/internal/store"
 	"github.com/go-envx/envx/app/internal/resources/cipher"
@@ -30,7 +29,7 @@ type Resolver struct {
 	// cipher decrypts revealed ciphertext with the group's private key.
 	cipher cipher.Cipher
 	// privateKeys resolves a group's private key on demand.
-	privateKeys privatekey.Resolver
+	privateKeys PrivateKeyService
 	// resolvedKeys caches each group's private key so it is resolved only once.
 	resolvedKeys map[string]string
 }
@@ -59,7 +58,7 @@ func (m *Manager) Resolver(params ResolverParams) (*Resolver, error) {
 		values:       values,
 		reveal:       params.Reveal,
 		cipher:       m.params.Cipher,
-		privateKeys:  m.params.PrivateKeyResolver,
+		privateKeys:  m.params.PrivateKeyService,
 		resolvedKeys: make(map[string]string),
 	}, nil
 }

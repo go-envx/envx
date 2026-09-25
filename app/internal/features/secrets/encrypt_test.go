@@ -6,7 +6,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/go-envx/envx/app/internal/features/privatekey"
 	"github.com/go-envx/envx/app/internal/features/secrets/internal/envelope"
 	"github.com/go-envx/envx/app/internal/features/secrets/internal/store"
 )
@@ -14,18 +13,17 @@ import (
 // newBulkManager builds a manager over the given store body using the age cipher
 // and the provided private-key resolver.
 func newBulkManager(
-	t *testing.T, body string, resolver privatekey.Resolver,
+	t *testing.T, body string, resolver PrivateKeyService,
 ) (manager *Manager, storePath string) {
 	t.Helper()
 	storePath = writeStore(t, body)
 	var err error
 	manager, err = New(Params{
-		SecretsPath:           storePath,
-		KeysPath:              filepath.Join(filepath.Dir(storePath), "envx.keys"),
-		DefaultIndent:         2,
-		Cipher:                newTestCipher(t),
-		PrivateKeyResolver:    resolver,
-		PrivateKeyDestination: newPrivateKeyTestDestination(),
+		SecretsPath:       storePath,
+		KeysPath:          filepath.Join(filepath.Dir(storePath), "envx.keys"),
+		DefaultIndent:     2,
+		Cipher:            newTestCipher(t),
+		PrivateKeyService: resolver,
 	})
 	if err != nil {
 		t.Fatalf("New(): %v", err)
@@ -397,12 +395,11 @@ func TestDecryptResolvesKeysLazilyByGroup(t *testing.T) {
 		prod.PublicKey, shared.PublicKey,
 	))
 	manager, err := New(Params{
-		SecretsPath:           storePath,
-		KeysPath:              filepath.Join(filepath.Dir(storePath), "envx.keys"),
-		DefaultIndent:         2,
-		Cipher:                selected,
-		PrivateKeyResolver:    resolver,
-		PrivateKeyDestination: newPrivateKeyTestDestination(),
+		SecretsPath:       storePath,
+		KeysPath:          filepath.Join(filepath.Dir(storePath), "envx.keys"),
+		DefaultIndent:     2,
+		Cipher:            selected,
+		PrivateKeyService: resolver,
 	})
 	if err != nil {
 		t.Fatalf("New(): %v", err)
@@ -444,7 +441,7 @@ func TestDecryptResolvesKeysLazilyByGroup(t *testing.T) {
 func TestDecryptSkipsUnavailableKey(t *testing.T) {
 	t.Parallel()
 
-	manager := newGetManager(t, newPrivateKeyTestResolver())
+	manager := newGetManager(t, newPrivateKeyTestService())
 	if err := manager.Set("production", "api_key", func() (string, error) {
 		return "plain-api", nil
 	}); err != nil {
@@ -496,12 +493,11 @@ func TestDecryptPartiallyDecryptsAvailableGroups(t *testing.T) {
 		prod.PublicKey, shared.PublicKey,
 	))
 	manager, err := New(Params{
-		SecretsPath:           storePath,
-		KeysPath:              filepath.Join(filepath.Dir(storePath), "envx.keys"),
-		DefaultIndent:         2,
-		Cipher:                selected,
-		PrivateKeyResolver:    resolver,
-		PrivateKeyDestination: newPrivateKeyTestDestination(),
+		SecretsPath:       storePath,
+		KeysPath:          filepath.Join(filepath.Dir(storePath), "envx.keys"),
+		DefaultIndent:     2,
+		Cipher:            selected,
+		PrivateKeyService: resolver,
 	})
 	if err != nil {
 		t.Fatalf("New(): %v", err)

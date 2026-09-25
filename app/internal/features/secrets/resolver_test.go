@@ -41,12 +41,15 @@ func (r *recordingResolver) Resolve(group string) (privatekey.PrivateKey, error)
 	return privatekey.PrivateKey{Value: value, Origin: "test"}, nil
 }
 
+// Set accepts private-key material without storing it.
+func (r *recordingResolver) Set(string, string) error { return nil }
+
 // TestManagerResolverMasksByDefault verifies the default resolver masks
 // references without loading any private key, even when none is available.
 func TestManagerResolverMasksByDefault(t *testing.T) {
 	t.Parallel()
 
-	manager := newGetManager(t, newPrivateKeyTestResolver())
+	manager := newGetManager(t, newPrivateKeyTestService())
 	if err := manager.Set("production", "database_password", func() (string, error) {
 		return "database-password", nil
 	}); err != nil {
@@ -141,12 +144,11 @@ func TestManagerResolverRevealsLazilyByGroup(t *testing.T) {
 			"\n  shared: "+sharedPair.PublicKey+"\n",
 	)
 	manager, err := New(Params{
-		SecretsPath:           storePath,
-		KeysPath:              filepath.Join(filepath.Dir(storePath), "envx.keys"),
-		DefaultIndent:         2,
-		Cipher:                selected,
-		PrivateKeyResolver:    resolver,
-		PrivateKeyDestination: newPrivateKeyTestDestination(),
+		SecretsPath:       storePath,
+		KeysPath:          filepath.Join(filepath.Dir(storePath), "envx.keys"),
+		DefaultIndent:     2,
+		Cipher:            selected,
+		PrivateKeyService: resolver,
 	})
 	if err != nil {
 		t.Fatalf("New(): %v", err)
@@ -197,12 +199,11 @@ func TestManagerResolverMissingFileIsEmpty(t *testing.T) {
 	t.Parallel()
 
 	manager, err := New(Params{
-		SecretsPath:           filepath.Join(t.TempDir(), "nope.yaml"),
-		KeysPath:              filepath.Join(t.TempDir(), "envx.keys"),
-		DefaultIndent:         2,
-		Cipher:                newTestCipher(t),
-		PrivateKeyResolver:    newPrivateKeyTestResolver(),
-		PrivateKeyDestination: newPrivateKeyTestDestination(),
+		SecretsPath:       filepath.Join(t.TempDir(), "nope.yaml"),
+		KeysPath:          filepath.Join(t.TempDir(), "envx.keys"),
+		DefaultIndent:     2,
+		Cipher:            newTestCipher(t),
+		PrivateKeyService: newPrivateKeyTestService(),
 	})
 	if err != nil {
 		t.Fatalf("New() absent: %v", err)
@@ -222,12 +223,11 @@ func TestManagerResolverMalformed(t *testing.T) {
 
 	storePath := writeStore(t, "{")
 	manager, err := New(Params{
-		SecretsPath:           storePath,
-		KeysPath:              filepath.Join(filepath.Dir(storePath), "envx.keys"),
-		DefaultIndent:         2,
-		Cipher:                newTestCipher(t),
-		PrivateKeyResolver:    newPrivateKeyTestResolver(),
-		PrivateKeyDestination: newPrivateKeyTestDestination(),
+		SecretsPath:       storePath,
+		KeysPath:          filepath.Join(filepath.Dir(storePath), "envx.keys"),
+		DefaultIndent:     2,
+		Cipher:            newTestCipher(t),
+		PrivateKeyService: newPrivateKeyTestService(),
 	})
 	if err != nil {
 		t.Fatalf("New(): %v", err)
@@ -287,12 +287,11 @@ func TestResolveMaskGroupCaseInsensitive(t *testing.T) {
 
 	path := writeStore(t, "secrets:\n  Production:\n    token: value\n")
 	manager, err := New(Params{
-		SecretsPath:           path,
-		KeysPath:              filepath.Join(filepath.Dir(path), "envx.keys"),
-		DefaultIndent:         2,
-		Cipher:                newTestCipher(t),
-		PrivateKeyResolver:    newPrivateKeyTestResolver(),
-		PrivateKeyDestination: newPrivateKeyTestDestination(),
+		SecretsPath:       path,
+		KeysPath:          filepath.Join(filepath.Dir(path), "envx.keys"),
+		DefaultIndent:     2,
+		Cipher:            newTestCipher(t),
+		PrivateKeyService: newPrivateKeyTestService(),
 	})
 	if err != nil {
 		t.Fatalf("New() error = %v", err)

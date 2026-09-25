@@ -56,19 +56,8 @@ func (m *Manager) GenerateKeypair(group string) (KeypairMetadata, error) {
 		return KeypairMetadata{}, err
 	}
 
-	// Protect file-based destinations before writing private-key material.
-	if m.params.PrivateKeyDestination == nil {
-		return KeypairMetadata{}, errors.New("private-key destination is nil")
-	}
-	if keysPath, isFile := privatekey.FilePath(
-		m.params.PrivateKeyDestination,
-	); isFile {
-		if err := ensureGitIgnored(keysPath); err != nil {
-			return KeypairMetadata{}, err
-		}
-	}
 	// Deliver the private key before committing its matching public key.
-	if err := m.params.PrivateKeyDestination.Write(group, pair.PrivateKey); err != nil {
+	if err := m.params.PrivateKeyService.Set(group, pair.PrivateKey); err != nil {
 		return KeypairMetadata{}, fmt.Errorf(
 			"writing private key for group %q: %w", group, err,
 		)
@@ -115,12 +104,12 @@ func (m *Manager) InspectKeypair(group string) (KeypairMetadata, error) {
 		PublicKey:        publicKey,
 		PrivateKeyStatus: PrivateKeyNotAvailable,
 	}
-	if m.params.PrivateKeyResolver == nil {
+	if m.params.PrivateKeyService == nil {
 		return metadata, nil
 	}
 
 	// Resolve and validate the private key without exposing its contents.
-	privateKey, err := m.params.PrivateKeyResolver.Resolve(group)
+	privateKey, err := m.params.PrivateKeyService.Resolve(group)
 	if err != nil {
 		if errors.Is(err, privatekey.ErrNotAvailable) {
 			return metadata, nil
@@ -212,7 +201,7 @@ func (m *Manager) RotateKeypair(group string) (UpdateResult, error) {
 	}
 
 	// Deliver the new private key before committing the new public state.
-	if err := m.params.PrivateKeyDestination.Write(group, pair.PrivateKey); err != nil {
+	if err := m.params.PrivateKeyService.Set(group, pair.PrivateKey); err != nil {
 		return UpdateResult{}, fmt.Errorf(
 			"writing private key for group %q: %w", group, err,
 		)
@@ -239,7 +228,7 @@ func (m *Manager) RotateKeypair(group string) (UpdateResult, error) {
 // resolveRotationKey resolves the group's current private key, translating an
 // unavailable key into a concise rotation failure.
 func (m *Manager) resolveRotationKey(group string) (privatekey.PrivateKey, error) {
-	oldKey, err := m.params.PrivateKeyResolver.Resolve(group)
+	oldKey, err := m.params.PrivateKeyService.Resolve(group)
 	if err != nil {
 		if errors.Is(err, privatekey.ErrNotAvailable) {
 			return privatekey.PrivateKey{}, fmt.Errorf(
@@ -260,15 +249,15 @@ func (m *Manager) resolveRotationKey(group string) (privatekey.PrivateKey, error
 func (m *Manager) checkRotationDestination(
 	group string, oldKey privatekey.PrivateKey,
 ) error {
-	keysPath, isFile := privatekey.FilePath(m.params.PrivateKeyDestination)
-	if !isFile || oldKey.Origin == keysPath {
+	if oldKey.Origin == "store" || oldKey.Origin == m.params.KeysPath ||
+		oldKey.Origin == "" {
 		return nil
 	}
 	return fmt.Errorf(
 		"cannot rotate group %q into the local key file %s: its current private key "+
 			"came from %s, which has higher lookup priority and would shadow the new "+
 			"key; rotate with an explicit private-key destination instead",
-		group, keysPath, oldKey.Origin,
+		group, m.params.KeysPath, oldKey.Origin,
 	)
 }
 
@@ -329,23 +318,22 @@ func (m *Manager) reencryptGroup(
 // survives a failed store commit. It returns the backup path, or an empty path
 // when the destination keeps no local file to preserve.
 func (m *Manager) prepareRotationRollback() (string, error) {
-	keysPath, isFile := privatekey.FilePath(m.params.PrivateKeyDestination)
-	if !isFile {
+	if m.params.KeysPath == "" {
 		return "", nil
 	}
-	if err := ensureGitIgnored(keysPath); err != nil {
+	if err := ensureGitIgnored(m.params.KeysPath); err != nil {
 		return "", err
 	}
 
-	data, err := file.Read(keysPath)
+	data, err := file.Read(m.params.KeysPath)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
 			return "", nil
 		}
-		return "", fmt.Errorf("reading private keys %s: %w", keysPath, err)
+		return "", fmt.Errorf("reading private keys %s: %w", m.params.KeysPath, err)
 	}
 
-	backupPath := keysPath + backupSuffix
+	backupPath := m.params.KeysPath + backupSuffix
 	if err := ensureGitIgnored(backupPath); err != nil {
 		return "", err
 	}

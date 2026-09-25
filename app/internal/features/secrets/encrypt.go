@@ -86,7 +86,7 @@ func (m *Manager) Decrypt(group, key string) (UpdateResult, error) {
 
 	// Decrypt every matching ciphertext value into staged changes first, so a
 	// failure partway through never writes a partially decrypted store.
-	keys := newPrivateKeyCache(m.params.PrivateKeyResolver)
+	keys := newPrivateKeyCache(m.params.PrivateKeyService)
 	var changes []store.Secret
 	var references []SecretReference
 	var unavailable []string
@@ -195,7 +195,7 @@ func (m *Manager) decryptStoredValue(
 // unavailable key (a reportable condition) from a hard resolution error.
 type privateKeyCache struct {
 	// resolver supplies a group's private-key material.
-	resolver privatekey.Resolver
+	resolver PrivateKeyService
 	// keys caches resolved private keys by group.
 	keys map[string]string
 	// missing records groups already known to have no available key.
@@ -203,7 +203,7 @@ type privateKeyCache struct {
 }
 
 // newPrivateKeyCache creates an empty per-group private-key cache.
-func newPrivateKeyCache(resolver privatekey.Resolver) *privateKeyCache {
+func newPrivateKeyCache(resolver PrivateKeyService) *privateKeyCache {
 	return &privateKeyCache{
 		resolver: resolver,
 		keys:     make(map[string]string),

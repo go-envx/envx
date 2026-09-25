@@ -1,16 +1,16 @@
-package privatekey
+package filestore
 
 import "testing"
 
-// TestParseKeyFileValid verifies comments, blank lines, CRLF endings, and
+// TestParseDocumentValid verifies comments, blank lines, CRLF endings, and
 // case-insensitive lookup across a well-formed key file.
-func TestParseKeyFileValid(t *testing.T) {
+func TestParseDocumentValid(t *testing.T) {
 	t.Parallel()
 
 	content := "# comment\r\n\nPRODUCTION=prod-value\r\nSHARED=shared-value\n"
-	parsed, err := parseKeyFile(content, "envx.keys")
+	parsed, err := parseDocument(content, "envx.keys")
 	if err != nil {
-		t.Fatalf("parseKeyFile(): %v", err)
+		t.Fatalf("parseDocument(): %v", err)
 	}
 	tests := []struct {
 		group string
@@ -33,9 +33,9 @@ func TestParseKeyFileValid(t *testing.T) {
 	}
 }
 
-// TestParseKeyFileRejectsMalformed verifies the parser fails closed on malformed,
+// TestParseDocumentRejectsMalformed verifies the parser fails closed on malformed,
 // empty, and duplicate entries instead of silently skipping them.
-func TestParseKeyFileRejectsMalformed(t *testing.T) {
+func TestParseDocumentRejectsMalformed(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
@@ -52,22 +52,22 @@ func TestParseKeyFileRejectsMalformed(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			if _, err := parseKeyFile(tt.content, "envx.keys"); err == nil {
-				t.Fatalf("parseKeyFile(%q) accepted malformed input", tt.content)
+			if _, err := parseDocument(tt.content, "envx.keys"); err == nil {
+				t.Fatalf("parseDocument(%q) accepted malformed input", tt.content)
 			}
 		})
 	}
 }
 
-// TestKeyFileUpsertUpdatesInPlace verifies updating an existing group preserves
+// TestDocumentUpsertUpdatesInPlace verifies updating an existing group preserves
 // comments, blank lines, and the order of surrounding entries.
-func TestKeyFileUpsertUpdatesInPlace(t *testing.T) {
+func TestDocumentUpsertUpdatesInPlace(t *testing.T) {
 	t.Parallel()
 
 	content := "# header\nPRODUCTION=old-value\nSHARED=shared-value\n"
-	parsed, err := parseKeyFile(content, "envx.keys")
+	parsed, err := parseDocument(content, "envx.keys")
 	if err != nil {
-		t.Fatalf("parseKeyFile(): %v", err)
+		t.Fatalf("parseDocument(): %v", err)
 	}
 	got := parsed.upsert("production", "new-value")
 	want := "# header\nPRODUCTION=new-value\nSHARED=shared-value\n"
@@ -76,14 +76,14 @@ func TestKeyFileUpsertUpdatesInPlace(t *testing.T) {
 	}
 }
 
-// TestKeyFileUpsertAppendsNewGroup verifies a new group is appended after the
+// TestDocumentUpsertAppendsNewGroup verifies a new group is appended after the
 // existing entries with a single trailing newline.
-func TestKeyFileUpsertAppendsNewGroup(t *testing.T) {
+func TestDocumentUpsertAppendsNewGroup(t *testing.T) {
 	t.Parallel()
 
-	parsed, err := parseKeyFile("PRODUCTION=prod-value\n", "envx.keys")
+	parsed, err := parseDocument("PRODUCTION=prod-value\n", "envx.keys")
 	if err != nil {
-		t.Fatalf("parseKeyFile(): %v", err)
+		t.Fatalf("parseDocument(): %v", err)
 	}
 	got := parsed.upsert("shared", "shared-value")
 	want := "PRODUCTION=prod-value\nSHARED=shared-value\n"
@@ -92,14 +92,14 @@ func TestKeyFileUpsertAppendsNewGroup(t *testing.T) {
 	}
 }
 
-// TestKeyFileUpsertWritesEmptyFile verifies upserting into empty content yields a
+// TestDocumentUpsertWritesEmptyFile verifies upserting into empty content yields a
 // single entry rather than a leading blank line.
-func TestKeyFileUpsertWritesEmptyFile(t *testing.T) {
+func TestDocumentUpsertWritesEmptyFile(t *testing.T) {
 	t.Parallel()
 
-	parsed, err := parseKeyFile("", "envx.keys")
+	parsed, err := parseDocument("", "envx.keys")
 	if err != nil {
-		t.Fatalf("parseKeyFile(): %v", err)
+		t.Fatalf("parseDocument(): %v", err)
 	}
 	got := parsed.upsert("production", "prod-value")
 	if got != "PRODUCTION=prod-value\n" {
@@ -107,16 +107,16 @@ func TestKeyFileUpsertWritesEmptyFile(t *testing.T) {
 	}
 }
 
-// TestKeyFileUpsertPreservesUntouchedLineEndings verifies a case-insensitive
+// TestDocumentUpsertPreservesUntouchedLineEndings verifies a case-insensitive
 // update rewrites only the matched entry and leaves other lines, including their
 // CRLF endings, intact.
-func TestKeyFileUpsertPreservesUntouchedLineEndings(t *testing.T) {
+func TestDocumentUpsertPreservesUntouchedLineEndings(t *testing.T) {
 	t.Parallel()
 
 	content := "PRODUCTION=old-value\r\nSHARED=shared-value\r\n"
-	parsed, err := parseKeyFile(content, "envx.keys")
+	parsed, err := parseDocument(content, "envx.keys")
 	if err != nil {
-		t.Fatalf("parseKeyFile(): %v", err)
+		t.Fatalf("parseDocument(): %v", err)
 	}
 	got := parsed.upsert("Production", "new-value")
 	want := "PRODUCTION=new-value\nSHARED=shared-value\r\n"

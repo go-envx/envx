@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/go-envx/envx/app/internal/features/privatekey"
+	pkfilestore "github.com/go-envx/envx/app/internal/features/privatekey/filestore"
 	"github.com/go-envx/envx/app/internal/features/secrets/internal/store"
 	"github.com/go-envx/envx/app/internal/resources/cipher"
 )
@@ -49,28 +50,22 @@ func (keypairTestCipher) Decrypt([]byte, string) (string, error) {
 	return "", errors.New("test cipher decryption is unused")
 }
 
-// keypairTestDestination records the write point for a generated private key.
-type keypairTestDestination struct {
-	// write records the destination call and may inspect the store before commit.
+// keypairTestService provides a test double implementing PrivateKeyService.
+type keypairTestService struct {
+	key   privatekey.PrivateKey
+	err   error
 	write func(group, privateKey string) error
 }
 
-// Write records a generated private-key handoff without storing the key.
-func (d keypairTestDestination) Write(group, privateKey string) error {
-	return d.write(group, privateKey)
+func (s keypairTestService) Resolve(string) (privatekey.PrivateKey, error) {
+	return s.key, s.err
 }
 
-// keypairTestResolver returns one configured private-key resolver result.
-type keypairTestResolver struct {
-	// key is returned by Resolve.
-	key privatekey.PrivateKey
-	// err is returned by Resolve.
-	err error
-}
-
-// Resolve returns the configured test source result.
-func (r keypairTestResolver) Resolve(string) (privatekey.PrivateKey, error) {
-	return r.key, r.err
+func (s keypairTestService) Set(group, privateKey string) error {
+	if s.write != nil {
+		return s.write(group, privateKey)
+	}
+	return nil
 }
 
 // TestGenerateKeypairCommitsPublicStateAfterPrivateHandoff verifies the safe
@@ -89,7 +84,7 @@ func TestGenerateKeypairCommitsPublicStateAfterPrivateHandoff(t *testing.T) {
 		},
 		validPrivate: privateValue,
 	}
-	destination := keypairTestDestination{
+	service := keypairTestService{
 		write: func(group, privateKey string) error {
 			if group != "production" || privateKey != privateValue {
 				t.Fatalf("destination received (%q, %q)", group, privateKey)
@@ -106,12 +101,11 @@ func TestGenerateKeypairCommitsPublicStateAfterPrivateHandoff(t *testing.T) {
 	}
 
 	manager, err := New(Params{
-		SecretsPath:           storePath,
-		KeysPath:              keysPath,
-		DefaultIndent:         2,
-		Cipher:                cipherDouble,
-		PrivateKeyResolver:    newPrivateKeyTestResolver(),
-		PrivateKeyDestination: destination,
+		SecretsPath:       storePath,
+		KeysPath:          keysPath,
+		DefaultIndent:     2,
+		Cipher:            cipherDouble,
+		PrivateKeyService: service,
 	})
 	if err != nil {
 		t.Fatalf("New(): %v", err)
@@ -157,10 +151,7 @@ func TestGenerateKeypairUsesDefaultIndent(t *testing.T) {
 			},
 			validPrivate: privateValue,
 		},
-		PrivateKeyResolver: newPrivateKeyTestResolver(),
-		PrivateKeyDestination: keypairTestDestination{
-			write: func(string, string) error { return nil },
-		},
+		PrivateKeyService: keypairTestService{},
 	})
 	if err != nil {
 		t.Fatalf("New(): %v", err)
@@ -194,8 +185,7 @@ func TestGenerateKeypairRefusesExistingIdentity(t *testing.T) {
 			pair:         cipher.Keypair{PublicKey: "new-public", PrivateKey: "new-private"},
 			validPrivate: "new-private",
 		},
-		PrivateKeyResolver: newPrivateKeyTestResolver(),
-		PrivateKeyDestination: keypairTestDestination{
+		PrivateKeyService: keypairTestService{
 			write: func(string, string) error {
 				called = true
 				return nil
@@ -227,27 +217,27 @@ func TestInspectKeypairStatuses(t *testing.T) {
 		validPrivate: "private-test-value",
 	}
 	tests := []struct {
-		name     string
-		resolver privatekey.Resolver
-		want     PrivateKeyStatus
+		name    string
+		service PrivateKeyService
+		want    PrivateKeyStatus
 	}{
 		{
 			name: "unavailable",
-			resolver: keypairTestResolver{
+			service: keypairTestService{
 				err: fmt.Errorf("%w for group production", privatekey.ErrNotAvailable),
 			},
 			want: PrivateKeyNotAvailable,
 		},
 		{
 			name: "valid",
-			resolver: keypairTestResolver{
+			service: keypairTestService{
 				key: privatekey.PrivateKey{Value: "private-test-value", Origin: "test"},
 			},
 			want: PrivateKeyValid,
 		},
 		{
 			name: "invalid",
-			resolver: keypairTestResolver{
+			service: keypairTestService{
 				key: privatekey.PrivateKey{Value: "wrong-private-value", Origin: "test"},
 			},
 			want: PrivateKeyInvalid,
@@ -257,12 +247,11 @@ func TestInspectKeypairStatuses(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			manager, err := New(Params{
-				SecretsPath:           storePath,
-				KeysPath:              filepath.Join(t.TempDir(), "envx.keys"),
-				DefaultIndent:         2,
-				Cipher:                cipherDouble,
-				PrivateKeyResolver:    tt.resolver,
-				PrivateKeyDestination: newPrivateKeyTestDestination(),
+				SecretsPath:       storePath,
+				KeysPath:          filepath.Join(t.TempDir(), "envx.keys"),
+				DefaultIndent:     2,
+				Cipher:            cipherDouble,
+				PrivateKeyService: tt.service,
 			})
 			if err != nil {
 				t.Fatalf("New(): %v", err)
@@ -302,10 +291,7 @@ func TestGenerateKeypairReportsRecoverableStoreFailure(t *testing.T) {
 			},
 			validPrivate: privateValue,
 		},
-		PrivateKeyResolver: newPrivateKeyTestResolver(),
-		PrivateKeyDestination: keypairTestDestination{
-			write: func(string, string) error { return nil },
-		},
+		PrivateKeyService: keypairTestService{},
 	})
 	if err != nil {
 		t.Fatalf("New(): %v", err)
@@ -346,15 +332,23 @@ func TestGenerateDefaultKeypairRoundTrip(t *testing.T) {
 	dir := t.TempDir()
 	storePath := filepath.Join(dir, "secrets.yaml")
 	keysPath := filepath.Join(dir, "envx.keys")
+	pkStore, err := pkfilestore.New(pkfilestore.Params{Path: keysPath})
+	if err != nil {
+		t.Fatalf("pkfilestore.New: %v", err)
+	}
+	pkService, err := privatekey.NewService(privatekey.ServiceParams{
+		Repository: pkStore,
+		LookupEnv:  func(string) (string, bool) { return "", false },
+	})
+	if err != nil {
+		t.Fatalf("privatekey.NewService: %v", err)
+	}
 	manager, err := New(Params{
-		SecretsPath:   storePath,
-		KeysPath:      keysPath,
-		DefaultIndent: 2,
-		Cipher:        newTestCipher(t),
-		PrivateKeyResolver: privatekey.NewResolver(privatekey.ResolverOptions{
-			KeysPath: keysPath,
-		}),
-		PrivateKeyDestination: privatekey.NewFileDestination(keysPath),
+		SecretsPath:       storePath,
+		KeysPath:          keysPath,
+		DefaultIndent:     2,
+		Cipher:            newTestCipher(t),
+		PrivateKeyService: pkService,
 	})
 	if err != nil {
 		t.Fatalf("New(): %v", err)
@@ -401,15 +395,23 @@ func TestGenerateDefaultKeypairRoundTrip(t *testing.T) {
 // local key-file resolver and destination in dir.
 func newLocalKeypairManager(t *testing.T, storePath, keysPath string) *Manager {
 	t.Helper()
+	pkStore, err := pkfilestore.New(pkfilestore.Params{Path: keysPath})
+	if err != nil {
+		t.Fatalf("pkfilestore.New: %v", err)
+	}
+	pkService, err := privatekey.NewService(privatekey.ServiceParams{
+		Repository: pkStore,
+		LookupEnv:  func(string) (string, bool) { return "", false },
+	})
+	if err != nil {
+		t.Fatalf("privatekey.NewService: %v", err)
+	}
 	manager, err := New(Params{
-		SecretsPath:   storePath,
-		KeysPath:      keysPath,
-		DefaultIndent: 2,
-		Cipher:        newTestCipher(t),
-		PrivateKeyResolver: privatekey.NewResolver(privatekey.ResolverOptions{
-			KeysPath: keysPath,
-		}),
-		PrivateKeyDestination: privatekey.NewFileDestination(keysPath),
+		SecretsPath:       storePath,
+		KeysPath:          keysPath,
+		DefaultIndent:     2,
+		Cipher:            newTestCipher(t),
+		PrivateKeyService: pkService,
 	})
 	if err != nil {
 		t.Fatalf("New(): %v", err)
@@ -494,15 +496,23 @@ func TestRotateKeypairRejectsHigherPriorityKeyOrigin(t *testing.T) {
 		}
 		return "", false
 	}
+	pkStore, err := pkfilestore.New(pkfilestore.Params{Path: keysPath})
+	if err != nil {
+		t.Fatalf("pkfilestore.New: %v", err)
+	}
+	pkService, err := privatekey.NewService(privatekey.ServiceParams{
+		Repository: pkStore,
+		LookupEnv:  lookupEnv,
+	})
+	if err != nil {
+		t.Fatalf("privatekey.NewService: %v", err)
+	}
 	manager, err := New(Params{
-		SecretsPath:   storePath,
-		KeysPath:      keysPath,
-		DefaultIndent: 2,
-		Cipher:        selected,
-		PrivateKeyResolver: privatekey.NewResolver(privatekey.ResolverOptions{
-			KeysPath: keysPath, LookupEnv: lookupEnv,
-		}),
-		PrivateKeyDestination: privatekey.NewFileDestination(keysPath),
+		SecretsPath:       storePath,
+		KeysPath:          keysPath,
+		DefaultIndent:     2,
+		Cipher:            selected,
+		PrivateKeyService: pkService,
 	})
 	if err != nil {
 		t.Fatalf("New(): %v", err)
@@ -528,7 +538,7 @@ func TestRotateKeypairFailsWhenKeyUnavailable(t *testing.T) {
 	manager, _ := newBulkManager(
 		t,
 		"public_keys:\n  production: public-test-value\n",
-		keypairTestResolver{
+		keypairTestService{
 			err: fmt.Errorf("%w for group production", privatekey.ErrNotAvailable),
 		},
 	)

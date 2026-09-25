@@ -4,7 +4,6 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/go-envx/envx/app/internal/features/privatekey"
 	"github.com/go-envx/envx/app/internal/features/secrets/internal/envelope"
 	"github.com/go-envx/envx/app/internal/resources/cipher"
 	"github.com/go-envx/envx/app/internal/shared/status"
@@ -14,7 +13,7 @@ import (
 // diagnoseResolver builds a resolver over a manager that has one stored secret,
 // with the requested reveal policy.
 func diagnoseResolver(
-	t *testing.T, reveal bool, resolver privatekey.Resolver,
+	t *testing.T, reveal bool, resolver PrivateKeyService,
 ) *Resolver {
 	t.Helper()
 	manager := newGetManager(t, resolver)
@@ -45,12 +44,11 @@ func diagnoseRawResolver(t *testing.T, storedValue string) *Resolver {
 			"\nsecrets:\n  production:\n    database_password: \""+storedValue+"\"\n",
 	)
 	manager, err := New(Params{
-		SecretsPath:           storePath,
-		KeysPath:              filepath.Join(filepath.Dir(storePath), "envx.keys"),
-		DefaultIndent:         2,
-		Cipher:                selected,
-		PrivateKeyResolver:    fixedPrivateKeyResolver{value: pair.PrivateKey},
-		PrivateKeyDestination: newPrivateKeyTestDestination(),
+		SecretsPath:       storePath,
+		KeysPath:          filepath.Join(filepath.Dir(storePath), "envx.keys"),
+		DefaultIndent:     2,
+		Cipher:            selected,
+		PrivateKeyService: fixedPrivateKeyResolver{value: pair.PrivateKey},
 	})
 	if err != nil {
 		t.Fatalf("New(): %v", err)
