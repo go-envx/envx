@@ -22,8 +22,11 @@ func (r fixedPrivateKeyResolver) Resolve(string) (privatekey.PrivateKey, error) 
 	return privatekey.PrivateKey{Value: r.value, Origin: "test"}, nil
 }
 
+// Set accepts private-key material without storing it.
+func (r fixedPrivateKeyResolver) Set(string, string) error { return nil }
+
 // newGetManager builds a manager whose stored secret decrypts with pair.
-func newGetManager(t *testing.T, resolver privatekey.Resolver) *Manager {
+func newGetManager(t *testing.T, resolver PrivateKeyService) *Manager {
 	t.Helper()
 
 	selected := newTestCipher(t)
@@ -37,12 +40,11 @@ func newGetManager(t *testing.T, resolver privatekey.Resolver) *Manager {
 
 	storePath := writeStore(t, "public_keys:\n  production: "+pair.PublicKey+"\n")
 	manager, err := New(Params{
-		SecretsPath:           storePath,
-		KeysPath:              filepath.Join(filepath.Dir(storePath), "envx.keys"),
-		DefaultIndent:         2,
-		Cipher:                selected,
-		PrivateKeyResolver:    resolver,
-		PrivateKeyDestination: newPrivateKeyTestDestination(),
+		SecretsPath:       storePath,
+		KeysPath:          filepath.Join(filepath.Dir(storePath), "envx.keys"),
+		DefaultIndent:     2,
+		Cipher:            selected,
+		PrivateKeyService: resolver,
 	})
 	if err != nil {
 		t.Fatalf("New(): %v", err)
@@ -171,12 +173,11 @@ func TestSetEncryptsAndStoresSecret(t *testing.T) {
 	}
 	storePath := writeStore(t, "public_keys:\n  production: "+pair.PublicKey+"\n")
 	manager, err := New(Params{
-		SecretsPath:           storePath,
-		KeysPath:              filepath.Join(filepath.Dir(storePath), "envx.keys"),
-		DefaultIndent:         2,
-		Cipher:                selected,
-		PrivateKeyResolver:    newPrivateKeyTestResolver(),
-		PrivateKeyDestination: newPrivateKeyTestDestination(),
+		SecretsPath:       storePath,
+		KeysPath:          filepath.Join(filepath.Dir(storePath), "envx.keys"),
+		DefaultIndent:     2,
+		Cipher:            selected,
+		PrivateKeyService: newPrivateKeyTestService(),
 	})
 	if err != nil {
 		t.Fatalf("New(): %v", err)
@@ -231,12 +232,11 @@ func TestSetUsesCipherAlgorithm(t *testing.T) {
 	}
 	storePath := writeStore(t, "public_keys:\n  shared: "+pair.PublicKey+"\n")
 	manager, err := New(Params{
-		SecretsPath:           storePath,
-		KeysPath:              filepath.Join(filepath.Dir(storePath), "envx.keys"),
-		DefaultIndent:         2,
-		Cipher:                selected,
-		PrivateKeyResolver:    newPrivateKeyTestResolver(),
-		PrivateKeyDestination: newPrivateKeyTestDestination(),
+		SecretsPath:       storePath,
+		KeysPath:          filepath.Join(filepath.Dir(storePath), "envx.keys"),
+		DefaultIndent:     2,
+		Cipher:            selected,
+		PrivateKeyService: newPrivateKeyTestService(),
 	})
 	if err != nil {
 		t.Fatalf("New(): %v", err)
@@ -280,12 +280,11 @@ func TestSetValidatesBeforeEncryption(t *testing.T) {
 	storePath := filepath.Join(t.TempDir(), "secrets.yaml")
 	cipherDouble := &setTestCipher{}
 	manager, err := New(Params{
-		SecretsPath:           storePath,
-		KeysPath:              filepath.Join(filepath.Dir(storePath), "envx.keys"),
-		DefaultIndent:         2,
-		Cipher:                cipherDouble,
-		PrivateKeyResolver:    newPrivateKeyTestResolver(),
-		PrivateKeyDestination: newPrivateKeyTestDestination(),
+		SecretsPath:       storePath,
+		KeysPath:          filepath.Join(filepath.Dir(storePath), "envx.keys"),
+		DefaultIndent:     2,
+		Cipher:            cipherDouble,
+		PrivateKeyService: newPrivateKeyTestService(),
 	})
 	if err != nil {
 		t.Fatalf("New(): %v", err)
@@ -357,12 +356,11 @@ func TestSetValidatesGeneratedPlaintext(t *testing.T) {
 	storePath := writeStore(t, "public_keys:\n  production: public\n")
 	cipherDouble := &setTestCipher{}
 	manager, err := New(Params{
-		SecretsPath:           storePath,
-		KeysPath:              filepath.Join(filepath.Dir(storePath), "envx.keys"),
-		DefaultIndent:         2,
-		Cipher:                cipherDouble,
-		PrivateKeyResolver:    newPrivateKeyTestResolver(),
-		PrivateKeyDestination: newPrivateKeyTestDestination(),
+		SecretsPath:       storePath,
+		KeysPath:          filepath.Join(filepath.Dir(storePath), "envx.keys"),
+		DefaultIndent:     2,
+		Cipher:            cipherDouble,
+		PrivateKeyService: newPrivateKeyTestService(),
 	})
 	if err != nil {
 		t.Fatalf("New(): %v", err)

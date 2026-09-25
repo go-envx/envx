@@ -2,8 +2,10 @@ package core
 
 import (
 	"fmt"
+	"os"
 
 	"github.com/go-envx/envx/app/internal/features/privatekey"
+	pkfilestore "github.com/go-envx/envx/app/internal/features/privatekey/filestore"
 	"github.com/go-envx/envx/app/internal/features/secrets"
 	"github.com/go-envx/envx/app/internal/features/workspace"
 	"github.com/go-envx/envx/app/internal/resources/cipher"
@@ -56,12 +58,22 @@ func NewSecretsManager(s secrets.Params, c cipher.Params) (*secrets.Manager, err
 		return nil, fmt.Errorf("creating configured cipher: %w", err)
 	}
 
-	// Add the workspace's private-key resolver and file destination ports.
+	pkRepo, err := pkfilestore.New(pkfilestore.Params{Path: s.KeysPath})
+	if err != nil {
+		return nil, fmt.Errorf("creating privatekey repository: %w", err)
+	}
+
+	pkService, err := privatekey.NewService(privatekey.ServiceParams{
+		Repository: pkRepo,
+		LookupEnv:  os.LookupEnv,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("creating privatekey service: %w", err)
+	}
+
+	// Add the workspace's cipher and private-key service.
 	s.Cipher = oCipher
-	s.PrivateKeyResolver = privatekey.NewResolver(
-		privatekey.ResolverOptions{KeysPath: s.KeysPath},
-	)
-	s.PrivateKeyDestination = privatekey.NewFileDestination(s.KeysPath)
+	s.PrivateKeyService = pkService
 
 	// Return the fully wired secrets manager.
 	return secrets.New(s)

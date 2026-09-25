@@ -206,12 +206,11 @@ func TestKeypairsReportsUnavailableKey(t *testing.T) {
 func newInventoryManager(t *testing.T, storePath string) *Manager {
 	t.Helper()
 	manager, err := New(Params{
-		SecretsPath:           storePath,
-		KeysPath:              filepath.Join(filepath.Dir(storePath), "envx.keys"),
-		DefaultIndent:         2,
-		Cipher:                newTestCipher(t),
-		PrivateKeyResolver:    newPrivateKeyTestResolver(),
-		PrivateKeyDestination: newPrivateKeyTestDestination(),
+		SecretsPath:       storePath,
+		KeysPath:          filepath.Join(filepath.Dir(storePath), "envx.keys"),
+		DefaultIndent:     2,
+		Cipher:            newTestCipher(t),
+		PrivateKeyService: newPrivateKeyTestService(),
 	})
 	if err != nil {
 		t.Fatalf("New(): %v", err)

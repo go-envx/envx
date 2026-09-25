@@ -112,7 +112,7 @@ func (m *Manager) Get(group, key string) (string, error) {
 	}
 
 	// Resolve the private key only after the ciphertext has been located.
-	privateKey, err := m.params.PrivateKeyResolver.Resolve(group)
+	privateKey, err := m.params.PrivateKeyService.Resolve(group)
 	if err != nil {
 		return "", fmt.Errorf(
 			"resolving private key for group %q: %w", group, err,
