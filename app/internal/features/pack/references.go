@@ -4,7 +4,7 @@ import (
 	"fmt"
 
 	"github.com/go-envx/envx/app/internal/features/secrets"
-	"github.com/go-envx/envx/app/internal/utils/file"
+	"github.com/go-envx/envx/app/internal/utils/filex"
 	"gopkg.in/yaml.v3"
 )
 
@@ -54,7 +54,7 @@ func (f includeFiles) sources() []string {
 
 // scanFile parses one namespace file and reports every string leaf value to add.
 func scanFile(path string, add func(string)) error {
-	data, err := file.Read(path)
+	data, err := filex.Read(path)
 	if err != nil {
 		return fmt.Errorf("reading %s: %w", path, err)
 	}

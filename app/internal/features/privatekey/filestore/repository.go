@@ -7,7 +7,7 @@ import (
 	"strings"
 
 	"github.com/go-envx/envx/app/internal/features/privatekey"
-	filex "github.com/go-envx/envx/app/internal/utils/file"
+	"github.com/go-envx/envx/app/internal/utils/filex"
 	"github.com/go-envx/envx/app/internal/utils/git"
 )
 

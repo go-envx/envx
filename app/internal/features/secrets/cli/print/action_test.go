@@ -9,7 +9,7 @@ import (
 
 	"github.com/go-envx/envx/app/internal/core"
 	"github.com/go-envx/envx/app/internal/resources/cipher"
-	"github.com/go-envx/envx/app/internal/utils/file"
+	"github.com/go-envx/envx/app/internal/utils/filex"
 )
 
 // TestExecuteUsesConfiguredCipher verifies print uses the manifest algorithm
@@ -33,11 +33,11 @@ func TestExecuteUsesConfiguredCipher(t *testing.T) {
 	if err := os.WriteFile(keysPath, []byte("existing keys\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	beforeSecrets, err := file.Read(secretsPath)
+	beforeSecrets, err := filex.Read(secretsPath)
 	if err != nil {
 		t.Fatal(err)
 	}
-	beforeKeys, err := file.Read(keysPath)
+	beforeKeys, err := filex.Read(keysPath)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -53,11 +53,11 @@ func TestExecuteUsesConfiguredCipher(t *testing.T) {
 		t.Errorf("private key = %q, want NaCl Box key", result.Keypair.PrivateKey)
 	}
 
-	afterSecrets, err := file.Read(secretsPath)
+	afterSecrets, err := filex.Read(secretsPath)
 	if err != nil {
 		t.Fatal(err)
 	}
-	afterKeys, err := file.Read(keysPath)
+	afterKeys, err := filex.Read(keysPath)
 	if err != nil {
 		t.Fatal(err)
 	}

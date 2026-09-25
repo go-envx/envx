@@ -6,7 +6,7 @@ import (
 	"testing"
 
 	"github.com/go-envx/envx/app/internal/core"
-	"github.com/go-envx/envx/app/internal/utils/file"
+	"github.com/go-envx/envx/app/internal/utils/filex"
 )
 
 // writeManifest creates the smallest valid workspace for management commands.
@@ -49,7 +49,7 @@ func TestExecuteAndRender(t *testing.T) {
 		t.Errorf("PrivateKeyStatus = %q, want valid", metadata.PrivateKeyStatus)
 	}
 
-	privateData, err := file.Read(resolved.Secrets.KeysPath)
+	privateData, err := filex.Read(resolved.Secrets.KeysPath)
 	if err != nil {
 		t.Fatalf("read private-key file: %v", err)
 	}

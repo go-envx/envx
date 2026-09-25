@@ -9,7 +9,7 @@ import (
 	"strings"
 
 	"github.com/go-envx/envx/app/internal/features/secrets"
-	"github.com/go-envx/envx/app/internal/utils/file"
+	"github.com/go-envx/envx/app/internal/utils/filex"
 )
 
 // defaultIndent is the block indentation applied to a rewritten manifest whose
@@ -163,7 +163,7 @@ func Pack(ws Workspace, p Params) (Result, error) {
 
 	// Rewrite the manifest so each project's includes resolve against its bundle
 	// directory and any explicit secrets path is dropped.
-	manifestData, err := file.Read(ws.ManifestPath)
+	manifestData, err := filex.Read(ws.ManifestPath)
 	if err != nil {
 		return Result{}, fmt.Errorf("reading manifest %s: %w", ws.ManifestPath, err)
 	}
@@ -439,7 +439,7 @@ func ensureOutDirEmpty(outDir string) error {
 
 // copyInto copies item.src to item.dest under outDir.
 func copyInto(outDir string, item copyItem) error {
-	data, err := file.Read(item.src)
+	data, err := filex.Read(item.src)
 	if err != nil {
 		return fmt.Errorf("reading %s: %w", item.src, err)
 	}
@@ -453,7 +453,7 @@ func writeFile(target string, data []byte) error {
 	if err := os.MkdirAll(filepath.Dir(target), 0o750); err != nil {
 		return fmt.Errorf("creating bundle directory for %s: %w", target, err)
 	}
-	return file.WriteAtomic(target, data)
+	return filex.WriteAtomic(target, data)
 }
 
 // exists reports whether path names an existing regular file, treating any stat

@@ -5,14 +5,14 @@ import (
 
 	"gopkg.in/yaml.v3"
 
-	"github.com/go-envx/envx/app/internal/utils/file"
+	"github.com/go-envx/envx/app/internal/utils/filex"
 )
 
 // loadYAML reads and unmarshals a YAML file into a generic map. It returns a
 // wrapped os.ErrNotExist when the file is missing so callers can distinguish
 // "missing" from "malformed".
 func loadYAML(path string) (map[string]any, error) {
-	data, err := file.Read(path)
+	data, err := filex.Read(path)
 	if err != nil {
 		return nil, err
 	}

@@ -7,7 +7,7 @@ import (
 	"strings"
 
 	"github.com/go-envx/envx/app/internal/core"
-	"github.com/go-envx/envx/app/internal/utils/file"
+	"github.com/go-envx/envx/app/internal/utils/filex"
 	"github.com/go-envx/envx/app/internal/utils/yamlx"
 	"gopkg.in/yaml.v3"
 )
@@ -66,7 +66,7 @@ func execute(p actionParams, in *core.Input) (actionResult, error) {
 		return actionResult{}, fmt.Errorf("marshaling %s: %w", target, err)
 	}
 	out = yamlx.PreserveBlankLines(source, out)
-	if err := file.WriteAtomic(target, out); err != nil {
+	if err := filex.WriteAtomic(target, out); err != nil {
 		return actionResult{}, err
 	}
 	return actionResult{Key: p.Key, OverlayPath: target}, nil
@@ -78,7 +78,7 @@ func execute(p actionParams, in *core.Input) (actionResult, error) {
 // missing file yields an empty document so the first set creates it.
 func readDoc(path string) (*yaml.Node, []byte, error) {
 	doc := new(yaml.Node)
-	data, err := file.Read(path)
+	data, err := filex.Read(path)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
 			return doc, nil, nil

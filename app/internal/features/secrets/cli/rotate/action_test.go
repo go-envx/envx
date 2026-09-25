@@ -8,7 +8,7 @@ import (
 
 	"github.com/go-envx/envx/app/internal/core"
 	"github.com/go-envx/envx/app/internal/features/secrets"
-	"github.com/go-envx/envx/app/internal/utils/file"
+	"github.com/go-envx/envx/app/internal/utils/filex"
 )
 
 // writeManifest creates the smallest valid workspace for management commands.
@@ -76,7 +76,7 @@ func TestExecuteRotatesGroup(t *testing.T) {
 		t.Errorf("Get() = %q, want plain-api", value)
 	}
 
-	privateData, err := file.Read(result.KeysPath)
+	privateData, err := filex.Read(result.KeysPath)
 	if err != nil {
 		t.Fatalf("read private-key file: %v", err)
 	}
