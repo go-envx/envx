@@ -18,8 +18,8 @@ func boolPtr(b bool) *bool { return &b }
 
 // testManifest builds an in-memory manifest with global and project-level env
 // settings for exercising the precedence chain.
-func testManifest() *workspace.Manifest {
-	return &workspace.Manifest{
+func testManifest() *workspace.Workspace {
+	return &workspace.Workspace{
 		Environments: []string{"development", "staging", "production"},
 		Settings:     workspace.Settings{Env: strPtr("staging")},
 		Projects: map[string]workspace.Project{
@@ -42,7 +42,7 @@ func TestResolveManifest(t *testing.T) {
 
 	t.Run("explicit wins", func(t *testing.T) {
 		_, params, err := resolveManifest(
-			manifestContext{manifest: m, project: "api"},
+			manifestContext{workspace: m, project: "api"},
 			&Input{Env: strPtr("from-flag")},
 		)
 		if err != nil {
@@ -54,7 +54,7 @@ func TestResolveManifest(t *testing.T) {
 	})
 	t.Run("project default", func(t *testing.T) {
 		_, params, err := resolveManifest(
-			manifestContext{manifest: m, project: "api"}, &Input{},
+			manifestContext{workspace: m, project: "api"}, &Input{},
 		)
 		if err != nil {
 			t.Fatal(err)
@@ -65,7 +65,7 @@ func TestResolveManifest(t *testing.T) {
 	})
 	t.Run("global default", func(t *testing.T) {
 		_, params, err := resolveManifest(
-			manifestContext{manifest: m, project: "web"}, &Input{},
+			manifestContext{workspace: m, project: "web"}, &Input{},
 		)
 		if err != nil {
 			t.Fatal(err)
@@ -75,14 +75,14 @@ func TestResolveManifest(t *testing.T) {
 		}
 	})
 	t.Run("env left empty for envmerge default", func(t *testing.T) {
-		bare := &workspace.Manifest{
+		bare := &workspace.Workspace{
 			Environments: []string{"development"},
 			Projects: map[string]workspace.Project{
 				"api": {Includes: []string{"env/x"}},
 			},
 		}
 		_, params, err := resolveManifest(
-			manifestContext{manifest: bare, project: "api"}, &Input{},
+			manifestContext{workspace: bare, project: "api"}, &Input{},
 		)
 		if err != nil {
 			t.Fatal(err)
@@ -96,7 +96,7 @@ func TestResolveManifest(t *testing.T) {
 	})
 	t.Run("settings and includes pass through", func(t *testing.T) {
 		_, params, err := resolveManifest(
-			manifestContext{manifest: m, project: "api"},
+			manifestContext{workspace: m, project: "api"},
 			&Input{Prefix: strPtr("APP"), RequireOverlays: boolPtr(true)},
 		)
 		if err != nil {
@@ -114,7 +114,7 @@ func TestResolveManifest(t *testing.T) {
 	})
 	t.Run("delimiter explicit flows through", func(t *testing.T) {
 		_, params, err := resolveManifest(
-			manifestContext{manifest: m, project: "api"},
+			manifestContext{workspace: m, project: "api"},
 			&Input{Delimiter: strPtr("|")},
 		)
 		if err != nil {
@@ -125,13 +125,19 @@ func TestResolveManifest(t *testing.T) {
 		}
 	})
 	t.Run("unknown project errors", func(t *testing.T) {
-		_, _, err := resolveManifest(manifestContext{manifest: m, project: "ghost"}, &Input{})
+		_, _, err := resolveManifest(
+			manifestContext{workspace: m, project: "ghost"},
+			&Input{},
+		)
 		if err == nil {
 			t.Error("expected error for unknown project")
 		}
 	})
 	t.Run("empty project resolves global only", func(t *testing.T) {
-		_, params, err := resolveManifest(manifestContext{manifest: m, project: ""}, &Input{})
+		_, params, err := resolveManifest(
+			manifestContext{workspace: m, project: ""},
+			&Input{},
+		)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -149,8 +155,8 @@ func TestResolveManifest(t *testing.T) {
 func TestOverloadResolution(t *testing.T) {
 	t.Parallel()
 
-	manifestWith := func(global, project *bool) *workspace.Manifest {
-		return &workspace.Manifest{
+	manifestWith := func(global, project *bool) *workspace.Workspace {
+		return &workspace.Workspace{
 			Environments: []string{"development"},
 			Settings:     workspace.Settings{Overload: global},
 			Projects: map[string]workspace.Project{
@@ -164,7 +170,7 @@ func TestOverloadResolution(t *testing.T) {
 
 	t.Run("explicit wins over manifest", func(t *testing.T) {
 		_, params, err := resolveManifest(
-			manifestContext{manifest: manifestWith(boolPtr(false), nil), project: "api"},
+			manifestContext{workspace: manifestWith(boolPtr(false), nil), project: "api"},
 			&Input{Overload: boolPtr(true)},
 		)
 		if err != nil {
@@ -176,7 +182,7 @@ func TestOverloadResolution(t *testing.T) {
 	})
 	t.Run("manifest global layer honored", func(t *testing.T) {
 		_, params, err := resolveManifest(
-			manifestContext{manifest: manifestWith(boolPtr(true), nil), project: "api"},
+			manifestContext{workspace: manifestWith(boolPtr(true), nil), project: "api"},
 			&Input{},
 		)
 		if err != nil {
@@ -189,8 +195,8 @@ func TestOverloadResolution(t *testing.T) {
 	t.Run("project layer over global", func(t *testing.T) {
 		_, params, err := resolveManifest(
 			manifestContext{
-				manifest: manifestWith(boolPtr(false), boolPtr(true)),
-				project:  "api",
+				workspace: manifestWith(boolPtr(false), boolPtr(true)),
+				project:   "api",
 			},
 			&Input{},
 		)
@@ -209,8 +215,8 @@ func TestOverloadResolution(t *testing.T) {
 func TestReferencePatternResolution(t *testing.T) {
 	t.Parallel()
 
-	manifestWith := func(global, project *string) *workspace.Manifest {
-		return &workspace.Manifest{
+	manifestWith := func(global, project *string) *workspace.Workspace {
+		return &workspace.Workspace{
 			Environments: []string{"development"},
 			Settings:     workspace.Settings{ReferencePattern: global},
 			Projects: map[string]workspace.Project{
@@ -224,7 +230,7 @@ func TestReferencePatternResolution(t *testing.T) {
 
 	t.Run("explicit wins over manifest", func(t *testing.T) {
 		_, params, err := resolveManifest(
-			manifestContext{manifest: manifestWith(strPtr("global"), nil), project: "api"},
+			manifestContext{workspace: manifestWith(strPtr("global"), nil), project: "api"},
 			&Input{ReferencePattern: strPtr("flag")},
 		)
 		if err != nil {
@@ -237,8 +243,8 @@ func TestReferencePatternResolution(t *testing.T) {
 	t.Run("project layer over global", func(t *testing.T) {
 		_, params, err := resolveManifest(
 			manifestContext{
-				manifest: manifestWith(strPtr("global"), strPtr("project")),
-				project:  "api",
+				workspace: manifestWith(strPtr("global"), strPtr("project")),
+				project:   "api",
 			},
 			&Input{},
 		)
@@ -251,7 +257,7 @@ func TestReferencePatternResolution(t *testing.T) {
 	})
 	t.Run("reference pattern explicit flows through", func(t *testing.T) {
 		_, params, err := resolveManifest(
-			manifestContext{manifest: manifestWith(nil, nil), project: "api"},
+			manifestContext{workspace: manifestWith(nil, nil), project: "api"},
 			&Input{ReferencePattern: strPtr(`\$env\{([^}]*)\}`)},
 		)
 		if err != nil {
@@ -329,7 +335,7 @@ func TestResolveWorkspace(t *testing.T) {
 	m := testManifest()
 	m.Secrets.SecretsPath = "private/secrets.yaml"
 	dir := t.TempDir()
-	r2, _, err := resolveManifest(manifestContext{manifest: m, dir: dir}, &Input{})
+	r2, _, err := resolveManifest(manifestContext{workspace: m, dir: dir}, &Input{})
 	if err != nil {
 		t.Fatalf("resolveManifest secrets path: %v", err)
 	}
@@ -342,7 +348,7 @@ func TestResolveWorkspace(t *testing.T) {
 		t.Errorf("Secrets.KeysPath = %q, want %q", r2.Secrets.KeysPath, wantKeysPath)
 	}
 	m.Secrets.Cipher = string(cipher.NaClBox)
-	r2, _, err = resolveManifest(manifestContext{manifest: m, dir: dir}, &Input{})
+	r2, _, err = resolveManifest(manifestContext{workspace: m, dir: dir}, &Input{})
 	if err != nil {
 		t.Fatalf("resolveManifest cipher setting: %v", err)
 	}
@@ -360,7 +366,7 @@ func TestResolveWorkspace(t *testing.T) {
 	// An explicit relative key path is resolved against the manifest directory,
 	// not against the custom secrets store directory.
 	m.Secrets.KeysPath = "keys/envx.keys"
-	r3, _, err := resolveManifest(manifestContext{manifest: m, dir: dir}, &Input{})
+	r3, _, err := resolveManifest(manifestContext{workspace: m, dir: dir}, &Input{})
 	if err != nil {
 		t.Fatalf("resolveManifest relative keys path: %v", err)
 	}
@@ -376,7 +382,7 @@ func TestResolveWorkspace(t *testing.T) {
 	// An explicit absolute key path remains rooted at its own location.
 	absoluteKeysPath := filepath.Join(t.TempDir(), "envx.keys")
 	m.Secrets.KeysPath = absoluteKeysPath
-	r4, _, err := resolveManifest(manifestContext{manifest: m, dir: dir}, &Input{})
+	r4, _, err := resolveManifest(manifestContext{workspace: m, dir: dir}, &Input{})
 	if err != nil {
 		t.Fatalf("resolveManifest absolute keys path: %v", err)
 	}
@@ -390,7 +396,7 @@ func TestResolveWorkspace(t *testing.T) {
 
 	// The manifest's detected indent flows through as the secrets fallback indent.
 	r5, _, err := resolveManifest(
-		manifestContext{manifest: m, dir: dir, indent: 4}, &Input{},
+		manifestContext{workspace: m, dir: dir, indent: 4}, &Input{},
 	)
 	if err != nil {
 		t.Fatalf("resolveManifest indent: %v", err)

@@ -44,7 +44,7 @@ service, err := feature.New(feature.Params{
 
 ### 3. Package Boundary Rules
 - **Feature Root**: Contains domain models, domain errors, use case services, and consumer-defined repository interfaces. It has zero awareness of the concrete filestore implementation and never imports it.
-- **Repository Subpackage**: Implements the repository interface using standard library file operations, atomic file helpers from [app/internal/utils/file](app/internal/utils/file), and YAML helpers. It imports domain models from its parent feature package.
+- **Repository Subpackage**: Implements the repository interface using standard library file operations, atomic file helpers from [app/internal/utils/filex](app/internal/utils/filex), gitignore protection from [app/internal/utils/git](app/internal/utils/git), and YAML helpers. It imports domain models from its parent feature package.
 - **Composition Root**: [app/internal/core](app/internal/core) imports both the feature package and its filestore subpackage, wiring them together during workspace and project resolution.
 - **CLI Adapter**: Remains a presentation adapter consuming the feature root or calling through [app/internal/core](app/internal/core).
 
@@ -53,12 +53,11 @@ service, err := feature.New(feature.Params{
 ### 1. Feature: Private Key
 
 - **Role & Scope**: Manages transient private-key material resolution across environment variables (`ENVX_PRIVATE_KEY_<GROUP>`, `ENVX_PRIVATE_KEY`) and persistent key storage.
-- **Consumer Interface**: `Repository` is defined in service.go as a consumer-defined interface specifying storage-agnostic `GetPrivateKey` and `SetPrivateKey`. It is completely storage-agnostic and free of any filesystem or destination concepts.
-- **Concrete Domain Service**: The resolver is reframed as a concrete domain `Service` in service.go with `ServiceParams`. In adherence to the consumer-defined interface principle, `privatekey` exports the concrete `*Service` providing `Resolve(group string) (PrivateKey, error)` and `Set(group, privateKey string) error`, rather than defining an interface for itself. Consumers (such as `secrets`) define their own interface for the private key capabilities they require.
-- **Dedicated Errors**: Sentinel errors (`ErrNotAvailable`, `ErrInvalidKey`) live in a dedicated errors file, providing a centralized and discoverable contract for error handling across callers.
-- **Persistence Encapsulation**: A dedicated `filestore` subpackage encapsulates `NAME=value` parsing (from [app/internal/features/privatekey/keyfile.go](app/internal/features/privatekey/keyfile.go)) and atomic writes (from [app/internal/features/privatekey/destinationFile.go](app/internal/features/privatekey/destinationFile.go)).
-- **Pure Repository Implementation**: `filestore.Store` implements `privatekey.Repository` exclusively (`GetPrivateKey` and `SetPrivateKey`). Filesystem details such as `path`, file permissions (`0600`), directory creation (`0750`), atomic writes, and gitignore protection are completely internal and private. Legacy `Destination`, `Write`, and `Path` methods are eliminated.
-- **Parameter Segregation**: `filestore.Params` accepts `Path`; `privatekey.ServiceParams` accepts `Repository` and an optional `LookupEnv` function—no file paths exist in the domain service.
+- **Consumer Interface**: `Repository` is defined in [app/internal/features/privatekey/service.go](app/internal/features/privatekey/service.go) as a consumer-defined interface specifying `Origin() string`, `GetPrivateKey(group string) (key string, found bool, err error)`, and `SetPrivateKey(group, privateKey string) error`. It is completely storage-agnostic, providing provenance identification via `Origin()` without leaking file paths or destination concepts.
+- **Concrete Domain Service**: `Service` coordinates multi-source precedence (specific env var > combined env var > repository) and validates group names and key formatting. In adherence to the consumer-defined interface principle, `privatekey` exports the concrete `*Service` providing `Resolve(group string) (PrivateKey, error)` and `Set(group, privateKey string) error`. Consumers (such as `secrets`) define their own interface (`PrivateKeyService`) for the capabilities they require.
+- **Dedicated Errors**: Sentinel errors (`ErrNotAvailable`, `ErrInvalidKey`, `ErrEmptyGroup`, `ErrInvalidGroup`, `ErrEmptyKey`, `ErrKeyHasLineBreak`) live in [app/internal/features/privatekey/errors.go](app/internal/features/privatekey/errors.go), providing a centralized and discoverable contract for error handling across callers.
+- **Persistence Encapsulation**: The `filestore` subpackage encapsulates `NAME=value` line parsing, comments/formatting preservation in [app/internal/features/privatekey/filestore/document.go](app/internal/features/privatekey/filestore/document.go), directory creation, and atomic private file writes (with `0600` permissions). It integrates with [app/internal/utils/git](app/internal/utils/git) to ensure key files are automatically git-ignored before any sensitive bytes are written.
+- **Parameter Segregation**: `filestore.Params` accepts `Path`; `privatekey.ServiceParams` accepts `Repository` and a required `LookupEnv` function—no file paths exist in the domain service.
 
 #### internal/features/privatekey/privatekey.go
 ```go
@@ -69,6 +68,12 @@ type PrivateKey struct {
 	Value  string
 	Origin string
 }
+
+// ValidateGroup rejects empty, whitespace, or line-breaking group names.
+func ValidateGroup(group string) error
+
+// ValidateEntry rejects values that could escape the one-entry key-file format.
+func ValidateEntry(group, privateKey string) error
 ```
 
 #### internal/features/privatekey/errors.go
@@ -82,6 +87,14 @@ var (
 	ErrNotAvailable = errors.New("private key not available")
 	// ErrInvalidKey indicates a present but malformed private key.
 	ErrInvalidKey = errors.New("invalid private key")
+	// ErrEmptyGroup indicates that a group name is empty or only whitespace.
+	ErrEmptyGroup = errors.New("private-key group is empty")
+	// ErrInvalidGroup indicates a group name containing whitespace, '=', or line breaks.
+	ErrInvalidGroup = errors.New("invalid private-key group")
+	// ErrEmptyKey indicates that a private key is empty.
+	ErrEmptyKey = errors.New("private key is empty")
+	// ErrKeyHasLineBreak indicates that a private key contains a line break.
+	ErrKeyHasLineBreak = errors.New("private key contains a line break")
 )
 ```
 
@@ -89,12 +102,16 @@ var (
 ```go
 package privatekey
 
-import "os"
+import (
+	"errors"
+)
 
 // Repository defines persistent storage operations consumed by Service.
 type Repository interface {
+	// Origin returns the provenance identifier for this repository.
+	Origin() string
 	// GetPrivateKey retrieves the stored key for a group, or reports false if absent.
-	GetPrivateKey(group string) (string, bool, error)
+	GetPrivateKey(group string) (key string, found bool, err error)
 	// SetPrivateKey persists a private key for a group.
 	SetPrivateKey(group, privateKey string) error
 }
@@ -103,7 +120,7 @@ type Repository interface {
 type ServiceParams struct {
 	// Repository provides persistent key storage. Optional; nil skips repository lookup.
 	Repository Repository
-	// LookupEnv queries environment variables. Defaults to os.LookupEnv if nil.
+	// LookupEnv queries environment variables. Required.
 	LookupEnv func(string) (string, bool)
 }
 
@@ -113,11 +130,11 @@ type Service struct {
 }
 
 // NewService constructs a private key domain service.
-func NewService(params ServiceParams) *Service {
+func NewService(params ServiceParams) (*Service, error) {
 	if params.LookupEnv == nil {
-		params.LookupEnv = os.LookupEnv
+		return nil, errors.New("lookupEnv is required")
 	}
-	return &Service{params: params}
+	return &Service{params: params}, nil
 }
 
 // Resolve returns the first available private key for a group across env vars and repository.
@@ -127,7 +144,7 @@ func (s *Service) Resolve(group string) (PrivateKey, error)
 func (s *Service) Set(group, privateKey string) error
 ```
 
-#### internal/features/privatekey/filestore/store.go
+#### internal/features/privatekey/filestore/repository.go
 ```go
 package filestore
 
@@ -136,19 +153,22 @@ type Params struct {
 	Path string
 }
 
-// Store implements privatekey.Repository for a local file.
-type Store struct {
+// Repository implements privatekey.Repository for a local file.
+type Repository struct {
 	path string
 }
 
-// New constructs a file-backed private key store.
-func New(params Params) (*Store, error)
+// New constructs a file-backed private key repository.
+func New(params Params) (*Repository, error)
+
+// Origin returns the provenance identifier for the repository ("store").
+func (r *Repository) Origin() string
 
 // GetPrivateKey retrieves a private key from the local key file.
-func (s *Store) GetPrivateKey(group string) (string, bool, error)
+func (r *Repository) GetPrivateKey(group string) (key string, found bool, err error)
 
-// SetPrivateKey adds or updates a group's private key in the local file.
-func (s *Store) SetPrivateKey(group, privateKey string) error
+// SetPrivateKey adds or updates a group's private key in the local file with gitignore protection.
+func (r *Repository) SetPrivateKey(group, privateKey string) error
 ```
 
 ---
@@ -494,23 +514,23 @@ func (s *Store) Load() (*workspace.Workspace, error)
 
 - **Role & Scope**: Scaffolds starter workspaces (`quick-start`) into a target directory from embedded templates with conflict checking.
 - **Independence from Workspace Repository**: Completely decoupled from `workspace.Repository` and `workspace.Service`; does not require an existing workspace on disk.
-- **Concrete Domain Service**: The scaffolding engine is framed as a concrete domain `Service` in service.go with `ServiceParams` storing `params ServiceParams`. Exposes `Create(cmd Command) (Result, error)`.
+- **Concrete Domain Service**: The scaffolding engine is framed as a concrete domain `Service` in service.go with `ServiceParams` storing `params ServiceParams`. Exposes `Create(params CreateParams) (CreateResult, error)`.
 - **Dedicated Errors**: Sentinel errors (`ErrTemplateNotFound`, `ErrConflict`) live in a dedicated errors file.
-- **Parameter Segregation**: File conflict policy and destination directory are supplied per `Create` invocation via `Command`.
+- **Parameter Segregation**: File conflict policy and destination directory are supplied per `Create` invocation via `CreateParams`.
 
 #### internal/features/scaffold/scaffold.go
 ```go
 package scaffold
 
-// Command defines input parameters for scaffolding a workspace template.
-type Command struct {
+// CreateParams defines input parameters for scaffolding a workspace template.
+type CreateParams struct {
 	Template  string
 	TargetDir string
 	Force     bool
 }
 
-// Result represents the outcome of scaffolding a workspace template.
-type Result struct {
+// CreateResult represents the outcome of scaffolding a workspace template.
+type CreateResult struct {
 	Written []string
 }
 ```
@@ -537,7 +557,7 @@ import "io/fs"
 
 // ServiceParams provides template filesystem dependencies to the scaffolding service.
 type ServiceParams struct {
-	// Source provides template files (defaults to embedded templates if nil).
+	// Source provides template files. Required.
 	Source fs.FS
 }
 
@@ -547,12 +567,15 @@ type Service struct {
 }
 
 // NewService constructs a workspace scaffolding domain service.
-func NewService(params ServiceParams) *Service {
-	return &Service{params: params}
+func NewService(params ServiceParams) (*Service, error) {
+	if params.Source == nil {
+		return nil, errors.New("template source fs is required")
+	}
+	return &Service{params: params}, nil
 }
 
 // Create scaffolds a template into the target directory with conflict checks.
-func (s *Service) Create(cmd Command) (Result, error)
+func (s *Service) Create(params CreateParams) (CreateResult, error)
 ```
 
 ---
@@ -1104,14 +1127,18 @@ func NewSecretsService(secretsPath, keysPath string, cipherParams cipher.Params,
 		return nil, fmt.Errorf("creating configured cipher: %w", err)
 	}
 
-	pkStore, err := pkfilestore.New(pkfilestore.Params{Path: keysPath})
+	pkRepo, err := pkfilestore.New(pkfilestore.Params{Path: keysPath})
 	if err != nil {
-		return nil, fmt.Errorf("creating privatekey store: %w", err)
+		return nil, fmt.Errorf("creating privatekey repository: %w", err)
 	}
 
-	pkService := privatekey.NewService(privatekey.ServiceParams{
-		Repository: pkStore,
+	pkService, err := privatekey.NewService(privatekey.ServiceParams{
+		Repository: pkRepo,
+		LookupEnv:  os.LookupEnv,
 	})
+	if err != nil {
+		return nil, fmt.Errorf("creating privatekey service: %w", err)
+	}
 
 	secStore, err := secfilestore.New(secfilestore.Params{
 		Path:          secretsPath,
@@ -1135,7 +1162,7 @@ Every sub-phase must compile, pass formatting and lint checks (`task envx:check`
 
 ```mermaid
 flowchart LR
-    Sub81["8.1: privatekey<br/>(Lighthouse)"] --> Sub82["8.2: workspace & scaffold<br/>(Workspace & Scaffolder)"]
+    Sub81["✅ 8.1: privatekey<br/>(Lighthouse)"] --> Sub82["✅ 8.2: workspace & scaffold<br/>(Workspace & Scaffolder)"]
     Sub82 --> Sub83["8.3: secrets<br/>(Store & Service)"]
     Sub83 --> Sub84["8.4: env<br/>(NamespaceStore)"]
     Sub84 --> Sub85["8.5: runner & emit<br/>(Pure Services)"]
@@ -1144,20 +1171,22 @@ flowchart LR
     Sub87 --> Sub88["8.8: Polish<br/>(Mocks & Verification)"]
 ```
 
-### Phase 8.1: Private Key DI Refactoring (Lighthouse)
-1. **Define repository and errors**: Declare storage-agnostic `GetPrivateKey` and `SetPrivateKey` in the repository contract and extract sentinel errors into a dedicated errors file.
-2. **Create privatekey filestore subpackage**: Move keyfile parsing and atomic persistence into the filestore subpackage, implementing `privatekey.Repository` with private filesystem configuration.
-3. **Reframe Resolver as Service**: Refactor the resolver into a concrete domain service `*Service` providing both `Resolve` and `Set` operations via `ServiceParams`.
-4. **Update core and callers**: Wire `pkfilestore.New` and `privatekey.NewService` in [app/internal/core/composer.go](app/internal/core/composer.go) and [app/internal/core/config.go](app/internal/core/config.go).
-5. **Update tests & verify**: Update unit tests to test `filestore` directly and use in-memory fake repositories for `Service`. Run `task envx:test`.
+### ✅ Phase 8.1: Private Key DI Refactoring (Lighthouse)
+1. **Define repository and errors**: Declared storage-agnostic `GetPrivateKey(group) (key, found, err)` and `SetPrivateKey(group, privateKey) error` along with provenance tracking `Origin() string` in `privatekey.Repository`, and extracted sentinel errors into [app/internal/features/privatekey/errors.go](app/internal/features/privatekey/errors.go).
+2. **Create privatekey filestore subpackage**: Implemented `filestore.Repository` encapsulating document line/comment preservation, `0600` atomic file writes, and directory creation.
+3. **Extract Git ignore helper**: Created [app/internal/utils/git](app/internal/utils/git) (`EnsureIgnored`) to automatically verify and apply `.gitignore` protection before writing private keys to disk.
+4. **Rename file utilities package**: Renamed `utils/file` to [app/internal/utils/filex](app/internal/utils/filex) to prevent symbol collisions with local file variables across the codebase.
+5. **Reframe Resolver as Service**: Replaced `Resolver` and `Destination` with concrete domain service `*Service` providing both `Resolve` and `Set` operations via `ServiceParams`.
+6. **Update core and callers**: Wired `pkfilestore.New` and `privatekey.NewService` in [app/internal/core/composer.go](app/internal/core/composer.go) and updated `secrets.Manager` to consume `PrivateKeyService`.
+7. **Comprehensive tests & verification**: Verified complete test suites with fast in-memory fake repositories in [app/internal/features/privatekey/service_test.go](app/internal/features/privatekey/service_test.go) and isolated filesystem tests in [app/internal/features/privatekey/filestore/repository_test.go](app/internal/features/privatekey/filestore/repository_test.go). Verified with `task envx:check` and `task envx:test`.
 
-### Phase 8.2: Workspace & Scaffold DI Refactoring
-1. **Consolidate domain entity**: Define pure `workspace.Workspace` in workspace.go with zero YAML tags, replacing `Manifest`, `ManifestDoc`, and `Document`.
-2. **Define repository and service**: Declare `Load` in `workspace.Repository` within service.go, internalizing discovery and existence checks into `filestore.Store`.
-3. **Create workspace filestore subpackage**: Implement `filestore.Store` encapsulating walk-up discovery, file reading, strict YAML decoding, and indentation detection.
-4. **Extract scaffold feature**: Extract workspace template creation into a dedicated `features/scaffold` package (`scaffold.Service`, `Command`, `Result`), decoupling template extraction from runtime workspace configuration.
-5. **Wire in core and CLI**: Update [app/internal/core/config.go](app/internal/core/config.go) and [app/internal/core/composer.go](app/internal/core/composer.go) to wire `workspace.Service`, and wire `scaffold.Service` into the `envx create` CLI command.
-6. **Update tests & verify**: Run `task envx:test`.
+### ✅ Phase 8.2: Workspace & Scaffold DI Refactoring
+1. **Consolidate domain entity**: Defined pure `workspace.Workspace` in [app/internal/features/workspace/workspace.go](app/internal/features/workspace/workspace.go) with zero YAML tags, replacing `Manifest`, `ManifestDoc`, and `Document`. Extracted sentinel errors into [app/internal/features/workspace/errors.go](app/internal/features/workspace/errors.go).
+2. **Define repository and service**: Declared `Load` in `workspace.Repository` within [app/internal/features/workspace/service.go](app/internal/features/workspace/service.go), internalizing discovery and existence checks into `filestore.Store`.
+3. **Create workspace filestore subpackage**: Implemented `filestore.Store` in [app/internal/features/workspace/filestore](app/internal/features/workspace/filestore) encapsulating walk-up discovery, file reading, strict YAML decoding, nearest-key suggestions, and indentation detection.
+4. **Extract scaffold feature**: Extracted workspace template creation into a dedicated `features/scaffold` package (`scaffold.Service`, `CreateParams`, `CreateResult`) and CLI adapter (`scaffold/cli`), decoupling template extraction from runtime workspace configuration.
+5. **Wire in core and CLI**: Updated [app/internal/core/config.go](app/internal/core/config.go) and [app/internal/core/composer.go](app/internal/core/composer.go) to wire `workspace.Service` and `wsfilestore.Store`, and wired `scaffold.Service` into the `envx create` CLI command via [app/internal/cli/root.go](app/internal/cli/root.go).
+6. **Update tests & verify**: Added in-memory unit tests in [app/internal/features/workspace/service_test.go](app/internal/features/workspace/service_test.go), comprehensive filestore tests in [app/internal/features/workspace/filestore/store_test.go](app/internal/features/workspace/filestore/store_test.go), and scaffold tests in [app/internal/features/scaffold/service_test.go](app/internal/features/scaffold/service_test.go). All unit, e2e, and lint checks verified.
 
 ### Phase 8.3: Secrets DI Refactoring
 1. **Define secrets repository interface**: Declare CRUD operations for public keys, keypairs, and secrets in the secrets package root, omitting filesystem existence and document validation.
