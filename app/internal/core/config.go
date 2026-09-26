@@ -9,6 +9,7 @@ import (
 	"github.com/go-envx/envx/app/internal/features/env"
 	"github.com/go-envx/envx/app/internal/features/secrets"
 	"github.com/go-envx/envx/app/internal/features/workspace"
+	wsfilestore "github.com/go-envx/envx/app/internal/features/workspace/filestore"
 	"github.com/go-envx/envx/app/internal/resources/cipher"
 	"github.com/go-envx/envx/app/internal/utils/filex"
 )
@@ -56,8 +57,8 @@ type Input struct {
 // resolveProjectLayer both read, and which Result retains so OverlayPath can
 // validate and join a target without re-loading.
 type manifestContext struct {
-	// manifest is the parsed, validated manifest.
-	manifest *workspace.Manifest
+	// workspace is the parsed, validated workspace.
+	workspace *workspace.Workspace
 	// path is the absolute path the manifest was loaded from.
 	path string
 	// dir is the absolute directory the manifest was loaded from.
@@ -156,8 +157,8 @@ func ResolveWorkspace(in *Input) (*Result, error) {
 // "project not found" error). Terminal fallbacks (e.g. the default environment)
 // are applied downstream, so an unset env stays empty here.
 func resolve(in *Input, project string) (*Result, env.Params, error) {
-	// Bind the resolved manifest path and conventional filename into a loader.
-	manifestLoader, err := workspace.NewManifestLoader(workspace.ManifestLoaderParams{
+	// Bind the resolved manifest path and conventional filename into a filestore.
+	repo, err := wsfilestore.New(wsfilestore.Params{
 		Path:     resolveManifestPath(in),
 		Filename: defaultManifestFilename,
 	})
@@ -165,22 +166,25 @@ func resolve(in *Input, project string) (*Result, env.Params, error) {
 		return nil, env.Params{}, err
 	}
 
-	// Load the manifest from the resolved manifest path.
-	manifestDocument, err := manifestLoader.Load()
+	// Construct the workspace service and load the workspace.
+	wsService, err := workspace.NewService(workspace.ServiceParams{
+		Repository: repo,
+	})
+	if err != nil {
+		return nil, env.Params{}, err
+	}
+	ws, err := wsService.Load()
 	if err != nil {
 		return nil, env.Params{}, err
 	}
 
-	// Get the absolute directory of the manifest so project includes can be joined.
-	dir := filepath.Dir(manifestDocument.Path)
-
 	// Construct the manifest context.
 	mc := manifestContext{
-		manifest: manifestDocument.Content,
-		path:     manifestDocument.Path,
-		dir:      dir,
-		indent:   manifestDocument.Indent,
-		project:  project,
+		workspace: ws,
+		path:      ws.Path,
+		dir:       ws.Root,
+		indent:    ws.Indent,
+		project:   project,
 	}
 
 	// Resolve the manifest context and input into a single Result.
@@ -236,7 +240,7 @@ func resolveProjectLayer(mc manifestContext) (projectLayer, error) {
 	}
 
 	// Look up the project in the manifest.
-	project, ok := mc.manifest.LookupProject(mc.project)
+	project, ok := mc.workspace.LookupProject(mc.project)
 	if !ok {
 		return projectLayer{}, fmt.Errorf(
 			"project %q not found in manifest", mc.project,
@@ -265,10 +269,10 @@ func resolveEnvmergeParams(
 	in *Input,
 	pl projectLayer,
 ) env.Params {
-	proj, global := pl.settings, mc.manifest.Settings
+	proj, global := pl.settings, mc.workspace.Settings
 	return env.Params{
 		Includes:     pl.includes,
-		Environments: mc.manifest.Environments,
+		Environments: mc.workspace.Environments,
 		DefaultEnvironment: env.PrecedenceString(&env.Env,
 			in.Env,
 			proj.Env,
@@ -331,7 +335,7 @@ func osEnvironment() map[string]string {
 // jobs.
 func resolveSecretsParams(mc manifestContext) secrets.Params {
 	// Look up the secrets path in the manifest; use the default filename if unset.
-	secretsPath := mc.manifest.Secrets.SecretsPath
+	secretsPath := mc.workspace.Secrets.SecretsPath
 	if secretsPath == "" {
 		secretsPath = defaultSecretsFilename
 	}
@@ -339,7 +343,7 @@ func resolveSecretsParams(mc manifestContext) secrets.Params {
 
 	// Look up the private-key path in the manifest; default beside the resolved
 	// secrets store and resolve explicit relative paths beside the manifest.
-	keysPath := mc.manifest.Secrets.KeysPath
+	keysPath := mc.workspace.Secrets.KeysPath
 	if keysPath == "" {
 		keysPath = filepath.Join(filepath.Dir(resolvedSecretsPath), defaultKeysFilename)
 	} else {
@@ -365,7 +369,7 @@ func resolveSecretsParams(mc manifestContext) secrets.Params {
 // resolveCipherParams resolves the configured algorithm and its construction
 // options while keeping cipher selection outside the secrets package.
 func resolveCipherParams(mc manifestContext) cipher.Params {
-	algorithm := cipher.Algorithm(mc.manifest.Secrets.Cipher)
+	algorithm := cipher.Algorithm(mc.workspace.Secrets.Cipher)
 	if algorithm == "" {
 		algorithm = defaultCipherAlgorithm
 	}

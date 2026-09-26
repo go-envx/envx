@@ -50,15 +50,15 @@ func (r *Result) WorkspaceDir() string {
 func (r *Result) OverlayPath(includePath string) (string, error) {
 	targetEnv := r.defaultEnvironment
 	if targetEnv == "" {
-		targetEnv = r.manifest.DefaultEnvironment()
+		targetEnv = r.workspace.DefaultEnvironment()
 	}
-	if !r.manifest.HasEnvironment(targetEnv) {
+	if !r.workspace.HasEnvironment(targetEnv) {
 		return "", fmt.Errorf(
 			"environment %q is not declared in the manifest (available: %v)",
-			targetEnv, r.manifest.Environments,
+			targetEnv, r.workspace.Environments,
 		)
 	}
-	if !r.manifest.HasInclude(includePath) {
+	if !r.workspace.HasInclude(includePath) {
 		return "", fmt.Errorf("include %q not found in manifest", includePath)
 	}
 	return filepath.Join(r.dir, includePath) + "." + targetEnv + ".yaml", nil

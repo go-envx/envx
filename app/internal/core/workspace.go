@@ -64,8 +64,8 @@ func ResolveWorkspaceLayout(in *Input) (*WorkspaceLayout, error) {
 	}
 
 	// Collect and sort the declared project names for deterministic iteration.
-	names := make([]string, 0, len(base.manifest.Projects))
-	for name := range base.manifest.Projects {
+	names := make([]string, 0, len(base.workspace.Projects))
+	for name := range base.workspace.Projects {
 		names = append(names, name)
 	}
 	sort.Strings(names)
@@ -75,7 +75,7 @@ func ResolveWorkspaceLayout(in *Input) (*WorkspaceLayout, error) {
 	for _, name := range names {
 		projects = append(projects, ProjectIncludes{
 			Name:     name,
-			Includes: base.manifest.Projects[name].Includes,
+			Includes: base.workspace.Projects[name].Includes,
 		})
 	}
 
@@ -84,7 +84,7 @@ func ResolveWorkspaceLayout(in *Input) (*WorkspaceLayout, error) {
 		Root:         base.dir,
 		SecretsPath:  base.Secrets.SecretsPath,
 		KeysPath:     base.Secrets.KeysPath,
-		Environments: base.manifest.Environments,
+		Environments: base.workspace.Environments,
 		Projects:     projects,
 	}, nil
 }
@@ -105,8 +105,8 @@ func ResolveWorkspaceProjects(in *Input) (*WorkspaceProjects, error) {
 	}
 
 	// Collect and sort the declared project names for deterministic iteration.
-	names := make([]string, 0, len(base.manifest.Projects))
-	for name := range base.manifest.Projects {
+	names := make([]string, 0, len(base.workspace.Projects))
+	for name := range base.workspace.Projects {
 		names = append(names, name)
 	}
 	sort.Strings(names)
@@ -123,14 +123,14 @@ func ResolveWorkspaceProjects(in *Input) (*WorkspaceProjects, error) {
 
 	// Resolve the validate severity overrides. The manifest already validated the
 	// block at load, so this only re-keys it by canonical code.
-	severity, err := status.Resolve(base.manifest.ValidateSeverities)
+	severity, err := status.Resolve(base.workspace.ValidateSeverities)
 	if err != nil {
 		return nil, err
 	}
 
 	return &WorkspaceProjects{
 		Projects:     projects,
-		Environments: base.manifest.Environments,
+		Environments: base.workspace.Environments,
 		Secrets:      base.Secrets,
 		Cipher:       base.Cipher,
 		Severity:     severity,
