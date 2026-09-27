@@ -10,9 +10,27 @@ import (
 	"testing"
 
 	"github.com/go-envx/envx/app/internal/core"
+	"github.com/go-envx/envx/app/internal/features/runner"
 	"github.com/go-envx/envx/app/internal/resources/cipher"
+	"github.com/go-envx/envx/app/internal/utils/printer"
 	"github.com/go-envx/envx/app/test/fixtures"
 )
+
+func runAction(
+	t *testing.T, p actionParams, in *core.Input, stdout, stderr io.Writer,
+) error {
+	t.Helper()
+	svc := runner.NewService(runner.ServiceParams{
+		Stdout: stdout,
+		Stderr: stderr,
+		Stdin:  strings.NewReader(""),
+	})
+	pr := printer.New(printer.Options{
+		Out: stdout,
+		Err: stderr,
+	})
+	return execute(svc, p, in, pr)
+}
 
 // TestExecuteInjectsEnv verifies the resolved environment reaches the child
 // process under the default (no-overload) settings.
@@ -22,10 +40,10 @@ func TestExecuteInjectsEnv(t *testing.T) {
 	path := fixtures.Manifest("basic")
 	var stdout bytes.Buffer
 	in := &core.Input{ConfigPath: &path}
-	err := execute(actionParams{
+	err := runAction(t, actionParams{
 		Project:  "api-core",
 		ExecArgs: []string{"printenv", "APP_NAME"},
-	}, in, streams{Stdout: &stdout, Stderr: io.Discard})
+	}, in, &stdout, io.Discard)
 	if err != nil {
 		t.Fatalf("execute: %v", err)
 	}
@@ -43,10 +61,10 @@ func TestExecuteOverloadFromEnv(t *testing.T) {
 	path := fixtures.Manifest("basic")
 	var stdout bytes.Buffer
 	in := &core.Input{ConfigPath: &path}
-	err := execute(actionParams{
+	err := runAction(t, actionParams{
 		Project:  "api-core",
 		ExecArgs: []string{"printenv", "APP_NAME"},
-	}, in, streams{Stdout: &stdout, Stderr: io.Discard})
+	}, in, &stdout, io.Discard)
 	if err != nil {
 		t.Fatalf("execute: %v", err)
 	}
@@ -64,10 +82,10 @@ func TestExecuteUnionsOSKeys(t *testing.T) {
 	path := fixtures.Manifest("basic")
 	var stdout bytes.Buffer
 	in := &core.Input{ConfigPath: &path}
-	err := execute(actionParams{
+	err := runAction(t, actionParams{
 		Project:  "api-core",
 		ExecArgs: []string{"printenv", "OS_ONLY_VAR"},
-	}, in, streams{Stdout: &stdout, Stderr: io.Discard})
+	}, in, &stdout, io.Discard)
 	if err != nil {
 		t.Fatalf("execute: %v", err)
 	}
@@ -109,10 +127,10 @@ func TestExecuteRevealFailurePreventsChildStartup(t *testing.T) {
 
 	cfgPath := filepath.Join(dir, "envx.yaml")
 	var stdout bytes.Buffer
-	err = execute(actionParams{
+	err = runAction(t, actionParams{
 		Project:  "api",
 		ExecArgs: []string{"printenv", "PASSWORD"},
-	}, &core.Input{ConfigPath: &cfgPath}, streams{Stdout: &stdout, Stderr: io.Discard})
+	}, &core.Input{ConfigPath: &cfgPath}, &stdout, io.Discard)
 	if err == nil {
 		t.Fatal("expected the reveal failure to prevent child-process startup")
 	}
@@ -136,10 +154,10 @@ func TestExecuteIgnoreErrorsFailsClosedByDefault(t *testing.T) {
 
 	cfgPath := filepath.Join(dir, "envx.yaml")
 	var stdout bytes.Buffer
-	err := execute(actionParams{
+	err := runAction(t, actionParams{
 		Project:  "api",
 		ExecArgs: []string{"printenv", "GOOD"},
-	}, &core.Input{ConfigPath: &cfgPath}, streams{Stdout: &stdout, Stderr: io.Discard})
+	}, &core.Input{ConfigPath: &cfgPath}, &stdout, io.Discard)
 	if err == nil {
 		t.Fatal("expected the missing reference to abort the run")
 	}
@@ -162,11 +180,11 @@ func TestExecuteIgnoreErrorsStartsChild(t *testing.T) {
 
 	cfgPath := filepath.Join(dir, "envx.yaml")
 	var stdout, stderr bytes.Buffer
-	err := execute(actionParams{
+	err := runAction(t, actionParams{
 		Project:      "api",
 		ExecArgs:     []string{"sh", "-c", "echo GOOD=$GOOD; echo BROKEN=${BROKEN-<unset>}"},
 		IgnoreErrors: true,
-	}, &core.Input{ConfigPath: &cfgPath}, streams{Stdout: &stdout, Stderr: &stderr})
+	}, &core.Input{ConfigPath: &cfgPath}, &stdout, &stderr)
 	if err != nil {
 		t.Fatalf("execute: %v", err)
 	}
@@ -196,11 +214,11 @@ func TestExecuteIgnoreErrorsKeepsAmbientValue(t *testing.T) {
 
 	cfgPath := filepath.Join(dir, "envx.yaml")
 	var stdout, stderr bytes.Buffer
-	err := execute(actionParams{
+	err := runAction(t, actionParams{
 		Project:      "api",
 		ExecArgs:     []string{"sh", "-c", "echo BROKEN=$BROKEN"},
 		IgnoreErrors: true,
-	}, &core.Input{ConfigPath: &cfgPath}, streams{Stdout: &stdout, Stderr: &stderr})
+	}, &core.Input{ConfigPath: &cfgPath}, &stdout, &stderr)
 	if err != nil {
 		t.Fatalf("execute: %v", err)
 	}
@@ -209,6 +227,48 @@ func TestExecuteIgnoreErrorsKeepsAmbientValue(t *testing.T) {
 	}
 	if !strings.Contains(stderr.String(), "keeping the value") {
 		t.Errorf("stderr = %q, want a fallback warning", stderr.String())
+	}
+}
+
+type fakeRunner struct {
+	called bool
+	params runner.RunParams
+	err    error
+}
+
+func (f *fakeRunner) Run(params runner.RunParams) error {
+	f.called = true
+	f.params = params
+	return f.err
+}
+
+// TestExecuteUsesInjectedRunner verifies execute invokes the consumer-defined
+// runnerService with the expected command arguments and materialized environment.
+func TestExecuteUsesInjectedRunner(t *testing.T) {
+	t.Parallel()
+
+	path := fixtures.Manifest("basic")
+	in := &core.Input{ConfigPath: &path}
+	fake := &fakeRunner{}
+	var stdout, stderr bytes.Buffer
+	pr := printer.New(printer.Options{Out: &stdout, Err: &stderr})
+	err := execute(fake, actionParams{
+		Project:  "api-core",
+		ExecArgs: []string{"custom-cmd", "--arg1"},
+	}, in, pr)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !fake.called {
+		t.Fatal("expected runner to be called")
+	}
+	if len(fake.params.Args) != 2 ||
+		fake.params.Args[0] != "custom-cmd" ||
+		fake.params.Args[1] != "--arg1" {
+		t.Errorf("unexpected args: %v", fake.params.Args)
+	}
+	if fake.params.Env["APP_NAME"] != "api-core" {
+		t.Errorf("expected APP_NAME=api-core in env, got %q", fake.params.Env["APP_NAME"])
 	}
 }
 

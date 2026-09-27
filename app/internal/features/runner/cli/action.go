@@ -1,13 +1,16 @@
 package cli
 
 import (
-	"io"
-
 	"github.com/go-envx/envx/app/internal/core"
 	"github.com/go-envx/envx/app/internal/features/env"
 	"github.com/go-envx/envx/app/internal/features/runner"
 	"github.com/go-envx/envx/app/internal/utils/printer"
 )
+
+// runnerService defines the process execution contract required by the run action.
+type runnerService interface {
+	Run(params runner.RunParams) error
+}
 
 // actionParams are the positional inputs to the run action.
 type actionParams struct {
@@ -20,19 +23,13 @@ type actionParams struct {
 	IgnoreErrors bool
 }
 
-// streams bundles the output sinks the run action wires the child process to.
-type streams struct {
-	// Stdout is the sink for the child process's standard output.
-	Stdout io.Writer
-	// Stderr is the sink for the child process's standard error.
-	Stderr io.Writer
-}
-
 // execute is the imperative shell: resolve the input into an env.Manager,
 // materialize the complete effective environment, then run the child process with
 // it. Overload and OS composition are settled inside Materialize, so the runner
 // receives a ready environment.
-func execute(p actionParams, in *core.Input, s streams) error {
+func execute(
+	r runnerService, p actionParams, in *core.Input, pr *printer.Printer,
+) error {
 	// resolve the input config
 	resolved, err := core.ResolveProject(in, p.Project)
 	if err != nil {
@@ -51,10 +48,6 @@ func execute(p actionParams, in *core.Input, s streams) error {
 	if err != nil {
 		return err
 	}
-	pr := printer.New(printer.Options{
-		Out: s.Stdout,
-		Err: s.Stderr,
-	})
 	for _, warning := range result.Warnings {
 		_ = pr.LogWarning(warning.Error())
 	}
@@ -62,9 +55,8 @@ func execute(p actionParams, in *core.Input, s streams) error {
 	// run the child process with the ready environment; the runner injects it
 	// verbatim, forwards signals to the child, and surfaces a non-zero or
 	// signal-terminated exit as an *exitcode.Error so main.go can propagate it.
-	return runner.Run(p.ExecArgs, runner.Params{
-		Env:    result.Environment.All(),
-		Stdout: s.Stdout,
-		Stderr: s.Stderr,
+	return r.Run(runner.RunParams{
+		Args: p.ExecArgs,
+		Env:  result.Environment.All(),
 	})
 }
