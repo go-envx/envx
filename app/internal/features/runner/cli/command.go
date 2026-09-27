@@ -6,7 +6,9 @@ import (
 
 	"github.com/go-envx/envx/app/internal/core"
 	"github.com/go-envx/envx/app/internal/features/env"
+	"github.com/go-envx/envx/app/internal/features/runner"
 	"github.com/go-envx/envx/app/internal/shared/flags"
+	"github.com/go-envx/envx/app/internal/utils/printer"
 	"github.com/go-envx/envx/app/internal/utils/str"
 	"github.com/spf13/cobra"
 )
@@ -63,11 +65,23 @@ func NewRunCmd() *cobra.Command {
 			flagset := cmd.Flags()
 			input := core.GetInput(flagset)
 
-			// execute the action
-			return execute(p, input, streams{
+			pr := printer.New(printer.Options{
+				Out: cmd.OutOrStdout(),
+				Err: cmd.ErrOrStderr(),
+			})
+
+			// runner.Service binds directly to process I/O streams (Stdout, Stderr, Stdin).
+			// Because Cobra streams are dynamic, command-scoped, and can be redirected per
+			// invocation (e.g. in tests via cmd.SetOut/SetErr), the service is constructed
+			// here in RunE rather than injected via NewRunCmd at the CLI root.
+			svc := runner.NewService(runner.ServiceParams{
 				Stdout: cmd.OutOrStdout(),
 				Stderr: cmd.ErrOrStderr(),
+				Stdin:  cmd.InOrStdin(),
 			})
+
+			// execute the action
+			return execute(svc, p, input, pr)
 		},
 	}
 
@@ -83,14 +97,9 @@ func NewRunCmd() *cobra.Command {
 
 	// --ignore-errors is a command-local flag, not a precedence-resolved setting,
 	// so it binds directly rather than through RegisterFlags.
-	flags.Bind(cmd.Flags(), &ignoreErrors, &IgnoreErrors)
+	flags.Bind(cmd.Flags(), &ignoreErrors, &ignoreErrorsFlag)
 
 	return cmd
-}
-
-// NewCommand is an alias for NewRunCmd.
-func NewCommand() *cobra.Command {
-	return NewRunCmd()
 }
 
 // validateArgs enforces run's positional layout: exactly one project name, a
