@@ -731,6 +731,7 @@ func (s *Store) LoadOverlay(includePath, env string) (env.NamespaceData, bool, e
 - **Concrete Domain Service**: The execution runner is framed as a concrete domain `Service` with `ServiceParams` storing `params ServiceParams`. Exposes `Run(params RunParams) error`.
 - **Dedicated Errors**: Sentinel errors (`ErrNoCommandSpecified`, `ErrProcessStartFailed`) live in a dedicated errors file.
 - **Parameter Segregation**: Standard streams (`Stdout`, `Stderr`, `Stdin`) are injected via `ServiceParams`, defaulting to OS streams when nil. Command arguments and injected environment maps are provided per `Run` invocation via `RunParams`.
+- **CLI Lifecycle & DI Boundary**: `runner.Service` binds directly to execution streams (`Stdout`, `Stderr`, `Stdin`). Because Cobra streams are dynamic, command-scoped, and overridable per invocation (e.g. `cmd.OutOrStdout()`), the concrete service is constructed within `RunE` rather than passed into `NewRunCmd()` at root startup. The action shell (`action.go`) remains decoupled and fully testable via the `runnerService` consumer interface.
 
 #### internal/features/runner/process.go
 ```go
