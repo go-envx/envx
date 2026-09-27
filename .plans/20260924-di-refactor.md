@@ -728,16 +728,16 @@ func (s *Store) LoadOverlay(includePath, env string) (env.NamespaceData, bool, e
 
 - **Role & Scope**: Subprocess supervisor executing child processes with injected materialized environments, transparent POSIX signal forwarding, and exit code mirroring.
 - **Consumer Interface**: Operates on injected process streams (`io.Writer`, `io.Reader`). Does not require a persistence repository.
-- **Concrete Domain Service**: The execution runner is framed as a concrete domain `Service` with `ServiceParams` storing `params ServiceParams`. Exposes `Run(cmd Command) error`.
+- **Concrete Domain Service**: The execution runner is framed as a concrete domain `Service` with `ServiceParams` storing `params ServiceParams`. Exposes `Run(params RunParams) error`.
 - **Dedicated Errors**: Sentinel errors (`ErrNoCommandSpecified`, `ErrProcessStartFailed`) live in a dedicated errors file.
-- **Parameter Segregation**: Standard streams (`Stdout`, `Stderr`, `Stdin`) are injected via `ServiceParams`, defaulting to OS streams when nil. Command arguments and environment maps are provided per `Run` invocation via `Command`.
+- **Parameter Segregation**: Standard streams (`Stdout`, `Stderr`, `Stdin`) are injected via `ServiceParams`, defaulting to OS streams when nil. Command arguments and injected environment maps are provided per `Run` invocation via `RunParams`.
 
 #### internal/features/runner/process.go
 ```go
 package runner
 
-// Command specifies the child command to spawn and its injected environment.
-type Command struct {
+// RunParams specifies the child command to spawn and its injected environment.
+type RunParams struct {
 	Args []string
 	Env  map[string]string
 }
@@ -793,7 +793,7 @@ func NewService(params ServiceParams) *Service {
 }
 
 // Run executes the command with injected environment and relays received signals.
-func (s *Service) Run(cmd Command) error
+func (s *Service) Run(params RunParams) error
 ```
 
 ---
@@ -801,16 +801,14 @@ func (s *Service) Run(cmd Command) error
 ### 7. Feature: Target Serialization (Emit)
 
 - **Role & Scope**: Serializes resolved environment key-value pairs into target deployment formats: plain dotenv, flat JSON, or Kubernetes resources (splitting sensitive keys into Kubernetes Secret and non-sensitive into ConfigMap, or unified bundle).
-- **Consumer Interface**: Does not require a repository. Operates on in-memory entries and serializes directly to any destination `io.Writer`.
-- **Concrete Domain Service**: The emit engine is framed as a concrete domain `Service` with `ServiceParams` storing `params ServiceParams`. Exposes `Render(cmd Command) error` to avoid method stutter (`emit.Emit`).
+- **Consumer Interface**: Does not require a repository. Operates on in-memory entries and serializes directly to destination `io.Writer`.
+- **Concrete Domain Service**: The emit engine is framed as a concrete domain `Service` with `ServiceParams` storing `params ServiceParams`. Exposes `Render(params RenderParams) error` to avoid method stutter (`emit.Emit`).
 - **Dedicated Errors**: Sentinel errors (`ErrUnknownTarget`, `ErrMissingNameBase`, `ErrNoEntries`) live in a dedicated errors file.
-- **Parameter Segregation**: Output formats, entry slices, and writer streams are supplied in `Command` at execution time.
+- **Parameter Segregation**: Destination stream (`Writer`) is injected via `ServiceParams`, defaulting to `os.Stdout` when nil. Output formats and entry slices are supplied in `RenderParams` at execution time.
 
 #### internal/features/emit/target.go
 ```go
 package emit
-
-import "io"
 
 // Target identifies the output serialization target.
 type Target string
@@ -829,15 +827,15 @@ type Entry struct {
 	Secret bool
 }
 
-// Command configures a single serialization request.
-type Command struct {
+// RenderParams configures a single serialization request.
+type RenderParams struct {
 	Target         Target
 	Entries        []Entry
-	Writer         io.Writer
 	NameBase       string
 	ExactName      bool
 	IncludeSecrets bool
 	IncludeConfig  bool
+	Key            string
 }
 ```
 
@@ -861,8 +859,15 @@ var (
 ```go
 package emit
 
-// ServiceParams configures default serialization parameters.
-type ServiceParams struct{}
+import (
+	"io"
+	"os"
+)
+
+// ServiceParams configures output stream dependencies for the serialization service.
+type ServiceParams struct {
+	Writer io.Writer
+}
 
 // Service handles rendering materialized environments into target formats.
 type Service struct {
@@ -871,11 +876,14 @@ type Service struct {
 
 // NewService constructs an emit domain service.
 func NewService(params ServiceParams) *Service {
+	if params.Writer == nil {
+		params.Writer = os.Stdout
+	}
 	return &Service{params: params}
 }
 
-// Render renders the requested environment entries to the target writer.
-func (s *Service) Render(cmd Command) error
+// Render renders the requested environment entries to the configured writer.
+func (s *Service) Render(params RenderParams) error
 ```
 
 ---
@@ -1163,12 +1171,13 @@ Every sub-phase must compile, pass formatting and lint checks (`task envx:check`
 ```mermaid
 flowchart LR
     Sub81["✅ 8.1: privatekey<br/>(Lighthouse)"] --> Sub82["✅ 8.2: workspace & scaffold<br/>(Workspace & Scaffolder)"]
-    Sub82 --> Sub83["8.3: secrets<br/>(Store & Service)"]
-    Sub83 --> Sub84["8.4: env<br/>(NamespaceStore)"]
-    Sub84 --> Sub85["8.5: runner & emit<br/>(Pure Services)"]
-    Sub85 --> Sub86["8.6: pack & validate<br/>(Bundling & Checks)"]
-    Sub86 --> Sub87["8.7: core<br/>(Composition Clean)"]
-    Sub87 --> Sub88["8.8: Polish<br/>(Mocks & Verification)"]
+    Sub82 --> Sub83["✅ 8.3: runner<br/>(Process Supervision)"]
+    Sub83 --> Sub84["8.4: emit<br/>(Serialization Engine)"]
+    Sub84 --> Sub85["8.5: secrets<br/>(Store & Service)"]
+    Sub85 --> Sub86["8.6: env<br/>(NamespaceStore)"]
+    Sub86 --> Sub87["8.7: pack & validate<br/>(Bundling & Checks)"]
+    Sub87 --> Sub88["8.8: core<br/>(Composition Clean)"]
+    Sub88 --> Sub89["8.9: Polish<br/>(Mocks & Verification)"]
 ```
 
 ### ✅ Phase 8.1: Private Key DI Refactoring (Lighthouse)
@@ -1188,39 +1197,45 @@ flowchart LR
 5. **Wire in core and CLI**: Updated [app/internal/core/config.go](app/internal/core/config.go) and [app/internal/core/composer.go](app/internal/core/composer.go) to wire `workspace.Service` and `wsfilestore.Store`, and wired `scaffold.Service` into the `envx create` CLI command via [app/internal/cli/root.go](app/internal/cli/root.go).
 6. **Update tests & verify**: Added in-memory unit tests in [app/internal/features/workspace/service_test.go](app/internal/features/workspace/service_test.go), comprehensive filestore tests in [app/internal/features/workspace/filestore/store_test.go](app/internal/features/workspace/filestore/store_test.go), and scaffold tests in [app/internal/features/scaffold/service_test.go](app/internal/features/scaffold/service_test.go). All unit, e2e, and lint checks verified.
 
-### Phase 8.3: Secrets DI Refactoring
+### ✅ Phase 8.3: Process Execution DI Refactoring (`runner`)
+1. **Refactor runner Service**: Frame process supervision and stream injection in `runner.Service` with `ServiceParams` (`Stdout`, `Stderr`, `Stdin`).
+2. **Define domain models and errors**: Declare `RunParams` (`Args`, `Env`) and extract sentinel errors (`ErrNoCommandSpecified`, `ErrProcessStartFailed`) into [app/internal/features/runner/errors.go](app/internal/features/runner/errors.go).
+3. **Update CLI caller**: Wire `runner.Service` into its presentation CLI adapter and define consumer interface.
+4. **Update tests & verify**: Run `task envx:test`.
+
+### Phase 8.4: Target Serialization DI Refactoring (`emit`)
+1. **Refactor emit Service**: Frame target serialization in `emit.Service` with `ServiceParams` (`Writer`).
+2. **Define domain models and errors**: Declare `RenderParams` and extract sentinel errors (`ErrUnknownTarget`, `ErrMissingNameBase`, `ErrNoEntries`) into [app/internal/features/emit/errors.go](app/internal/features/emit/errors.go).
+3. **Update CLI caller**: Wire `emit.Service` into its presentation CLI adapter and define consumer interface.
+4. **Update tests & verify**: Run `task envx:test`.
+
+### Phase 8.5: Secrets DI Refactoring
 1. **Define secrets repository interface**: Declare CRUD operations for public keys, keypairs, and secrets in the secrets package root, omitting filesystem existence and document validation.
 2. **Elevate internal store to secrets filestore**: Convert the internal YAML store into a public filestore subpackage, implementing the secrets repository interface.
 3. **Refactor secrets Service**: Reframe manager into `secrets.Service` accepting `secrets.Repository`, `CipherClient`, and `PrivateKeyService`. Remove file paths from domain params.
 4. **Update core composition**: Update `NewSecretsService` in [app/internal/core/composer.go](app/internal/core/composer.go) and [app/internal/core/config.go](app/internal/core/config.go) to construct the secrets filestore.
 5. **Update tests & verify**: Update unit tests in secrets to mock the repository where appropriate. Run `task envx:test`.
 
-### Phase 8.4: Environment & Namespace DI Refactoring
+### Phase 8.6: Environment & Namespace DI Refactoring
 1. **Define env namespace repository interface**: Declare `LoadBase` and `LoadOverlay` in the env package root.
 2. **Create env filestore subpackage**: Implement store handling YAML file reading, unmarshaling, and error wrapping.
 3. **Refactor env Service**: Reframe manager into `env.Service`. Remove direct calls to `file.Read` and `yaml.Unmarshal`. Supply `NamespaceRepository` via `env.ServiceParams`.
 4. **Wire in core**: Update `ResolveProject` in [app/internal/core/config.go](app/internal/core/config.go) to construct and inject the env filestore.
 5. **Update tests & verify**: Run `task envx:test`.
 
-### Phase 8.5: Process Execution & Serialization DI Refactoring (`runner` & `emit`)
-1. **Refactor runner Service**: Encapsulate process supervision and stream injection in `runner.Service` with `ServiceParams`.
-2. **Refactor emit Service**: Encapsulate target serialization in `emit.Service` with `ServiceParams`.
-3. **Update CLI callers**: Wire `runner.Service` and `emit.Service` into their presentation CLI adapters.
-4. **Update tests & verify**: Run `task envx:test`.
-
-### Phase 8.6: Bundling & Diagnostics DI Refactoring (`pack` & `validate`)
+### Phase 8.7: Bundling & Diagnostics DI Refactoring (`pack` & `validate`)
 1. **Refactor pack Service**: Encapsulate workspace layout bundling, path rewriting, and store filtering into `pack.Service`.
 2. **Refactor validate Service & Consumer Interfaces**: Define `EnvironmentDiagnoser` and `StoreDiagnoser` interfaces in `validate`, decoupling it from concrete services.
 3. **Update CLI callers**: Wire `pack.Service` and `validate.Service` into their presentation CLI adapters.
 4. **Update tests & verify**: Run `task envx:test`.
 
-### Phase 8.7: Core Composition Root Streamlining
+### Phase 8.8: Core Composition Root Streamlining
 1. **Consolidate builder methods**: Review and simplify builder functions across [app/internal/core/config.go](app/internal/core/config.go), [app/internal/core/composer.go](app/internal/core/composer.go), and [app/internal/core/workspace.go](app/internal/core/workspace.go).
 2. **Enforce clean lifecycle boundaries**: Ensure no store I/O occurs prematurely during workspace discovery.
 3. **Verify CLI commands**: Ensure all Cobra commands under feature cli subpackages interact with cleanly assembled domain services.
 4. **Run full verification**: Execute `task envx:check` and `task envx:test`.
 
-### Phase 8.8: Standards Alignment & Test Fixtures Polish
+### Phase 8.9: Standards Alignment & Test Fixtures Polish
 1. **Harmonize test doubles**: Provide reusable in-memory fake repositories in test files for fast unit testing.
 2. **Audit doc comments**: Verify that all new interfaces and constructors have complete-sentence, symbol-first doc comments.
 3. **Verify E2E test suite**: Run `task envx:test:e2e` to confirm full CLI and workflow compatibility against testdata fixtures.

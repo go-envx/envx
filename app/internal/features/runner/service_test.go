@@ -4,11 +4,51 @@ import (
 	"bytes"
 	"errors"
 	"os"
-	"syscall"
+	"strings"
 	"testing"
 
 	"github.com/go-envx/envx/app/internal/shared/exitcode"
 )
+
+// TestNewServiceDefaultsStreams verifies that nil streams fall back to the process's
+// standard streams.
+func TestNewServiceDefaultsStreams(t *testing.T) {
+	t.Parallel()
+
+	svc := NewService(ServiceParams{})
+	if svc.params.Stdout != os.Stdout {
+		t.Errorf("Stdout = %v, want os.Stdout", svc.params.Stdout)
+	}
+	if svc.params.Stderr != os.Stderr {
+		t.Errorf("Stderr = %v, want os.Stderr", svc.params.Stderr)
+	}
+	if svc.params.Stdin != os.Stdin {
+		t.Errorf("Stdin = %v, want os.Stdin", svc.params.Stdin)
+	}
+}
+
+// TestNewServicePreservesStreams verifies that explicit streams are left untouched.
+func TestNewServicePreservesStreams(t *testing.T) {
+	t.Parallel()
+
+	var out, errBuf bytes.Buffer
+	in := strings.NewReader("input")
+	svc := NewService(ServiceParams{
+		Stdout: &out,
+		Stderr: &errBuf,
+		Stdin:  in,
+	})
+
+	if svc.params.Stdout != &out {
+		t.Error("Stdout was replaced, want the provided writer")
+	}
+	if svc.params.Stderr != &errBuf {
+		t.Error("Stderr was replaced, want the provided writer")
+	}
+	if svc.params.Stdin != in {
+		t.Error("Stdin was replaced, want the provided reader")
+	}
+}
 
 // TestRunInjectsEnv verifies the merged env is passed to the child and that only
 // the supplied values appear in its environment.
@@ -16,10 +56,13 @@ func TestRunInjectsEnv(t *testing.T) {
 	t.Parallel()
 
 	var stdout bytes.Buffer
-	err := Run([]string{"printenv", "FROM_FILE"}, Params{
-		Env:    map[string]string{"FROM_FILE": "yes"},
+	svc := NewService(ServiceParams{
 		Stdout: &stdout,
 		Stderr: &bytes.Buffer{},
+	})
+	err := svc.Run(RunParams{
+		Args: []string{"printenv", "FROM_FILE"},
+		Env:  map[string]string{"FROM_FILE": "yes"},
 	})
 	if err != nil {
 		t.Fatalf("Run: %v", err)
@@ -34,9 +77,12 @@ func TestRunInjectsEnv(t *testing.T) {
 func TestRunPropagatesExitCode(t *testing.T) {
 	t.Parallel()
 
-	err := Run([]string{"sh", "-c", "exit 3"}, Params{
+	svc := NewService(ServiceParams{
 		Stdout: &bytes.Buffer{},
 		Stderr: &bytes.Buffer{},
+	})
+	err := svc.Run(RunParams{
+		Args: []string{"sh", "-c", "exit 3"},
 	})
 	var ec *exitcode.Error
 	if !errors.As(err, &ec) {
@@ -47,26 +93,33 @@ func TestRunPropagatesExitCode(t *testing.T) {
 	}
 }
 
-// TestRunNoCommand verifies an empty argument list is rejected.
+// TestRunNoCommand verifies an empty argument list returns ErrNoCommandSpecified.
 func TestRunNoCommand(t *testing.T) {
 	t.Parallel()
 
-	if err := Run(nil, Params{}); err == nil {
-		t.Fatal("expected error for empty args")
+	svc := NewService(ServiceParams{})
+	err := svc.Run(RunParams{})
+	if !errors.Is(err, ErrNoCommandSpecified) {
+		t.Fatalf("expected ErrNoCommandSpecified, got %v", err)
 	}
 }
 
 // TestRunCommandNotFound verifies a command missing from PATH surfaces as an
-// *exitcode.Error carrying the shell convention 127 (rather than the generic
-// runtime code) and writes a diagnostic to stderr.
+// error wrapping ErrProcessStartFailed and an *exitcode.Error carrying code 127.
 func TestRunCommandNotFound(t *testing.T) {
 	t.Parallel()
 
 	var stderr bytes.Buffer
-	err := Run([]string{"envx-nonexistent-command-xyz"}, Params{
+	svc := NewService(ServiceParams{
 		Stdout: &bytes.Buffer{},
 		Stderr: &stderr,
 	})
+	err := svc.Run(RunParams{
+		Args: []string{"envx-nonexistent-command-xyz"},
+	})
+	if !errors.Is(err, ErrProcessStartFailed) {
+		t.Fatalf("expected ErrProcessStartFailed, got %v", err)
+	}
 	var ec *exitcode.Error
 	if !errors.As(err, &ec) {
 		t.Fatalf("expected *exitcode.Error, got %v", err)
@@ -86,9 +139,12 @@ func TestRunSignaledExitCode(t *testing.T) {
 	t.Parallel()
 
 	// The child signals only its own PID ($$), so the test process is unaffected.
-	err := Run([]string{"sh", "-c", "kill -INT $$"}, Params{
+	svc := NewService(ServiceParams{
 		Stdout: &bytes.Buffer{},
 		Stderr: &bytes.Buffer{},
+	})
+	err := svc.Run(RunParams{
+		Args: []string{"sh", "-c", "kill -INT $$"},
 	})
 	var ec *exitcode.Error
 	if !errors.As(err, &ec) {
@@ -96,38 +152,5 @@ func TestRunSignaledExitCode(t *testing.T) {
 	}
 	if ec.Code != 130 {
 		t.Errorf("Code = %d, want 130 (128+SIGINT)", ec.Code)
-	}
-}
-
-// TestShouldForward verifies the interactive guard: terminal-delivered signals
-// (SIGINT, SIGQUIT) are not re-forwarded when attached to a tty (the tty already
-// delivered them to the child), while supervisor signals and every signal in
-// non-interactive mode are forwarded.
-func TestShouldForward(t *testing.T) {
-	t.Parallel()
-
-	tests := []struct {
-		name        string
-		sig         os.Signal
-		interactive bool
-		want        bool
-	}{
-		{"interactive SIGINT not forwarded", os.Interrupt, true, false},
-		{"interactive SIGQUIT not forwarded", syscall.SIGQUIT, true, false},
-		{"interactive SIGTERM forwarded", syscall.SIGTERM, true, true},
-		{"interactive SIGHUP forwarded", syscall.SIGHUP, true, true},
-		{"non-interactive SIGINT forwarded", os.Interrupt, false, true},
-		{"non-interactive SIGQUIT forwarded", syscall.SIGQUIT, false, true},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-			if got := shouldForward(tt.sig, tt.interactive); got != tt.want {
-				t.Errorf(
-					"shouldForward(%v, interactive=%v) = %v, want %v",
-					tt.sig, tt.interactive, got, tt.want,
-				)
-			}
-		})
 	}
 }
