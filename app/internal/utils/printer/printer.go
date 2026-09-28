@@ -6,7 +6,7 @@ import (
 	"os"
 
 	"github.com/go-envx/envx/app/internal/utils/style"
-	"golang.org/x/term"
+	"github.com/go-envx/envx/app/internal/utils/termx"
 )
 
 // Glyph and label prefixes applied to logged warnings and errors so severity is
@@ -60,6 +60,18 @@ func New(opts Options) *Printer {
 		outStyle: style.New(colorEnabled(out, opts.Color)),
 		errStyle: style.New(colorEnabled(errStream, opts.Color)),
 	}
+}
+
+// NewPlain builds a Printer writing to out and err with styling disabled.
+// Useful in tests and non-interactive environments requiring unstyled output.
+func NewPlain(out, err io.Writer) *Printer {
+	disabled := false
+	return New(Options{Out: out, Err: err, Color: &disabled})
+}
+
+// NewDiscard builds a Printer that silences all output.
+func NewDiscard() *Printer {
+	return New(Options{Out: io.Discard, Err: io.Discard})
 }
 
 // LogBlank writes an empty line to standard error, separating a banner or
@@ -116,11 +128,5 @@ func colorEnabled(w io.Writer, override *bool) bool {
 	if _, ok := os.LookupEnv("NO_COLOR"); ok {
 		return false
 	}
-	return isTerminal(w)
-}
-
-// isTerminal reports whether w is an interactive terminal.
-func isTerminal(w io.Writer) bool {
-	file, ok := w.(*os.File)
-	return ok && term.IsTerminal(int(file.Fd()))
+	return termx.IsTerminal(w)
 }

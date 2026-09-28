@@ -158,3 +158,30 @@ func TestNewAutoDetectsNonTerminal(t *testing.T) {
 		t.Error("errStyle enabled for a non-terminal writer")
 	}
 }
+
+// TestNewPlain verifies styling is disabled.
+func TestNewPlain(t *testing.T) {
+	t.Parallel()
+
+	var out, errStream bytes.Buffer
+	p := NewPlain(&out, &errStream)
+	if p.outStyle.Enabled() {
+		t.Error("outStyle enabled for NewPlain")
+	}
+	if p.errStyle.Enabled() {
+		t.Error("errStyle enabled for NewPlain")
+	}
+}
+
+// TestNewDiscard verifies output is discarded.
+func TestNewDiscard(t *testing.T) {
+	t.Parallel()
+
+	p := NewDiscard()
+	if err := p.LogMessage("hello"); err != nil {
+		t.Fatalf("LogMessage() error = %v", err)
+	}
+	if err := p.LogError("boom"); err != nil {
+		t.Fatalf("LogError() error = %v", err)
+	}
+}
