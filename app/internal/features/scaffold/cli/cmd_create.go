@@ -1,6 +1,9 @@
 package cli
 
 import (
+	"fmt"
+	"strings"
+
 	"github.com/go-envx/envx/app/internal/features/scaffold"
 	"github.com/go-envx/envx/app/internal/shared/flags"
 	"github.com/go-envx/envx/app/internal/utils/printer"
@@ -25,12 +28,6 @@ const (
 	`
 )
 
-// scaffoldService defines the contract required by the create CLI command
-// to scaffold a workspace.
-type scaffoldService interface {
-	Create(params scaffold.CreateParams) (scaffold.CreateResult, error)
-}
-
 // templateSpec describes the metadata for a single template subcommand.
 type templateSpec struct {
 	Name  string
@@ -38,18 +35,19 @@ type templateSpec struct {
 	Long  string
 }
 
-// NewCreateCmd builds the "create" command and its per-template subcommands.
-func NewCreateCmd(svc scaffoldService) *cobra.Command {
+// NewCreateCommand builds the "create" command and its per-template subcommands.
+func NewCreateCommand(factory Factory) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   createUsage,
 		Short: createShort,
 		Long:  str.Dedent(createLong),
+		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			return cmd.Help()
 		},
 	}
 	cmd.AddCommand(
-		newTemplateCmd(svc, templateSpec{
+		newTemplateCommand(factory, templateSpec{
 			Name:  scaffold.QuickStartTemplate,
 			Short: quickStartShort,
 			Long:  quickStartLong,
@@ -58,8 +56,8 @@ func NewCreateCmd(svc scaffoldService) *cobra.Command {
 	return cmd
 }
 
-// newTemplateCmd builds one "create <template>" subcommand.
-func newTemplateCmd(svc scaffoldService, spec templateSpec) *cobra.Command {
+// newTemplateCommand builds one "create <template>" subcommand.
+func newTemplateCommand(f Factory, spec templateSpec) *cobra.Command {
 	var (
 		targetDir string
 		force     bool
@@ -71,7 +69,14 @@ func newTemplateCmd(svc scaffoldService, spec templateSpec) *cobra.Command {
 		Long:  str.Dedent(spec.Long),
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			res, err := svc.Create(scaffold.CreateParams{
+			// Obtain the scaffold service from the factory.
+			scaffoldService, err := f.ScaffoldService()
+			if err != nil {
+				return err
+			}
+
+			// Create the workspace template using the scaffold service.
+			result, err := scaffoldService.Create(scaffold.CreateParams{
 				Template:  spec.Name,
 				TargetDir: targetDir,
 				Force:     force,
@@ -80,16 +85,19 @@ func newTemplateCmd(svc scaffoldService, spec templateSpec) *cobra.Command {
 				return err
 			}
 
-			// Render the scaffold summary through the shared printer.
-			pr := printer.New(printer.Options{
+			// Initialize the console printer for output.
+			console := printer.New(printer.Options{
 				Out: cmd.OutOrStdout(),
 				Err: cmd.ErrOrStderr(),
 			})
-			return render(pr, summaryParams{
-				Template:  spec.Name,
-				TargetDir: targetDir,
-				Written:   res.Written,
-			})
+
+			// Output the result of the scaffold operation.
+			return outputCreate(
+				console,
+				spec.Name,
+				targetDir,
+				result,
+			)
 		},
 	}
 
@@ -97,4 +105,32 @@ func newTemplateCmd(svc scaffoldService, spec templateSpec) *cobra.Command {
 	flags.Bind(cmd.Flags(), &force, &forceFlag)
 
 	return cmd
+}
+
+// outputCreate writes a human summary of a completed scaffold through the
+// shared printer.
+func outputCreate(
+	console *printer.Printer,
+	template string,
+	targetDir string,
+	result scaffold.CreateResult,
+) error {
+	lines := []string{
+		fmt.Sprintf(
+			"Scaffolded %s into %s/ (%d files):",
+			template,
+			targetDir,
+			len(result.Written),
+		),
+	}
+	for _, f := range result.Written {
+		lines = append(lines, "  "+f)
+	}
+	lines = append(lines,
+		"",
+		"Try it:",
+		"  cd "+targetDir,
+		"  envx get api-service DATABASE_HOST",
+	)
+	return console.LogMessage(strings.Join(lines, "\n"))
 }
