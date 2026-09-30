@@ -1,6 +1,7 @@
 package core
 
 import (
+	"github.com/go-envx/envx/app/internal/features/scaffold"
 	"github.com/go-envx/envx/app/internal/features/secrets"
 )
 
@@ -11,6 +12,13 @@ type App struct{}
 // NewApp constructs an App factory.
 func NewApp() *App {
 	return &App{}
+}
+
+// ScaffoldService returns the domain scaffold service.
+func (a *App) ScaffoldService() (*scaffold.Service, error) {
+	return scaffold.NewService(scaffold.ServiceParams{
+		Source: scaffold.TemplatesFS,
+	})
 }
 
 // SecretsService resolves the workspace and returns the domain secrets service.

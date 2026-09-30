@@ -6,7 +6,6 @@ import (
 	envcli "github.com/go-envx/envx/app/internal/features/env/cli"
 	packcli "github.com/go-envx/envx/app/internal/features/pack/cli"
 	runnercli "github.com/go-envx/envx/app/internal/features/runner/cli"
-	"github.com/go-envx/envx/app/internal/features/scaffold"
 	scaffoldcli "github.com/go-envx/envx/app/internal/features/scaffold/cli"
 	secretscli "github.com/go-envx/envx/app/internal/features/secrets/cli"
 	validatecli "github.com/go-envx/envx/app/internal/features/validate/cli"
@@ -43,17 +42,10 @@ func NewRootCmd(info BuildInfo) *cobra.Command {
 
 	flags.Bind(root.PersistentFlags(), new(string), &flags.Config)
 
-	scaffoldService, err := scaffold.NewService(scaffold.ServiceParams{
-		Source: scaffold.TemplatesFS,
-	})
-	if err != nil {
-		panic(err)
-	}
-
 	app := core.NewApp()
 
 	root.AddCommand(
-		scaffoldcli.NewCreateCmd(scaffoldService),
+		scaffoldcli.NewCreateCommand(app),
 		envcli.NewGetCmd(),
 		secretscli.NewKeypairCmd(app),
 		packcli.NewPackCmd(),
