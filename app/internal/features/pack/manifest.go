@@ -48,10 +48,12 @@ func rewriteManifest(source []byte, bundles []projectBundle) ([]byte, error) {
 // project that was not selected so the bundle manifest declares only the projects
 // it actually carries. An include entry with no assigned name is left untouched.
 func rewriteIncludes(root *yaml.Node, bundles []projectBundle) error {
-	projects, _ := yamlx.MappingEntry(root, "projects", false)
-	if projects == nil || projects.Kind != yaml.MappingNode {
+	projectsEntry, found := yamlx.FindMappingEntry(root, "projects")
+	if !found || projectsEntry.ValueNode == nil ||
+		projectsEntry.ValueNode.Kind != yaml.MappingNode {
 		return errors.New("manifest has no projects mapping")
 	}
+	projects := projectsEntry.ValueNode
 
 	byName := make(map[string]projectBundle, len(bundles))
 	for _, bundle := range bundles {
@@ -66,17 +68,18 @@ func rewriteIncludes(root *yaml.Node, bundles []projectBundle) error {
 		if !ok {
 			// A project the pack did not select carries no files into the bundle, so
 			// drop it from the manifest rather than leaving a dangling declaration.
-			yamlx.RemoveMappingEntry(projects, i)
+			yamlx.DeleteMappingEntry(projects, name)
 			continue
 		}
 		project := projects.Content[i+1]
-		includes, _ := yamlx.MappingEntry(project, "includes", false)
-		if includes == nil || includes.Kind != yaml.SequenceNode {
+		includesEntry, found := yamlx.FindMappingEntry(project, "includes")
+		if !found || includesEntry.ValueNode == nil ||
+			includesEntry.ValueNode.Kind != yaml.SequenceNode {
 			continue
 		}
-		for _, entry := range includes.Content {
+		for _, entry := range includesEntry.ValueNode.Content {
 			if stem, ok := bundle.names[entry.Value]; ok {
-				yamlx.SetStringScalar(entry, bundle.dir+"/"+stem)
+				yamlx.SetScalarNode(entry, bundle.dir+"/"+stem)
 			}
 		}
 	}
@@ -89,16 +92,16 @@ func rewriteIncludes(root *yaml.Node, bundles []projectBundle) error {
 // block or declares no explicit path. When path was the block's only setting, the
 // now-empty secrets block is removed too rather than left as an empty mapping.
 func dropSecretsPath(root *yaml.Node) {
-	secrets, secretsIndex := yamlx.MappingEntry(root, "secrets", false)
-	if secrets == nil || secrets.Kind != yaml.MappingNode {
+	secretsEntry, found := yamlx.FindMappingEntry(root, "secrets")
+	if !found || secretsEntry.ValueNode == nil ||
+		secretsEntry.ValueNode.Kind != yaml.MappingNode {
 		return
 	}
-	if _, pathIndex := yamlx.MappingEntry(secrets, "path", false); pathIndex >= 0 {
-		yamlx.RemoveMappingEntry(secrets, pathIndex)
-	} else {
+	secrets := secretsEntry.ValueNode
+	if !yamlx.DeleteMappingEntry(secrets, "path") {
 		return
 	}
 	if len(secrets.Content) == 0 {
-		yamlx.RemoveMappingEntry(root, secretsIndex)
+		yamlx.DeleteMappingEntry(root, "secrets")
 	}
 }

@@ -18,8 +18,8 @@ func TestResolvePath(t *testing.T) {
 	}{
 		{
 			name: "relative",
-			path: filepath.Join("private", "secrets.yaml"),
-			want: filepath.Join(base, "private", "secrets.yaml"),
+			path: filepath.Join("data", "config.yaml"),
+			want: filepath.Join(base, "data", "config.yaml"),
 		},
 		{
 			name: "absolute",
@@ -28,12 +28,12 @@ func TestResolvePath(t *testing.T) {
 				"other",
 				"store",
 				"..",
-				"secrets.yaml",
+				"config.yaml",
 			),
 			want: filepath.Join(
 				string(filepath.Separator),
 				"other",
-				"secrets.yaml",
+				"config.yaml",
 			),
 		},
 	}

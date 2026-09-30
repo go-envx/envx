@@ -227,7 +227,7 @@ func encryptedWorkspace(t *testing.T) (cfgPath, privateKey string) {
 	writeWorkspaceFile(t, dir, filepath.Join("env", "app.yaml"),
 		"app_name: myapp\ndb_password: secret://production/db\n")
 	writeWorkspaceFile(t, dir, "secrets.yaml",
-		"public_keys:\n  production: "+pair.PublicKey+
+		"public-keys:\n  production: "+pair.PublicKey+
 			"\nsecrets:\n  production:\n    db: "+ciphertext+"\n")
 
 	return filepath.Join(dir, "envx.yaml"), pair.PrivateKey

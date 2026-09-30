@@ -86,7 +86,7 @@ func TestWriteAtomicPrivateCreates(t *testing.T) {
 	t.Parallel()
 
 	dir := t.TempDir()
-	target := filepath.Join(dir, "private.key")
+	target := filepath.Join(dir, "secure.dat")
 
 	if err := WriteAtomicPrivate(target, []byte("private")); err != nil {
 		t.Fatalf("WriteAtomicPrivate: %v", err)
@@ -107,7 +107,7 @@ func TestWriteAtomicPrivateOverwrites(t *testing.T) {
 	t.Parallel()
 
 	dir := t.TempDir()
-	target := filepath.Join(dir, "private.key")
+	target := filepath.Join(dir, "secure.dat")
 
 	if err := os.WriteFile(target, []byte("old"), 0o600); err != nil {
 		t.Fatal(err)

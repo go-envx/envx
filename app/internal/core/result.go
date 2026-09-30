@@ -5,7 +5,6 @@ import (
 	"path/filepath"
 
 	"github.com/go-envx/envx/app/internal/features/env"
-	"github.com/go-envx/envx/app/internal/features/secrets"
 	"github.com/go-envx/envx/app/internal/resources/cipher"
 )
 
@@ -20,7 +19,7 @@ type Result struct {
 	// Secrets locates the workspace secrets store and private-key file.
 	// ResolveProject binds these into the resolver factory the Manager opens on
 	// demand; ResolveWorkspace leaves them as data and never reads the store.
-	Secrets secrets.Params
+	Secrets SecretsParams
 
 	// Cipher contains the configured cipher construction parameters used to
 	// compose the secrets manager.

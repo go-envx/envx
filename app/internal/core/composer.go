@@ -8,6 +8,7 @@ import (
 	"github.com/go-envx/envx/app/internal/features/privatekey"
 	pkfilestore "github.com/go-envx/envx/app/internal/features/privatekey/filestore"
 	"github.com/go-envx/envx/app/internal/features/secrets"
+	secfilestore "github.com/go-envx/envx/app/internal/features/secrets/filestore"
 	"github.com/go-envx/envx/app/internal/features/workspace"
 	wsfilestore "github.com/go-envx/envx/app/internal/features/workspace/filestore"
 	"github.com/go-envx/envx/app/internal/resources/cipher"
@@ -53,16 +54,54 @@ func NewConfiguredCipher(in *Input) (cipher.Cipher, error) {
 	return selectedCipher, nil
 }
 
-// NewSecretsManager composes the configured cipher and private-key ports into
-// a secrets manager for one resolved workspace.
-func NewSecretsManager(s secrets.Params, c cipher.Params) (*secrets.Manager, error) {
-	// Construct the configured cipher before wiring it into the secrets manager.
-	oCipher, err := cipher.New(c)
+// cipherAdapter adapts a cipher.Cipher to the secrets.CipherClient interface.
+type cipherAdapter struct {
+	cipher cipher.Cipher
+}
+
+func (a cipherAdapter) Algorithm() string {
+	return string(a.cipher.Algorithm())
+}
+
+func (a cipherAdapter) Keypair() (publicKey, privateKey string, err error) {
+	kp, err := a.cipher.Keypair()
+	if err != nil {
+		return "", "", err
+	}
+	return kp.PublicKey, kp.PrivateKey, nil
+}
+
+func (a cipherAdapter) ValidateKeypair(publicKey, privateKey string) error {
+	return a.cipher.ValidateKeypair(publicKey, privateKey)
+}
+
+func (a cipherAdapter) Encrypt(plaintext, publicKey string) ([]byte, error) {
+	return a.cipher.Encrypt(plaintext, publicKey)
+}
+
+func (a cipherAdapter) Decrypt(ciphertext []byte, privateKey string) (string, error) {
+	return a.cipher.Decrypt(ciphertext, privateKey)
+}
+
+// SecretsParams supplies paths and configuration for secrets composition.
+type SecretsParams struct {
+	SecretsPath   string
+	KeysPath      string
+	DefaultIndent int
+}
+
+// NewSecretsService composes the configured cipher, filestores, and domain services.
+func NewSecretsService(
+	secretsPath, keysPath string,
+	cipherParams cipher.Params,
+	indent int,
+) (*secrets.Service, error) {
+	oCipher, err := cipher.New(cipherParams)
 	if err != nil {
 		return nil, fmt.Errorf("creating configured cipher: %w", err)
 	}
 
-	pkRepo, err := pkfilestore.New(pkfilestore.Params{Path: s.KeysPath})
+	pkRepo, err := pkfilestore.New(pkfilestore.Params{Path: keysPath})
 	if err != nil {
 		return nil, fmt.Errorf("creating privatekey repository: %w", err)
 	}
@@ -75,10 +114,23 @@ func NewSecretsManager(s secrets.Params, c cipher.Params) (*secrets.Manager, err
 		return nil, fmt.Errorf("creating privatekey service: %w", err)
 	}
 
-	// Add the workspace's cipher and private-key service.
-	s.Cipher = oCipher
-	s.PrivateKeyService = pkService
+	secStore, err := secfilestore.New(secfilestore.Params{
+		Path:          secretsPath,
+		DefaultIndent: indent,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("creating secrets store: %w", err)
+	}
 
-	// Return the fully wired secrets manager.
-	return secrets.New(s)
+	return secrets.NewService(secrets.ServiceParams{
+		Repository:        secStore,
+		Cipher:            cipherAdapter{cipher: oCipher},
+		PrivateKeyService: pkService,
+	})
+}
+
+// NewSecretsManager composes the configured cipher and private-key ports into
+// a secrets service for one resolved workspace.
+func NewSecretsManager(s SecretsParams, c cipher.Params) (*secrets.Service, error) {
+	return NewSecretsService(s.SecretsPath, s.KeysPath, c, s.DefaultIndent)
 }

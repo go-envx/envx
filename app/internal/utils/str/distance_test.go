@@ -42,7 +42,7 @@ func TestClosest(t *testing.T) {
 		"environments",
 		"projects",
 		"settings",
-		"secrets",
+		"sections",
 	}
 
 	tests := []struct {
@@ -71,10 +71,10 @@ func TestClosest(t *testing.T) {
 		},
 		{
 			name:        "typo within distance",
-			target:      "secretz",
+			target:      "sectionz",
 			candidates:  candidates,
 			maxDistance: 3,
-			wantMatch:   "secrets",
+			wantMatch:   "sections",
 			wantFound:   true,
 		},
 		{

@@ -122,7 +122,7 @@ func TestExecuteRevealFailurePreventsChildStartup(t *testing.T) {
 	writeWorkspaceFile(t, dir, filepath.Join("env", "app.yaml"),
 		"password: secret://production/db\n")
 	writeWorkspaceFile(t, dir, "secrets.yaml",
-		"public_keys:\n  production: "+pair.PublicKey+
+		"public-keys:\n  production: "+pair.PublicKey+
 			"\nsecrets:\n  production:\n    db: "+ciphertext+"\n")
 
 	cfgPath := filepath.Join(dir, "envx.yaml")

@@ -7,7 +7,6 @@ import (
 	"testing"
 
 	"github.com/go-envx/envx/app/internal/core"
-	"github.com/go-envx/envx/app/internal/features/secrets"
 	engine "github.com/go-envx/envx/app/internal/features/validate"
 	"github.com/go-envx/envx/app/internal/resources/cipher"
 	"github.com/go-envx/envx/app/internal/shared/status"
@@ -300,7 +299,7 @@ func writeWarningOnlyWorkspace(t *testing.T) string {
 	// A valid keypair keeps the store readable; "shared" is available and produces
 	// no finding.
 	manager, err := core.NewSecretsManager(
-		secrets.Params{
+		core.SecretsParams{
 			SecretsPath:   secretsPath,
 			KeysPath:      filepath.Join(dir, "envx.keys"),
 			DefaultIndent: 2,

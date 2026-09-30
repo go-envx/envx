@@ -23,19 +23,19 @@ func TestEnsureIgnoredCreatesLocalRule(t *testing.T) {
 	t.Parallel()
 
 	dir := t.TempDir()
-	targetPath := filepath.Join(dir, "secrets", "envx.keys")
+	targetPath := filepath.Join(dir, "build", "cache.dat")
 
 	if err := EnsureIgnored(targetPath); err != nil {
 		t.Fatalf("EnsureIgnored(): %v", err)
 	}
 
-	ignoreFile := filepath.Join(dir, "secrets", ".gitignore")
+	ignoreFile := filepath.Join(dir, "build", ".gitignore")
 	data, err := os.ReadFile(ignoreFile) //nolint:gosec // path is test-local.
 	if err != nil {
 		t.Fatalf("ReadFile(.gitignore): %v", err)
 	}
-	if !strings.Contains(string(data), "envx.keys\n") {
-		t.Errorf(".gitignore = %q, want envx.keys rule", string(data))
+	if !strings.Contains(string(data), "cache.dat\n") {
+		t.Errorf(".gitignore = %q, want cache.dat rule", string(data))
 	}
 
 	// Calling again should be idempotent and not duplicate the entry.
@@ -56,7 +56,7 @@ func TestEnsureIgnoredSkipsWhenGitUnavailable(t *testing.T) {
 	t.Setenv("PATH", gitlessPath)
 
 	dir := t.TempDir()
-	targetPath := filepath.Join(dir, "envx.keys")
+	targetPath := filepath.Join(dir, "cache.dat")
 	if err := EnsureIgnored(targetPath); err != nil {
 		t.Fatalf("EnsureIgnored(): %v", err)
 	}
@@ -78,26 +78,26 @@ func TestHasIgnoreRule(t *testing.T) {
 	}{
 		{
 			name:    "exact match",
-			content: "# header\nenvx.keys\n",
-			target:  "envx.keys",
+			content: "# header\ncache.dat\n",
+			target:  "cache.dat",
 			want:    true,
 		},
 		{
 			name:    "leading slash match",
-			content: "/envx.keys\n",
-			target:  "envx.keys",
+			content: "/cache.dat\n",
+			target:  "cache.dat",
 			want:    true,
 		},
 		{
 			name:    "no match",
-			content: "other.keys\n",
-			target:  "envx.keys",
+			content: "other.dat\n",
+			target:  "cache.dat",
 			want:    false,
 		},
 		{
 			name:    "substring is not match",
-			content: "my-envx.keys\n",
-			target:  "envx.keys",
+			content: "my-cache.dat\n",
+			target:  "cache.dat",
 			want:    false,
 		},
 	}

@@ -7,6 +7,7 @@ import (
 	"github.com/go-envx/envx/app/internal/features/env"
 	"github.com/go-envx/envx/app/internal/features/workspace"
 	"github.com/go-envx/envx/app/internal/resources/cipher"
+	"github.com/go-envx/envx/app/internal/shared/flags"
 	"github.com/go-envx/envx/app/test/fixtures"
 )
 
@@ -481,21 +482,21 @@ func TestResolveProjectDanglingSecretReference(t *testing.T) {
 // then ENVX_CONFIG, then empty (which defers to the manifest walk-up).
 func TestManifestPath(t *testing.T) {
 	t.Run("flag wins over env", func(t *testing.T) {
-		t.Setenv(workspace.ConfigFlag.Env, "from-env")
+		t.Setenv(flags.Config.Env, "from-env")
 		flag := "from-flag"
 		if got := resolveManifestPath(&Input{ConfigPath: &flag}); got != "from-flag" {
 			t.Errorf("got %q, want from-flag", got)
 		}
 	})
 	t.Run("env when flag empty", func(t *testing.T) {
-		t.Setenv(workspace.ConfigFlag.Env, "from-env")
+		t.Setenv(flags.Config.Env, "from-env")
 		empty := ""
 		if got := resolveManifestPath(&Input{ConfigPath: &empty}); got != "from-env" {
 			t.Errorf("got %q, want from-env", got)
 		}
 	})
 	t.Run("empty when neither set", func(t *testing.T) {
-		t.Setenv(workspace.ConfigFlag.Env, "")
+		t.Setenv(flags.Config.Env, "")
 		if got := resolveManifestPath(&Input{}); got != "" {
 			t.Errorf("got %q, want empty", got)
 		}

@@ -45,6 +45,11 @@ func (r *Repository) Origin() string {
 	return defaultOrigin
 }
 
+// Location returns the file path of the private key repository.
+func (r *Repository) Location() string {
+	return r.path
+}
+
 // GetPrivateKey retrieves a private key from the local key file.
 func (r *Repository) GetPrivateKey(group string) (key string, found bool, err error) {
 	if err := privatekey.ValidateGroup(group); err != nil {

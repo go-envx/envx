@@ -1,8 +1,9 @@
-package yamlx
+package yamlx_test
 
 import (
 	"testing"
 
+	"github.com/go-envx/envx/app/internal/utils/yamlx"
 	"gopkg.in/yaml.v3"
 )
 
@@ -45,7 +46,7 @@ func TestIndentLevel(t *testing.T) {
 			if err := yaml.Unmarshal([]byte(test.body), document); err != nil {
 				t.Fatalf("yaml.Unmarshal() error = %v", err)
 			}
-			got, found := IndentLevel(document)
+			got, found := yamlx.IndentLevel(document)
 			if got != test.want || found != test.found {
 				t.Errorf(
 					"IndentLevel() = (%d, %t), want (%d, %t)",
@@ -61,10 +62,10 @@ func TestIndentLevel(t *testing.T) {
 func TestIndentLevelReturnsNoMatchForEmptyAndNil(t *testing.T) {
 	t.Parallel()
 
-	if got, found := IndentLevel(nil); got != 0 || found {
+	if got, found := yamlx.IndentLevel(nil); got != 0 || found {
 		t.Errorf("IndentLevel(nil) = (%d, %t), want (0, false)", got, found)
 	}
-	if got, found := IndentLevel(new(yaml.Node)); got != 0 || found {
+	if got, found := yamlx.IndentLevel(new(yaml.Node)); got != 0 || found {
 		t.Errorf("IndentLevel(empty) = (%d, %t), want (0, false)", got, found)
 	}
 }

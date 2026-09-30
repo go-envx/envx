@@ -44,3 +44,20 @@ func splitRef(body string) (reference, error) {
 	}
 	return reference{group: strings.ToLower(group), key: key}, nil
 }
+
+// ParseReference reports the group and key a value references, and whether the
+// value is a well-formed secret reference. A plain value, an escaped literal
+// ("\secret://x"), or a malformed reference yields ok=false. The group is
+// lowercased to match how the store indexes references, while the key is
+// returned verbatim. It never touches the store, so a caller can enumerate the
+// references a configuration uses without resolving them.
+func ParseReference(value string) (group, key string, ok bool) {
+	if !strings.HasPrefix(value, scheme) {
+		return "", "", false
+	}
+	ref, err := splitRef(strings.TrimPrefix(value, scheme))
+	if err != nil {
+		return "", "", false
+	}
+	return ref.group, ref.key, true
+}
