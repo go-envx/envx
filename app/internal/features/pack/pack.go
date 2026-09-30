@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/go-envx/envx/app/internal/features/secrets"
+	secfilestore "github.com/go-envx/envx/app/internal/features/secrets/filestore"
 	"github.com/go-envx/envx/app/internal/utils/filex"
 )
 
@@ -204,11 +205,46 @@ func Pack(ws Workspace, p Params) (Result, error) {
 			return Result{}, err
 		}
 		if len(referenced) > 0 {
-			dst := filepath.Join(outDir, secretsName)
-			if err := secrets.WriteFilteredStore(ws.SecretsPath, dst, referenced); err != nil {
-				return Result{}, err
+			srcRepo, err := secfilestore.New(secfilestore.Params{
+				Path: ws.SecretsPath,
+			})
+			if err != nil {
+				return Result{}, fmt.Errorf(
+					"opening secrets store %s: %w", ws.SecretsPath, err,
+				)
 			}
-			written = append(written, secretsName)
+
+			var toCopy []secrets.SecretRecord
+			for _, ref := range referenced {
+				record, found, err := srcRepo.GetSecret(ref.Group, ref.Key)
+				if err != nil {
+					return Result{}, fmt.Errorf(
+						"reading secret %s/%s from %s: %w",
+						ref.Group, ref.Key, ws.SecretsPath, err,
+					)
+				}
+				if found {
+					toCopy = append(toCopy, record)
+				}
+			}
+
+			if len(toCopy) > 0 {
+				dst := filepath.Join(outDir, secretsName)
+				dstRepo, err := secfilestore.New(secfilestore.Params{
+					Path: dst,
+				})
+				if err != nil {
+					return Result{}, fmt.Errorf(
+						"creating bundled secrets store %s: %w", dst, err,
+					)
+				}
+				if err := dstRepo.SetSecrets(toCopy); err != nil {
+					return Result{}, fmt.Errorf(
+						"writing bundled secrets store %s: %w", dst, err,
+					)
+				}
+				written = append(written, secretsName)
+			}
 		}
 	}
 	sort.Strings(written)

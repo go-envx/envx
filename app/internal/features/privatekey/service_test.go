@@ -7,9 +7,17 @@ import (
 )
 
 type fakeRepository struct {
-	keys   map[string]string
-	err    error
-	origin string
+	keys     map[string]string
+	err      error
+	origin   string
+	location string
+}
+
+func (f *fakeRepository) Location() string {
+	if f.location != "" {
+		return f.location
+	}
+	return "fake-location"
 }
 
 func (f *fakeRepository) Origin() string {

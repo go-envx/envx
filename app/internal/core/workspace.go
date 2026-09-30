@@ -3,7 +3,6 @@ package core
 import (
 	"sort"
 
-	"github.com/go-envx/envx/app/internal/features/secrets"
 	"github.com/go-envx/envx/app/internal/features/workspace"
 	"github.com/go-envx/envx/app/internal/resources/cipher"
 	"github.com/go-envx/envx/app/internal/shared/status"
@@ -32,7 +31,7 @@ type WorkspaceProjects struct {
 	Environments []string
 	// Secrets locates the workspace secrets store and private-key file, shared
 	// across projects because secrets are workspace-level.
-	Secrets secrets.Params
+	Secrets SecretsParams
 	// Cipher holds the configured cipher construction parameters.
 	Cipher cipher.Params
 	// Severity is the resolved per-check severity override from the manifest's

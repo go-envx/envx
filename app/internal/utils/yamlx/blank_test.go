@@ -1,18 +1,22 @@
-package yamlx
+package yamlx_test
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/go-envx/envx/app/internal/utils/yamlx"
+)
 
 // TestPreserveBlankLinesReinsertsSeparators verifies blank runs from the original
 // are restored before the matching content lines in the rendered output.
 func TestPreserveBlankLinesReinsertsSeparators(t *testing.T) {
 	t.Parallel()
 
-	original := "public_keys:\n  dev: aaa\n\n  shared: bbb\n\n" +
-		"secrets:\n  dev:\n    key: ccc\n"
-	rendered := "public_keys:\n  dev: aaa\n  shared: bbb\n" +
-		"secrets:\n  dev:\n    key: ccc\n"
+	original := "users:\n  alice: 100\n\n  bob: 200\n\n" +
+		"metadata:\n  env:\n    region: us-east\n"
+	rendered := "users:\n  alice: 100\n  bob: 200\n" +
+		"metadata:\n  env:\n    region: us-east\n"
 
-	got := string(PreserveBlankLines([]byte(original), []byte(rendered)))
+	got := string(yamlx.PreserveBlankLines([]byte(original), []byte(rendered)))
 	if got != original {
 		t.Errorf("PreserveBlankLines() =\n%q\nwant\n%q", got, original)
 	}
@@ -26,7 +30,7 @@ func TestPreserveBlankLinesKeepsConsecutiveRuns(t *testing.T) {
 	original := "a: 1\n\n\nb: 2\n"
 	rendered := "a: 1\nb: 2\n"
 
-	got := string(PreserveBlankLines([]byte(original), []byte(rendered)))
+	got := string(yamlx.PreserveBlankLines([]byte(original), []byte(rendered)))
 	if got != original {
 		t.Errorf("PreserveBlankLines() =\n%q\nwant\n%q", got, original)
 	}
@@ -42,7 +46,7 @@ func TestPreserveBlankLinesDropsRemovedAnchors(t *testing.T) {
 	rendered := "a: 1\nc: 3\n"
 	want := "a: 1\n\nc: 3\n"
 
-	got := string(PreserveBlankLines([]byte(original), []byte(rendered)))
+	got := string(yamlx.PreserveBlankLines([]byte(original), []byte(rendered)))
 	if got != want {
 		t.Errorf("PreserveBlankLines() =\n%q\nwant\n%q", got, want)
 	}
@@ -57,7 +61,7 @@ func TestPreserveBlankLinesIgnoresAddedLines(t *testing.T) {
 	rendered := "a: 1\nnew: 9\nb: 2\n"
 	want := "a: 1\nnew: 9\n\nb: 2\n"
 
-	got := string(PreserveBlankLines([]byte(original), []byte(rendered)))
+	got := string(yamlx.PreserveBlankLines([]byte(original), []byte(rendered)))
 	if got != want {
 		t.Errorf("PreserveBlankLines() =\n%q\nwant\n%q", got, want)
 	}
@@ -71,7 +75,7 @@ func TestPreserveBlankLinesPreservesLeadingBlankLines(t *testing.T) {
 	original := "\na: 1\n"
 	rendered := "a: 1\n"
 
-	got := string(PreserveBlankLines([]byte(original), []byte(rendered)))
+	got := string(yamlx.PreserveBlankLines([]byte(original), []byte(rendered)))
 	if got != original {
 		t.Errorf("PreserveBlankLines() =\n%q\nwant\n%q", got, original)
 	}
@@ -83,7 +87,7 @@ func TestPreserveBlankLinesReturnsRenderedWhenOriginalEmpty(t *testing.T) {
 	t.Parallel()
 
 	rendered := []byte("a: 1\nb: 2\n")
-	got := string(PreserveBlankLines(nil, rendered))
+	got := string(yamlx.PreserveBlankLines(nil, rendered))
 	if got != string(rendered) {
 		t.Errorf("PreserveBlankLines() = %q, want %q", got, rendered)
 	}
@@ -96,7 +100,7 @@ func TestPreserveBlankLinesNoOpWithoutBlankLines(t *testing.T) {
 
 	original := []byte("a: 1\nb: 2\n")
 	rendered := []byte("a: 1\nb: 2\n")
-	got := string(PreserveBlankLines(original, rendered))
+	got := string(yamlx.PreserveBlankLines(original, rendered))
 	if got != string(rendered) {
 		t.Errorf("PreserveBlankLines() = %q, want %q", got, rendered)
 	}

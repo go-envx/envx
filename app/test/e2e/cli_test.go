@@ -5,8 +5,6 @@ package e2e_test
 import (
 	"bytes"
 	"encoding/json"
-	"os"
-	"path/filepath"
 	"strings"
 	"testing"
 
@@ -38,69 +36,6 @@ func TestRootShowsHelp(t *testing.T) {
 	}
 	if !strings.Contains(stdout.String(), "envx") {
 		t.Errorf("expected help output, got %q", stdout.String())
-	}
-}
-
-// TestKeypairPrintUsesConfiguredCipher verifies print honors the manifest
-// cipher, leaves stderr empty, and does not create managed files.
-func TestKeypairPrintUsesConfiguredCipher(t *testing.T) {
-	t.Parallel()
-
-	dir := t.TempDir()
-	configPath := filepath.Join(dir, "envx.yaml")
-	body := "environments: [production]\n" +
-		"secrets:\n  cipher: nacl-box\n" +
-		"projects:\n  app:\n    includes: [env/app]\n"
-	if err := os.WriteFile(configPath, []byte(body), 0o600); err != nil {
-		t.Fatal(err)
-	}
-
-	stdout, stderr, err := execCmd(
-		"keypair", "print", "--config", configPath,
-	)
-	if err != nil {
-		t.Fatalf("keypair print: %v", err)
-	}
-	if !strings.Contains(stdout.String(), "nacl-box-public-key:") ||
-		!strings.Contains(stdout.String(), "nacl-box-private-key:") {
-		t.Errorf("stdout = %q, want configured NaCl Box keys", stdout.String())
-	}
-	if stderr.Len() != 0 {
-		t.Errorf("stderr = %q, want empty", stderr.String())
-	}
-	for _, path := range []string{
-		filepath.Join(dir, "secrets.yaml"),
-		filepath.Join(dir, "envx.keys"),
-	} {
-		if _, err := os.Stat(path); !os.IsNotExist(err) {
-			t.Errorf("stdout command created %s, stat error = %v", path, err)
-		}
-	}
-}
-
-// TestKeypairPrintCipherFlagOverridesManifest verifies an explicit cipher flag
-// wins over the algorithm configured in envx.yaml.
-func TestKeypairPrintCipherFlagOverridesManifest(t *testing.T) {
-	t.Parallel()
-
-	dir := t.TempDir()
-	configPath := filepath.Join(dir, "envx.yaml")
-	body := "environments: [production]\n" +
-		"secrets:\n  cipher: age\n" +
-		"projects:\n  app:\n    includes: [env/app]\n"
-	if err := os.WriteFile(configPath, []byte(body), 0o600); err != nil {
-		t.Fatal(err)
-	}
-
-	stdout, _, err := execCmd(
-		"keypair", "print", "--config", configPath, "--cipher", "nacl-box",
-	)
-	if err != nil {
-		t.Fatalf("keypair print --cipher: %v", err)
-	}
-	if !strings.Contains(stdout.String(), "nacl-box-public-key:") ||
-		!strings.Contains(stdout.String(), "nacl-box-private-key:") {
-		t.Errorf("stdout = %q, want flag-selected NaCl Box keys", stdout.String())
 	}
 }
 

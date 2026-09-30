@@ -5,7 +5,6 @@ import (
 
 	"github.com/go-envx/envx/app/internal/core"
 	"github.com/go-envx/envx/app/internal/features/env"
-	"github.com/go-envx/envx/app/internal/features/workspace"
 	"github.com/go-envx/envx/app/internal/shared/flags"
 	"github.com/spf13/pflag"
 )
@@ -39,7 +38,7 @@ func TestGetInputCapturesEveryOption(t *testing.T) {
 	t.Parallel()
 
 	fs := newFlags()
-	flags.Bind(fs, new(string), &workspace.ConfigFlag)
+	flags.Bind(fs, new(string), &flags.Config)
 	env.RegisterFlags(fs,
 		env.WithEnv,
 		env.WithRequireOverlays,
@@ -71,7 +70,7 @@ func TestGetInputConfigPath(t *testing.T) {
 
 	t.Run("reads --config", func(t *testing.T) {
 		fs := newFlags()
-		flags.Bind(fs, new(string), &workspace.ConfigFlag)
+		flags.Bind(fs, new(string), &flags.Config)
 		if err := fs.Parse([]string{"--config", "envx.yaml"}); err != nil {
 			t.Fatalf("parse: %v", err)
 		}
@@ -82,7 +81,7 @@ func TestGetInputConfigPath(t *testing.T) {
 	})
 	t.Run("nil when unset", func(t *testing.T) {
 		fs := newFlags()
-		flags.Bind(fs, new(string), &workspace.ConfigFlag)
+		flags.Bind(fs, new(string), &flags.Config)
 		if err := fs.Parse(nil); err != nil {
 			t.Fatalf("parse: %v", err)
 		}

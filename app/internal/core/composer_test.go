@@ -6,7 +6,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/go-envx/envx/app/internal/features/secrets"
 	"github.com/go-envx/envx/app/internal/resources/cipher"
 )
 
@@ -70,7 +69,7 @@ func writeCipherManifest(t *testing.T, algorithm string) string {
 // passes the selected cipher into the root secrets workflow.
 func TestNewSecretsManagerUsesConfiguredAlgorithm(t *testing.T) {
 	dir := t.TempDir()
-	manager, err := NewSecretsManager(secrets.Params{
+	manager, err := NewSecretsManager(SecretsParams{
 		SecretsPath:   filepath.Join(dir, "secrets.yaml"),
 		KeysPath:      filepath.Join(dir, "envx.keys"),
 		DefaultIndent: 2,
@@ -80,12 +79,12 @@ func TestNewSecretsManagerUsesConfiguredAlgorithm(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewSecretsManager(): %v", err)
 	}
-	metadata, err := manager.GenerateKeypair("production")
+	result, err := manager.GenerateKeypair("production")
 	if err != nil {
 		t.Fatalf("GenerateKeypair(): %v", err)
 	}
-	if !strings.HasPrefix(metadata.PublicKey, "nacl-box-public-key:") {
-		t.Errorf("PublicKey = %q, want NaCl Box key", metadata.PublicKey)
+	if !strings.HasPrefix(result.Keypair.PublicKey, "nacl-box-public-key:") {
+		t.Errorf("PublicKey = %q, want NaCl Box key", result.Keypair.PublicKey)
 	}
 	if _, err := os.Stat(filepath.Join(dir, "envx.keys")); err != nil {
 		t.Fatalf("private-key file was not written: %v", err)

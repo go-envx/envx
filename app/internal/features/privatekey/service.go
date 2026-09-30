@@ -12,6 +12,8 @@ const (
 
 // Repository defines persistent storage operations consumed by Service.
 type Repository interface {
+	// Location reports the storage location of the repository.
+	Location() string
 	// Origin returns the provenance identifier for this repository.
 	Origin() string
 	// GetPrivateKey retrieves the stored key for a group, or reports false if absent.
@@ -87,6 +89,15 @@ func (s *Service) Resolve(group string) (PrivateKey, error) {
 	}
 
 	return PrivateKey{Value: key, Origin: s.params.Repository.Origin()}, nil
+}
+
+// Location reports the storage location of the underlying repository, or empty
+// string if no repository is configured.
+func (s *Service) Location() string {
+	if s.params.Repository == nil {
+		return ""
+	}
+	return s.params.Repository.Location()
 }
 
 // Set validates and persists a private key for a group via the repository.

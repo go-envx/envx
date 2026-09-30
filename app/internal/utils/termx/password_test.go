@@ -26,14 +26,14 @@ func TestPassword(t *testing.T) {
 		In:     tmpFile,
 		Prompt: "Enter password: ",
 		ReadPassword: func(fd int) ([]byte, error) {
-			return []byte("super-secret-pwd"), nil
+			return []byte("sample-pass-val"), nil
 		},
 	})
 	if err != nil {
 		t.Fatalf("Password() unexpected error: %v", err)
 	}
-	if pwd != "super-secret-pwd" {
-		t.Errorf("Password() = %q, want %q", pwd, "super-secret-pwd")
+	if pwd != "sample-pass-val" {
+		t.Errorf("Password() = %q, want %q", pwd, "sample-pass-val")
 	}
 	if out.String() != "Enter password: \n" {
 		t.Errorf("out = %q, want %q", out.String(), "Enter password: \n")

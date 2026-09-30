@@ -45,7 +45,7 @@ func newWorkspace(t *testing.T) (string, Workspace) {
 	writeSource(t, root, "env/app.production.yaml", "A: prod\n")
 	writeSource(t, root, "env/api.yaml", "B: base\n")
 	writeSource(t, root, "env/api.development.yaml", "B: dev\n")
-	store := "public_keys:\n  shared: PUBKEY\n" +
+	store := "public-keys:\n  shared: PUBKEY\n" +
 		"secrets:\n" +
 		"  shared:\n    token: t0k\n    unused: nope\n" +
 		"  other:\n    x: y\n"
@@ -571,7 +571,7 @@ func TestPackFiltersSecrets(t *testing.T) {
 		t.Errorf("referenced secret missing from bundle store:\n%s", got)
 	}
 	// Everything unreferenced is gone.
-	gone := []string{"unused", "nope", "other", "x: y", "public_keys", "PUBKEY"}
+	gone := []string{"unused", "nope", "other", "x: y", "public-keys", "PUBKEY"}
 	for _, dropped := range gone {
 		if strings.Contains(got, dropped) {
 			t.Errorf("bundle store still contains %q:\n%s", dropped, got)
@@ -615,7 +615,7 @@ func TestPackStandardizesManifestAndStoreNames(t *testing.T) {
 			"projects:\n  app:\n    includes: [env/app]\n")
 	writeSource(t, root, "env/app.yaml", "TOKEN: secret://shared/token\n")
 	store := writeSource(t, root, "private/vault.yaml",
-		"public_keys:\n  shared: PUBKEY\nsecrets:\n  shared:\n    token: t0k\n")
+		"public-keys:\n  shared: PUBKEY\nsecrets:\n  shared:\n    token: t0k\n")
 	ws := Workspace{
 		ManifestPath: manifest,
 		Root:         root,

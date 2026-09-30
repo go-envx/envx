@@ -30,7 +30,7 @@ type Workspace struct {
 	// against.
 	Environments []string
 	// Secrets provides the store-level findings; nil skips them.
-	Secrets *secrets.Manager
+	Secrets *secrets.Service
 }
 
 // storeRef identifies one stored secret for orphan matching. The group is
@@ -182,7 +182,7 @@ func collectReferences(referenced map[storeRef]bool, items []string) {
 // check reads — the stored secrets and the group keypairs — and skips an artifact
 // entirely when none of its checks are selected.
 func addStoreFindings(
-	report *Report, params Params, manager *secrets.Manager, referenced map[storeRef]bool,
+	report *Report, params Params, manager *secrets.Service, referenced map[storeRef]bool,
 ) error {
 	// The encryption, algorithm, orphan, and missing-public-key checks all read the
 	// stored secrets; read them once when any of those checks runs.
@@ -211,7 +211,7 @@ func addStoreFindings(
 // only for the checks it lists, and the orphan check reuses the referenced set
 // gathered during the per-environment merge.
 func addSecretFindings(
-	report *Report, params Params, manager *secrets.Manager, referenced map[storeRef]bool,
+	report *Report, params Params, manager *secrets.Service, referenced map[storeRef]bool,
 ) error {
 	stored, err := manager.StoredSecrets()
 	if err != nil {
@@ -269,8 +269,8 @@ func addSecretFindings(
 // private key — reading the group keypairs without exposing key material. Each
 // finding is gated by its own selection so one keypair check can run without the
 // other.
-func addKeypairFindings(report *Report, params Params, manager *secrets.Manager) error {
-	keypairs, err := manager.Keypairs()
+func addKeypairFindings(report *Report, params Params, manager *secrets.Service) error {
+	keypairs, err := manager.ListKeypairs()
 	if err != nil {
 		return fmt.Errorf("reading keypairs: %w", err)
 	}

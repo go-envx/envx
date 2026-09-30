@@ -152,7 +152,7 @@ func TestPackFiltersAndDecryptsSecrets(t *testing.T) {
 	if !strings.Contains(string(store), "api_key:") {
 		t.Errorf("bundle store missing referenced secret:\n%s", store)
 	}
-	if strings.Contains(string(store), "public_keys") {
+	if strings.Contains(string(store), "public-keys") {
 		t.Errorf("bundle store still carries public keys:\n%s", store)
 	}
 

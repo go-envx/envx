@@ -11,6 +11,7 @@ import (
 	"github.com/go-envx/envx/app/internal/features/workspace"
 	wsfilestore "github.com/go-envx/envx/app/internal/features/workspace/filestore"
 	"github.com/go-envx/envx/app/internal/resources/cipher"
+	"github.com/go-envx/envx/app/internal/shared/flags"
 	"github.com/go-envx/envx/app/internal/utils/filex"
 )
 
@@ -121,7 +122,7 @@ func ResolveProject(in *Input, project string) (*Result, error) {
 // the provider.
 type resolverFactory struct {
 	// secrets locates the workspace secrets store and private-key file.
-	secrets secrets.Params
+	secrets SecretsParams
 	// cipher holds the configured cipher construction parameters.
 	cipher cipher.Params
 }
@@ -198,7 +199,7 @@ func resolveManifestPath(in *Input) string {
 	if in.ConfigPath != nil && *in.ConfigPath != "" {
 		return *in.ConfigPath
 	}
-	if v := os.Getenv(workspace.ConfigFlag.Env); v != "" {
+	if v := os.Getenv(flags.Config.Env); v != "" {
 		return v
 	}
 	return ""
@@ -333,7 +334,7 @@ func osEnvironment() map[string]string {
 // flag-overridable — so it reads only the workspace-level manifest secrets
 // block; constructing the manager and opening the store are ResolveProject's
 // jobs.
-func resolveSecretsParams(mc manifestContext) secrets.Params {
+func resolveSecretsParams(mc manifestContext) SecretsParams {
 	// Look up the secrets path in the manifest; use the default filename if unset.
 	secretsPath := mc.workspace.Secrets.SecretsPath
 	if secretsPath == "" {
@@ -359,7 +360,7 @@ func resolveSecretsParams(mc manifestContext) secrets.Params {
 
 	// Return the secrets parameters. DefaultIndent is applied only when the
 	// secrets store has no block indentation of its own.
-	return secrets.Params{
+	return SecretsParams{
 		SecretsPath:   resolvedSecretsPath,
 		KeysPath:      keysPath,
 		DefaultIndent: indent,

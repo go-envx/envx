@@ -2,7 +2,6 @@ package core
 
 import (
 	"github.com/go-envx/envx/app/internal/features/env"
-	"github.com/go-envx/envx/app/internal/features/workspace"
 	"github.com/go-envx/envx/app/internal/shared/flags"
 	"github.com/spf13/pflag"
 )
@@ -13,7 +12,7 @@ import (
 // to nil and falls through to the ENVX_* var and manifest layers.
 func GetInput(fs *pflag.FlagSet) *Input {
 	return &Input{
-		ConfigPath:       optString(fs, &workspace.ConfigFlag),
+		ConfigPath:       optString(fs, &flags.Config),
 		Env:              optString(fs, &env.Env),
 		RequireOverlays:  optBool(fs, &env.RequireOverlays),
 		Prefix:           optString(fs, &env.Prefix),

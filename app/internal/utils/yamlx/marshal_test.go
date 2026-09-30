@@ -1,9 +1,10 @@
-package yamlx
+package yamlx_test
 
 import (
 	"strings"
 	"testing"
 
+	"github.com/go-envx/envx/app/internal/utils/yamlx"
 	"gopkg.in/yaml.v3"
 )
 
@@ -20,7 +21,7 @@ func TestMarshalPreservesIndentAndComments(t *testing.T) {
 		t.Fatalf("Unmarshal() error = %v", err)
 	}
 
-	out, err := Marshal(&doc, 4)
+	out, err := yamlx.Marshal(&doc, 4)
 	if err != nil {
 		t.Fatalf("Marshal() error = %v", err)
 	}

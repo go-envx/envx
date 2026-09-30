@@ -139,7 +139,8 @@ func documentRoot(doc *yaml.Node) (*yaml.Node, error) {
 // position survive; a missing key is appended after the existing entries.
 func setNestedKey(node *yaml.Node, parts []string, value string) error {
 	for i, part := range parts[:len(parts)-1] {
-		child, _ := yamlx.MappingEntry(node, part, false)
+		entry, _ := yamlx.FindMappingEntry(node, part)
+		child := entry.ValueNode
 		switch {
 		case child == nil:
 			child = &yaml.Node{Kind: yaml.MappingNode}
@@ -160,7 +161,9 @@ func setNestedKey(node *yaml.Node, parts []string, value string) error {
 	}
 
 	last := parts[len(parts)-1]
-	if v, _ := yamlx.MappingEntry(node, last, false); v != nil {
+	entry, found := yamlx.FindMappingEntry(node, last)
+	if found && entry.ValueNode != nil {
+		v := entry.ValueNode
 		if v.Kind == yaml.SequenceNode || v.Kind == yaml.MappingNode {
 			kind := "a mapping"
 			if v.Kind == yaml.SequenceNode {
@@ -170,11 +173,11 @@ func setNestedKey(node *yaml.Node, parts []string, value string) error {
 				"%q is %s; refusing to overwrite it", strings.Join(parts, "."), kind,
 			)
 		}
-		yamlx.SetStringScalar(v, value)
+		yamlx.SetScalarNode(v, value)
 		return nil
 	}
 	leaf := new(yaml.Node)
-	yamlx.SetStringScalar(leaf, value)
+	yamlx.SetScalarNode(leaf, value)
 	appendPair(node, last, leaf)
 	return nil
 }
