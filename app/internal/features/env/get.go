@@ -5,16 +5,6 @@ import (
 	"strings"
 )
 
-// Entry is one successfully resolved winning env-var value and its provenance.
-type Entry struct {
-	// Key is the canonical uppercase env-var key that was looked up.
-	Key string
-	// Value is the resolved, rendered value of the winning leaf.
-	Value string
-	// Origin records the winning source and every source it shadowed.
-	Origin Origin
-}
-
 // GetParams selects one key, environment, and reveal policy for a single lookup.
 type GetParams struct {
 	// Key is the env-var key to look up; it is normalized to uppercase.
@@ -35,48 +25,53 @@ type GetParams struct {
 // failure is returned without leaking its value. A masked get still invokes the
 // resolver so implicit references are canonicalized and escaped references are
 // unescaped, but it never substitutes: the {{ }} template is shown as declared.
-func (m *Manager) Get(params GetParams) (Entry, error) {
-	environment, err := m.normalizeEnvironment(params.Environment)
+func (s *Service) Get(params GetParams) (GetResult, error) {
+	environment, err := s.normalizeEnvironment(params.Environment)
 	if err != nil {
-		return Entry{}, err
+		return GetResult{}, err
 	}
 
-	state, err := m.merge(environment)
+	state, err := s.merge(environment)
 	if err != nil {
-		return Entry{}, err
+		return GetResult{}, err
 	}
 
 	// Apply OS source selection over the namespace keys, without unioning OS-only
 	// keys, so a get reflects an OS override exactly as run would.
-	m.applyOSEnvironment(state, false)
+	s.applyOSEnvironment(state, false)
 
 	key := strings.ToUpper(params.Key)
 	value, ok := state.values[key]
 	if !ok {
-		return Entry{}, fmt.Errorf("key %q not found", key)
+		return GetResult{}, fmt.Errorf("key %q not found", key)
 	}
 	origin := state.origins[key]
 
-	resolver, err := m.openResolver(params.Reveal)
+	resolver, err := s.openResolver(params.Reveal)
 	if err != nil {
-		return Entry{}, err
+		return GetResult{}, err
 	}
 
-	rendered, err := m.getValue(
+	rendered, err := s.getValue(
 		params.Reveal, state, resolver, environment, key, value, origin,
 	)
 	if err != nil {
-		return Entry{}, err
+		return GetResult{}, err
 	}
 
-	return Entry{Key: key, Value: rendered, Origin: origin}, nil
+	return GetResult{
+		Key:    key,
+		Value:  rendered,
+		Source: origin.Winner.File,
+		Origin: origin,
+	}, nil
 }
 
 // getValue renders the requested key's value under the call's reveal policy. A
 // masked read resolves and renders only the requested leaf, leaving any {{ }}
 // template literal; a revealed read composes the key's transitive dependency
 // closure through the substitution engine.
-func (m *Manager) getValue(
+func (s *Service) getValue(
 	reveal bool,
 	state *mergeState,
 	resolver ValueResolver,
@@ -85,7 +80,7 @@ func (m *Manager) getValue(
 	origin Origin,
 ) (string, error) {
 	if reveal {
-		engine := m.newSubstituter(m.getSymbols(state, resolver, environment))
+		engine := s.newSubstituter(s.getSymbols(state, resolver, environment))
 		return engine.Resolve(key)
 	}
 
@@ -93,5 +88,5 @@ func (m *Manager) getValue(
 	if err != nil {
 		return "", err
 	}
-	return renderLeafValue(resolved, origin.Winner.Key, m.params.Settings.Delimiter)
+	return renderLeafValue(resolved, origin.Winner.Key, s.params.Settings.Delimiter)
 }

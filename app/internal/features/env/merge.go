@@ -1,34 +1,18 @@
 package env
 
 import (
-	"errors"
 	"fmt"
 	"maps"
-	"os"
-	"path/filepath"
 	"strings"
 )
-
-// namespace identifies one namespace to load. It resolves to up to two files:
-//   - base:    <dir>/<name>.yaml       (required — defines the namespace)
-//   - overlay: <dir>/<name>.<env>.yaml (optional unless require-overlays)
-type namespace struct {
-	// dir is the absolute directory holding the namespace's YAML files.
-	dir string
-	// name is the namespace's base file name, without extension.
-	name string
-}
 
 // loadedNamespace holds one operation-local parsed base so a multi-environment
 // operation can reuse it across environments without re-reading the base file.
 // Its snapshot is discarded when the operation returns.
 type loadedNamespace struct {
-	namespace
-	// baseFile is the absolute path to the namespace's base file.
+	include  string
 	baseFile string
-	// baseFlat holds the base file's flattened, unresolved leaves.
 	baseFlat map[string]leafValue
-	// baseKeys maps each flat key back to its dotted path in the base file.
 	baseKeys map[string]string
 }
 
@@ -41,44 +25,27 @@ type mergeState struct {
 	origins map[string]Origin
 }
 
-// buildNamespaces resolves each include into a namespace (directory + base
-// name), preserving declaration order. Includes are already absolute paths and no
-// files are read.
-func buildNamespaces(includes []string) []namespace {
-	out := make([]namespace, 0, len(includes))
-	for _, inc := range includes {
-		out = append(out, namespace{
-			dir:  filepath.Dir(inc),
-			name: filepath.Base(inc),
-		})
-	}
-	return out
-}
-
 // loadNamespaces reads and flattens every included base file into one
 // operation-local snapshot. It performs the base-file I/O that a multi-environment
 // operation would otherwise repeat per side. Malformed base YAML and flatten
 // collisions are operation-fatal.
-func (m *Manager) loadNamespaces() ([]loadedNamespace, error) {
-	namespaces := buildNamespaces(m.params.Includes)
-	loaded := make([]loadedNamespace, 0, len(namespaces))
-	for _, ns := range namespaces {
-		baseFile := filepath.Join(ns.dir, ns.name+".yaml")
-
-		baseMap, err := loadYAML(baseFile)
+func (s *Service) loadNamespaces() ([]loadedNamespace, error) {
+	loaded := make([]loadedNamespace, 0, len(s.params.Includes))
+	for _, inc := range s.params.Includes {
+		baseData, err := s.params.Repository.LoadBase(inc)
 		if err != nil {
-			return nil, fmt.Errorf("loading base file %s: %w", baseFile, err)
+			return nil, err
 		}
-		baseFlat, err := flatten(baseMap)
+		baseFlat, err := flatten(baseData.Data)
 		if err != nil {
-			return nil, fmt.Errorf("namespace %s/%s: %w", ns.dir, ns.name, err)
+			return nil, fmt.Errorf("namespace %s: %w", inc, err)
 		}
 
 		loaded = append(loaded, loadedNamespace{
-			namespace: ns,
-			baseFile:  baseFile,
-			baseFlat:  baseFlat,
-			baseKeys:  flattenKeys(baseMap),
+			include:  inc,
+			baseFile: baseData.SourcePath,
+			baseFlat: baseFlat,
+			baseKeys: flattenKeys(baseData.Data),
 		})
 	}
 	return loaded, nil
@@ -87,18 +54,18 @@ func (m *Manager) loadNamespaces() ([]loadedNamespace, error) {
 // merge loads a fresh base snapshot for one environment and selects unresolved
 // winners. An ordinary single-environment operation calls it; Diff reuses one
 // snapshot across both sides via loadNamespaces and mergeLoaded directly.
-func (m *Manager) merge(environment string) (*mergeState, error) {
-	namespaces, err := m.loadNamespaces()
+func (s *Service) merge(environment string) (*mergeState, error) {
+	namespaces, err := s.loadNamespaces()
 	if err != nil {
 		return nil, err
 	}
-	return m.mergeLoaded(namespaces, environment)
+	return s.mergeLoaded(namespaces, environment)
 }
 
 // mergeLoaded applies one environment's overlays to an operation-local base
 // snapshot, selecting winners and tracking provenance in declaration order
 // (deterministic last-wins), then applies the global prefix and suffix.
-func (m *Manager) mergeLoaded(
+func (s *Service) mergeLoaded(
 	namespaces []loadedNamespace, environment string,
 ) (*mergeState, error) {
 	state := &mergeState{
@@ -107,38 +74,43 @@ func (m *Manager) mergeLoaded(
 	}
 
 	for _, ns := range namespaces {
-		if err := loadNamespace(ns, environment, m.params.Settings, state); err != nil {
+		if err := s.loadNamespace(ns, environment, s.params.Settings, state); err != nil {
 			return nil, err
 		}
 	}
 
-	applyAffixes(state, m.params.Settings)
+	applyAffixes(state, s.params.Settings)
 	return state, nil
 }
 
 // loadNamespace layers one namespace's optional environment overlay over its
 // pre-loaded base, flattens the overlay, and integrates the unresolved result
 // into the running values/origins maps.
-func loadNamespace(
+func (s *Service) loadNamespace(
 	ns loadedNamespace, environment string, settings Settings, state *mergeState,
 ) error {
-	envFile := filepath.Join(ns.dir, ns.name+"."+environment+".yaml")
-
-	envMap, err := loadYAML(envFile)
+	overlayData, found, err := s.params.Repository.LoadOverlay(ns.include, environment)
 	if err != nil {
-		if settings.RequireOverlays || !errors.Is(err, os.ErrNotExist) {
-			return fmt.Errorf("loading environment file %s: %w", envFile, err)
+		return err
+	}
+	if !found {
+		if settings.RequireOverlays {
+			source := overlayData.SourcePath
+			if source == "" {
+				source = ns.include + "." + environment + ".yaml"
+			}
+			return fmt.Errorf("loading environment file %s: %w", source, ErrOverlayNotFound)
 		}
-		envMap = nil
+		overlayData.Data = nil
 	}
 
 	// Flatten the overlay independently, then layer it over the base. Equivalent
 	// nested and flat spellings (log.level and log_level) collapse to the same env
 	// key, so an overlay can override a base value written in the other style,
 	// while flatten still rejects two spellings colliding within a single file.
-	envFlat, err := flatten(envMap)
+	envFlat, err := flatten(overlayData.Data)
 	if err != nil {
-		return fmt.Errorf("namespace %s/%s: %w", ns.dir, ns.name, err)
+		return fmt.Errorf("namespace %s: %w", ns.include, err)
 	}
 
 	flat := make(map[string]leafValue, len(ns.baseFlat)+len(envFlat))
@@ -147,11 +119,13 @@ func loadNamespace(
 
 	// Map each flat key back to its dotted overlay path once so the per-key loop
 	// can attribute a value to the exact file(s) that defined it.
-	envKeys := flattenKeys(envMap)
+	envKeys := flattenKeys(overlayData.Data)
 	for key, value := range flat {
 		finalKey := key
 
-		sources := namespaceSources(key, ns.baseFile, envFile, ns.baseKeys, envKeys)
+		sources := namespaceSources(
+			key, ns.baseFile, overlayData.SourcePath, ns.baseKeys, envKeys,
+		)
 		integrateSources(state, finalKey, sources)
 		state.values[finalKey] = value
 	}

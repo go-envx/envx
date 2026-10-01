@@ -1,6 +1,7 @@
 package core
 
 import (
+	"github.com/go-envx/envx/app/internal/features/env"
 	"github.com/go-envx/envx/app/internal/features/scaffold"
 	"github.com/go-envx/envx/app/internal/features/secrets"
 )
@@ -34,4 +35,14 @@ func (a *App) SecretsService(configPath string) (*secrets.Service, error) {
 		return nil, err
 	}
 	return NewSecretsManager(c.Secrets, c.Cipher)
+}
+
+// EnvService resolves project/workspace configuration and returns the domain
+// env service.
+func (a *App) EnvService(in *Input, project string) (*env.Service, error) {
+	resolved, err := ResolveProject(in, project)
+	if err != nil {
+		return nil, err
+	}
+	return resolved.Envmerge, nil
 }

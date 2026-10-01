@@ -25,9 +25,9 @@ func osOriginSource(key string) Source {
 // provenance. When unionOSKeys is set, OS-only keys are added as opaque winners
 // so a materialized child receives a complete environment; get, explain, and diff
 // leave them out because they enumerate namespace keys only.
-func (m *Manager) applyOSEnvironment(state *mergeState, unionOSKeys bool) {
-	overload := m.params.Settings.Overload
-	for key, osValue := range m.params.OSEnvironment {
+func (s *Service) applyOSEnvironment(state *mergeState, unionOSKeys bool) {
+	overload := s.params.Settings.Overload
+	for key, osValue := range s.params.OSEnvironment {
 		_, isNamespace := state.values[key]
 		switch {
 		case isNamespace && !overload:

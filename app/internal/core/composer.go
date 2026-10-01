@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/go-envx/envx/app/internal/features/env"
+	envfilestore "github.com/go-envx/envx/app/internal/features/env/filestore"
 	"github.com/go-envx/envx/app/internal/features/privatekey"
 	pkfilestore "github.com/go-envx/envx/app/internal/features/privatekey/filestore"
 	"github.com/go-envx/envx/app/internal/features/secrets"
@@ -133,4 +135,12 @@ func NewSecretsService(
 // a secrets service for one resolved workspace.
 func NewSecretsManager(s SecretsParams, c cipher.Params) (*secrets.Service, error) {
 	return NewSecretsService(s.SecretsPath, s.KeysPath, c, s.DefaultIndent)
+}
+
+// NewEnvService constructs an env.Service with a local filestore repository.
+func NewEnvService(params env.ServiceParams) (*env.Service, error) {
+	if params.Repository == nil {
+		params.Repository = envfilestore.New(envfilestore.Params{})
+	}
+	return env.NewService(params)
 }

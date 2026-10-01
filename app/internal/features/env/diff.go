@@ -51,36 +51,36 @@ type DiffParams struct {
 // a dangling reference or cycle on either side is fatal. Namespace, YAML,
 // flatten, and render failures on either side are fatal and yield no partial
 // result.
-func (m *Manager) Diff(params DiffParams) (*DiffResult, error) {
-	envA, err := m.normalizeEnvironment(params.EnvironmentA)
+func (s *Service) Diff(params DiffParams) (*DiffResult, error) {
+	envA, err := s.normalizeEnvironment(params.EnvironmentA)
 	if err != nil {
 		return nil, err
 	}
-	envB, err := m.normalizeEnvironment(params.EnvironmentB)
-	if err != nil {
-		return nil, err
-	}
-
-	namespaces, err := m.loadNamespaces()
+	envB, err := s.normalizeEnvironment(params.EnvironmentB)
 	if err != nil {
 		return nil, err
 	}
 
-	stateA, err := m.mergeLoaded(namespaces, envA)
+	namespaces, err := s.loadNamespaces()
 	if err != nil {
 		return nil, err
 	}
-	stateB, err := m.mergeLoaded(namespaces, envB)
+
+	stateA, err := s.mergeLoaded(namespaces, envA)
+	if err != nil {
+		return nil, err
+	}
+	stateB, err := s.mergeLoaded(namespaces, envB)
 	if err != nil {
 		return nil, err
 	}
 
 	// Apply OS source selection to each side so an OS override is compared exactly
 	// as run would see it; OS-only keys are excluded from the comparison.
-	m.applyOSEnvironment(stateA, false)
-	m.applyOSEnvironment(stateB, false)
+	s.applyOSEnvironment(stateA, false)
+	s.applyOSEnvironment(stateB, false)
 
-	valuesA, valuesB, err := m.diffValues(params.Reveal, stateA, stateB, envA, envB)
+	valuesA, valuesB, err := s.diffValues(params.Reveal, stateA, stateB, envA, envB)
 	if err != nil {
 		return nil, err
 	}
@@ -92,11 +92,11 @@ func (m *Manager) Diff(params DiffParams) (*DiffResult, error) {
 // policy: masked, each side is rendered to its declared literals without a
 // resolver; revealed, each side is resolved and substituted through a shared
 // revealing resolver.
-func (m *Manager) diffValues(
+func (s *Service) diffValues(
 	reveal bool, stateA, stateB *mergeState, envA, envB string,
 ) (mapA, mapB map[string]string, err error) {
 	if !reveal {
-		delimiter := m.params.Settings.Delimiter
+		delimiter := s.params.Settings.Delimiter
 		literalsA, lerr := renderLiterals(stateA, delimiter)
 		if lerr != nil {
 			return nil, nil, lerr
@@ -108,15 +108,15 @@ func (m *Manager) diffValues(
 		return literalsA, literalsB, nil
 	}
 
-	resolver, rerr := m.openResolver(true)
+	resolver, rerr := s.openResolver(true)
 	if rerr != nil {
 		return nil, nil, rerr
 	}
-	valuesA, rerr := m.resolveEffective(stateA, resolver, envA)
+	valuesA, rerr := s.resolveEffective(stateA, resolver, envA)
 	if rerr != nil {
 		return nil, nil, rerr
 	}
-	valuesB, rerr := m.resolveEffective(stateB, resolver, envB)
+	valuesB, rerr := s.resolveEffective(stateB, resolver, envB)
 	if rerr != nil {
 		return nil, nil, rerr
 	}

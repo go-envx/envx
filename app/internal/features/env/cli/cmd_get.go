@@ -1,6 +1,9 @@
-package get
+package cli
 
 import (
+	"fmt"
+	"io"
+
 	"github.com/go-envx/envx/app/internal/core"
 	"github.com/go-envx/envx/app/internal/features/env"
 	"github.com/go-envx/envx/app/internal/shared/flags"
@@ -9,9 +12,9 @@ import (
 )
 
 const (
-	usage = "get <project> <key>"
-	short = "Get the value of an environment variable for a project"
-	long  = `
+	getUsage = "get <project> <key>"
+	getShort = "Get the value of an environment variable for a project"
+	getLong  = `
 		Get resolves the merged environment for a project and prints the value
 		of the specified key. The key is matched case-insensitively (uppercased).
 
@@ -22,47 +25,43 @@ const (
 		Secret references are masked as "secret://group/key" by default; pass
 		--reveal to decrypt and print their plaintext.
 	`
-	example = `
+	getExample = `
 		envx get api-service DATABASE_HOST
 		envx get api-service database_host --env=production
 		envx get api-service DATABASE_PASSWORD --reveal
 	`
 )
 
-// NewCommand builds the "get" command, which parses args into the action's
-// params/config, executes the action, and writes the value to stdout.
-func NewCommand() *cobra.Command {
+// NewGetCommand builds the "get" command.
+func NewGetCommand(f Factory) *cobra.Command {
 	var reveal bool
 
 	cmd := &cobra.Command{
-		Use:     usage,
-		Short:   short,
-		Long:    str.Dedent(long),
-		Example: str.Dedent(example, 2),
+		Use:     getUsage,
+		Short:   getShort,
+		Long:    str.Dedent(getLong),
+		Example: str.Dedent(getExample, 2),
 		Args:    cobra.ExactArgs(2),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			// map args to action params
-			p := actionParams{
-				Project: args[0],
-				Key:     args[1],
-				Reveal:  reveal,
-			}
+			project := args[0]
+			key := args[1]
 
-			// get the flag inputs
-			flagset := cmd.Flags()
-			input := core.GetInput(flagset)
+			in := core.GetInput(cmd.Flags())
 
-			// execute the action
-			res, err := execute(p, input)
+			envService, err := f.EnvService(in, project)
 			if err != nil {
 				return err
 			}
 
-			// render the result
-			return render(&renderParams{
-				Writer: cmd.OutOrStdout(),
-				Result: res,
+			result, err := envService.Get(env.GetParams{
+				Key:    key,
+				Reveal: reveal,
 			})
+			if err != nil {
+				return err
+			}
+
+			return outputGet(cmd.OutOrStdout(), result.Value)
 		},
 	}
 
@@ -79,4 +78,11 @@ func NewCommand() *cobra.Command {
 	flags.Bind(cmd.Flags(), &reveal, &env.Reveal)
 
 	return cmd
+}
+
+// outputGet prints the resolved value followed by a newline so the value is
+// convenient to pipe.
+func outputGet(w io.Writer, value string) error {
+	_, err := fmt.Fprintln(w, value)
+	return err
 }

@@ -1,9 +1,13 @@
 package syntax
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 )
+
+// ErrCircularReference indicates variable substitution encountered a dependency cycle.
+var ErrCircularReference = errors.New("circular variable reference detected")
 
 // MissingReferenceError reports a reference that resolves in neither the
 // namespace nor the OS environment. It carries only key names, never a value.
@@ -33,4 +37,14 @@ type CircularReferenceError struct {
 // Error describes the cycle as a name path without exposing any value.
 func (e *CircularReferenceError) Error() string {
 	return "circular reference: " + strings.Join(e.Cycle, " -> ")
+}
+
+// Unwrap returns the underlying ErrCircularReference sentinel error.
+func (e *CircularReferenceError) Unwrap() error {
+	return ErrCircularReference
+}
+
+// Is reports whether target matches ErrCircularReference.
+func (e *CircularReferenceError) Is(target error) bool {
+	return target == ErrCircularReference
 }

@@ -50,8 +50,8 @@ func flatten(m map[string]any) (map[string]leafValue, error) {
 					first, second = second, first
 				}
 				return fmt.Errorf(
-					"flatten collision: %q and %q both produce key %q",
-					first, second, flatKey,
+					"%w: %q and %q both produce key %q",
+					ErrFlattenCollision, first, second, flatKey,
 				)
 			}
 			origins[flatKey] = path

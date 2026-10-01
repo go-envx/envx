@@ -1155,7 +1155,7 @@ Every sub-phase must compile, pass formatting and lint checks (`task envx:check`
 flowchart LR
     Sub81["✅ 8.1: privatekey<br/>(Lighthouse)"] --> Sub82["✅ 8.2: workspace & scaffold<br/>(Workspace & Scaffolder)"]
     Sub82 --> Sub83["✅ 8.3: secrets<br/>(Store & Service)"]
-    Sub83 --> Sub84["8.4: env<br/>(NamespaceStore)"]
+    Sub83 --> Sub84["✅ 8.4: env<br/>(NamespaceStore)"]
     Sub84 --> Sub85["8.5: runner<br/>(Process Supervision)"]
     Sub85 --> Sub86["8.6: emit<br/>(Serialization Engine)"]
     Sub86 --> Sub87["8.7: pack & validate<br/>(Bundling & Checks)"]
@@ -1187,12 +1187,12 @@ flowchart LR
 4. **Update core composition**: Added `NewSecretsService` and `cipherAdapter` in [app/internal/core/composer.go](app/internal/core/composer.go) to wire the configured cipher, private key service, and `filestore.Store` into `secrets.Service`. Updated [app/internal/core/config.go](app/internal/core/config.go) and [app/internal/core/workspace.go](app/internal/core/workspace.go).
 5. **Update tests & verify**: Migrated unit tests in `features/secrets` to use fast in-memory fake repositories without disk I/O or import cycles. Added comprehensive repository tests in [app/internal/features/secrets/filestore/store_test.go](app/internal/features/secrets/filestore/store_test.go). Verified with `task envx:all`.
 
-### Phase 8.4: Environment & Namespace DI Refactoring
-1. **Define env namespace repository interface**: Declare `LoadBase` and `LoadOverlay` in the env package root.
-2. **Create env filestore subpackage**: Implement store handling YAML file reading, unmarshaling, and error wrapping.
-3. **Refactor env Service**: Reframe manager into `env.Service`. Remove direct calls to `file.Read` and `yaml.Unmarshal`. Supply `NamespaceRepository` via `env.ServiceParams`.
-4. **Wire in core**: Update `ResolveProject` in [app/internal/core/config.go](app/internal/core/config.go) to construct and inject the env filestore.
-5. **Update tests & verify**: Run `task envx:test`.
+### ✅ Phase 8.4: Environment & Namespace DI Refactoring
+1. **Define env namespace repository interface**: Declared `NamespaceData` and `NamespaceRepository` (`LoadBase` and `LoadOverlay`) in the env package root, and extracted sentinel errors (`ErrEnvironmentNotDeclared`, `ErrOverlayNotFound`, `ErrFlattenCollision`, `ErrCircularReference`) into [app/internal/features/env/errors.go](app/internal/features/env/errors.go).
+2. **Create env filestore subpackage**: Implemented `filestore.Repository` (`filestore.Store`) in [app/internal/features/env/filestore](app/internal/features/env/filestore) handling YAML file reading, unmarshaling, and error wrapping.
+3. **Refactor env Service**: Reframed `Manager` into `env.Service` with `ServiceParams` accepting `NamespaceRepository`. Removed direct file I/O and YAML unmarshaling from domain service methods.
+4. **Wire in core**: Added `NewEnvService` in [app/internal/core/composer.go](app/internal/core/composer.go) and updated `ResolveProject` in [app/internal/core/config.go](app/internal/core/config.go) to construct and inject the env filestore.
+5. **Update tests & verify**: Migrated unit tests in `features/env` to use fast in-memory fake repositories without disk I/O or import cycles. Added comprehensive filestore tests in [app/internal/features/env/filestore/repository_test.go](app/internal/features/env/filestore/repository_test.go). Verified with `task envx:all`.
 
 ### Phase 8.5: Process Execution DI Refactoring (`runner`)
 1. **Refactor RunParams and stream injection**: Move process stream dependencies (`Stdout`, `Stderr`, `Stdin`) from `ServiceParams` to `RunParams` so streams are supplied directly to `runnerService.Run(params RunParams)` instead of `NewService()`, achieving true dependency inversion. Default nil streams to OS streams within `Run`.

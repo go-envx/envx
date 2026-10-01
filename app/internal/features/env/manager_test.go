@@ -16,18 +16,8 @@ func setupWorkspace(t *testing.T) string {
 	if err := os.MkdirAll(envDir, 0o750); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(
-		filepath.Join(envDir, "postgres.yaml"),
-		[]byte("host: localhost\nport: 5432\n"), 0o600,
-	); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(
-		filepath.Join(envDir, "postgres.production.yaml"),
-		[]byte("host: prod-db\n"), 0o600,
-	); err != nil {
-		t.Fatal(err)
-	}
+	writeYAML(t, envDir, "postgres.yaml", "host: localhost\nport: 5432\n")
+	writeYAML(t, envDir, "postgres.production.yaml", "host: prod-db\n")
 	return dir
 }
 
@@ -35,6 +25,7 @@ func setupWorkspace(t *testing.T) string {
 // development and production environments.
 func baseParams(dir string) Params {
 	return Params{
+		Repository:   testRepo,
 		Includes:     []string{filepath.Join(dir, "env", "postgres")},
 		Environments: []string{"development", "production"},
 	}
@@ -58,6 +49,7 @@ func TestNewPerformsNoNamespaceIO(t *testing.T) {
 
 	dir := t.TempDir()
 	if _, err := New(Params{
+		Repository:   testRepo,
 		Includes:     []string{filepath.Join(dir, "missing")},
 		Environments: []string{"development"},
 	}); err != nil {
@@ -72,6 +64,7 @@ func TestNewDoesNotOpenResolver(t *testing.T) {
 
 	factory := &recordingFactory{resolver: fakeResolver{}}
 	if _, err := New(Params{
+		Repository:      testRepo,
 		Environments:    []string{"development"},
 		ResolverFactory: factory,
 	}); err != nil {

@@ -2,16 +2,135 @@ package env
 
 import (
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
+	"sync"
 	"testing"
+
+	"gopkg.in/yaml.v3"
 )
 
-// writeYAML writes a YAML file into dir.
+type fakeNamespaceRepository struct {
+	mu          sync.RWMutex
+	bases       map[string]NamespaceData
+	overlays    map[string]map[string]NamespaceData
+	parseErrors map[string]error
+	baseErr     error
+	overlayErr  error
+}
+
+func newFakeNamespaceRepository() *fakeNamespaceRepository {
+	return &fakeNamespaceRepository{
+		bases:       make(map[string]NamespaceData),
+		overlays:    make(map[string]map[string]NamespaceData),
+		parseErrors: make(map[string]error),
+	}
+}
+
+var testRepo = newFakeNamespaceRepository()
+
+func (r *fakeNamespaceRepository) LoadBase(includePath string) (NamespaceData, error) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	if r.baseErr != nil {
+		return NamespaceData{}, r.baseErr
+	}
+	clean := strings.TrimSuffix(includePath, ".yaml")
+	baseFile := clean + ".yaml"
+	if err, ok := r.parseErrors[baseFile]; ok {
+		return NamespaceData{}, err
+	}
+	if data, ok := r.bases[clean]; ok {
+		return data, nil
+	}
+	return NamespaceData{}, fmt.Errorf(
+		"loading base file %s: %w", baseFile, os.ErrNotExist,
+	)
+}
+
+func (r *fakeNamespaceRepository) LoadOverlay(
+	includePath, environment string,
+) (NamespaceData, bool, error) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	if r.overlayErr != nil {
+		return NamespaceData{}, false, r.overlayErr
+	}
+	clean := strings.TrimSuffix(includePath, ".yaml")
+	envFile := clean + "." + environment + ".yaml"
+	if err, ok := r.parseErrors[envFile]; ok {
+		return NamespaceData{}, false, err
+	}
+	if envMap, ok := r.overlays[clean]; ok {
+		if data, ok := envMap[environment]; ok {
+			return data, true, nil
+		}
+	}
+	return NamespaceData{SourcePath: envFile}, false, nil
+}
+
+func (r *fakeNamespaceRepository) SetOverlay(
+	includePath, environment, key, value string,
+) (string, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	clean := strings.TrimSuffix(includePath, ".yaml")
+	envFile := clean + "." + environment + ".yaml"
+	if r.overlays[clean] == nil {
+		r.overlays[clean] = make(map[string]NamespaceData)
+	}
+	data := r.overlays[clean][environment].Data
+	if data == nil {
+		data = make(map[string]any)
+	}
+	data[key] = value
+	r.overlays[clean][environment] = NamespaceData{
+		Data:       data,
+		SourcePath: envFile,
+	}
+	return envFile, nil
+}
+
+// writeYAML writes a YAML file into dir and updates the test fake repository.
 func writeYAML(t *testing.T, dir, name, body string) {
 	t.Helper()
-	if err := os.WriteFile(filepath.Join(dir, name), []byte(body), 0o600); err != nil {
+	filePath := filepath.Join(dir, name)
+	if err := os.WriteFile(filePath, []byte(body), 0o600); err != nil {
 		t.Fatal(err)
+	}
+
+	testRepo.mu.Lock()
+	defer testRepo.mu.Unlock()
+
+	var m map[string]any
+	if err := yaml.Unmarshal([]byte(body), &m); err != nil {
+		testRepo.parseErrors[filePath] = fmt.Errorf("loading %s: %w", filePath, err)
+		return
+	}
+	if m == nil {
+		m = make(map[string]any)
+	}
+
+	stem := strings.TrimSuffix(name, ".yaml")
+	if strings.Contains(stem, ".") {
+		parts := strings.SplitN(stem, ".", 2)
+		inc := filepath.Join(dir, parts[0])
+		envName := parts[1]
+		if testRepo.overlays[inc] == nil {
+			testRepo.overlays[inc] = make(map[string]NamespaceData)
+		}
+		testRepo.overlays[inc][envName] = NamespaceData{
+			Data:       m,
+			SourcePath: filePath,
+		}
+	} else {
+		inc := filepath.Join(dir, stem)
+		testRepo.bases[inc] = NamespaceData{
+			Data:       m,
+			SourcePath: filePath,
+		}
 	}
 }
 
@@ -80,6 +199,9 @@ func managerFor(t *testing.T, params Params) *Manager {
 	if params.Environments == nil {
 		params.Environments = []string{"development", "production"}
 	}
+	if params.Repository == nil {
+		params.Repository = testRepo
+	}
 	manager, err := New(params)
 	if err != nil {
 		t.Fatalf("New: %v", err)
@@ -91,6 +213,9 @@ func managerFor(t *testing.T, params Params) *Manager {
 // exercising the shared merge kernel exactly as a Manager operation does.
 func mergeEnv(t *testing.T, p Params) (*Environment, error) {
 	t.Helper()
+	if p.Repository == nil {
+		p.Repository = testRepo
+	}
 	manager, err := New(p)
 	if err != nil {
 		return nil, err

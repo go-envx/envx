@@ -95,20 +95,21 @@ func ResolveProject(in *Input, project string) (*Result, error) {
 		return nil, err
 	}
 
-	// Bind a resolver factory so a Manager operation can open a fresh,
+	// Bind a resolver factory so an env.Service operation can open a fresh,
 	// operation-scoped resolver on demand without construction-time secrets I/O.
 	params.ResolverFactory = resolverFactory{
 		secrets: res.Secrets,
 		cipher:  res.Cipher,
 	}
 
-	// Construct the Manager from the resolved params. New validates and copies the
-	// params without reading namespace files or opening the store.
-	manager, err := env.New(params)
+	// Construct the Service from the resolved params. NewEnvService wires
+	// the filestore repository and validates params without reading files or
+	// opening the store.
+	service, err := NewEnvService(params)
 	if err != nil {
 		return nil, err
 	}
-	res.Envmerge = manager
+	res.Envmerge = service
 	return res, nil
 }
 
@@ -272,6 +273,7 @@ func resolveEnvmergeParams(
 ) env.Params {
 	proj, global := pl.settings, mc.workspace.Settings
 	return env.Params{
+		WorkspaceDir: mc.dir,
 		Includes:     pl.includes,
 		Environments: mc.workspace.Environments,
 		DefaultEnvironment: env.PrecedenceString(&env.Env,

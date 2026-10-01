@@ -1,4 +1,4 @@
-package set
+package filestore
 
 import (
 	"errors"
@@ -6,71 +6,15 @@ import (
 	"os"
 	"strings"
 
-	"github.com/go-envx/envx/app/internal/core"
+	"gopkg.in/yaml.v3"
+
 	"github.com/go-envx/envx/app/internal/utils/filex"
 	"github.com/go-envx/envx/app/internal/utils/yamlx"
-	"gopkg.in/yaml.v3"
 )
 
-// actionParams are the positional inputs to the set action.
-type actionParams struct {
-	// IncludePath identifies the target overlay from a project's includes list.
-	IncludePath string
-	// Key is the dot-separated key path to write.
-	Key string
-	// Value is the value to write at the key path.
-	Value string
-}
-
-// actionResult carries the written key and overlay location to the renderer.
-type actionResult struct {
-	// Key is the dot-separated key path that was written.
-	Key string
-	// OverlayPath is the overlay file that received the value.
-	OverlayPath string
-}
-
-// execute is the imperative shell: it resolves the target overlay (environment +
-// include path) via config, reads the current document into a YAML node tree,
-// applies the pure edit, and writes the result back atomically. Editing the node
-// tree in place preserves the file's comments, key order, and formatting; set
-// never invokes envmerge since no project means there is nothing to merge.
-func execute(p actionParams, in *core.Input) (actionResult, error) {
-	// resolve the workspace (no project) and derive the target overlay file
-	resolved, err := core.ResolveWorkspace(in)
-	if err != nil {
-		return actionResult{}, err
-	}
-	target, err := resolved.OverlayPath(p.IncludePath)
-	if err != nil {
-		return actionResult{}, err
-	}
-
-	// read the current document, preserving comments, key order, and formatting
-	doc, source, err := readDoc(target)
-	if err != nil {
-		return actionResult{}, err
-	}
-
-	// match the file's existing indentation so the edit blends in
-	indent := detectIndent(doc)
-
-	// apply the change surgically to the node tree
-	if err := apply(doc, p); err != nil {
-		return actionResult{}, fmt.Errorf("setting %q in %s: %w", p.Key, target, err)
-	}
-
-	// re-encode and write the result back atomically
-	out, err := yamlx.Marshal(doc, indent)
-	if err != nil {
-		return actionResult{}, fmt.Errorf("marshaling %s: %w", target, err)
-	}
-	out = yamlx.PreserveBlankLines(source, out)
-	if err := filex.WriteAtomic(target, out); err != nil {
-		return actionResult{}, err
-	}
-	return actionResult{Key: p.Key, OverlayPath: target}, nil
-}
+// defaultIndent is the indentation width used when a document has no nested
+// mapping to infer one from (a flat, empty, or brand-new file).
+const defaultIndent = 2
 
 // readDoc parses the overlay at path into a YAML document node, preserving its
 // comments, key order, and structure for a surgical edit. It also returns the
@@ -91,16 +35,15 @@ func readDoc(path string) (*yaml.Node, []byte, error) {
 	return doc, data, nil
 }
 
-// apply is the pure kernel: it sets the key path on the document's root mapping,
-// creating the root and any intermediate mappings as needed. It edits value
-// nodes in place so surrounding keys, comments, and formatting are left
-// untouched. Node tree in, mutated node tree out; no file I/O.
-func apply(doc *yaml.Node, p actionParams) error {
+// applyNode sets the key path on the document's root mapping, creating the root
+// and any intermediate mappings as needed. It edits value nodes in place so
+// surrounding keys, comments, and formatting are left untouched.
+func applyNode(doc *yaml.Node, key, value string) error {
 	root, err := documentRoot(doc)
 	if err != nil {
 		return err
 	}
-	return setNestedKey(root, strings.Split(p.Key, "."), p.Value)
+	return setNestedKey(root, strings.Split(key, "."), value)
 }
 
 // documentRoot returns the mapping node the keys live under, seeding an empty
@@ -131,11 +74,9 @@ func documentRoot(doc *yaml.Node) (*yaml.Node, error) {
 
 // setNestedKey walks parts through node's nested mappings, creating intermediate
 // mappings as needed, and writes value at the final part. A scalar blocking an
-// intermediate step is reinterpreted as a mapping (a first-time write refining a
-// bare leaf into a branch). Structured data is never silently discarded: a list
-// or mapping the target would overwrite, or a list an intermediate step would
-// descend through, is refused with an error so a user's hand-authored YAML
-// survives. An existing scalar leaf is updated in place so its comments and
+// intermediate step is reinterpreted as a mapping. A list or mapping the target
+// would overwrite, or a list an intermediate step would descend through, is refused
+// with an error. An existing scalar leaf is updated in place so its comments and
 // position survive; a missing key is appended after the existing entries.
 func setNestedKey(node *yaml.Node, parts []string, value string) error {
 	for i, part := range parts[:len(parts)-1] {
@@ -154,7 +95,7 @@ func setNestedKey(node *yaml.Node, parts []string, value string) error {
 			)
 		default:
 			// A scalar (or null) leaf is refined into a mapping so the path can
-			// continue; only a single value is superseded, not a collection.
+			// continue.
 			*child = yaml.Node{Kind: yaml.MappingNode}
 		}
 		node = child
@@ -188,10 +129,6 @@ func appendPair(node *yaml.Node, key string, value *yaml.Node) {
 	keyNode := &yaml.Node{Kind: yaml.ScalarNode, Tag: "!!str", Value: key}
 	node.Content = append(node.Content, keyNode, value)
 }
-
-// defaultIndent is the indentation width used when a document has no nested
-// mapping to infer one from (a flat, empty, or brand-new file).
-const defaultIndent = 2
 
 // detectIndent infers the per-level indentation width from the document's first
 // nested mapping via yamlx.IndentLevel, falling back to defaultIndent when the

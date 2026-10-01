@@ -113,14 +113,14 @@ type MaterializeResult struct {
 // ambient environment. Structural failures (a malformed manifest, unreadable
 // YAML, or a flatten collision) remain fatal in both modes because they leave no
 // salvageable environment.
-func (m *Manager) Materialize(params MaterializeParams) (*MaterializeResult, error) {
-	state, resolver, environment, err := m.prepareMaterialize(params.Environment)
+func (s *Service) Materialize(params MaterializeParams) (*MaterializeResult, error) {
+	state, resolver, environment, err := s.prepareMaterialize(params.Environment)
 	if err != nil {
 		return nil, err
 	}
 
 	if params.IgnoreErrors {
-		values, warnings := m.resolveEffectiveTolerant(state, resolver, environment)
+		values, warnings := s.resolveEffectiveTolerant(state, resolver, environment)
 		return &MaterializeResult{
 			Environment: &Environment{values: values, origins: state.origins},
 			Warnings:    warnings,
@@ -129,7 +129,7 @@ func (m *Manager) Materialize(params MaterializeParams) (*MaterializeResult, err
 
 	// Resolve every winning value and then substitute every {{ }} reference over
 	// the composed effective environment; a materialized child always reveals.
-	values, err := m.resolveEffective(state, resolver, environment)
+	values, err := s.resolveEffective(state, resolver, environment)
 	if err != nil {
 		return nil, err
 	}
@@ -142,24 +142,24 @@ func (m *Manager) Materialize(params MaterializeParams) (*MaterializeResult, err
 // the environment, merges the namespaces and composes the effective environment,
 // and opens a revealing resolver. Structural failures are fatal here, before
 // either the strict or the lenient path resolves any value.
-func (m *Manager) prepareMaterialize(
+func (s *Service) prepareMaterialize(
 	environment string,
 ) (state *mergeState, resolver ValueResolver, env string, err error) {
-	env, err = m.normalizeEnvironment(environment)
+	env, err = s.normalizeEnvironment(environment)
 	if err != nil {
 		return nil, nil, "", err
 	}
 
-	state, err = m.merge(env)
+	state, err = s.merge(env)
 	if err != nil {
 		return nil, nil, "", err
 	}
 
 	// Compose the complete effective environment: overlay OS overrides and union
 	// OS-only keys so the child receives every variable it would see under a shell.
-	m.applyOSEnvironment(state, true)
+	s.applyOSEnvironment(state, true)
 
-	resolver, err = m.openResolver(true)
+	resolver, err = s.openResolver(true)
 	if err != nil {
 		return nil, nil, "", err
 	}

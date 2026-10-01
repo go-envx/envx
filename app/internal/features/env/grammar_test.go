@@ -29,7 +29,8 @@ func TestCustomGrammarResolvesThroughManager(t *testing.T) {
 	t.Parallel()
 
 	m, err := New(Params{
-		Settings: Settings{ReferencePattern: `\$\{([^}]*)\}`},
+		Repository: testRepo,
+		Settings:   Settings{ReferencePattern: `\$\{([^}]*)\}`},
 	})
 	if err != nil {
 		t.Fatalf("New: %v", err)
@@ -54,7 +55,8 @@ func TestNewManagerInvalidPatternFails(t *testing.T) {
 	t.Parallel()
 
 	if _, err := New(Params{
-		Settings: Settings{ReferencePattern: `(unterminated`},
+		Repository: testRepo,
+		Settings:   Settings{ReferencePattern: `(unterminated`},
 	}); err == nil {
 		t.Error("New with an invalid reference pattern should fail")
 	}

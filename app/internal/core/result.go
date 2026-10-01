@@ -12,9 +12,9 @@ import (
 // resolution pass. Actions read the fields they need and ignore the rest;
 // OverlayPath derives the set action's target file from the same result.
 type Result struct {
-	// Envmerge is the constructed envmerge Manager the environment-building actions
+	// Envmerge is the constructed envmerge Service the environment-building actions
 	// operate through. ResolveProject builds it; ResolveWorkspace leaves it nil.
-	Envmerge *env.Manager
+	Envmerge *env.Service
 
 	// Secrets locates the workspace secrets store and private-key file.
 	// ResolveProject binds these into the resolver factory the Manager opens on

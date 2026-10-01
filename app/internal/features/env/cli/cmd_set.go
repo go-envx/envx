@@ -1,6 +1,8 @@
-package set
+package cli
 
 import (
+	"fmt"
+
 	"github.com/go-envx/envx/app/internal/core"
 	"github.com/go-envx/envx/app/internal/features/env"
 	"github.com/go-envx/envx/app/internal/utils/printer"
@@ -9,9 +11,9 @@ import (
 )
 
 const (
-	usage = "set <include-path> <key> <value>"
-	short = "Set an environment variable in a namespace's overlay file"
-	long  = `
+	setUsage = "set <include-path> <key> <value>"
+	setShort = "Set an environment variable in a namespace's overlay file"
+	setLong  = `
 		Set writes a key/value pair to the environment overlay file for the
 		given include path. The key supports dot notation for nested YAML paths
 		(e.g. "credentials.password").
@@ -23,49 +25,67 @@ const (
 		var, a manifest env setting, or defaults to the first environment declared
 		in envx.yaml.
 	`
-	example = `
+	setExample = `
 		envx set api-service/env/values log_level warn --env=production
 		envx set env/database database.password rotated --env=production
 		envx set env/gateway gateway.timeout 10
 	`
 )
 
-// NewCommand builds the "set" command, which parses args into the action's
-// params/config and executes the action.
-func NewCommand() *cobra.Command {
+// NewSetCommand builds the "set" command.
+func NewSetCommand(f Factory) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:     usage,
-		Short:   short,
-		Long:    str.Dedent(long),
-		Example: str.Dedent(example, 2),
+		Use:     setUsage,
+		Short:   setShort,
+		Long:    str.Dedent(setLong),
+		Example: str.Dedent(setExample, 2),
 		Args:    cobra.ExactArgs(3),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			// map args to action params
-			p := actionParams{
-				IncludePath: args[0],
-				Key:         args[1],
-				Value:       args[2],
-			}
+			includePath := args[0]
+			key := args[1]
+			value := args[2]
 
-			// execute the action
 			in := core.GetInput(cmd.Flags())
-			result, err := execute(p, in)
+
+			envService, err := f.EnvService(in, "")
 			if err != nil {
 				return err
 			}
 
-			// render the write confirmation through the shared printer
-			pr := printer.New(printer.Options{
+			var envTarget string
+			if in.Env != nil {
+				envTarget = *in.Env
+			}
+
+			result, err := envService.Set(env.SetParams{
+				IncludePath: includePath,
+				Environment: envTarget,
+				Key:         key,
+				Value:       value,
+			})
+			if err != nil {
+				return err
+			}
+
+			console := printer.New(printer.Options{
 				Out: cmd.OutOrStdout(),
 				Err: cmd.ErrOrStderr(),
 			})
-			return render(&renderParams{
-				Printer: pr,
-				Result:  result,
-			})
+
+			return outputSet(console, result)
 		},
 	}
 
 	env.RegisterFlags(cmd.Flags(), env.WithEnv)
+
 	return cmd
+}
+
+// outputSet confirms the written key and the overlay file it landed in.
+func outputSet(console *printer.Printer, result env.SetResult) error {
+	return console.LogMessage(fmt.Sprintf(
+		"Set %q in:\n%s",
+		result.Key,
+		str.QuotePath(result.OverlayPath),
+	))
 }

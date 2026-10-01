@@ -23,16 +23,6 @@ type ExplainParams struct {
 	Reveal bool
 }
 
-// Explanation is a sorted diagnostic view of the selected winning values. It
-// carries per-key literals, provenance, and non-fatal resolution status, and is
-// never consumable as a process environment.
-type Explanation struct {
-	// Entries holds one diagnostic row per selected key, sorted by key.
-	Entries []ExplanationEntry
-	// Summary aggregates the resolution severities across the selected entries.
-	Summary ExplanationSummary
-}
-
 // ExplanationEntry records one winning literal, its provenance, and its
 // non-fatal resolution status.
 type ExplanationEntry struct {
@@ -80,27 +70,27 @@ func (s ExplanationSummary) Severity() Severity {
 // carried by its Resolution. The fresh resolver receives the reveal policy, and
 // diagnosis still attempts decryption when masked so status stays meaningful;
 // plaintext is retained only when reveal is requested.
-func (m *Manager) Explain(params ExplainParams) (*Explanation, error) {
-	environment, err := m.normalizeEnvironment(params.Environment)
+func (s *Service) Explain(params ExplainParams) (*ExplainResult, error) {
+	environment, err := s.normalizeEnvironment(params.Environment)
 	if err != nil {
 		return nil, err
 	}
 
-	state, err := m.merge(environment)
+	state, err := s.merge(environment)
 	if err != nil {
 		return nil, err
 	}
 
 	// Apply OS source selection over the namespace keys so an override surfaces as
 	// an "OS environment" source; OS-only keys are left out of the enumeration.
-	m.applyOSEnvironment(state, false)
+	s.applyOSEnvironment(state, false)
 
 	keys, err := explainKeys(state, params.Key)
 	if err != nil {
 		return nil, err
 	}
 
-	resolver, err := m.openResolver(params.Reveal)
+	resolver, err := s.openResolver(params.Reveal)
 	if err != nil {
 		return nil, err
 	}
@@ -108,9 +98,9 @@ func (m *Manager) Explain(params ExplainParams) (*Explanation, error) {
 	if err != nil {
 		return nil, err
 	}
-	engine := m.newSubstituter(m.getSymbols(state, resolver, environment))
+	engine := s.newSubstituter(s.getSymbols(state, resolver, environment))
 
-	delimiter := m.params.Settings.Delimiter
+	delimiter := s.params.Settings.Delimiter
 	entries := make([]ExplanationEntry, 0, len(keys))
 	var summary ExplanationSummary
 	for _, key := range keys {
@@ -136,7 +126,7 @@ func (m *Manager) Explain(params ExplainParams) (*Explanation, error) {
 		})
 	}
 
-	return &Explanation{Entries: entries, Summary: summary}, nil
+	return &ExplainResult{Entries: entries, Summary: summary}, nil
 }
 
 // itemsOf returns a copy of a leaf's raw pre-resolution items, or nil for an
