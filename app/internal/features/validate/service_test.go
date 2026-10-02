@@ -89,9 +89,11 @@ func TestServiceValidateReportsResolutionFindings(t *testing.T) {
 		"web": {{Key: "NAME", Resolution: env.Resolution{Severity: env.SeverityOK}}},
 	}}
 	service := newTestService(t, ServiceParams{
-		EnvService:   environment,
-		Projects:     []string{"api", "web"},
-		Environments: []string{"development", "production"},
+		EnvService: environment,
+		Config: Config{
+			Projects:     []string{"api", "web"},
+			Environments: []string{"development", "production"},
+		},
 	})
 
 	report, err := service.Validate(ValidateParams{})
@@ -121,9 +123,11 @@ func TestServiceValidatePassesOptionsAndMasks(t *testing.T) {
 	prefix := "APP_"
 	environment := &fakeEnvironment{}
 	service := newTestService(t, ServiceParams{
-		EnvService:   environment,
-		Projects:     []string{"api"},
-		Environments: []string{"production"},
+		EnvService: environment,
+		Config: Config{
+			Projects:     []string{"api"},
+			Environments: []string{"production"},
+		},
 	})
 
 	if _, err := service.Validate(ValidateParams{
@@ -150,11 +154,13 @@ func TestServiceValidateAppliesSeverityOverrides(t *testing.T) {
 		"api": {danglingEntry("PASSWORD")},
 	}}
 	params := ServiceParams{
-		EnvService:   environment,
-		Projects:     []string{"api"},
-		Environments: []string{"production"},
-		Severity: map[string]status.Severity{
-			status.SecretReferenceNotFound: status.Warn,
+		EnvService: environment,
+		Config: Config{
+			Projects:     []string{"api"},
+			Environments: []string{"production"},
+			Severity: map[string]status.Severity{
+				status.SecretReferenceNotFound: status.Warn,
+			},
 		},
 	}
 
@@ -174,7 +180,7 @@ func TestServiceValidateAppliesSeverityOverrides(t *testing.T) {
 		t.Error("a warning must fail under strict")
 	}
 
-	params.Severity = map[string]status.Severity{
+	params.Config.Severity = map[string]status.Severity{
 		status.SecretReferenceNotFound: status.Off,
 	}
 	off, err := newTestService(t, params).Validate(ValidateParams{Strict: true})
@@ -207,8 +213,10 @@ func TestServiceValidateReportsStoreFindings(t *testing.T) {
 	service := newTestService(t, ServiceParams{
 		EnvService:     &fakeEnvironment{},
 		SecretsService: store,
-		Projects:       []string{"api"},
-		Environments:   []string{"production"},
+		Config: Config{
+			Projects:     []string{"api"},
+			Environments: []string{"production"},
+		},
 	})
 
 	report, err := service.Validate(ValidateParams{})
@@ -239,8 +247,10 @@ func TestServiceValidateStoreOnlySelectionSkipsMerge(t *testing.T) {
 	service := newTestService(t, ServiceParams{
 		EnvService:     environment,
 		SecretsService: &fakeStore{missing: []string{"db"}},
-		Projects:       []string{"api"},
-		Environments:   []string{"production"},
+		Config: Config{
+			Projects:     []string{"api"},
+			Environments: []string{"production"},
+		},
 	})
 
 	report, err := service.Validate(ValidateParams{
@@ -263,9 +273,11 @@ func TestServiceValidateNilStoreSkipsStoreChecks(t *testing.T) {
 	t.Parallel()
 
 	service := newTestService(t, ServiceParams{
-		EnvService:   &fakeEnvironment{},
-		Projects:     []string{"api"},
-		Environments: []string{"production"},
+		EnvService: &fakeEnvironment{},
+		Config: Config{
+			Projects:     []string{"api"},
+			Environments: []string{"production"},
+		},
 	})
 
 	report, err := service.Validate(ValidateParams{})
@@ -285,9 +297,11 @@ func TestServiceValidateReturnsDiagnoserErrors(t *testing.T) {
 	want := errors.New("boom")
 
 	envFailure := newTestService(t, ServiceParams{
-		EnvService:   &fakeEnvironment{err: want},
-		Projects:     []string{"api"},
-		Environments: []string{"production"},
+		EnvService: &fakeEnvironment{err: want},
+		Config: Config{
+			Projects:     []string{"api"},
+			Environments: []string{"production"},
+		},
 	})
 	if _, err := envFailure.Validate(ValidateParams{}); !errors.Is(err, want) {
 		t.Errorf("environment err = %v, want %v", err, want)
@@ -296,8 +310,10 @@ func TestServiceValidateReturnsDiagnoserErrors(t *testing.T) {
 	storeFailure := newTestService(t, ServiceParams{
 		EnvService:     &fakeEnvironment{},
 		SecretsService: &fakeStore{err: want},
-		Projects:       []string{"api"},
-		Environments:   []string{"production"},
+		Config: Config{
+			Projects:     []string{"api"},
+			Environments: []string{"production"},
+		},
 	})
 	if _, err := storeFailure.Validate(ValidateParams{}); !errors.Is(err, want) {
 		t.Errorf("store err = %v, want %v", err, want)

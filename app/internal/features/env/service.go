@@ -50,22 +50,13 @@ type ValueResolverFactory interface {
 
 // ServiceParams provides dependencies to the environment domain service.
 type ServiceParams struct {
-	// WorkspaceDir is the workspace root directory.
-	WorkspaceDir string
+	// Config is the manifest-derived workspace configuration.
+	Config Config
 	// Repository loads base and overlay namespace data. Required.
 	Repository NamespaceRepository
-	// Projects maps declared project names to their definitions.
-	Projects map[string]ProjectConfig
 	// Includes is an ordered chain of namespaces to merge when no project is
 	// declared.
 	Includes []string
-	// Environments lists the declared environments, used to validate the target.
-	Environments []string
-	// DefaultEnvironment is the precedence-resolved default an operation uses when
-	// it is given no explicit environment.
-	DefaultEnvironment string
-	// Settings holds the fully-resolved env-resolution knobs the merge reads.
-	Settings Settings
 	// ResolverFactory opens a fresh, operation-scoped value resolver on demand. A
 	// nil factory is identity behavior for callers with no reference syntax.
 	ResolverFactory ValueResolverFactory
@@ -104,7 +95,7 @@ func NewService(params ServiceParams) (*Service, error) {
 		return nil, err
 	}
 	grammar, err := syntax.NewGrammar(syntax.GrammarParams{
-		ReferencePattern: normalized.Settings.ReferencePattern,
+		ReferencePattern: normalized.Config.Settings.ReferencePattern,
 	})
 	if err != nil {
 		return nil, err
@@ -114,7 +105,7 @@ func NewService(params ServiceParams) (*Service, error) {
 
 // WorkspaceDir returns the configured workspace directory.
 func (s *Service) WorkspaceDir() string {
-	return s.params.WorkspaceDir
+	return s.params.Config.WorkspaceDir
 }
 
 // operationContext holds resolved includes, environment, settings, and grammar
@@ -140,10 +131,10 @@ func (s *Service) resolveContext(
 	var projOpts Options
 	switch {
 	case projectName != "":
-		if proj, ok := s.params.Projects[projectName]; ok {
+		if proj, ok := s.params.Config.Projects[projectName]; ok {
 			includes = proj.Includes
 			projOpts = proj.Settings
-		} else if len(s.params.Projects) == 0 && len(s.params.Includes) > 0 {
+		} else if len(s.params.Config.Projects) == 0 && len(s.params.Includes) > 0 {
 			includes = s.params.Includes
 		} else {
 			return operationContext{}, fmt.Errorf(
@@ -151,8 +142,8 @@ func (s *Service) resolveContext(
 				ErrProjectNotFound, projectName,
 			)
 		}
-	case len(s.params.Projects) == 1:
-		for _, proj := range s.params.Projects {
+	case len(s.params.Config.Projects) == 1:
+		for _, proj := range s.params.Config.Projects {
 			includes = proj.Includes
 			projOpts = proj.Settings
 			break
@@ -162,21 +153,21 @@ func (s *Service) resolveContext(
 	}
 
 	targetEnv := s.resolveEnvironment(envOverride, opts.Env, projOpts.Env)
-	if targetEnv == "" && len(s.params.Environments) > 0 {
-		targetEnv = s.params.Environments[0]
+	environments := s.params.Config.Environments
+	if targetEnv == "" && len(environments) > 0 {
+		targetEnv = environments[0]
 	}
-	if len(s.params.Environments) > 0 &&
-		!slices.Contains(s.params.Environments, targetEnv) {
+	if len(environments) > 0 && !slices.Contains(environments, targetEnv) {
 		return operationContext{}, fmt.Errorf(
 			"%w: %q (available: %v)",
-			ErrEnvironmentNotDeclared, targetEnv, s.params.Environments,
+			ErrEnvironmentNotDeclared, targetEnv, environments,
 		)
 	}
 
 	settings := s.resolveSettings(opts, direct, projOpts)
 
 	grammar := s.grammar
-	if settings.ReferencePattern != s.params.Settings.ReferencePattern ||
+	if settings.ReferencePattern != s.params.Config.Settings.ReferencePattern ||
 		grammar == nil {
 		g, err := syntax.NewGrammar(syntax.GrammarParams{
 			ReferencePattern: settings.ReferencePattern,
@@ -205,11 +196,11 @@ func (s *Service) resolveEnvironment(
 	if val != "" {
 		return val
 	}
-	if s.params.DefaultEnvironment != "" {
-		return s.params.DefaultEnvironment
+	if s.params.Config.DefaultEnvironment != "" {
+		return s.params.Config.DefaultEnvironment
 	}
-	if len(s.params.Environments) > 0 {
-		return s.params.Environments[0]
+	if len(s.params.Config.Environments) > 0 {
+		return s.params.Config.Environments[0]
 	}
 	return ""
 }
@@ -220,12 +211,14 @@ func (s *Service) resolveEnvironment(
 func (s *Service) resolveSettings(
 	opts Options, direct Settings, projOpts Options,
 ) Settings {
+	base := s.params.Config.Settings
+
 	var directPrefix, basePrefix *string
 	if direct.Prefix != "" {
 		directPrefix = &direct.Prefix
 	}
-	if s.params.Settings.Prefix != "" {
-		basePrefix = &s.params.Settings.Prefix
+	if base.Prefix != "" {
+		basePrefix = &base.Prefix
 	}
 	prefix := PrecedenceString(
 		opts.Prefix, directPrefix, projOpts.Prefix, basePrefix,
@@ -235,8 +228,8 @@ func (s *Service) resolveSettings(
 	if direct.Suffix != "" {
 		directSuffix = &direct.Suffix
 	}
-	if s.params.Settings.Suffix != "" {
-		baseSuffix = &s.params.Settings.Suffix
+	if base.Suffix != "" {
+		baseSuffix = &base.Suffix
 	}
 	suffix := PrecedenceString(
 		opts.Suffix, directSuffix, projOpts.Suffix, baseSuffix,
@@ -246,8 +239,8 @@ func (s *Service) resolveSettings(
 	if direct.Delimiter != "" {
 		directDelimiter = &direct.Delimiter
 	}
-	if s.params.Settings.Delimiter != "" {
-		baseDelimiter = &s.params.Settings.Delimiter
+	if base.Delimiter != "" {
+		baseDelimiter = &base.Delimiter
 	}
 	delimiter := PrecedenceString(
 		opts.Delimiter, directDelimiter, projOpts.Delimiter,
@@ -261,8 +254,8 @@ func (s *Service) resolveSettings(
 	if direct.ReferencePattern != "" {
 		directPattern = &direct.ReferencePattern
 	}
-	if s.params.Settings.ReferencePattern != "" {
-		basePattern = &s.params.Settings.ReferencePattern
+	if base.ReferencePattern != "" {
+		basePattern = &base.ReferencePattern
 	}
 	refPattern := PrecedenceString(
 		opts.ReferencePattern, directPattern,
@@ -273,8 +266,8 @@ func (s *Service) resolveSettings(
 	if direct.RequireOverlays {
 		directOverlays = &direct.RequireOverlays
 	}
-	if s.params.Settings.RequireOverlays {
-		baseOverlays = &s.params.Settings.RequireOverlays
+	if base.RequireOverlays {
+		baseOverlays = &base.RequireOverlays
 	}
 	requireOverlays := PrecedenceBool(
 		opts.RequireOverlays, directOverlays,
@@ -285,8 +278,8 @@ func (s *Service) resolveSettings(
 	if direct.Overload {
 		directOverload = &direct.Overload
 	}
-	if s.params.Settings.Overload {
-		baseOverload = &s.params.Settings.Overload
+	if base.Overload {
+		baseOverload = &base.Overload
 	}
 	overload := PrecedenceBool(
 		opts.Overload, directOverload, projOpts.Overload,
@@ -308,16 +301,17 @@ func (s *Service) resolveSettings(
 // the environment the operation will actually use. Validating per operation lets
 // an explicit environment supersede an irrelevant configured default.
 func (s *Service) normalizeEnvironment(environment string) (string, error) {
+	environments := s.params.Config.Environments
 	if environment == "" {
-		environment = s.params.DefaultEnvironment
+		environment = s.params.Config.DefaultEnvironment
 	}
-	if environment == "" && len(s.params.Environments) > 0 {
-		environment = s.params.Environments[0]
+	if environment == "" && len(environments) > 0 {
+		environment = environments[0]
 	}
-	if !slices.Contains(s.params.Environments, environment) {
+	if !slices.Contains(environments, environment) {
 		return "", fmt.Errorf(
 			"%w: %q (available: %v)",
-			ErrEnvironmentNotDeclared, environment, s.params.Environments,
+			ErrEnvironmentNotDeclared, environment, environments,
 		)
 	}
 	return environment, nil

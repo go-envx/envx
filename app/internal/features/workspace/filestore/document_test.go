@@ -1,6 +1,8 @@
 package filestore
 
 import (
+	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
@@ -43,6 +45,91 @@ func TestParseDocumentDetectsIndent(t *testing.T) {
 				t.Errorf("Indent = %d, want %d", ws.Indent, tc.want)
 			}
 		})
+	}
+}
+
+// TestParseDocumentAppliesDefaults verifies manifest defaults are applied once at
+// load: absolute include, store, and key paths, the default cipher, and a clamped
+// indent.
+func TestParseDocumentAppliesDefaults(t *testing.T) {
+	t.Parallel()
+
+	const manifestPath = "/work/envx.yaml"
+	root := filepath.Dir(manifestPath)
+	absKeys := filepath.Join(string(filepath.Separator), "etc", "envx.keys")
+
+	tests := map[string]struct {
+		body    string
+		secrets workspace.SecretsConfig
+	}{
+		"defaults beside the manifest": {
+			body: "environments: [dev]\nprojects:\n  api:\n    includes: [env/x]\n",
+			secrets: workspace.SecretsConfig{
+				SecretsPath: filepath.Join(root, "secrets.yaml"),
+				KeysPath:    filepath.Join(root, "envx.keys"),
+				Cipher:      "age",
+			},
+		},
+		"keys default beside a custom store": {
+			body: "environments: [dev]\nprojects:\n  api:\n    includes: [env/x]\n" +
+				"secrets:\n  path: private/secrets.yaml\n  cipher: nacl-box\n",
+			secrets: workspace.SecretsConfig{
+				SecretsPath: filepath.Join(root, "private", "secrets.yaml"),
+				KeysPath:    filepath.Join(root, "private", "envx.keys"),
+				Cipher:      "nacl-box",
+			},
+		},
+		"relative keys resolve against the manifest": {
+			body: "environments: [dev]\nprojects:\n  api:\n    includes: [env/x]\n" +
+				"secrets:\n  path: private/secrets.yaml\n  keys-path: keys/envx.keys\n",
+			secrets: workspace.SecretsConfig{
+				SecretsPath: filepath.Join(root, "private", "secrets.yaml"),
+				KeysPath:    filepath.Join(root, "keys", "envx.keys"),
+				Cipher:      "age",
+			},
+		},
+		"absolute keys stay rooted": {
+			body: "environments: [dev]\nprojects:\n  api:\n    includes: [env/x]\n" +
+				"secrets:\n  keys-path: " + absKeys + "\n",
+			secrets: workspace.SecretsConfig{
+				SecretsPath: filepath.Join(root, "secrets.yaml"),
+				KeysPath:    absKeys,
+				Cipher:      "age",
+			},
+		},
+	}
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			ws, err := parseDocument([]byte(tc.body), manifestPath)
+			if err != nil {
+				t.Fatalf("parseDocument: %v", err)
+			}
+			if ws.Secrets != tc.secrets {
+				t.Errorf("Secrets = %+v, want %+v", ws.Secrets, tc.secrets)
+			}
+			api := ws.Projects["api"]
+			wantPaths := []string{filepath.Join(root, "env", "x")}
+			if !slices.Equal(api.IncludePaths, wantPaths) {
+				t.Errorf("IncludePaths = %v, want %v", api.IncludePaths, wantPaths)
+			}
+			if want := []string{"env/x"}; !slices.Equal(api.Includes, want) {
+				t.Errorf("Includes = %v, want declared %v", api.Includes, want)
+			}
+		})
+	}
+}
+
+// TestManifestIndentClamped verifies an out-of-range indent falls back to two.
+func TestManifestIndentClamped(t *testing.T) {
+	t.Parallel()
+
+	tests := map[int]int{1: 2, 2: 2, 4: 4, 9: 9, 12: 2}
+	for in, want := range tests {
+		ws := manifestYAML{}.toWorkspace("/work/envx.yaml", in)
+		if ws.Indent != want {
+			t.Errorf("Indent(%d) = %d, want %d", in, ws.Indent, want)
+		}
 	}
 }
 

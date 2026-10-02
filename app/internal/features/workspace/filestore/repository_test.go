@@ -96,11 +96,13 @@ func TestLoadValid(t *testing.T) {
 	if !ws.HasEnvironment("production") {
 		t.Error("expected production environment to be present")
 	}
-	if ws.Secrets.SecretsPath != "./private/secrets.yaml" {
-		t.Errorf("SecretsPath = %q, want ./private/secrets.yaml", ws.Secrets.SecretsPath)
+	wantSecrets := filepath.Join(ws.Root, "private", "secrets.yaml")
+	if ws.Secrets.SecretsPath != wantSecrets {
+		t.Errorf("SecretsPath = %q, want %q", ws.Secrets.SecretsPath, wantSecrets)
 	}
-	if ws.Secrets.KeysPath != "./private/envx.keys" {
-		t.Errorf("KeysPath = %q, want ./private/envx.keys", ws.Secrets.KeysPath)
+	wantKeys := filepath.Join(ws.Root, "private", "envx.keys")
+	if ws.Secrets.KeysPath != wantKeys {
+		t.Errorf("KeysPath = %q, want %q", ws.Secrets.KeysPath, wantKeys)
 	}
 	if ws.Secrets.Cipher != "age" {
 		t.Errorf("Cipher = %q, want age", ws.Secrets.Cipher)

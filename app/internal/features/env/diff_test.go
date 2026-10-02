@@ -37,8 +37,8 @@ func TestDiffValidatesEnvironmentsBeforeIO(t *testing.T) {
 	t.Parallel()
 
 	manager := managerFor(t, ServiceParams{
-		Includes:     []string{filepath.Join(t.TempDir(), "missing")},
-		Environments: []string{"development", "production"},
+		Includes: []string{filepath.Join(t.TempDir(), "missing")},
+		Config:   Config{Environments: []string{"development", "production"}},
 	})
 
 	if _, err := manager.Diff(DiffParams{

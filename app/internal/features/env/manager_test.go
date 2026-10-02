@@ -25,9 +25,9 @@ func setupWorkspace(t *testing.T) string {
 // development and production environments.
 func baseParams(dir string) ServiceParams {
 	return ServiceParams{
-		Repository:   testRepo,
-		Includes:     []string{filepath.Join(dir, "env", "postgres")},
-		Environments: []string{"development", "production"},
+		Repository: testRepo,
+		Includes:   []string{filepath.Join(dir, "env", "postgres")},
+		Config:     Config{Environments: []string{"development", "production"}},
 	}
 }
 
@@ -36,9 +36,11 @@ func baseParams(dir string) ServiceParams {
 func TestNewAppliesStructuralDefaults(t *testing.T) {
 	t.Parallel()
 
-	manager := managerFor(t, ServiceParams{DefaultEnvironment: "undeclared"})
-	if manager.params.Settings.Delimiter != "," {
-		t.Errorf("Delimiter = %q, want , (default)", manager.params.Settings.Delimiter)
+	manager := managerFor(t, ServiceParams{
+		Config: Config{DefaultEnvironment: "undeclared"},
+	})
+	if manager.params.Config.Settings.Delimiter != "," {
+		t.Errorf("Delimiter = %q, want , (default)", manager.params.Config.Settings.Delimiter)
 	}
 }
 
@@ -49,9 +51,9 @@ func TestNewPerformsNoNamespaceIO(t *testing.T) {
 
 	dir := t.TempDir()
 	if _, err := NewService(ServiceParams{
-		Repository:   testRepo,
-		Includes:     []string{filepath.Join(dir, "missing")},
-		Environments: []string{"development"},
+		Repository: testRepo,
+		Includes:   []string{filepath.Join(dir, "missing")},
+		Config:     Config{Environments: []string{"development"}},
 	}); err != nil {
 		t.Errorf("New performed namespace I/O: %v", err)
 	}
@@ -65,7 +67,7 @@ func TestNewDoesNotOpenResolver(t *testing.T) {
 	factory := &recordingFactory{resolver: fakeResolver{}}
 	if _, err := NewService(ServiceParams{
 		Repository:      testRepo,
-		Environments:    []string{"development"},
+		Config:          Config{Environments: []string{"development"}},
 		ResolverFactory: factory,
 	}); err != nil {
 		t.Fatalf("New: %v", err)
@@ -83,7 +85,7 @@ func TestNormalizeEnvironment(t *testing.T) {
 
 	t.Run("empty uses configured default", func(t *testing.T) {
 		t.Parallel()
-		m := managerFor(t, ServiceParams{DefaultEnvironment: "production"})
+		m := managerFor(t, ServiceParams{Config: Config{DefaultEnvironment: "production"}})
 		got, err := m.normalizeEnvironment("")
 		if err != nil || got != "production" {
 			t.Fatalf("normalizeEnvironment(\"\") = %q, %v; want production", got, err)
@@ -99,7 +101,7 @@ func TestNormalizeEnvironment(t *testing.T) {
 	})
 	t.Run("explicit supersedes unrelated default", func(t *testing.T) {
 		t.Parallel()
-		m := managerFor(t, ServiceParams{DefaultEnvironment: "undeclared"})
+		m := managerFor(t, ServiceParams{Config: Config{DefaultEnvironment: "undeclared"}})
 		got, err := m.normalizeEnvironment("production")
 		if err != nil || got != "production" {
 			t.Fatalf("normalizeEnvironment = %q, %v; want production", got, err)
@@ -120,7 +122,7 @@ func TestSelectExplicitEnvironment(t *testing.T) {
 	t.Parallel()
 
 	p := baseParams(setupWorkspace(t))
-	p.DefaultEnvironment = "development"
+	p.Config.DefaultEnvironment = "development"
 	res, err := mergeEnv(t, p)
 	if err != nil {
 		t.Fatalf("Resolve: %v", err)
@@ -140,7 +142,7 @@ func TestSelectDefaultsToFirstEnvironment(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Resolve: %v", err)
 	}
-	want := p.Environments[0]
+	want := p.Config.Environments[0]
 	if v, _ := res.Get("HOST"); v != "localhost" {
 		t.Errorf("HOST = %q, want localhost (default env %q)", v, want)
 	}
@@ -152,7 +154,7 @@ func TestSelectProductionAppliesOverlay(t *testing.T) {
 	t.Parallel()
 
 	p := baseParams(setupWorkspace(t))
-	p.DefaultEnvironment = "production"
+	p.Config.DefaultEnvironment = "production"
 	res, err := mergeEnv(t, p)
 	if err != nil {
 		t.Fatalf("Resolve: %v", err)
@@ -167,7 +169,7 @@ func TestSelectUndeclaredEnvironmentFails(t *testing.T) {
 	t.Parallel()
 
 	p := baseParams(setupWorkspace(t))
-	p.DefaultEnvironment = "nope"
+	p.Config.DefaultEnvironment = "nope"
 	if _, err := mergeEnv(t, p); err == nil {
 		t.Error("expected error for undeclared environment")
 	}

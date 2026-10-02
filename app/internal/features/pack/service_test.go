@@ -30,8 +30,8 @@ func writeSource(t *testing.T, dir, path, body string) string {
 
 // newWorkspace scaffolds a two-project workspace whose namespaces live in nested
 // directories, with base files and overlays for development and production, plus a
-// secrets store, and returns the root dir and a Workspace describing it.
-func newWorkspace(t *testing.T) (string, Workspace) {
+// secrets store, and returns the root dir and a Config describing it.
+func newWorkspace(t *testing.T) (string, Config) {
 	t.Helper()
 	root := t.TempDir()
 
@@ -53,7 +53,7 @@ func newWorkspace(t *testing.T) (string, Workspace) {
 		"  other:\n    x: y\n"
 	secrets := writeSource(t, root, "secrets.yaml", store)
 
-	return root, Workspace{
+	return root, Config{
 		ManifestPath: manifest,
 		Root:         root,
 		SecretsPath:  secrets,
@@ -141,7 +141,7 @@ func readFile(t *testing.T, path string) []byte {
 }
 
 // newService constructs a Service over ws backed by real secrets filestores.
-func newService(t *testing.T, ws Workspace) *Service {
+func newService(t *testing.T, ws Config) *Service {
 	t.Helper()
 
 	// The reader is unused when the workspace has no store, so any path suffices.
@@ -155,7 +155,7 @@ func newService(t *testing.T, ws Workspace) *Service {
 	}
 
 	service, err := NewService(ServiceParams{
-		Workspace:     ws,
+		Config:        ws,
 		SecretsReader: reader,
 		NewSecretsWriter: func(path string) (SecretsWriter, error) {
 			return secfilestore.New(secfilestore.Params{Path: path})
@@ -168,7 +168,7 @@ func newService(t *testing.T, ws Workspace) *Service {
 }
 
 // mustPack runs Pack and fails the test on error, returning the result.
-func mustPack(t *testing.T, ws Workspace, p PackParams) PackResult {
+func mustPack(t *testing.T, ws Config, p PackParams) PackResult {
 	t.Helper()
 	result, err := newService(t, ws).Pack(p)
 	if err != nil {
@@ -264,7 +264,7 @@ func TestPackSeparatesCollidingBasenamesByProject(t *testing.T) {
 			"  two:\n    includes: [svc/app]\n")
 	writeSource(t, root, "env/app.yaml", "A: 1\n")
 	writeSource(t, root, "svc/app.yaml", "A: 2\n")
-	ws := Workspace{
+	ws := Config{
 		ManifestPath: manifest,
 		Root:         root,
 		Environments: []string{"development"},
@@ -309,7 +309,7 @@ func TestPackDisambiguatesIntraProjectCollision(t *testing.T) {
 			"  one:\n    includes: [env/app, svc/app]\n")
 	writeSource(t, root, "env/app.yaml", "A: 1\n")
 	writeSource(t, root, "svc/app.yaml", "A: 2\n")
-	ws := Workspace{
+	ws := Config{
 		ManifestPath: manifest,
 		Root:         root,
 		Environments: []string{"development"},
@@ -347,7 +347,7 @@ func TestPackDisambiguatesBaseOverlayCollision(t *testing.T) {
 	writeSource(t, root, "env/app.yaml", "A: base\n")
 	writeSource(t, root, "env/app.production.yaml", "A: overlay\n")
 	writeSource(t, root, "svc/app.production.yaml", "B: other\n")
-	ws := Workspace{
+	ws := Config{
 		ManifestPath: manifest,
 		Root:         root,
 		Environments: []string{"production"},
@@ -389,7 +389,7 @@ func TestPackSanitizesProjectDirectoryName(t *testing.T) {
 			"projects:\n"+
 			"  \"team/api\":\n    includes: [env/app]\n")
 	writeSource(t, root, "env/app.yaml", "A: 1\n")
-	ws := Workspace{
+	ws := Config{
 		ManifestPath: manifest,
 		Root:         root,
 		Environments: []string{"development"},
@@ -419,7 +419,7 @@ func TestPackHandlesEscapingInclude(t *testing.T) {
 		"environments: [development]\n"+
 			"projects:\n  escape:\n    includes: ['../outside']\n")
 	writeSource(t, parent, "outside.yaml", "X: 1\n")
-	ws := Workspace{
+	ws := Config{
 		ManifestPath: manifest,
 		Root:         root,
 		Environments: []string{"development"},
@@ -650,7 +650,7 @@ func TestPackOmitsStoreWhenNothingReferenced(t *testing.T) {
 	writeSource(t, root, "env/app.yaml", "A: base\n") // no secret:// reference
 	secrets := writeSource(t, root, "secrets.yaml",
 		"secrets:\n  shared:\n    token: t0k\n")
-	ws := Workspace{
+	ws := Config{
 		ManifestPath: manifest,
 		Root:         root,
 		SecretsPath:  secrets,
@@ -676,7 +676,7 @@ func TestPackStandardizesManifestAndStoreNames(t *testing.T) {
 	writeSource(t, root, "env/app.yaml", "TOKEN: secret://shared/token\n")
 	store := writeSource(t, root, "private/vault.yaml",
 		"public-keys:\n  shared: PUBKEY\nsecrets:\n  shared:\n    token: t0k\n")
-	ws := Workspace{
+	ws := Config{
 		ManifestPath: manifest,
 		Root:         root,
 		SecretsPath:  store,
@@ -721,7 +721,7 @@ func TestPackDropsEmptySecretsBlock(t *testing.T) {
 	writeSource(t, root, "env/app.yaml", "TOKEN: secret://shared/token\n")
 	store := writeSource(t, root, "private/vault.yaml",
 		"secrets:\n  shared:\n    token: t0k\n")
-	ws := Workspace{
+	ws := Config{
 		ManifestPath: manifest,
 		Root:         root,
 		SecretsPath:  store,
@@ -840,7 +840,7 @@ func TestPackSingleProjectStillNests(t *testing.T) {
 		"environments: [development]\n"+
 			"projects:\n  solo:\n    includes: [env/app]\n")
 	writeSource(t, root, "env/app.yaml", "A: base\n")
-	ws := Workspace{
+	ws := Config{
 		ManifestPath: manifest,
 		Root:         root,
 		Environments: []string{"development"},
@@ -873,7 +873,7 @@ func TestPackStoreCoversUnionOfProjects(t *testing.T) {
 	writeSource(t, root, "env/two.yaml", "B: secret://shared/beta\n")
 	store := writeSource(t, root, "secrets.yaml",
 		"secrets:\n  shared:\n    alpha: a0\n    beta: b0\n    gamma: g0\n")
-	ws := Workspace{
+	ws := Config{
 		ManifestPath: manifest,
 		Root:         root,
 		SecretsPath:  store,

@@ -190,8 +190,8 @@ func TestMaterializeJoinsListWithDefaultDelimiter(t *testing.T) {
 	writeYAML(t, dir, "app.yaml", "hosts:\n  - a\n  - b\n")
 
 	res, err := mergeEnv(t, ServiceParams{
-		Includes:     []string{filepath.Join(dir, "app")},
-		Environments: []string{"development"},
+		Includes: []string{filepath.Join(dir, "app")},
+		Config:   Config{Environments: []string{"development"}},
 	})
 	if err != nil {
 		t.Fatalf("Materialize: %v", err)
@@ -215,7 +215,7 @@ func TestMaterializeResolvesListReferences(t *testing.T) {
 	}}}
 	res, err := mergeEnv(t, ServiceParams{
 		Includes:        []string{filepath.Join(dir, "app")},
-		Environments:    []string{"development"},
+		Config:          Config{Environments: []string{"development"}},
 		ResolverFactory: factory,
 	})
 	if err != nil {

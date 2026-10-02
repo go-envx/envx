@@ -105,7 +105,7 @@ func TestMaterializeIgnoringErrorsFallsBackToOSValue(t *testing.T) {
 	manager := managerFor(t, ServiceParams{
 		Includes:      []string{filepath.Join(dir, "app")},
 		OSEnvironment: map[string]string{"BROKEN": "from-os"},
-		Settings:      Settings{Overload: true},
+		Config:        Config{Settings: Settings{Overload: true}},
 	})
 
 	result, err := manager.Materialize(MaterializeParams{IgnoreErrors: true})

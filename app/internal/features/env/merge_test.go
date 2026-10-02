@@ -13,10 +13,12 @@ func buildNamespace(
 ) (*Environment, error) {
 	t.Helper()
 	return mergeEnv(t, ServiceParams{
-		Includes:           []string{filepath.Join(dir, name)},
-		Environments:       []string{"development", "production"},
-		DefaultEnvironment: env,
-		Settings:           settings,
+		Includes: []string{filepath.Join(dir, name)},
+		Config: Config{
+			Environments:       []string{"development", "production"},
+			DefaultEnvironment: env,
+			Settings:           settings,
+		},
 	})
 }
 

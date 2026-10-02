@@ -17,9 +17,9 @@ func customPatternManager(
 	return managerFor(t, ServiceParams{
 		Includes:      []string{filepath.Join(dir, "app")},
 		OSEnvironment: osEnv,
-		Settings: Settings{
+		Config: Config{Settings: Settings{
 			ReferencePattern: `\$\{([^}]*)\}`,
-		},
+		}},
 	})
 }
 
@@ -30,7 +30,7 @@ func TestCustomGrammarResolvesThroughManager(t *testing.T) {
 
 	m, err := NewService(ServiceParams{
 		Repository: testRepo,
-		Settings:   Settings{ReferencePattern: `\$\{([^}]*)\}`},
+		Config:     Config{Settings: Settings{ReferencePattern: `\$\{([^}]*)\}`}},
 	})
 	if err != nil {
 		t.Fatalf("New: %v", err)
@@ -56,7 +56,7 @@ func TestNewManagerInvalidPatternFails(t *testing.T) {
 
 	if _, err := NewService(ServiceParams{
 		Repository: testRepo,
-		Settings:   Settings{ReferencePattern: `(unterminated`},
+		Config:     Config{Settings: Settings{ReferencePattern: `(unterminated`}},
 	}); err == nil {
 		t.Error("New with an invalid reference pattern should fail")
 	}

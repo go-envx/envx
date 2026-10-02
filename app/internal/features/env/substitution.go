@@ -34,7 +34,7 @@ func mapSymbols(
 // newSubstituter builds a syntax.Substituter over the provided symbol table,
 // wired to the manager's grammar, OS environment getter, and overload setting.
 func (s *Service) newSubstituter(symbols syntax.SymbolTable) *syntax.Substituter {
-	return s.newSubstituterWith(symbols, s.grammar, s.params.Settings.Overload)
+	return s.newSubstituterWith(symbols, s.grammar, s.params.Config.Settings.Overload)
 }
 
 // newSubstituterWith builds a substituter using the specified grammar and

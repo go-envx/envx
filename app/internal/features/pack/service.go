@@ -42,8 +42,8 @@ type SecretsWriter interface {
 
 // ServiceParams provides dependencies to the bundling domain service.
 type ServiceParams struct {
-	// Workspace is the file-level layout bundles are copied from.
-	Workspace Workspace
+	// Config is the file-level layout bundles are copied from.
+	Config Config
 	// SecretsReader reads the workspace secrets store the bundle is filtered from.
 	SecretsReader SecretsReader
 	// NewSecretsWriter opens the bundled secrets store at the given path.
@@ -79,7 +79,7 @@ func NewService(params ServiceParams) (*Service, error) {
 // params.Force is set, in which case it is cleared just before the bundle is
 // written.
 func (s *Service) Pack(params PackParams) (PackResult, error) {
-	ws := s.params.Workspace
+	ws := s.params.Config
 
 	if strings.TrimSpace(params.OutDir) == "" {
 		return PackResult{}, ErrOutputRequired
@@ -219,7 +219,7 @@ func (s *Service) copySecrets(target string, bundles []projectBundle) (bool, err
 		if err != nil {
 			return false, fmt.Errorf(
 				"reading secret %s/%s from %s: %w",
-				ref.Group, ref.Key, s.params.Workspace.SecretsPath, err,
+				ref.Group, ref.Key, s.params.Config.SecretsPath, err,
 			)
 		}
 		if found {

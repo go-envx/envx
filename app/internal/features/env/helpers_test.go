@@ -196,8 +196,8 @@ func (f *mutableFactory) Resolver(bool) (ValueResolver, error) {
 // production, without validating the environment at construction.
 func managerFor(t *testing.T, params ServiceParams) *Service {
 	t.Helper()
-	if params.Environments == nil {
-		params.Environments = []string{"development", "production"}
+	if params.Config.Environments == nil {
+		params.Config.Environments = []string{"development", "production"}
 	}
 	if params.Repository == nil {
 		params.Repository = testRepo

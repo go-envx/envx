@@ -148,7 +148,7 @@ func (s *Service) Explain(params ExplainParams) (*ExplainResult, error) {
 	}
 
 	return &ExplainResult{
-		WorkspaceDir: s.params.WorkspaceDir,
+		WorkspaceDir: s.params.Config.WorkspaceDir,
 		Entries:      entries,
 		Summary:      summary,
 	}, nil

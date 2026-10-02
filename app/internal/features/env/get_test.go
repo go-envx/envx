@@ -50,8 +50,8 @@ func TestGetEnvironment(t *testing.T) {
 	writeYAML(t, dir, "app.production.yaml", "host: prod\n")
 
 	manager := managerFor(t, ServiceParams{
-		Includes:           []string{filepath.Join(dir, "app")},
-		DefaultEnvironment: "production",
+		Includes: []string{filepath.Join(dir, "app")},
+		Config:   Config{DefaultEnvironment: "production"},
 	})
 
 	t.Run("empty uses configured default", func(t *testing.T) {

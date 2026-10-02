@@ -10,23 +10,27 @@ import (
 func TestNormalizeParamsDefaultsDelimiter(t *testing.T) {
 	t.Parallel()
 
-	def, err := normalizeParams(ServiceParams{Environments: []string{"development"}})
-	if err != nil {
-		t.Fatalf("normalizeParams: %v", err)
-	}
-	if def.Settings.Delimiter != "," {
-		t.Errorf("Delimiter = %q, want , (default)", def.Settings.Delimiter)
-	}
-
-	custom, err := normalizeParams(ServiceParams{
-		Environments: []string{"development"},
-		Settings:     Settings{Delimiter: ":"},
+	def, err := normalizeParams(ServiceParams{
+		Config: Config{Environments: []string{"development"}},
 	})
 	if err != nil {
 		t.Fatalf("normalizeParams: %v", err)
 	}
-	if custom.Settings.Delimiter != ":" {
-		t.Errorf("Delimiter = %q, want : (explicit)", custom.Settings.Delimiter)
+	if def.Config.Settings.Delimiter != "," {
+		t.Errorf("Delimiter = %q, want , (default)", def.Config.Settings.Delimiter)
+	}
+
+	custom, err := normalizeParams(ServiceParams{
+		Config: Config{
+			Environments: []string{"development"},
+			Settings:     Settings{Delimiter: ":"},
+		},
+	})
+	if err != nil {
+		t.Fatalf("normalizeParams: %v", err)
+	}
+	if custom.Config.Settings.Delimiter != ":" {
+		t.Errorf("Delimiter = %q, want : (explicit)", custom.Config.Settings.Delimiter)
 	}
 }
 
@@ -38,8 +42,8 @@ func TestNormalizeParamsCopiesSlices(t *testing.T) {
 	includes := []string{"a", "b"}
 	environments := []string{"development", "production"}
 	normalized, err := normalizeParams(ServiceParams{
-		Includes:     includes,
-		Environments: environments,
+		Includes: includes,
+		Config:   Config{Environments: environments},
 	})
 	if err != nil {
 		t.Fatalf("normalizeParams: %v", err)
@@ -50,8 +54,8 @@ func TestNormalizeParamsCopiesSlices(t *testing.T) {
 	if slices.Contains(normalized.Includes, "mutated") {
 		t.Errorf("Includes shares the caller's array: %v", normalized.Includes)
 	}
-	if slices.Contains(normalized.Environments, "mutated") {
-		t.Errorf("Environments shares the caller's array: %v", normalized.Environments)
+	if slices.Contains(normalized.Config.Environments, "mutated") {
+		t.Errorf("Environments shares the caller's array: %v", normalized.Config.Environments)
 	}
 }
 
@@ -62,8 +66,10 @@ func TestNormalizeParamsDoesNotValidateEnvironment(t *testing.T) {
 	t.Parallel()
 
 	if _, err := normalizeParams(ServiceParams{
-		Environments:       []string{"development"},
-		DefaultEnvironment: "undeclared",
+		Config: Config{
+			Environments:       []string{"development"},
+			DefaultEnvironment: "undeclared",
+		},
 	}); err != nil {
 		t.Errorf("normalizeParams validated the environment: %v", err)
 	}

@@ -76,9 +76,9 @@ func TestNewServicePerformsNoIO(t *testing.T) {
 
 	repo := newMockRepository()
 	_, err := env.NewService(env.ServiceParams{
-		Repository:   repo,
-		Includes:     []string{"missing"},
-		Environments: []string{"dev"},
+		Repository: repo,
+		Includes:   []string{"missing"},
+		Config:     env.Config{Environments: []string{"dev"}},
 	})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -109,9 +109,9 @@ func TestServiceMaterialize(t *testing.T) {
 	}
 
 	svc, err := env.NewService(env.ServiceParams{
-		Repository:   repo,
-		Includes:     []string{"app"},
-		Environments: []string{"development", "production"},
+		Repository: repo,
+		Includes:   []string{"app"},
+		Config:     env.Config{Environments: []string{"development", "production"}},
 	})
 	if err != nil {
 		t.Fatalf("NewService: %v", err)
@@ -135,8 +135,8 @@ func TestServiceEnvironmentNotDeclared(t *testing.T) {
 
 	repo := newMockRepository()
 	svc, err := env.NewService(env.ServiceParams{
-		Repository:   repo,
-		Environments: []string{"dev"},
+		Repository: repo,
+		Config:     env.Config{Environments: []string{"dev"}},
 	})
 	if err != nil {
 		t.Fatalf("NewService: %v", err)
@@ -161,11 +161,11 @@ func TestServiceRequireOverlaysMissingOverlay(t *testing.T) {
 	}
 
 	svc, err := env.NewService(env.ServiceParams{
-		Repository:   repo,
-		Includes:     []string{"app"},
-		Environments: []string{"dev", "prod"},
-		Settings: env.Settings{
-			RequireOverlays: true,
+		Repository: repo,
+		Includes:   []string{"app"},
+		Config: env.Config{
+			Environments: []string{"dev", "prod"},
+			Settings:     env.Settings{RequireOverlays: true},
 		},
 	})
 	if err != nil {
@@ -186,9 +186,9 @@ func TestServiceSet(t *testing.T) {
 
 	repo := newMockRepository()
 	svc, err := env.NewService(env.ServiceParams{
-		Repository:   repo,
-		Includes:     []string{"app"},
-		Environments: []string{"dev", "prod"},
+		Repository: repo,
+		Includes:   []string{"app"},
+		Config:     env.Config{Environments: []string{"dev", "prod"}},
 	})
 	if err != nil {
 		t.Fatalf("NewService: %v", err)
@@ -223,9 +223,9 @@ func TestServiceGet(t *testing.T) {
 	}
 
 	svc, err := env.NewService(env.ServiceParams{
-		Repository:   repo,
-		Includes:     []string{"app"},
-		Environments: []string{"dev", "prod"},
+		Repository: repo,
+		Includes:   []string{"app"},
+		Config:     env.Config{Environments: []string{"dev", "prod"}},
 	})
 	if err != nil {
 		t.Fatalf("NewService: %v", err)

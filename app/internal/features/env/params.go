@@ -63,23 +63,23 @@ type Options struct {
 //nolint:gocritic // Internal normalizer copies caller parameters.
 func normalizeParams(params ServiceParams) (ServiceParams, error) {
 	// Apply the default list delimiter when none was configured.
-	if params.Settings.Delimiter == "" {
-		params.Settings.Delimiter = defaultDelimiter
+	if params.Config.Settings.Delimiter == "" {
+		params.Config.Settings.Delimiter = defaultDelimiter
 	}
 
 	// Copy caller-owned slices and the OS snapshot so caller mutation cannot
 	// change service behavior.
 	params.Includes = slices.Clone(params.Includes)
-	params.Environments = slices.Clone(params.Environments)
+	params.Config.Environments = slices.Clone(params.Config.Environments)
 	params.OSEnvironment = maps.Clone(params.OSEnvironment)
 
-	if params.Projects != nil {
-		cloned := make(map[string]ProjectConfig, len(params.Projects))
-		for k, v := range params.Projects {
+	if params.Config.Projects != nil {
+		cloned := make(map[string]ProjectConfig, len(params.Config.Projects))
+		for k, v := range params.Config.Projects {
 			v.Includes = slices.Clone(v.Includes)
 			cloned[k] = v
 		}
-		params.Projects = cloned
+		params.Config.Projects = cloned
 	}
 
 	return params, nil

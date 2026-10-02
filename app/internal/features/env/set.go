@@ -39,19 +39,19 @@ func (s *Service) Set(params SetParams) (SetResult, error) {
 	}
 
 	targetPath := params.IncludePath
-	if s.params.WorkspaceDir != "" && !filepath.IsAbs(targetPath) {
-		targetPath = filepath.Join(s.params.WorkspaceDir, targetPath)
+	if dir := s.params.Config.WorkspaceDir; dir != "" && !filepath.IsAbs(targetPath) {
+		targetPath = filepath.Join(dir, targetPath)
 	}
 
 	var allowedIncludes []string
 	switch {
 	case params.Project != "":
-		if s.params.Projects == nil {
+		if s.params.Config.Projects == nil {
 			return SetResult{}, fmt.Errorf(
 				"%w: %q", ErrProjectNotFound, params.Project,
 			)
 		}
-		proj, ok := s.params.Projects[params.Project]
+		proj, ok := s.params.Config.Projects[params.Project]
 		if !ok {
 			return SetResult{}, fmt.Errorf(
 				"%w: project %q not found in manifest",
@@ -59,8 +59,8 @@ func (s *Service) Set(params SetParams) (SetResult, error) {
 			)
 		}
 		allowedIncludes = proj.Includes
-	case len(s.params.Projects) > 0:
-		for _, proj := range s.params.Projects {
+	case len(s.params.Config.Projects) > 0:
+		for _, proj := range s.params.Config.Projects {
 			allowedIncludes = append(allowedIncludes, proj.Includes...)
 		}
 	default:

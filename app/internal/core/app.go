@@ -42,8 +42,7 @@ func (a *App) SecretsService(configPath string) (*secrets.Service, error) {
 	if err != nil {
 		return nil, err
 	}
-	s := res.secrets
-	return NewSecretsService(s.SecretsPath, s.KeysPath, res.cipher, s.DefaultIndent)
+	return newConfiguredSecretsService(res.secrets)
 }
 
 // EnvService resolves workspace configuration and returns the domain env
@@ -56,14 +55,13 @@ func (a *App) EnvService(configPath string) (*env.Service, error) {
 	return newWorkspaceEnvService(res)
 }
 
-// PackService resolves the workspace layout and returns the domain bundling
-// service.
+// PackService resolves the workspace and returns the domain bundling service.
 func (a *App) PackService(configPath string) (*pack.Service, error) {
-	layout, err := ResolveWorkspaceLayout(configPath)
+	res, err := resolveWorkspace(configPath)
 	if err != nil {
 		return nil, err
 	}
-	return NewPackService(layout)
+	return newPackService(res.pack)
 }
 
 // ValidateService resolves workspace configuration and returns the domain

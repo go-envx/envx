@@ -5,7 +5,6 @@ import (
 
 	"github.com/go-envx/envx/app/internal/features/env"
 	"github.com/go-envx/envx/app/internal/features/secrets"
-	"github.com/go-envx/envx/app/internal/shared/status"
 )
 
 // EnvService defines what validate consumes from environment resolution: a
@@ -29,20 +28,13 @@ type SecretsService interface {
 
 // ServiceParams provides dependencies to the workspace diagnostics service.
 type ServiceParams struct {
+	// Config is the manifest-derived diagnostics configuration.
+	Config Config
 	// EnvService diagnoses each project in each declared environment.
 	EnvService EnvService
 	// SecretsService provides the store-level findings; nil skips them, running
 	// only the per-environment resolution checks.
 	SecretsService SecretsService
-	// Projects lists every project to diagnose.
-	Projects []string
-	// Environments lists the declared environments every project is diagnosed
-	// against.
-	Environments []string
-	// Severity overrides the default reporting level per status code, keyed by
-	// canonical code. A nil map leaves every code at its default; a code mapped to
-	// status.Off suppresses its findings entirely.
-	Severity map[string]status.Severity
 }
 
 // Service diagnoses a whole workspace for resolution and store problems.

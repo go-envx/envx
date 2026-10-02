@@ -59,22 +59,3 @@ func TestAppPackServiceWritesBundle(t *testing.T) {
 		t.Errorf("bundle manifest not written: %v", err)
 	}
 }
-
-// TestNewPackServiceRequiresLayout verifies composition rejects a missing layout.
-func TestNewPackServiceRequiresLayout(t *testing.T) {
-	t.Parallel()
-
-	if _, err := NewPackService(nil); err == nil {
-		t.Fatal("NewPackService(nil) succeeded")
-	}
-}
-
-// TestNewValidateServiceRequiresWorkspace verifies composition rejects a missing
-// resolved workspace.
-func TestNewValidateServiceRequiresWorkspace(t *testing.T) {
-	t.Parallel()
-
-	if _, err := newValidateService(nil); err == nil {
-		t.Fatal("newValidateService(nil) succeeded")
-	}
-}

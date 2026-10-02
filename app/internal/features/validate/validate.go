@@ -36,8 +36,8 @@ func (s *Service) Validate(params ValidateParams) (Report, error) {
 	// merge and no network I/O.
 	referenced := make(map[storeRef]bool)
 	if params.needsMerge() {
-		for _, project := range s.params.Projects {
-			for _, environment := range s.params.Environments {
+		for _, project := range s.params.Config.Projects {
+			for _, environment := range s.params.Config.Environments {
 				if err := s.diagnoseEnvironment(
 					&report, params, referenced, project, environment,
 				); err != nil {
@@ -88,7 +88,7 @@ func (s *Service) diagnoseEnvironment(
 		// merge regardless of how the value resolved.
 		if params.runs(status.PropertyNotDeclaredInBase) &&
 			!declaredInBase(entry.Origin, environment) {
-			report.record(s.params.Severity, Finding{
+			report.record(s.params.Config.Severity, Finding{
 				Project:     project,
 				Environment: environment,
 				Key:         entry.Key,
@@ -107,7 +107,7 @@ func (s *Service) diagnoseEnvironment(
 		if !ok || group != GroupResolution || !params.runs(entry.Resolution.Code) {
 			continue
 		}
-		report.record(s.params.Severity, Finding{
+		report.record(s.params.Config.Severity, Finding{
 			Project:     project,
 			Environment: environment,
 			Key:         entry.Key,
@@ -201,7 +201,7 @@ func (s *Service) addSecretFindings(
 		switch {
 		case !secret.Encrypted:
 			if params.runs(status.SecretIsNotEncrypted) {
-				report.record(s.params.Severity, Finding{
+				report.record(s.params.Config.Severity, Finding{
 					Key:     identity,
 					Code:    status.SecretIsNotEncrypted,
 					Message: "stored value is not encrypted",
@@ -209,7 +209,7 @@ func (s *Service) addSecretFindings(
 			}
 		case secret.AlgorithmMismatch:
 			if params.runs(status.SecretAlgorithmMismatch) {
-				report.record(s.params.Severity, Finding{
+				report.record(s.params.Config.Severity, Finding{
 					Key:     identity,
 					Code:    status.SecretAlgorithmMismatch,
 					Message: "stored under a different algorithm than the configured cipher",
@@ -219,7 +219,7 @@ func (s *Service) addSecretFindings(
 		if params.runs(status.SecretIsNotReferenced) {
 			ref := storeRef{group: strings.ToLower(secret.Group), key: secret.Key}
 			if !referenced[ref] {
-				report.record(s.params.Severity, Finding{
+				report.record(s.params.Config.Severity, Finding{
 					Key:     identity,
 					Code:    status.SecretIsNotReferenced,
 					Message: "stored value is never referenced by any environment",
@@ -234,7 +234,7 @@ func (s *Service) addSecretFindings(
 			return fmt.Errorf("reading public keys: %w", err)
 		}
 		for _, group := range groups {
-			report.record(s.params.Severity, Finding{
+			report.record(s.params.Config.Severity, Finding{
 				Key:     group,
 				Code:    status.PublicKeyIsMissing,
 				Message: "the group has stored secrets but no public key",
@@ -258,7 +258,7 @@ func (s *Service) addKeypairFindings(report *Report, params ValidateParams) erro
 		if !ok || !params.runs(finding.Code) {
 			continue
 		}
-		report.record(s.params.Severity, finding)
+		report.record(s.params.Config.Severity, finding)
 	}
 	return nil
 }

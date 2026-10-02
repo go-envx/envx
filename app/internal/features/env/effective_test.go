@@ -14,7 +14,7 @@ func osManager(
 	return managerFor(t, ServiceParams{
 		Includes:      []string{filepath.Join(dir, "app")},
 		OSEnvironment: osEnv,
-		Settings:      Settings{Overload: overload},
+		Config:        Config{Settings: Settings{Overload: overload}},
 	})
 }
 

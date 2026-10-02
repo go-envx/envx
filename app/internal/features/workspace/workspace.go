@@ -26,11 +26,15 @@ type Settings struct {
 
 // Project defines one project's environment configuration within a workspace.
 type Project struct {
+	// Includes are the namespace prefixes as declared, relative to the workspace root.
 	Includes []string
-	Settings Settings
+	// IncludePaths are Includes joined onto the workspace root, in the same order.
+	IncludePaths []string
+	Settings     Settings
 }
 
-// SecretsConfig configures the workspace-level secrets store.
+// SecretsConfig configures the workspace-level secrets store. A loaded workspace
+// carries absolute paths and a non-empty Cipher.
 type SecretsConfig struct {
 	SecretsPath string
 	KeysPath    string
@@ -39,39 +43,15 @@ type SecretsConfig struct {
 
 // Workspace represents the validated workspace domain entity.
 type Workspace struct {
-	Path               string
-	Root               string
+	Path string
+	Root string
+	// Indent is the block indentation for rewritten YAML, within 2 to 9.
 	Indent             int
 	Environments       []string
 	Projects           map[string]Project
 	Settings           Settings
 	Secrets            SecretsConfig
 	ValidateSeverities map[string]string
-}
-
-// ProjectRef represents a declared project's includes within a workspace.
-type ProjectRef struct {
-	// Name is the project name declared in the manifest.
-	Name string
-	// Includes lists the project's ordered namespace relative paths.
-	Includes []string
-}
-
-// Layout represents the file-level view of a workspace: manifest path, root
-// directory, secrets and keys locations, declared environments, and projects.
-type Layout struct {
-	// ManifestPath is the absolute path to the manifest file.
-	ManifestPath string
-	// Root is the absolute root directory of the workspace.
-	Root string
-	// SecretsPath is the absolute path to the secrets store file.
-	SecretsPath string
-	// KeysPath is the absolute path to the private-key file.
-	KeysPath string
-	// Environments is the list of declared environments.
-	Environments []string
-	// Projects is the list of project includes in sorted order.
-	Projects []ProjectRef
 }
 
 // DefaultEnvironment returns the first declared environment, or an empty string.
