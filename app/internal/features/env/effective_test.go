@@ -187,9 +187,9 @@ func TestMaterializeOSValueIsOpaque(t *testing.T) {
 	// A revealing factory would fail every reference; an opaque OS value must not
 	// reach it, so materialization succeeds with the reference kept verbatim.
 	manager := managerFor(t, ServiceParams{
-		Includes:        []string{filepath.Join(dir, "app")},
-		OSEnvironment:   map[string]string{"HOST": "secret://group/key"},
-		ResolverFactory: &recordingFactory{resolver: fakeResolver{failAll: true}},
+		Includes:       []string{filepath.Join(dir, "app")},
+		OSEnvironment:  map[string]string{"HOST": "secret://group/key"},
+		SecretsService: &recordingFactory{resolver: fakeResolver{failAll: true}},
 	})
 	env := materializeEnv(t, manager, "")
 	if got, _ := env.Get("HOST"); got != "secret://group/key" {

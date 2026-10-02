@@ -154,12 +154,15 @@ func newService(t *testing.T, ws Config) *Service {
 		t.Fatalf("secfilestore.New(): %v", err)
 	}
 
+	exporter, err := secfilestore.NewExporter(secfilestore.ExporterParams{})
+	if err != nil {
+		t.Fatalf("secfilestore.NewExporter(): %v", err)
+	}
+
 	service, err := NewService(ServiceParams{
-		Config:        ws,
-		SecretsReader: reader,
-		NewSecretsWriter: func(path string) (SecretsWriter, error) {
-			return secfilestore.New(secfilestore.Params{Path: path})
-		},
+		Config:          ws,
+		SecretsReader:   reader,
+		SecretsExporter: exporter,
 	})
 	if err != nil {
 		t.Fatalf("NewService(): %v", err)
@@ -565,7 +568,7 @@ func TestPackRequiresOutDir(t *testing.T) {
 }
 
 // TestNewServiceRequiresDependencies verifies construction rejects a missing
-// secrets reader or writer factory.
+// secrets reader or exporter.
 func TestNewServiceRequiresDependencies(t *testing.T) {
 	t.Parallel()
 
@@ -573,13 +576,16 @@ func TestNewServiceRequiresDependencies(t *testing.T) {
 	if err != nil {
 		t.Fatalf("secfilestore.New(): %v", err)
 	}
-	writer := func(string) (SecretsWriter, error) { return nil, nil }
+	exporter, err := secfilestore.NewExporter(secfilestore.ExporterParams{})
+	if err != nil {
+		t.Fatalf("secfilestore.NewExporter(): %v", err)
+	}
 
-	if _, err := NewService(ServiceParams{NewSecretsWriter: writer}); err == nil {
+	if _, err := NewService(ServiceParams{SecretsExporter: exporter}); err == nil {
 		t.Error("NewService() accepted a nil secrets reader")
 	}
 	if _, err := NewService(ServiceParams{SecretsReader: reader}); err == nil {
-		t.Error("NewService() accepted a nil secrets writer factory")
+		t.Error("NewService() accepted a nil secrets exporter")
 	}
 }
 

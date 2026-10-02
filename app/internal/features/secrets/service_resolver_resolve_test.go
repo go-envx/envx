@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/go-envx/envx/app/internal/features/privatekey"
+	"github.com/go-envx/envx/app/internal/shared/value"
 )
 
 // newMaskingResolver builds a masking Resolver over an in-memory store. A masking
@@ -37,15 +38,30 @@ func (r *recordingResolver) Location() string { return "test-keys-location" }
 // from keys reports that no key is available.
 func (r *recordingResolver) Resolve(group string) (privatekey.PrivateKey, error) {
 	r.calls[group]++
-	value, ok := r.keys[group]
+	key, ok := r.keys[group]
 	if !ok {
 		return privatekey.PrivateKey{}, privatekey.ErrNotAvailable
 	}
-	return privatekey.PrivateKey{Value: value, Origin: "test"}, nil
+	return privatekey.PrivateKey{Value: key, Origin: "test"}, nil
 }
 
 // Set accepts private-key material without storing it.
 func (r *recordingResolver) Set(string, string) error { return nil }
+
+// TestOpenResolverImplementsEvaluator verifies the opened resolver can also
+// evaluate values, which env.Explain relies on.
+func TestOpenResolverImplementsEvaluator(t *testing.T) {
+	t.Parallel()
+
+	manager := newGetManager(t, newPrivateKeyTestService())
+	r, err := manager.OpenResolver(false)
+	if err != nil {
+		t.Fatalf("OpenResolver(): %v", err)
+	}
+	if _, ok := r.(value.Evaluator); !ok {
+		t.Errorf("OpenResolver() = %T, want a value.Evaluator", r)
+	}
+}
 
 // TestManagerResolverMasksByDefault verifies the default resolver masks
 // references without loading any private key, even when none is available.
@@ -62,9 +78,9 @@ func TestManagerResolverMasksByDefault(t *testing.T) {
 		t.Fatalf("SetSecret(): %v", err)
 	}
 
-	r, err := manager.Resolver(ResolverParams{})
+	r, err := manager.OpenResolver(false)
 	if err != nil {
-		t.Fatalf("Resolver(): %v", err)
+		t.Fatalf("OpenResolver(): %v", err)
 	}
 	got, err := r.Resolve("secret://production/database_password", "")
 	if err != nil {
@@ -91,9 +107,9 @@ func TestManagerResolverRevealsStoredSecret(t *testing.T) {
 		t.Fatalf("SetSecret(): %v", err)
 	}
 
-	r, err := manager.Resolver(ResolverParams{Reveal: true})
+	r, err := manager.OpenResolver(true)
 	if err != nil {
-		t.Fatalf("Resolver(): %v", err)
+		t.Fatalf("OpenResolver(): %v", err)
 	}
 	got, err := r.Resolve("secret://Production/database_password", "")
 	if err != nil {
@@ -119,9 +135,9 @@ func TestManagerResolverRevealUnavailableKeyFails(t *testing.T) {
 		t.Fatalf("SetSecret(): %v", err)
 	}
 
-	r, err := manager.Resolver(ResolverParams{Reveal: true})
+	r, err := manager.OpenResolver(true)
 	if err != nil {
-		t.Fatalf("Resolver(): %v", err)
+		t.Fatalf("OpenResolver(): %v", err)
 	}
 	if _, err := r.Resolve("secret://production/database_password", ""); err == nil {
 		t.Fatal("Resolve() revealed a secret without an available private key")
@@ -168,9 +184,9 @@ func TestManagerResolverRevealsLazilyByGroup(t *testing.T) {
 		t.Fatalf("SetSecret() shared: %v", err)
 	}
 
-	r, err := manager.Resolver(ResolverParams{Reveal: true})
+	r, err := manager.OpenResolver(true)
 	if err != nil {
-		t.Fatalf("Resolver(): %v", err)
+		t.Fatalf("OpenResolver(): %v", err)
 	}
 	for range 2 {
 		got, err := r.Resolve("secret://production/token", "")
@@ -210,9 +226,9 @@ func TestManagerResolverMissingFileIsEmpty(t *testing.T) {
 	if err != nil {
 		t.Fatalf("New() absent: %v", err)
 	}
-	r, err := manager.Resolver(ResolverParams{Reveal: true})
+	r, err := manager.OpenResolver(true)
 	if err != nil {
-		t.Fatalf("Resolver() absent: %v", err)
+		t.Fatalf("OpenResolver() absent: %v", err)
 	}
 	if _, err := r.Resolve("secret://any/thing", ""); err == nil {
 		t.Error("expected a missing-file resolver to reject a revealed reference")
@@ -232,8 +248,8 @@ func TestManagerResolverMalformed(t *testing.T) {
 	if err != nil {
 		t.Fatalf("New(): %v", err)
 	}
-	if _, err := manager.Resolver(ResolverParams{}); err == nil {
-		t.Error("expected Resolver() to reject a malformed secrets file")
+	if _, err := manager.OpenResolver(false); err == nil {
+		t.Error("expected OpenResolver() to reject a malformed secrets file")
 	}
 }
 
@@ -294,21 +310,21 @@ func TestResolveMaskGroupCaseInsensitive(t *testing.T) {
 	if err != nil {
 		t.Fatalf("New() error = %v", err)
 	}
-	r, err := manager.Resolver(ResolverParams{})
+	r, err := manager.OpenResolver(false)
 	if err != nil {
-		t.Fatalf("Resolver() error = %v", err)
+		t.Fatalf("OpenResolver() error = %v", err)
 	}
 
-	for _, value := range []string{
+	for _, ref := range []string{
 		"secret://production/token",
 		"secret://PRODUCTION/token",
 	} {
-		got, err := r.Resolve(value, "")
+		got, err := r.Resolve(ref, "")
 		if err != nil {
-			t.Fatalf("Resolve(%q) error = %v", value, err)
+			t.Fatalf("Resolve(%q) error = %v", ref, err)
 		}
 		if want := "secret://production/token"; got != want {
-			t.Errorf("Resolve(%q) = %q, want %q", value, got, want)
+			t.Errorf("Resolve(%q) = %q, want %q", ref, got, want)
 		}
 	}
 }
@@ -344,9 +360,9 @@ func TestManagerResolverRevealDanglingFails(t *testing.T) {
 	t.Parallel()
 
 	manager := newGetManager(t, fixedPrivateKeyResolver{})
-	r, err := manager.Resolver(ResolverParams{Reveal: true})
+	r, err := manager.OpenResolver(true)
 	if err != nil {
-		t.Fatalf("Resolver(): %v", err)
+		t.Fatalf("OpenResolver(): %v", err)
 	}
 	if _, err := r.Resolve("secret://production/missing", ""); err == nil {
 		t.Fatal("revealing a dangling reference should fail")

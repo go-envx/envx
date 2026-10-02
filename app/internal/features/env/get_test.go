@@ -8,11 +8,11 @@ import (
 
 // getManager builds a Manager over a single "app" namespace in dir with the given
 // resolver factory (nil for identity behavior).
-func getManager(t *testing.T, dir string, factory ValueResolverFactory) *Service {
+func getManager(t *testing.T, dir string, factory SecretsService) *Service {
 	t.Helper()
 	return managerFor(t, ServiceParams{
-		Includes:        []string{filepath.Join(dir, "app")},
-		ResolverFactory: factory,
+		Includes:       []string{filepath.Join(dir, "app")},
+		SecretsService: factory,
 	})
 }
 

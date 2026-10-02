@@ -52,7 +52,11 @@ func (a *App) EnvService(configPath string) (*env.Service, error) {
 	if err != nil {
 		return nil, err
 	}
-	return newWorkspaceEnvService(res)
+	secretsService, err := newConfiguredSecretsService(res.secrets)
+	if err != nil {
+		return nil, err
+	}
+	return newWorkspaceEnvService(res, secretsService)
 }
 
 // PackService resolves the workspace and returns the domain bundling service.

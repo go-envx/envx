@@ -66,14 +66,14 @@ func (f fakeDiagnoser) Diagnose(value, _ string) Resolution {
 // diagnoserFactory returns a fakeDiagnoser reflecting the requested reveal
 // policy, recording how many resolvers it opened.
 type diagnoserFactory struct {
-	// calls counts how many times Resolver was invoked.
+	// calls counts how many times OpenResolver was invoked.
 	calls int
 	// base is the diagnoser template whose reveal flag is set per call.
 	base fakeDiagnoser
 }
 
-// Resolver returns a fresh diagnoser bound to the reveal policy.
-func (f *diagnoserFactory) Resolver(reveal bool) (ValueResolver, error) {
+// OpenResolver returns a fresh diagnoser bound to the reveal policy.
+func (f *diagnoserFactory) OpenResolver(reveal bool) (ValueResolver, error) {
 	f.calls++
 	d := f.base
 	d.reveal = reveal
@@ -82,11 +82,11 @@ func (f *diagnoserFactory) Resolver(reveal bool) (ValueResolver, error) {
 
 // explainManager builds a Manager over a single "app" namespace in dir with the
 // given resolver factory.
-func explainManager(t *testing.T, dir string, factory ValueResolverFactory) *Service {
+func explainManager(t *testing.T, dir string, factory SecretsService) *Service {
 	t.Helper()
 	return managerFor(t, ServiceParams{
-		Includes:        []string{filepath.Join(dir, "app")},
-		ResolverFactory: factory,
+		Includes:       []string{filepath.Join(dir, "app")},
+		SecretsService: factory,
 	})
 }
 

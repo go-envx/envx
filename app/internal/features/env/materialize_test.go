@@ -18,8 +18,8 @@ func TestMaterializeResolvesEveryWinner(t *testing.T) {
 		resolver: fakeResolver{values: map[string]string{"secret://x": "pw"}},
 	}
 	manager := managerFor(t, ServiceParams{
-		Includes:        []string{filepath.Join(dir, "app")},
-		ResolverFactory: factory,
+		Includes:       []string{filepath.Join(dir, "app")},
+		SecretsService: factory,
 	})
 
 	env := materializeEnv(t, manager, "development")
@@ -47,8 +47,8 @@ func TestMaterializeOpensOneRevealingResolver(t *testing.T) {
 
 	factory := &recordingFactory{resolver: fakeResolver{}}
 	manager := managerFor(t, ServiceParams{
-		Includes:        []string{filepath.Join(dir, "app")},
-		ResolverFactory: factory,
+		Includes:       []string{filepath.Join(dir, "app")},
+		SecretsService: factory,
 	})
 
 	if _, err := manager.Materialize(
@@ -74,8 +74,8 @@ func TestMaterializeAggregatesFailures(t *testing.T) {
 
 	factory := &recordingFactory{resolver: fakeResolver{failAll: true}}
 	manager := managerFor(t, ServiceParams{
-		Includes:        []string{filepath.Join(dir, "app")},
-		ResolverFactory: factory,
+		Includes:       []string{filepath.Join(dir, "app")},
+		SecretsService: factory,
 	})
 
 	result, err := manager.Materialize(MaterializeParams{Environment: "development"})
@@ -103,8 +103,8 @@ func TestMaterializeObservesFileEdits(t *testing.T) {
 
 	factory := &mutableFactory{value: "first"}
 	manager := managerFor(t, ServiceParams{
-		Includes:        []string{filepath.Join(dir, "app")},
-		ResolverFactory: factory,
+		Includes:       []string{filepath.Join(dir, "app")},
+		SecretsService: factory,
 	})
 
 	first := materializeEnv(t, manager, "development")
@@ -140,8 +140,8 @@ func TestMaterializeSkipsShadowedReferences(t *testing.T) {
 
 	factory := &recordingFactory{resolver: fakeResolver{fail: "secret://stale"}}
 	manager := managerFor(t, ServiceParams{
-		Includes:        []string{filepath.Join(dir, "app")},
-		ResolverFactory: factory,
+		Includes:       []string{filepath.Join(dir, "app")},
+		SecretsService: factory,
 	})
 
 	env := materializeEnv(t, manager, "production")
@@ -162,8 +162,8 @@ func TestMaterializeRedactsResolvedListItemErrors(t *testing.T) {
 		"secret://sensitive": "plaintext,secret",
 	}}}
 	manager := managerFor(t, ServiceParams{
-		Includes:        []string{filepath.Join(dir, "app")},
-		ResolverFactory: factory,
+		Includes:       []string{filepath.Join(dir, "app")},
+		SecretsService: factory,
 	})
 
 	result, err := manager.Materialize(MaterializeParams{Environment: "development"})
@@ -214,9 +214,9 @@ func TestMaterializeResolvesListReferences(t *testing.T) {
 		"secret://b": "tok-b",
 	}}}
 	res, err := mergeEnv(t, ServiceParams{
-		Includes:        []string{filepath.Join(dir, "app")},
-		Config:          Config{Environments: []string{"development"}},
-		ResolverFactory: factory,
+		Includes:       []string{filepath.Join(dir, "app")},
+		Config:         Config{Environments: []string{"development"}},
+		SecretsService: factory,
 	})
 	if err != nil {
 		t.Fatalf("Materialize: %v", err)

@@ -16,14 +16,6 @@ var (
 	_ value.Evaluator = (*Resolver)(nil)
 )
 
-// ResolverParams controls how one resolver materializes secret references. The
-// zero value masks references; revealing them decrypts on lookup and therefore
-// requires an available private key for each referenced group.
-type ResolverParams struct {
-	// Reveal decrypts referenced values instead of masking them.
-	Reveal bool
-}
-
 // Resolver dereferences secret references against a secrets store. It recognizes
 // values of the form "secret://<group>/<key>"; every other value passes through
 // unchanged. A masking resolver returns the canonical reference without touching
@@ -43,11 +35,23 @@ type Resolver struct {
 	codec *envelopeCodec
 }
 
-// Resolver opens the current secrets store and returns a resolver bound to it
+// OpenResolver opens the current secrets store and returns a resolver bound to
+// it. Revealing decrypts each referenced value and requires an available private
+// key for its group; otherwise references are masked. The returned resolver also
+// implements value.Evaluator.
+func (s *Service) OpenResolver(reveal bool) (value.Resolver, error) {
+	resolver, err := s.openResolver(reveal)
+	if err != nil {
+		return nil, err
+	}
+	return resolver, nil
+}
+
+// openResolver opens the current secrets store and returns a resolver bound to it
 // with the requested materialization policy. A missing store yields an empty
 // resolver, so a reference against it fails loudly as a dangling reference rather
 // than leaking the raw reference string.
-func (s *Service) Resolver(params ResolverParams) (*Resolver, error) {
+func (s *Service) openResolver(reveal bool) (*Resolver, error) {
 	records, err := s.params.Repository.ListSecrets()
 	if err != nil {
 		return nil, err
@@ -64,7 +68,7 @@ func (s *Service) Resolver(params ResolverParams) (*Resolver, error) {
 
 	return &Resolver{
 		values:       values,
-		reveal:       params.Reveal,
+		reveal:       reveal,
 		cipher:       s.params.Cipher,
 		privateKeys:  s.params.PrivateKeyService,
 		resolvedKeys: make(map[string]string),
@@ -74,7 +78,7 @@ func (s *Service) Resolver(params ResolverParams) (*Resolver, error) {
 
 // Evaluate performs a one-off evaluation of a single reference value.
 func (s *Service) Evaluate(ref string, reveal bool) (value.Evaluation, error) {
-	r, err := s.Resolver(ResolverParams{Reveal: reveal})
+	r, err := s.openResolver(reveal)
 	if err != nil {
 		return value.Evaluation{}, err
 	}

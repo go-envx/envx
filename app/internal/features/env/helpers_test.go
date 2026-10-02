@@ -157,12 +157,12 @@ func (f fakeResolver) Resolve(value, _ string) (string, error) {
 	return value, nil
 }
 
-// recordingFactory is a ValueResolverFactory that records how many resolvers it
+// recordingFactory is a SecretsService that records how many resolvers it
 // opened and the reveal policy of the last call, returning a caller-supplied
 // resolver. It proves each operation opens exactly one fresh resolver and that
 // construction opens none.
 type recordingFactory struct {
-	// calls counts how many times Resolver was invoked.
+	// calls counts how many times OpenResolver was invoked.
 	calls int
 	// reveal records the reveal policy of the most recent call.
 	reveal bool
@@ -170,8 +170,8 @@ type recordingFactory struct {
 	resolver ValueResolver
 }
 
-// Resolver records the call and returns the configured resolver.
-func (f *recordingFactory) Resolver(reveal bool) (ValueResolver, error) {
+// OpenResolver records the call and returns the configured resolver.
+func (f *recordingFactory) OpenResolver(reveal bool) (ValueResolver, error) {
 	f.calls++
 	f.reveal = reveal
 	return f.resolver, nil
@@ -180,14 +180,14 @@ func (f *recordingFactory) Resolver(reveal bool) (ValueResolver, error) {
 // mutableFactory returns a fresh resolver reflecting its current value on each
 // call, so a test can prove no resolver state survives across operations.
 type mutableFactory struct {
-	// calls counts how many times Resolver was invoked.
+	// calls counts how many times OpenResolver was invoked.
 	calls int
 	// value is the plaintext the returned resolver maps "secret://x" to.
 	value string
 }
 
-// Resolver returns a fresh resolver bound to the factory's current value.
-func (f *mutableFactory) Resolver(bool) (ValueResolver, error) {
+// OpenResolver returns a fresh resolver bound to the factory's current value.
+func (f *mutableFactory) OpenResolver(bool) (ValueResolver, error) {
 	f.calls++
 	return fakeResolver{values: map[string]string{"secret://x": f.value}}, nil
 }

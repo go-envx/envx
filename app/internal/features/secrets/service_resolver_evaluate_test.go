@@ -23,9 +23,9 @@ func diagnoseResolver(
 	if err != nil {
 		t.Fatalf("SetSecret(): %v", err)
 	}
-	r, err := manager.Resolver(ResolverParams{Reveal: reveal})
+	r, err := manager.openResolver(reveal)
 	if err != nil {
-		t.Fatalf("Resolver(): %v", err)
+		t.Fatalf("openResolver(): %v", err)
 	}
 	return r
 }
@@ -49,9 +49,9 @@ func diagnoseRawResolver(t *testing.T, storedValue string) *Resolver {
 	if err != nil {
 		t.Fatalf("New(): %v", err)
 	}
-	r, err := manager.Resolver(ResolverParams{Reveal: true})
+	r, err := manager.openResolver(true)
 	if err != nil {
-		t.Fatalf("Resolver(): %v", err)
+		t.Fatalf("openResolver(): %v", err)
 	}
 	return r
 }
@@ -215,9 +215,9 @@ func TestDiagnoseInvalidPrivateKey(t *testing.T) {
 	if err != nil {
 		t.Fatalf("SetSecret(): %v", err)
 	}
-	r, err := manager.Resolver(ResolverParams{Reveal: true})
+	r, err := manager.openResolver(true)
 	if err != nil {
-		t.Fatalf("Resolver(): %v", err)
+		t.Fatalf("openResolver(): %v", err)
 	}
 
 	res := r.Evaluate("secret://production/database_password", "")

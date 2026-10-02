@@ -9,11 +9,11 @@ import (
 // diffManager builds a Manager over a single "app" namespace in dir declaring the
 // development and production environments, with an optional resolver factory so a
 // test can prove Diff never opens one.
-func diffManager(t *testing.T, dir string, factory ValueResolverFactory) *Service {
+func diffManager(t *testing.T, dir string, factory SecretsService) *Service {
 	t.Helper()
 	return managerFor(t, ServiceParams{
-		Includes:        []string{filepath.Join(dir, "app")},
-		ResolverFactory: factory,
+		Includes:       []string{filepath.Join(dir, "app")},
+		SecretsService: factory,
 	})
 }
 

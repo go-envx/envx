@@ -33,11 +33,11 @@ type SecretsReader interface {
 	GetSecret(group, key string) (secrets.SecretRecord, bool, error)
 }
 
-// SecretsWriter defines what pack consumes from the bundled secrets store: an
-// atomic bulk write of the filtered records.
-type SecretsWriter interface {
-	// SetSecrets stores every record in one write.
-	SetSecrets(records []secrets.SecretRecord) error
+// SecretsExporter defines what pack consumes to write the bundled secrets store:
+// an atomic bulk write of the filtered records into a new store.
+type SecretsExporter interface {
+	// WriteSecrets stores every record in the store at path in one write.
+	WriteSecrets(path string, records []secrets.SecretRecord) error
 }
 
 // ServiceParams provides dependencies to the bundling domain service.
@@ -46,8 +46,8 @@ type ServiceParams struct {
 	Config Config
 	// SecretsReader reads the workspace secrets store the bundle is filtered from.
 	SecretsReader SecretsReader
-	// NewSecretsWriter opens the bundled secrets store at the given path.
-	NewSecretsWriter func(path string) (SecretsWriter, error)
+	// SecretsExporter writes the bundled secrets store.
+	SecretsExporter SecretsExporter
 }
 
 // Service selects environment-scoped workspace files and writes them as a
@@ -62,8 +62,8 @@ func NewService(params ServiceParams) (*Service, error) {
 	if params.SecretsReader == nil {
 		return nil, errors.New("secrets reader is required")
 	}
-	if params.NewSecretsWriter == nil {
-		return nil, errors.New("secrets writer factory is required")
+	if params.SecretsExporter == nil {
+		return nil, errors.New("secrets exporter is required")
 	}
 	return &Service{params: params}, nil
 }
@@ -230,11 +230,8 @@ func (s *Service) copySecrets(target string, bundles []projectBundle) (bool, err
 		return false, nil
 	}
 
-	writer, err := s.params.NewSecretsWriter(target)
+	err = s.params.SecretsExporter.WriteSecrets(target, records)
 	if err != nil {
-		return false, fmt.Errorf("creating bundled secrets store %s: %w", target, err)
-	}
-	if err := writer.SetSecrets(records); err != nil {
 		return false, fmt.Errorf("writing bundled secrets store %s: %w", target, err)
 	}
 	return true, nil

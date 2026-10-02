@@ -11,13 +11,13 @@ import (
 // subManager builds a Manager over a single "app" namespace in dir with the given
 // resolver factory (nil for identity behavior) and injected OS environment.
 func subManager(
-	t *testing.T, dir string, factory ValueResolverFactory, osEnv map[string]string,
+	t *testing.T, dir string, factory SecretsService, osEnv map[string]string,
 ) *Service {
 	t.Helper()
 	return managerFor(t, ServiceParams{
-		Includes:        []string{filepath.Join(dir, "app")},
-		ResolverFactory: factory,
-		OSEnvironment:   osEnv,
+		Includes:       []string{filepath.Join(dir, "app")},
+		SecretsService: factory,
+		OSEnvironment:  osEnv,
 	})
 }
 

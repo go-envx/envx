@@ -69,30 +69,12 @@ func NewSecretsService(
 	})
 }
 
-// resolverFactory opens a fresh secrets service and operation-scoped resolver for
-// each resolving env operation, so no store snapshot or private-key cache
-// survives it. It implements env.ValueResolverFactory.
-type resolverFactory struct {
-	secrets secrets.Config
-}
-
-// Resolver composes a fresh secrets service and opens a resolver under the
-// reveal policy.
-func (f resolverFactory) Resolver(reveal bool) (env.ValueResolver, error) {
-	manager, err := newConfiguredSecretsService(f.secrets)
-	if err != nil {
-		return nil, err
-	}
-	resolver, err := manager.Resolver(secrets.ResolverParams{Reveal: reveal})
-	if err != nil {
-		return nil, err
-	}
-	return resolver, nil
-}
-
 // newWorkspaceEnvService composes a workspace-level env.Service from a resolved
-// workspace.
-func newWorkspaceEnvService(res *resolvedWorkspace) (*env.Service, error) {
+// workspace. The secrets service opens a fresh store snapshot per resolving
+// operation, so one instance is safe to share.
+func newWorkspaceEnvService(
+	res *resolvedWorkspace, secretsService env.SecretsService,
+) (*env.Service, error) {
 	repo, err := envfilestore.New(envfilestore.Params{})
 	if err != nil {
 		return nil, fmt.Errorf("creating namespace repository: %w", err)
@@ -104,31 +86,30 @@ func newWorkspaceEnvService(res *resolvedWorkspace) (*env.Service, error) {
 	}
 
 	return env.NewService(env.ServiceParams{
-		Config:          res.env,
-		Repository:      repo,
-		ResolverFactory: resolverFactory{secrets: res.secrets},
-		OSEnvironment:   procEnv.Environ(),
+		Config:         res.env,
+		Repository:     repo,
+		SecretsService: secretsService,
+		OSEnvironment:  procEnv.Environ(),
 	})
 }
 
 // newPackService composes a pack.Service over a pack config, reading the
-// workspace secrets store and writing bundled stores through secrets filestores.
+// workspace secrets store and writing bundled stores through a secrets exporter.
 func newPackService(config pack.Config) (*pack.Service, error) {
 	secStore, err := secfilestore.New(secfilestore.Params{Path: config.SecretsPath})
 	if err != nil {
 		return nil, fmt.Errorf("creating secrets store: %w", err)
 	}
 
+	exporter, err := secfilestore.NewExporter(secfilestore.ExporterParams{})
+	if err != nil {
+		return nil, fmt.Errorf("creating secrets exporter: %w", err)
+	}
+
 	return pack.NewService(pack.ServiceParams{
-		Config:        config,
-		SecretsReader: secStore,
-		NewSecretsWriter: func(path string) (pack.SecretsWriter, error) {
-			bundleStore, err := secfilestore.New(secfilestore.Params{Path: path})
-			if err != nil {
-				return nil, err
-			}
-			return bundleStore, nil
-		},
+		Config:          config,
+		SecretsReader:   secStore,
+		SecretsExporter: exporter,
 	})
 }
 
@@ -136,12 +117,12 @@ func newPackService(config pack.Config) (*pack.Service, error) {
 // workspace-level env.Service diagnoses each project environment and the secrets
 // service supplies the store-level findings.
 func newValidateService(res *resolvedWorkspace) (*validate.Service, error) {
-	envService, err := newWorkspaceEnvService(res)
+	secretsService, err := newConfiguredSecretsService(res.secrets)
 	if err != nil {
 		return nil, err
 	}
 
-	secretsService, err := newConfiguredSecretsService(res.secrets)
+	envService, err := newWorkspaceEnvService(res, secretsService)
 	if err != nil {
 		return nil, err
 	}

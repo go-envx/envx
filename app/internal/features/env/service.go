@@ -6,6 +6,7 @@ import (
 	"slices"
 
 	"github.com/go-envx/envx/app/internal/features/env/syntax"
+	"github.com/go-envx/envx/app/internal/shared/value"
 )
 
 // NamespaceData holds unmarshaled key-value tree data loaded for a namespace.
@@ -29,23 +30,18 @@ type NamespaceRepository interface {
 }
 
 // ValueResolver dereferences one winning scalar value and returns unrecognized
-// values unchanged. env is the active environment, used by implementations that
-// support environment-implicit references.
-type ValueResolver interface {
-	// Resolve returns value with any recognized reference dereferenced, or value
-	// unchanged when it is not a reference.
-	Resolve(value, env string) (string, error)
-}
+// values unchanged.
+type ValueResolver = value.Resolver
 
-// ValueResolverFactory opens a fresh, operation-scoped value resolver under the
-// requested reveal policy. Each resolving operation asks for a new resolver after
-// namespace winner selection, so no store snapshot or private-key cache survives
-// the operation.
-type ValueResolverFactory interface {
-	// Resolver returns a fresh resolver materializing references under the reveal
-	// policy: a revealing resolver decrypts, a masking resolver returns canonical
-	// references.
-	Resolver(reveal bool) (ValueResolver, error)
+// SecretsService is what env consumes from secrets: a fresh, operation-scoped
+// value resolver. Each resolving operation opens a new resolver after namespace
+// winner selection, so no store snapshot or private-key cache survives the
+// operation.
+type SecretsService interface {
+	// OpenResolver returns a fresh resolver materializing references under the
+	// reveal policy: a revealing resolver decrypts, a masking resolver returns
+	// canonical references.
+	OpenResolver(reveal bool) (value.Resolver, error)
 }
 
 // ServiceParams provides dependencies to the environment domain service.
@@ -57,9 +53,9 @@ type ServiceParams struct {
 	// Includes is an ordered chain of namespaces to merge when no project is
 	// declared.
 	Includes []string
-	// ResolverFactory opens a fresh, operation-scoped value resolver on demand. A
-	// nil factory is identity behavior for callers with no reference syntax.
-	ResolverFactory ValueResolverFactory
+	// SecretsService opens a fresh, operation-scoped value resolver on demand. A
+	// nil service is identity behavior for callers with no reference syntax.
+	SecretsService SecretsService
 	// OSEnvironment is the injected snapshot of the process environment used to
 	// compose the effective environment.
 	OSEnvironment map[string]string
@@ -82,7 +78,7 @@ type Service struct {
 }
 
 // NewService validates structural settings, applies terminal defaults, and privately
-// copies params without performing I/O. It permits a nil ResolverFactory, which
+// copies params without performing I/O. It permits a nil SecretsService, which
 // remains identity behavior for callers that deliberately have no reference
 // syntax, and does not require namespace or secrets files to exist; missing or
 // malformed files are reported by the operation that needs them.
@@ -318,11 +314,11 @@ func (s *Service) normalizeEnvironment(environment string) (string, error) {
 }
 
 // openResolver obtains a fresh, operation-scoped value resolver under the reveal
-// policy. A nil factory yields a nil resolver, which the resolution helpers treat
+// policy. A nil service yields a nil resolver, which the resolution helpers treat
 // as identity behavior for callers with no reference syntax.
 func (s *Service) openResolver(reveal bool) (ValueResolver, error) {
-	if s.params.ResolverFactory == nil {
+	if s.params.SecretsService == nil {
 		return nil, nil
 	}
-	return s.params.ResolverFactory.Resolver(reveal)
+	return s.params.SecretsService.OpenResolver(reveal)
 }

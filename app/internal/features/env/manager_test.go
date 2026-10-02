@@ -66,9 +66,9 @@ func TestNewDoesNotOpenResolver(t *testing.T) {
 
 	factory := &recordingFactory{resolver: fakeResolver{}}
 	if _, err := NewService(ServiceParams{
-		Repository:      testRepo,
-		Config:          Config{Environments: []string{"development"}},
-		ResolverFactory: factory,
+		Repository:     testRepo,
+		Config:         Config{Environments: []string{"development"}},
+		SecretsService: factory,
 	}); err != nil {
 		t.Fatalf("New: %v", err)
 	}
