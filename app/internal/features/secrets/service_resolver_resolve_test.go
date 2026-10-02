@@ -136,14 +136,8 @@ func TestManagerResolverRevealsLazilyByGroup(t *testing.T) {
 	t.Parallel()
 
 	selected := newTestCipher(t)
-	prodPub, prodPriv, err := selected.Keypair()
-	if err != nil {
-		t.Fatalf("Keypair() production: %v", err)
-	}
-	sharedPub, _, err := selected.Keypair()
-	if err != nil {
-		t.Fatalf("Keypair() shared: %v", err)
-	}
+	prodPub, prodPriv := testKeys(t, selected)
+	sharedPub, _ := testKeys(t, selected)
 
 	// Only the production group's private key is available; shared's is absent to
 	// prove its key is never requested when no reference reveals it.

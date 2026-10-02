@@ -15,10 +15,7 @@ func TestNaClBoxRoundTrip(t *testing.T) {
 	if err != nil {
 		t.Fatalf("New(NaClBox) error = %v", err)
 	}
-	pair, err := selected.Keypair()
-	if err != nil {
-		t.Fatalf("Keypair() error = %v", err)
-	}
+	pair := newKeypair(t, selected)
 	if !strings.HasPrefix(pair.PublicKey, "nacl-box-public-key:") {
 		t.Fatalf("PublicKey = %q, missing public key marker", pair.PublicKey)
 	}
@@ -53,14 +50,8 @@ func TestNaClBoxRejectsWrongKey(t *testing.T) {
 	if err != nil {
 		t.Fatalf("New(NaClBox) error = %v", err)
 	}
-	first, err := selected.Keypair()
-	if err != nil {
-		t.Fatalf("first Keypair() error = %v", err)
-	}
-	second, err := selected.Keypair()
-	if err != nil {
-		t.Fatalf("second Keypair() error = %v", err)
-	}
+	first := newKeypair(t, selected)
+	second := newKeypair(t, selected)
 	ciphertext, err := selected.Encrypt("secret", first.PublicKey)
 	if err != nil {
 		t.Fatalf("Encrypt() error = %v", err)
@@ -79,14 +70,8 @@ func TestNaClBoxValidatesKeypair(t *testing.T) {
 	if err != nil {
 		t.Fatalf("New(NaClBox) error = %v", err)
 	}
-	first, err := selected.Keypair()
-	if err != nil {
-		t.Fatalf("first Keypair() error = %v", err)
-	}
-	second, err := selected.Keypair()
-	if err != nil {
-		t.Fatalf("second Keypair() error = %v", err)
-	}
+	first := newKeypair(t, selected)
+	second := newKeypair(t, selected)
 
 	tests := []struct {
 		name       string
@@ -132,10 +117,7 @@ func TestNaClBoxRejectsTampering(t *testing.T) {
 	if err != nil {
 		t.Fatalf("New(NaClBox) error = %v", err)
 	}
-	pair, err := selected.Keypair()
-	if err != nil {
-		t.Fatalf("Keypair() error = %v", err)
-	}
+	pair := newKeypair(t, selected)
 	ciphertext, err := selected.Encrypt("secret", pair.PublicKey)
 	if err != nil {
 		t.Fatalf("Encrypt() error = %v", err)

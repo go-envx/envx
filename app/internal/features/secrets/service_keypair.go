@@ -28,12 +28,13 @@ func (s *Service) GenerateKeypair(group string) (GenerateKeypairResult, error) {
 	}
 
 	// Generate and validate both key halves before changing the repository.
-	pubKey, privKey, err := s.params.Cipher.Keypair()
+	pair, err := s.params.Cipher.Keypair()
 	if err != nil {
 		return GenerateKeypairResult{}, fmt.Errorf(
 			"generating keypair for group %q: %w", group, err,
 		)
 	}
+	pubKey, privKey := pair.PublicKey, pair.PrivateKey
 	if pubKey == "" || privKey == "" {
 		return GenerateKeypairResult{}, errors.New("cipher generated an incomplete keypair")
 	}
@@ -189,12 +190,13 @@ func (s *Service) RotateKeypair(group string) (RotateKeypairResult, error) {
 	}
 
 	// Generate and validate the replacement identity before touching the store.
-	newPub, newPriv, err := s.params.Cipher.Keypair()
+	pair, err := s.params.Cipher.Keypair()
 	if err != nil {
 		return RotateKeypairResult{}, fmt.Errorf(
 			"generating keypair for group %q: %w", group, err,
 		)
 	}
+	newPub, newPriv := pair.PublicKey, pair.PrivateKey
 	if newPub == "" || newPriv == "" {
 		return RotateKeypairResult{}, errors.New("cipher generated an incomplete keypair")
 	}

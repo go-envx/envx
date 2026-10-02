@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"strings"
 	"testing"
+
+	"github.com/go-envx/envx/app/internal/shared/value"
 )
 
 // TestNew selects registered algorithms and rejects unsupported option types.
@@ -66,10 +68,7 @@ func TestNewAppliesDefaultOptions(t *testing.T) {
 			if err != nil {
 				t.Fatalf("New(): %v", err)
 			}
-			pair, err := selected.Keypair()
-			if err != nil {
-				t.Fatalf("Keypair(): %v", err)
-			}
+			pair := newKeypair(t, selected)
 			if !strings.HasPrefix(pair.PublicKey, test.prefix) {
 				t.Errorf("PublicKey = %q, want prefix %q", pair.PublicKey, test.prefix)
 			}
@@ -83,10 +82,7 @@ func TestCipherInterfaceAcceptsAnotherImplementation(t *testing.T) {
 	t.Parallel()
 
 	var selected Cipher = alternateCipher{}
-	pair, err := selected.Keypair()
-	if err != nil {
-		t.Fatalf("alternate Keypair() error = %v", err)
-	}
+	pair := newKeypair(t, selected)
 	if pair.PublicKey == "" || pair.PrivateKey == "" {
 		t.Fatal("alternate Keypair() returned incomplete key material")
 	}
@@ -106,18 +102,31 @@ func TestCipherInterfaceAcceptsAnotherImplementation(t *testing.T) {
 	}
 }
 
+// newKeypair generates a keypair from c, failing the test on error.
+func newKeypair(t *testing.T, c Cipher) value.Keypair {
+	t.Helper()
+	pair, err := c.Keypair()
+	if err != nil {
+		t.Fatalf("Keypair() error = %v", err)
+	}
+	return pair
+}
+
 // alternateCipher is a test-only implementation that verifies callers depend
 // on the Cipher contract rather than age-specific details.
 type alternateCipher struct{}
 
 // Algorithm identifies the algorithm metadata used by the test cipher.
-func (alternateCipher) Algorithm() Algorithm {
-	return Age
+func (alternateCipher) Algorithm() string {
+	return string(Age)
 }
 
 // Keypair returns representative opaque key strings for the test cipher.
-func (alternateCipher) Keypair() (Keypair, error) {
-	return Keypair{PublicKey: "alternate-public", PrivateKey: "alternate-private"}, nil
+func (alternateCipher) Keypair() (value.Keypair, error) {
+	return value.Keypair{
+		PublicKey:  "alternate-public",
+		PrivateKey: "alternate-private",
+	}, nil
 }
 
 // ValidateKeypair accepts the fixed key material used by the test cipher.

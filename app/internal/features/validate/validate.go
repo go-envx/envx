@@ -48,7 +48,7 @@ func (s *Service) Validate(params ValidateParams) (Report, error) {
 	}
 
 	// Add the store-level findings the per-environment view cannot produce.
-	if s.params.Store != nil {
+	if s.params.SecretsService != nil {
 		if err := s.addStoreFindings(&report, params, referenced); err != nil {
 			return Report{}, err
 		}
@@ -68,7 +68,7 @@ func (s *Service) diagnoseEnvironment(
 	project string,
 	environment string,
 ) error {
-	explanation, err := s.params.Environment.Explain(env.ExplainParams{
+	explanation, err := s.params.EnvService.Explain(env.ExplainParams{
 		Project:     project,
 		Environment: environment,
 		Reveal:      false,
@@ -192,7 +192,7 @@ func (s *Service) addStoreFindings(
 func (s *Service) addSecretFindings(
 	report *Report, params ValidateParams, referenced map[storeRef]bool,
 ) error {
-	stored, err := s.params.Store.StoredSecrets()
+	stored, err := s.params.SecretsService.StoredSecrets()
 	if err != nil {
 		return fmt.Errorf("reading secrets store: %w", err)
 	}
@@ -229,7 +229,7 @@ func (s *Service) addSecretFindings(
 	}
 
 	if params.runs(status.PublicKeyIsMissing) {
-		groups, err := s.params.Store.GroupsMissingPublicKey()
+		groups, err := s.params.SecretsService.GroupsMissingPublicKey()
 		if err != nil {
 			return fmt.Errorf("reading public keys: %w", err)
 		}
@@ -249,7 +249,7 @@ func (s *Service) addSecretFindings(
 // finding is gated by its own selection so one keypair check can run without the
 // other.
 func (s *Service) addKeypairFindings(report *Report, params ValidateParams) error {
-	keypairs, err := s.params.Store.ListKeypairs()
+	keypairs, err := s.params.SecretsService.ListKeypairs()
 	if err != nil {
 		return fmt.Errorf("reading keypairs: %w", err)
 	}

@@ -1,9 +1,7 @@
 package core
 
 import (
-	"os"
 	"path/filepath"
-	"strings"
 
 	"github.com/go-envx/envx/app/internal/features/workspace"
 	wsfilestore "github.com/go-envx/envx/app/internal/features/workspace/filestore"
@@ -59,20 +57,6 @@ func resolveWorkspace(configPath string) (*resolvedWorkspace, error) {
 		secrets:   resolveSecretsParams(ws),
 		cipher:    resolveCipherParams(ws),
 	}, nil
-}
-
-// osEnvironment snapshots the process environment into a map so env can
-// compose the effective environment from an injected value rather than reading
-// os.Environ() inside its core.
-func osEnvironment() map[string]string {
-	environ := os.Environ()
-	out := make(map[string]string, len(environ))
-	for _, entry := range environ {
-		if i := strings.IndexByte(entry, '='); i >= 0 {
-			out[entry[:i]] = entry[i+1:]
-		}
-	}
-	return out
 }
 
 // resolveSecretsParams builds the secrets input from the workspace-level

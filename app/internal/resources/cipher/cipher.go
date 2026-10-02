@@ -1,6 +1,10 @@
 package cipher
 
-import "fmt"
+import (
+	"fmt"
+
+	"github.com/go-envx/envx/app/internal/shared/value"
+)
 
 // Algorithm identifies an encryption algorithm supported by the cipher factory.
 type Algorithm string
@@ -27,25 +31,15 @@ type Params struct {
 	Options AlgorithmOptions
 }
 
-// Keypair contains the opaque public and private key strings produced by a
-// cipher. PrivateKey is transient material and must not be included in status
-// or mutation results.
-type Keypair struct {
-	// PublicKey is the key used to encrypt values.
-	PublicKey string
-	// PrivateKey is the key used to decrypt values.
-	PrivateKey string
-}
-
 // Cipher is the contract for key generation, secret encryption, and envelope
 // algorithm metadata. Key and ciphertext formats are implementation details,
 // allowing callers to select an algorithm without branching on its
 // representation.
 type Cipher interface {
 	// Algorithm identifies the algorithm produced by the cipher.
-	Algorithm() Algorithm
-	// Keypair generates a new public/private keypair.
-	Keypair() (Keypair, error)
+	Algorithm() string
+	// Keypair generates a new public/private keypair of opaque key strings.
+	Keypair() (value.Keypair, error)
 	// ValidateKeypair checks key format and public/private correspondence.
 	ValidateKeypair(publicKey, privateKey string) error
 	// Encrypt encrypts plaintext for publicKey and returns native ciphertext bytes.

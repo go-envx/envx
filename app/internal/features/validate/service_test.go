@@ -9,7 +9,7 @@ import (
 	"github.com/go-envx/envx/app/internal/shared/status"
 )
 
-// fakeEnvironment is an in-memory EnvironmentDiagnoser keyed by project.
+// fakeEnvironment is an in-memory EnvService keyed by project.
 type fakeEnvironment struct {
 	entries map[string][]env.ExplanationEntry
 	err     error
@@ -26,7 +26,7 @@ func (f *fakeEnvironment) Explain(
 	return &env.ExplainResult{Entries: f.entries[params.Project]}, nil
 }
 
-// fakeStore is an in-memory StoreDiagnoser.
+// fakeStore is an in-memory SecretsService.
 type fakeStore struct {
 	stored   []secrets.StoredSecret
 	missing  []string
@@ -68,13 +68,13 @@ func newTestService(t *testing.T, params ServiceParams) *Service {
 	return service
 }
 
-// TestNewServiceRequiresEnvironment verifies construction rejects a missing
-// environment diagnoser.
-func TestNewServiceRequiresEnvironment(t *testing.T) {
+// TestNewServiceRequiresEnvService verifies construction rejects a missing
+// env service.
+func TestNewServiceRequiresEnvService(t *testing.T) {
 	t.Parallel()
 
 	if _, err := NewService(ServiceParams{}); err == nil {
-		t.Fatal("NewService() accepted a nil environment diagnoser")
+		t.Fatal("NewService() accepted a nil env service")
 	}
 }
 
@@ -89,7 +89,7 @@ func TestServiceValidateReportsResolutionFindings(t *testing.T) {
 		"web": {{Key: "NAME", Resolution: env.Resolution{Severity: env.SeverityOK}}},
 	}}
 	service := newTestService(t, ServiceParams{
-		Environment:  environment,
+		EnvService:   environment,
 		Projects:     []string{"api", "web"},
 		Environments: []string{"development", "production"},
 	})
@@ -121,7 +121,7 @@ func TestServiceValidatePassesOptionsAndMasks(t *testing.T) {
 	prefix := "APP_"
 	environment := &fakeEnvironment{}
 	service := newTestService(t, ServiceParams{
-		Environment:  environment,
+		EnvService:   environment,
 		Projects:     []string{"api"},
 		Environments: []string{"production"},
 	})
@@ -150,7 +150,7 @@ func TestServiceValidateAppliesSeverityOverrides(t *testing.T) {
 		"api": {danglingEntry("PASSWORD")},
 	}}
 	params := ServiceParams{
-		Environment:  environment,
+		EnvService:   environment,
 		Projects:     []string{"api"},
 		Environments: []string{"production"},
 		Severity: map[string]status.Severity{
@@ -205,10 +205,10 @@ func TestServiceValidateReportsStoreFindings(t *testing.T) {
 		},
 	}
 	service := newTestService(t, ServiceParams{
-		Environment:  &fakeEnvironment{},
-		Store:        store,
-		Projects:     []string{"api"},
-		Environments: []string{"production"},
+		EnvService:     &fakeEnvironment{},
+		SecretsService: store,
+		Projects:       []string{"api"},
+		Environments:   []string{"production"},
 	})
 
 	report, err := service.Validate(ValidateParams{})
@@ -237,10 +237,10 @@ func TestServiceValidateStoreOnlySelectionSkipsMerge(t *testing.T) {
 
 	environment := &fakeEnvironment{err: errors.New("merge must not run")}
 	service := newTestService(t, ServiceParams{
-		Environment:  environment,
-		Store:        &fakeStore{missing: []string{"db"}},
-		Projects:     []string{"api"},
-		Environments: []string{"production"},
+		EnvService:     environment,
+		SecretsService: &fakeStore{missing: []string{"db"}},
+		Projects:       []string{"api"},
+		Environments:   []string{"production"},
 	})
 
 	report, err := service.Validate(ValidateParams{
@@ -263,7 +263,7 @@ func TestServiceValidateNilStoreSkipsStoreChecks(t *testing.T) {
 	t.Parallel()
 
 	service := newTestService(t, ServiceParams{
-		Environment:  &fakeEnvironment{},
+		EnvService:   &fakeEnvironment{},
 		Projects:     []string{"api"},
 		Environments: []string{"production"},
 	})
@@ -285,7 +285,7 @@ func TestServiceValidateReturnsDiagnoserErrors(t *testing.T) {
 	want := errors.New("boom")
 
 	envFailure := newTestService(t, ServiceParams{
-		Environment:  &fakeEnvironment{err: want},
+		EnvService:   &fakeEnvironment{err: want},
 		Projects:     []string{"api"},
 		Environments: []string{"production"},
 	})
@@ -294,10 +294,10 @@ func TestServiceValidateReturnsDiagnoserErrors(t *testing.T) {
 	}
 
 	storeFailure := newTestService(t, ServiceParams{
-		Environment:  &fakeEnvironment{},
-		Store:        &fakeStore{err: want},
-		Projects:     []string{"api"},
-		Environments: []string{"production"},
+		EnvService:     &fakeEnvironment{},
+		SecretsService: &fakeStore{err: want},
+		Projects:       []string{"api"},
+		Environments:   []string{"production"},
 	})
 	if _, err := storeFailure.Validate(ValidateParams{}); !errors.Is(err, want) {
 		t.Errorf("store err = %v, want %v", err, want)

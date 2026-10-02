@@ -7,6 +7,8 @@ import (
 	"strings"
 
 	"golang.org/x/crypto/nacl/box"
+
+	"github.com/go-envx/envx/app/internal/shared/value"
 )
 
 const (
@@ -31,20 +33,20 @@ func newNaClBoxCipher(NaClBoxOptions) (Cipher, error) {
 type naclBoxCipher struct{}
 
 // Algorithm identifies the envelope algorithm produced by the NaCl Box cipher.
-func (naclBoxCipher) Algorithm() Algorithm {
-	return NaClBox
+func (naclBoxCipher) Algorithm() string {
+	return string(NaClBox)
 }
 
 // Keypair creates a NaCl Box keypair and returns self-identifying textual keys.
-func (naclBoxCipher) Keypair() (Keypair, error) {
-	publicKey, privateKey, err := box.GenerateKey(rand.Reader)
+func (naclBoxCipher) Keypair() (value.Keypair, error) {
+	pub, priv, err := box.GenerateKey(rand.Reader)
 	if err != nil {
-		return Keypair{}, fmt.Errorf("generate NaCl Box keypair: %w", err)
+		return value.Keypair{}, fmt.Errorf("generate NaCl Box keypair: %w", err)
 	}
 
-	return Keypair{
-		PublicKey:  encodeNaClBoxPublicKey(publicKey),
-		PrivateKey: encodeNaClBoxPrivateKey(publicKey, privateKey),
+	return value.Keypair{
+		PublicKey:  encodeNaClBoxPublicKey(pub),
+		PrivateKey: encodeNaClBoxPrivateKey(pub, priv),
 	}, nil
 }
 
@@ -111,8 +113,8 @@ func encodeNaClBoxPrivateKey(
 }
 
 // decodeNaClBoxPublicKey decodes and validates a marked public key.
-func decodeNaClBoxPublicKey(value string) (*[naclBoxKeySize]byte, error) {
-	keyMaterial, err := decodeNaClBoxKey(value, naclBoxPublicKeyPrefix, "public")
+func decodeNaClBoxPublicKey(key string) (*[naclBoxKeySize]byte, error) {
+	keyMaterial, err := decodeNaClBoxKey(key, naclBoxPublicKeyPrefix, "public")
 	if err != nil {
 		return nil, err
 	}
@@ -125,9 +127,9 @@ func decodeNaClBoxPublicKey(value string) (*[naclBoxKeySize]byte, error) {
 // decodeNaClBoxPrivateKey decodes a private key bundle into its public and
 // private components.
 func decodeNaClBoxPrivateKey(
-	value string,
+	key string,
 ) (publicKey, privateKey *[naclBoxKeySize]byte, err error) {
-	keyMaterial, err := decodeNaClBoxKey(value, naclBoxPrivateKeyPrefix, "private")
+	keyMaterial, err := decodeNaClBoxKey(key, naclBoxPrivateKeyPrefix, "private")
 	if err != nil {
 		return nil, nil, err
 	}
@@ -140,8 +142,8 @@ func decodeNaClBoxPrivateKey(
 }
 
 // decodeNaClBoxKey decodes a marked key and validates its exact byte length.
-func decodeNaClBoxKey(value, prefix, kind string) ([]byte, error) {
-	encoded, found := strings.CutPrefix(value, prefix)
+func decodeNaClBoxKey(key, prefix, kind string) ([]byte, error) {
+	encoded, found := strings.CutPrefix(key, prefix)
 	if !found {
 		return nil, fmt.Errorf("%w: not a NaCl Box %s key", ErrInvalidKey, kind)
 	}

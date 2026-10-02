@@ -19,18 +19,31 @@ func render(t *testing.T, entries []Entry, params RenderParams) string {
 	}
 	params.Entries = entries
 	var buffer bytes.Buffer
-	if err := NewService(ServiceParams{Writer: &buffer}).Render(params); err != nil {
+	params.Writer = &buffer
+	if err := newService(t).Render(params); err != nil {
 		t.Fatalf("Render(%s): %v", params.Target, err)
 	}
 	return buffer.String()
 }
 
+// newService constructs the emit service, failing the test on error.
+func newService(t *testing.T) *Service {
+	t.Helper()
+	service, err := NewService(ServiceParams{})
+	if err != nil {
+		t.Fatalf("NewService(): %v", err)
+	}
+	return service
+}
+
 // renderErr renders params to a buffer and returns the written output with any
 // render error, for the cases that assert on failure.
-func renderErr(entries []Entry, params RenderParams) (string, error) {
+func renderErr(t *testing.T, entries []Entry, params RenderParams) (string, error) {
+	t.Helper()
 	params.Entries = entries
 	var buffer bytes.Buffer
-	err := NewService(ServiceParams{Writer: &buffer}).Render(params)
+	params.Writer = &buffer
+	err := newService(t).Render(params)
 	return buffer.String(), err
 }
 
@@ -225,7 +238,7 @@ func TestRenderK8sRequiresName(t *testing.T) {
 	}
 	for _, sel := range slices {
 		sel.Target = TargetK8s
-		got, err := renderErr(sampleEntries(), sel)
+		got, err := renderErr(t, sampleEntries(), sel)
 		if !errors.Is(err, ErrMissingNameBase) {
 			t.Errorf("Render(k8s, %+v) error = %v, want ErrMissingNameBase", sel, err)
 		}
@@ -288,7 +301,7 @@ func TestRenderK8sBundle(t *testing.T) {
 func TestRenderK8sBundleBadExtension(t *testing.T) {
 	t.Parallel()
 
-	got, err := renderErr(sampleEntries(), RenderParams{
+	got, err := renderErr(t, sampleEntries(), RenderParams{
 		Target: TargetK8sBundle, NameBase: "api", IncludeConfig: true, Key: "config.yaml",
 	})
 	if err == nil {
@@ -304,7 +317,7 @@ func TestRenderK8sBundleBadExtension(t *testing.T) {
 func TestRenderRequiresASlice(t *testing.T) {
 	t.Parallel()
 
-	got, err := renderErr(sampleEntries(), RenderParams{Target: TargetJSON})
+	got, err := renderErr(t, sampleEntries(), RenderParams{Target: TargetJSON})
 	if !errors.Is(err, ErrNoSliceSelected) {
 		t.Errorf("Render error = %v, want ErrNoSliceSelected", err)
 	}
@@ -318,7 +331,7 @@ func TestRenderRequiresASlice(t *testing.T) {
 func TestRenderUnknownTarget(t *testing.T) {
 	t.Parallel()
 
-	got, err := renderErr(sampleEntries(), RenderParams{
+	got, err := renderErr(t, sampleEntries(), RenderParams{
 		Target: "toml", IncludeSecrets: true, IncludeConfig: true,
 	})
 	if !errors.Is(err, ErrUnknownTarget) {

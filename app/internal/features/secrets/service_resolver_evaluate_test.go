@@ -36,10 +36,7 @@ func diagnoseResolver(
 func diagnoseRawResolver(t *testing.T, storedValue string) *Resolver {
 	t.Helper()
 	selected := newTestCipher(t)
-	pubKey, privKey, err := selected.Keypair()
-	if err != nil {
-		t.Fatalf("Keypair(): %v", err)
-	}
+	pubKey, privKey := testKeys(t, selected)
 	storePath := writeStore(t,
 		"public-keys:\n  production: "+pubKey+
 			"\nsecrets:\n  production:\n    database_password: \""+storedValue+"\"\n",
@@ -208,12 +205,9 @@ func TestDiagnoseInvalidPrivateKey(t *testing.T) {
 
 	// A second, independent keypair yields a well-formed key that cannot decrypt
 	// a value encrypted for the store's own public key.
-	_, wrongPriv, err := newTestCipher(t).Keypair()
-	if err != nil {
-		t.Fatalf("Keypair(): %v", err)
-	}
+	_, wrongPriv := testKeys(t, newTestCipher(t))
 	manager := newGetManager(t, fixedPrivateKeyResolver{value: wrongPriv})
-	_, err = manager.SetSecret(
+	_, err := manager.SetSecret(
 		"production", "database_password", func() (string, error) {
 			return "database-password", nil
 		},

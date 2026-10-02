@@ -22,8 +22,8 @@ type Params struct{}
 type Repository struct{}
 
 // New constructs a file-backed namespace repository.
-func New(params Params) *Repository {
-	return &Repository{}
+func New(Params) (*Repository, error) {
+	return &Repository{}, nil
 }
 
 // LoadBase loads the base namespace tree for an include path.

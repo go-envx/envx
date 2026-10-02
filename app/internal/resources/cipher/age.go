@@ -7,6 +7,8 @@ import (
 	"strings"
 
 	"filippo.io/age"
+
+	"github.com/go-envx/envx/app/internal/shared/value"
 )
 
 const (
@@ -31,18 +33,18 @@ func newAgeCipher(AgeOptions) (Cipher, error) {
 type ageCipher struct{}
 
 // Algorithm identifies the envelope algorithm produced by the age cipher.
-func (ageCipher) Algorithm() Algorithm {
-	return Age
+func (ageCipher) Algorithm() string {
+	return string(Age)
 }
 
 // Keypair creates an age X25519 identity and returns its textual key forms.
-func (ageCipher) Keypair() (Keypair, error) {
+func (ageCipher) Keypair() (value.Keypair, error) {
 	identity, err := age.GenerateX25519Identity()
 	if err != nil {
-		return Keypair{}, fmt.Errorf("generate age keypair: %w", err)
+		return value.Keypair{}, fmt.Errorf("generate age keypair: %w", err)
 	}
 
-	return Keypair{
+	return value.Keypair{
 		PublicKey:  agePublicKeyPrefix + identity.Recipient().String(),
 		PrivateKey: agePrivateKeyPrefix + identity.String(),
 	}, nil

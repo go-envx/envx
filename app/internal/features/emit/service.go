@@ -1,31 +1,21 @@
 package emit
 
-import (
-	"io"
-	"os"
-)
+import "os"
 
-// ServiceParams provides dependencies to the target serialization service.
-type ServiceParams struct {
-	// Writer receives the rendered output; nil uses os.Stdout.
-	Writer io.Writer
-}
+// ServiceParams provides dependencies to the target serialization service. The
+// service is stateless: the destination writer arrives with each Render.
+type ServiceParams struct{}
 
 // Service renders resolved environment entries into delivery target formats.
-type Service struct {
-	// params is the privately-owned configuration copied at construction.
-	params ServiceParams
-}
+type Service struct{}
 
 // NewService constructs a target serialization domain service.
-func NewService(params ServiceParams) *Service {
-	if params.Writer == nil {
-		params.Writer = os.Stdout
-	}
-	return &Service{params: params}
+func NewService(ServiceParams) (*Service, error) {
+	return &Service{}, nil
 }
 
-// Render writes the entries to the configured writer in the target's shape,
+// Render writes the entries to params.Writer (os.Stdout when nil) in the
+// target's shape,
 // restricted to the selected slice: IncludeSecrets keeps the secret-derived
 // values and IncludeConfig the plain ones (at least one must be set). json and
 // dotenv render the selected values as a single document. k8s renders a Secret
@@ -36,7 +26,10 @@ func (s *Service) Render(params RenderParams) error {
 	if !params.IncludeSecrets && !params.IncludeConfig {
 		return ErrNoSliceSelected
 	}
-	w := s.params.Writer
+	w := params.Writer
+	if w == nil {
+		w = os.Stdout
+	}
 	sorted := sortedEntries(params.Entries)
 	switch params.Target {
 	case TargetJSON:

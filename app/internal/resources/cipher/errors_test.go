@@ -15,14 +15,8 @@ func TestDecryptWrongKeyIsErrDecrypt(t *testing.T) {
 		if err != nil {
 			t.Fatalf("New(%s) error = %v", algorithm, err)
 		}
-		first, err := selected.Keypair()
-		if err != nil {
-			t.Fatalf("first Keypair() error = %v", err)
-		}
-		second, err := selected.Keypair()
-		if err != nil {
-			t.Fatalf("second Keypair() error = %v", err)
-		}
+		first := newKeypair(t, selected)
+		second := newKeypair(t, selected)
 		ciphertext, err := selected.Encrypt("secret", first.PublicKey)
 		if err != nil {
 			t.Fatalf("Encrypt() error = %v", err)
@@ -45,10 +39,7 @@ func TestDecryptMalformedKeyIsErrInvalidKey(t *testing.T) {
 		if err != nil {
 			t.Fatalf("New(%s) error = %v", algorithm, err)
 		}
-		pair, err := selected.Keypair()
-		if err != nil {
-			t.Fatalf("Keypair() error = %v", err)
-		}
+		pair := newKeypair(t, selected)
 		ciphertext, err := selected.Encrypt("secret", pair.PublicKey)
 		if err != nil {
 			t.Fatalf("Encrypt() error = %v", err)

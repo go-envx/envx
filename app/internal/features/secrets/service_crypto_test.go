@@ -355,14 +355,8 @@ func TestDecryptResolvesKeysLazilyByGroup(t *testing.T) {
 	t.Parallel()
 
 	selected := newTestCipher(t)
-	prodPub, prodPriv, err := selected.Keypair()
-	if err != nil {
-		t.Fatalf("Keypair() production: %v", err)
-	}
-	sharedPub, sharedPriv, err := selected.Keypair()
-	if err != nil {
-		t.Fatalf("Keypair() shared: %v", err)
-	}
+	prodPub, prodPriv := testKeys(t, selected)
+	sharedPub, sharedPriv := testKeys(t, selected)
 	resolver := &recordingResolver{
 		keys: map[string]string{
 			"production": prodPriv,
@@ -453,14 +447,8 @@ func TestDecryptPartiallyDecryptsAvailableGroups(t *testing.T) {
 	t.Parallel()
 
 	selected := newTestCipher(t)
-	prodPub, prodPriv, err := selected.Keypair()
-	if err != nil {
-		t.Fatalf("Keypair() production: %v", err)
-	}
-	sharedPub, _, err := selected.Keypair()
-	if err != nil {
-		t.Fatalf("Keypair() shared: %v", err)
-	}
+	prodPub, prodPriv := testKeys(t, selected)
+	sharedPub, _ := testKeys(t, selected)
 	// Only production's private key is available; shared's is absent.
 	resolver := &recordingResolver{
 		keys:  map[string]string{"production": prodPriv},

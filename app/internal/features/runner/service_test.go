@@ -9,12 +9,22 @@ import (
 	"github.com/go-envx/envx/app/internal/shared/exitcode"
 )
 
+// newService constructs the runner service, failing the test on error.
+func newService(t *testing.T) *Service {
+	t.Helper()
+	svc, err := NewService(ServiceParams{})
+	if err != nil {
+		t.Fatalf("NewService(): %v", err)
+	}
+	return svc
+}
+
 // TestRunDefaultsNilStreams verifies that nil streams fall back to the process's
 // standard streams rather than failing.
 func TestRunDefaultsNilStreams(t *testing.T) {
 	t.Parallel()
 
-	svc := NewService()
+	svc := newService(t)
 	err := svc.Run(RunParams{
 		Args: []string{"sh", "-c", "exit 0"},
 	})
@@ -29,7 +39,7 @@ func TestRunUsesInjectedStreams(t *testing.T) {
 	t.Parallel()
 
 	var stdout, stderr bytes.Buffer
-	svc := NewService()
+	svc := newService(t)
 	err := svc.Run(RunParams{
 		Args:   []string{"sh", "-c", "cat; echo err >&2"},
 		Stdout: &stdout,
@@ -53,7 +63,7 @@ func TestRunInjectsEnv(t *testing.T) {
 	t.Parallel()
 
 	var stdout bytes.Buffer
-	svc := NewService()
+	svc := newService(t)
 	err := svc.Run(RunParams{
 		Args:   []string{"printenv", "FROM_FILE"},
 		Env:    map[string]string{"FROM_FILE": "yes"},
@@ -73,7 +83,7 @@ func TestRunInjectsEnv(t *testing.T) {
 func TestRunPropagatesExitCode(t *testing.T) {
 	t.Parallel()
 
-	svc := NewService()
+	svc := newService(t)
 	err := svc.Run(RunParams{
 		Args:   []string{"sh", "-c", "exit 3"},
 		Stdout: &bytes.Buffer{},
@@ -92,7 +102,7 @@ func TestRunPropagatesExitCode(t *testing.T) {
 func TestRunNoCommand(t *testing.T) {
 	t.Parallel()
 
-	svc := NewService()
+	svc := newService(t)
 	err := svc.Run(RunParams{})
 	if !errors.Is(err, ErrNoCommandSpecified) {
 		t.Fatalf("expected ErrNoCommandSpecified, got %v", err)
@@ -105,7 +115,7 @@ func TestRunCommandNotFound(t *testing.T) {
 	t.Parallel()
 
 	var stderr bytes.Buffer
-	svc := NewService()
+	svc := newService(t)
 	err := svc.Run(RunParams{
 		Args:   []string{"envx-nonexistent-command-xyz"},
 		Stdout: &bytes.Buffer{},
@@ -133,7 +143,7 @@ func TestRunSignaledExitCode(t *testing.T) {
 	t.Parallel()
 
 	// The child signals only its own PID ($$), so the test process is unaffected.
-	svc := NewService()
+	svc := newService(t)
 	err := svc.Run(RunParams{
 		Args:   []string{"sh", "-c", "kill -INT $$"},
 		Stdout: &bytes.Buffer{},

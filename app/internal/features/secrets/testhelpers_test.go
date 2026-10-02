@@ -8,6 +8,7 @@ import (
 
 	"github.com/go-envx/envx/app/internal/features/privatekey"
 	"github.com/go-envx/envx/app/internal/resources/cipher"
+	"github.com/go-envx/envx/app/internal/shared/value"
 	"gopkg.in/yaml.v3"
 )
 
@@ -75,37 +76,6 @@ func newTestStore(t *testing.T, id string) *fakeRepository {
 	return getTestStore(id)
 }
 
-// testCipherAdapter adapts a cipher.Cipher to CipherClient for testing.
-type testCipherAdapter struct {
-	cipher cipher.Cipher
-}
-
-func (a testCipherAdapter) Algorithm() string {
-	return string(a.cipher.Algorithm())
-}
-
-func (a testCipherAdapter) Keypair() (publicKey, privateKey string, err error) {
-	kp, err := a.cipher.Keypair()
-	if err != nil {
-		return "", "", err
-	}
-	return kp.PublicKey, kp.PrivateKey, nil
-}
-
-func (a testCipherAdapter) ValidateKeypair(publicKey, privateKey string) error {
-	return a.cipher.ValidateKeypair(publicKey, privateKey)
-}
-
-func (a testCipherAdapter) Encrypt(plaintext, publicKey string) ([]byte, error) {
-	return a.cipher.Encrypt(plaintext, publicKey)
-}
-
-func (a testCipherAdapter) Decrypt(
-	ciphertext []byte, privateKey string,
-) (string, error) {
-	return a.cipher.Decrypt(ciphertext, privateKey)
-}
-
 // newTestCipher creates the default cipher for service construction tests.
 func newTestCipher(t *testing.T) CipherClient {
 	t.Helper()
@@ -116,22 +86,27 @@ func newTestCipher(t *testing.T) CipherClient {
 	if err != nil {
 		t.Fatal(err)
 	}
-	return testCipherAdapter{cipher: selected}
+	return selected
 }
 
-type testKeypair struct {
-	PublicKey  string
-	PrivateKey string
-}
-
-func testKeypairFor(t *testing.T) testKeypair {
+// testKeypairFor generates a keypair with the default test cipher.
+func testKeypairFor(t *testing.T) value.Keypair {
 	t.Helper()
-	c := newTestCipher(t)
-	pub, priv, err := c.Keypair()
+	pair, err := newTestCipher(t).Keypair()
 	if err != nil {
 		t.Fatalf("Keypair(): %v", err)
 	}
-	return testKeypair{PublicKey: pub, PrivateKey: priv}
+	return pair
+}
+
+// testKeys generates a keypair with c and returns its halves.
+func testKeys(t *testing.T, c CipherClient) (publicKey, privateKey string) {
+	t.Helper()
+	pair, err := c.Keypair()
+	if err != nil {
+		t.Fatalf("Keypair(): %v", err)
+	}
+	return pair.PublicKey, pair.PrivateKey
 }
 
 // newPrivateKeyTestService creates a service double for service construction tests.

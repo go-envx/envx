@@ -3,7 +3,6 @@ package core
 import (
 	"errors"
 	"fmt"
-	"os"
 	"path/filepath"
 	"sort"
 
@@ -16,37 +15,9 @@ import (
 	secfilestore "github.com/go-envx/envx/app/internal/features/secrets/filestore"
 	"github.com/go-envx/envx/app/internal/features/validate"
 	"github.com/go-envx/envx/app/internal/resources/cipher"
+	"github.com/go-envx/envx/app/internal/resources/procenv"
 	"github.com/go-envx/envx/app/internal/shared/status"
 )
-
-// cipherAdapter adapts a cipher.Cipher to the secrets.CipherClient interface.
-type cipherAdapter struct {
-	cipher cipher.Cipher
-}
-
-func (a cipherAdapter) Algorithm() string {
-	return string(a.cipher.Algorithm())
-}
-
-func (a cipherAdapter) Keypair() (publicKey, privateKey string, err error) {
-	kp, err := a.cipher.Keypair()
-	if err != nil {
-		return "", "", err
-	}
-	return kp.PublicKey, kp.PrivateKey, nil
-}
-
-func (a cipherAdapter) ValidateKeypair(publicKey, privateKey string) error {
-	return a.cipher.ValidateKeypair(publicKey, privateKey)
-}
-
-func (a cipherAdapter) Encrypt(plaintext, publicKey string) ([]byte, error) {
-	return a.cipher.Encrypt(plaintext, publicKey)
-}
-
-func (a cipherAdapter) Decrypt(ciphertext []byte, privateKey string) (string, error) {
-	return a.cipher.Decrypt(ciphertext, privateKey)
-}
 
 // SecretsParams supplies paths and configuration for secrets composition.
 type SecretsParams struct {
@@ -71,9 +42,14 @@ func NewSecretsService(
 		return nil, fmt.Errorf("creating privatekey repository: %w", err)
 	}
 
+	procEnv, err := procenv.New(procenv.Params{})
+	if err != nil {
+		return nil, fmt.Errorf("creating process environment client: %w", err)
+	}
+
 	pkService, err := privatekey.NewService(privatekey.ServiceParams{
 		Repository: pkRepo,
-		LookupEnv:  os.LookupEnv,
+		LookupEnv:  procEnv.LookupEnv,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("creating privatekey service: %w", err)
@@ -89,7 +65,7 @@ func NewSecretsService(
 
 	return secrets.NewService(secrets.ServiceParams{
 		Repository:        secStore,
-		Cipher:            cipherAdapter{cipher: oCipher},
+		Cipher:            oCipher,
 		PrivateKeyService: pkService,
 	})
 }
@@ -147,7 +123,15 @@ func newWorkspaceEnvService(res *resolvedWorkspace) (*env.Service, error) {
 		}
 	}
 
-	repo := envfilestore.New(envfilestore.Params{})
+	repo, err := envfilestore.New(envfilestore.Params{})
+	if err != nil {
+		return nil, fmt.Errorf("creating namespace repository: %w", err)
+	}
+
+	procEnv, err := procenv.New(procenv.Params{})
+	if err != nil {
+		return nil, fmt.Errorf("creating process environment client: %w", err)
+	}
 
 	resolverFact := resolverFactory{
 		secrets: res.secrets,
@@ -176,7 +160,7 @@ func newWorkspaceEnvService(res *resolvedWorkspace) (*env.Service, error) {
 		DefaultEnvironment: defaultEnv,
 		Settings:           globalSettings,
 		ResolverFactory:    resolverFact,
-		OSEnvironment:      osEnvironment(),
+		OSEnvironment:      procEnv.Environ(),
 	})
 }
 
@@ -256,10 +240,10 @@ func newValidateService(res *resolvedWorkspace) (*validate.Service, error) {
 	sort.Strings(projects)
 
 	return validate.NewService(validate.ServiceParams{
-		Environment:  envService,
-		Store:        secretsService,
-		Projects:     projects,
-		Environments: res.workspace.Environments,
-		Severity:     severity,
+		EnvService:     envService,
+		SecretsService: secretsService,
+		Projects:       projects,
+		Environments:   res.workspace.Environments,
+		Severity:       severity,
 	})
 }

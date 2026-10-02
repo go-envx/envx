@@ -7,6 +7,7 @@ import (
 
 	"github.com/go-envx/envx/app/internal/features/privatekey"
 	"github.com/go-envx/envx/app/internal/resources/cipher"
+	"github.com/go-envx/envx/app/internal/shared/value"
 )
 
 // fixedPrivateKeyResolver returns one private key for every group.
@@ -31,10 +32,11 @@ func newGetManager(t *testing.T, resolver PrivateKeyService) *Service {
 	t.Helper()
 
 	selected := newTestCipher(t)
-	pubKey, privKey, err := selected.Keypair()
+	pair, err := selected.Keypair()
 	if err != nil {
 		t.Fatalf("Keypair(): %v", err)
 	}
+	pubKey, privKey := pair.PublicKey, pair.PrivateKey
 	if r, ok := resolver.(fixedPrivateKeyResolver); ok && r.value == "" {
 		resolver = fixedPrivateKeyResolver{value: privKey}
 	}
@@ -175,10 +177,11 @@ func TestSetEncryptsAndStoresSecret(t *testing.T) {
 	t.Parallel()
 
 	selected := newTestCipher(t)
-	pubKey, privKey, err := selected.Keypair()
+	pair, err := selected.Keypair()
 	if err != nil {
 		t.Fatalf("Keypair(): %v", err)
 	}
+	pubKey, privKey := pair.PublicKey, pair.PrivateKey
 	storePath := writeStore(t, "public-keys:\n  production: "+pubKey+"\n")
 	manager, err := NewService(ServiceParams{
 		Repository:        newTestStore(t, storePath),
@@ -233,15 +236,15 @@ func TestSetEncryptsAndStoresSecret(t *testing.T) {
 func TestSetUsesCipherAlgorithm(t *testing.T) {
 	t.Parallel()
 
-	naclCipher, err := cipher.New(cipher.Params{Algorithm: cipher.NaClBox})
+	selected, err := cipher.New(cipher.Params{Algorithm: cipher.NaClBox})
 	if err != nil {
 		t.Fatalf("cipher.New(): %v", err)
 	}
-	selected := testCipherAdapter{cipher: naclCipher}
-	pubKey, privKey, err := selected.Keypair()
+	pair, err := selected.Keypair()
 	if err != nil {
 		t.Fatalf("Keypair(): %v", err)
 	}
+	pubKey, privKey := pair.PublicKey, pair.PrivateKey
 	storePath := writeStore(t, "public-keys:\n  shared: "+pubKey+"\n")
 	manager, err := NewService(ServiceParams{
 		Repository:        newTestStore(t, storePath),
@@ -399,8 +402,8 @@ func (setTestCipher) Algorithm() string {
 }
 
 // Keypair returns representative test key material.
-func (setTestCipher) Keypair() (publicKey, privateKey string, err error) {
-	return "public", "private", nil
+func (setTestCipher) Keypair() (value.Keypair, error) {
+	return value.Keypair{PublicKey: "public", PrivateKey: "private"}, nil
 }
 
 // ValidateKeypair accepts the representative test key material.

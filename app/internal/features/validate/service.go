@@ -8,17 +8,17 @@ import (
 	"github.com/go-envx/envx/app/internal/shared/status"
 )
 
-// EnvironmentDiagnoser defines what validate consumes from environment
-// resolution: a masked, non-aborting explanation of one project environment.
-type EnvironmentDiagnoser interface {
+// EnvService defines what validate consumes from environment resolution: a
+// masked, non-aborting explanation of one project environment.
+type EnvService interface {
 	// Explain diagnoses every winning value of one project environment.
 	Explain(params env.ExplainParams) (*env.ExplainResult, error)
 }
 
-// StoreDiagnoser defines what validate consumes from secrets store inspection:
+// SecretsService defines what validate consumes from secrets store inspection:
 // offline views of the stored values and group keypairs that never expose
 // plaintext or private-key material.
-type StoreDiagnoser interface {
+type SecretsService interface {
 	// StoredSecrets lists every stored entry with how its value is encoded.
 	StoredSecrets() ([]secrets.StoredSecret, error)
 	// GroupsMissingPublicKey lists groups with stored secrets but no public key.
@@ -29,11 +29,11 @@ type StoreDiagnoser interface {
 
 // ServiceParams provides dependencies to the workspace diagnostics service.
 type ServiceParams struct {
-	// Environment diagnoses each project in each declared environment.
-	Environment EnvironmentDiagnoser
-	// Store provides the store-level findings; nil skips them, running only the
-	// per-environment resolution checks.
-	Store StoreDiagnoser
+	// EnvService diagnoses each project in each declared environment.
+	EnvService EnvService
+	// SecretsService provides the store-level findings; nil skips them, running
+	// only the per-environment resolution checks.
+	SecretsService SecretsService
 	// Projects lists every project to diagnose.
 	Projects []string
 	// Environments lists the declared environments every project is diagnosed
@@ -53,8 +53,8 @@ type Service struct {
 
 // NewService constructs a workspace diagnostics domain service.
 func NewService(params ServiceParams) (*Service, error) {
-	if params.Environment == nil {
-		return nil, errors.New("environment diagnoser is required")
+	if params.EnvService == nil {
+		return nil, errors.New("env service is required")
 	}
 	return &Service{params: params}, nil
 }

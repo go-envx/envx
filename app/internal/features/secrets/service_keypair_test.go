@@ -10,13 +10,13 @@ import (
 
 	"github.com/go-envx/envx/app/internal/features/privatekey"
 	pkfilestore "github.com/go-envx/envx/app/internal/features/privatekey/filestore"
-	"github.com/go-envx/envx/app/internal/resources/cipher"
+	"github.com/go-envx/envx/app/internal/shared/value"
 )
 
 // keypairTestCipher is a deterministic cipher double for keypair workflow tests.
 type keypairTestCipher struct {
 	// pair is returned by Keypair.
-	pair cipher.Keypair
+	pair value.Keypair
 	// validPrivate is the only private key ValidateKeypair accepts.
 	validPrivate string
 }
@@ -27,8 +27,8 @@ func (keypairTestCipher) Algorithm() string {
 }
 
 // Keypair returns the deterministic test keypair.
-func (c keypairTestCipher) Keypair() (publicKey, privateKey string, err error) {
-	return c.pair.PublicKey, c.pair.PrivateKey, nil
+func (c keypairTestCipher) Keypair() (value.Keypair, error) {
+	return c.pair, nil
 }
 
 // ValidateKeypair validates the deterministic test keypair.
@@ -82,7 +82,7 @@ func TestGenerateKeypairCommitsPublicStateAfterPrivateHandoff(t *testing.T) {
 
 	const privateValue = "private-test-value"
 	cipherDouble := keypairTestCipher{
-		pair: cipher.Keypair{
+		pair: value.Keypair{
 			PublicKey:  "public-test-value",
 			PrivateKey: privateValue,
 		},
@@ -143,7 +143,7 @@ func TestGenerateKeypairRefusesExistingIdentity(t *testing.T) {
 	manager, err := NewService(ServiceParams{
 		Repository: newTestStore(t, storePath),
 		Cipher: keypairTestCipher{
-			pair:         cipher.Keypair{PublicKey: "new-public", PrivateKey: "new-private"},
+			pair:         value.Keypair{PublicKey: "new-public", PrivateKey: "new-private"},
 			validPrivate: "new-private",
 		},
 		PrivateKeyService: keypairTestService{
@@ -171,7 +171,7 @@ func TestInspectKeypairStatuses(t *testing.T) {
 
 	storePath := writeStore(t, "public-keys:\n  production: public-test-value\n")
 	cipherDouble := keypairTestCipher{
-		pair: cipher.Keypair{
+		pair: value.Keypair{
 			PublicKey:  "public-test-value",
 			PrivateKey: "private-test-value",
 		},
@@ -372,10 +372,7 @@ func TestRotateKeypairRejectsHigherPriorityKeyOrigin(t *testing.T) {
 	t.Parallel()
 
 	selected := newTestCipher(t)
-	pubKey, privKey, err := selected.Keypair()
-	if err != nil {
-		t.Fatalf("Keypair(): %v", err)
-	}
+	pubKey, privKey := testKeys(t, selected)
 	storePath := writeStore(t, "public-keys:\n  production: "+pubKey+"\n")
 	keysPath := filepath.Join(filepath.Dir(storePath), "envx.keys")
 	lookupEnv := func(name string) (string, bool) {

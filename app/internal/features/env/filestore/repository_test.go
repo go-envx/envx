@@ -13,10 +13,23 @@ import (
 func TestNew(t *testing.T) {
 	t.Parallel()
 
-	repo := filestore.New(filestore.Params{})
+	repo, err := filestore.New(filestore.Params{})
+	if err != nil {
+		t.Fatalf("New: %v", err)
+	}
 	if repo == nil {
 		t.Fatal("New returned nil")
 	}
+}
+
+// newRepo constructs the repository, failing the test on error.
+func newRepo(t *testing.T) *filestore.Repository {
+	t.Helper()
+	repo, err := filestore.New(filestore.Params{})
+	if err != nil {
+		t.Fatalf("New: %v", err)
+	}
+	return repo
 }
 
 func TestLoadBaseSuccess(t *testing.T) {
@@ -29,7 +42,7 @@ func TestLoadBaseSuccess(t *testing.T) {
 		t.Fatalf("WriteFile: %v", err)
 	}
 
-	repo := filestore.New(filestore.Params{})
+	repo := newRepo(t)
 
 	// Test with path without extension
 	data, err := repo.LoadBase(filepath.Join(dir, "app"))
@@ -57,7 +70,7 @@ func TestLoadBaseMissingFile(t *testing.T) {
 	t.Parallel()
 
 	dir := t.TempDir()
-	repo := filestore.New(filestore.Params{})
+	repo := newRepo(t)
 
 	_, err := repo.LoadBase(filepath.Join(dir, "missing"))
 	if err == nil {
@@ -77,7 +90,7 @@ func TestLoadBaseMalformedYAML(t *testing.T) {
 		t.Fatalf("WriteFile: %v", err)
 	}
 
-	repo := filestore.New(filestore.Params{})
+	repo := newRepo(t)
 	_, err := repo.LoadBase(filepath.Join(dir, "bad"))
 	if err == nil {
 		t.Fatal("expected error for malformed YAML")
@@ -93,7 +106,7 @@ func TestLoadBaseEmptyFile(t *testing.T) {
 		t.Fatalf("WriteFile: %v", err)
 	}
 
-	repo := filestore.New(filestore.Params{})
+	repo := newRepo(t)
 	data, err := repo.LoadBase(filepath.Join(dir, "empty"))
 	if err != nil {
 		t.Fatalf("LoadBase empty file: %v", err)
@@ -113,7 +126,7 @@ func TestLoadOverlaySuccess(t *testing.T) {
 		t.Fatalf("WriteFile: %v", err)
 	}
 
-	repo := filestore.New(filestore.Params{})
+	repo := newRepo(t)
 
 	data, found, err := repo.LoadOverlay(filepath.Join(dir, "app"), "production")
 	if err != nil {
@@ -134,7 +147,7 @@ func TestLoadOverlayMissingReturnsFalse(t *testing.T) {
 	t.Parallel()
 
 	dir := t.TempDir()
-	repo := filestore.New(filestore.Params{})
+	repo := newRepo(t)
 
 	data, found, err := repo.LoadOverlay(filepath.Join(dir, "app"), "staging")
 	if err != nil {
@@ -158,7 +171,7 @@ func TestLoadOverlayMalformedYAML(t *testing.T) {
 		t.Fatalf("WriteFile: %v", err)
 	}
 
-	repo := filestore.New(filestore.Params{})
+	repo := newRepo(t)
 	_, found, err := repo.LoadOverlay(filepath.Join(dir, "app"), "staging")
 	if err == nil {
 		t.Fatal("expected error for malformed overlay YAML")
@@ -172,7 +185,7 @@ func TestSetOverlayCreatesNewFile(t *testing.T) {
 	t.Parallel()
 
 	dir := t.TempDir()
-	repo := filestore.New(filestore.Params{})
+	repo := newRepo(t)
 
 	path, err := repo.SetOverlay(filepath.Join(dir, "app"), "prod", "host", "prod.local")
 	if err != nil {
@@ -203,7 +216,7 @@ func TestSetOverlayUpdatesExistingKeyAndNested(t *testing.T) {
 		t.Fatalf("WriteFile: %v", err)
 	}
 
-	repo := filestore.New(filestore.Params{})
+	repo := newRepo(t)
 
 	_, err := repo.SetOverlay(filepath.Join(dir, "app"), "prod", "host", "new")
 	if err != nil {
@@ -241,7 +254,7 @@ func TestSetOverlayRefusesToOverwriteCollection(t *testing.T) {
 		t.Fatalf("WriteFile: %v", err)
 	}
 
-	repo := filestore.New(filestore.Params{})
+	repo := newRepo(t)
 
 	_, err := repo.SetOverlay(filepath.Join(dir, "app"), "prod", "items", "scalar")
 	if err == nil {

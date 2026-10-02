@@ -15,10 +15,7 @@ func TestAgeRoundTrip(t *testing.T) {
 	if err != nil {
 		t.Fatalf("New(age) error = %v", err)
 	}
-	pair, err := selected.Keypair()
-	if err != nil {
-		t.Fatalf("Keypair() error = %v", err)
-	}
+	pair := newKeypair(t, selected)
 	if !strings.HasPrefix(pair.PublicKey, "age-public-key:age1") {
 		t.Fatalf("PublicKey = %q, want labeled age key", pair.PublicKey)
 	}
@@ -49,14 +46,8 @@ func TestAgeRejectsWrongKey(t *testing.T) {
 	if err != nil {
 		t.Fatalf("New(age) error = %v", err)
 	}
-	first, err := selected.Keypair()
-	if err != nil {
-		t.Fatalf("first Keypair() error = %v", err)
-	}
-	second, err := selected.Keypair()
-	if err != nil {
-		t.Fatalf("second Keypair() error = %v", err)
-	}
+	first := newKeypair(t, selected)
+	second := newKeypair(t, selected)
 	ciphertext, err := selected.Encrypt("secret", first.PublicKey)
 	if err != nil {
 		t.Fatalf("Encrypt() error = %v", err)
@@ -75,14 +66,8 @@ func TestAgeValidatesKeypair(t *testing.T) {
 	if err != nil {
 		t.Fatalf("New(age) error = %v", err)
 	}
-	first, err := selected.Keypair()
-	if err != nil {
-		t.Fatalf("first Keypair() error = %v", err)
-	}
-	second, err := selected.Keypair()
-	if err != nil {
-		t.Fatalf("second Keypair() error = %v", err)
-	}
+	first := newKeypair(t, selected)
+	second := newKeypair(t, selected)
 
 	tests := []struct {
 		name       string
@@ -147,10 +132,7 @@ func TestAgeReturnsNativeCiphertext(t *testing.T) {
 	if err != nil {
 		t.Fatalf("New(age) error = %v", err)
 	}
-	pair, err := selected.Keypair()
-	if err != nil {
-		t.Fatalf("Keypair() error = %v", err)
-	}
+	pair := newKeypair(t, selected)
 	ciphertext, err := selected.Encrypt("secret", pair.PublicKey)
 	if err != nil {
 		t.Fatalf("Encrypt() error = %v", err)

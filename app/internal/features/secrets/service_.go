@@ -4,6 +4,7 @@ import (
 	"errors"
 
 	"github.com/go-envx/envx/app/internal/features/privatekey"
+	"github.com/go-envx/envx/app/internal/shared/value"
 )
 
 // PrivateKeyService defines the contract secrets consumes from the private key domain.
@@ -16,7 +17,7 @@ type PrivateKeyService interface {
 // CipherClient defines the cryptographic operations secrets consumes.
 type CipherClient interface {
 	Algorithm() string
-	Keypair() (publicKey, privateKey string, err error)
+	Keypair() (value.Keypair, error)
 	ValidateKeypair(publicKey, privateKey string) error
 	Encrypt(plaintext, publicKey string) ([]byte, error)
 	Decrypt(ciphertext []byte, privateKey string) (string, error)

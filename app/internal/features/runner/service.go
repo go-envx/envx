@@ -11,13 +11,17 @@ import (
 	"github.com/go-envx/envx/app/internal/shared/exitcode"
 )
 
+// ServiceParams provides dependencies to the process execution service. The
+// service is stateless, so it currently has none.
+type ServiceParams struct{}
+
 // Service supervises child process lifecycle, signal propagation, and exit status.
 // It is stateless: the command, environment, and streams arrive with each Run.
 type Service struct{}
 
 // NewService constructs a process execution domain service.
-func NewService() *Service {
-	return &Service{}
+func NewService(ServiceParams) (*Service, error) {
+	return &Service{}, nil
 }
 
 // Run executes the command with injected environment and relays received signals.

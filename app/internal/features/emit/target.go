@@ -2,6 +2,7 @@ package emit
 
 import (
 	"fmt"
+	"io"
 	"strings"
 )
 
@@ -97,4 +98,6 @@ type RenderParams struct {
 	// Key is the single data key a k8s-bundle render packs the slice into; its
 	// extension (.json or .env) selects the body format. Used by k8s-bundle only.
 	Key string
+	// Writer receives the rendered output; nil uses os.Stdout.
+	Writer io.Writer
 }

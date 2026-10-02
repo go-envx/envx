@@ -159,8 +159,8 @@ func NewEmitCommand(f Factory) *cobra.Command {
 			// a file target is committed atomically.
 			var buffer bytes.Buffer
 
-			// Obtain the emit service writing into the buffer.
-			emitService, err := f.EmitService(&buffer)
+			// Obtain the emit service.
+			emitService, err := f.EmitService()
 			if err != nil {
 				return err
 			}
@@ -173,6 +173,7 @@ func NewEmitCommand(f Factory) *cobra.Command {
 				IncludeSecrets: includeSecrets,
 				IncludeConfig:  includeConfig,
 				Key:            key,
+				Writer:         &buffer,
 			}
 			if err := emitService.Render(renderParams); err != nil {
 				return err

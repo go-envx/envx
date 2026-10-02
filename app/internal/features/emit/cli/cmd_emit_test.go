@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/base64"
 	"errors"
-	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -31,11 +30,11 @@ func (m *mockEmitFactory) EnvService(configPath string) (*env.Service, error) {
 	return core.NewApp().EnvService(configPath)
 }
 
-func (m *mockEmitFactory) EmitService(writer io.Writer) (*emit.Service, error) {
+func (m *mockEmitFactory) EmitService() (*emit.Service, error) {
 	if m.emitErr != nil {
 		return nil, m.emitErr
 	}
-	return core.NewApp().EmitService(writer)
+	return core.NewApp().EmitService()
 }
 
 // executeEmit builds the emit command, executes it with args, and returns its

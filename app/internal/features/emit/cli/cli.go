@@ -6,8 +6,6 @@
 package cli
 
 import (
-	"io"
-
 	"github.com/go-envx/envx/app/internal/features/emit"
 	"github.com/go-envx/envx/app/internal/features/env"
 	"github.com/go-envx/envx/app/internal/shared/flags"
@@ -104,5 +102,5 @@ var (
 // Factory defines the capabilities required for the emit command.
 type Factory interface {
 	EnvService(configPath string) (*env.Service, error)
-	EmitService(writer io.Writer) (*emit.Service, error)
+	EmitService() (*emit.Service, error)
 }
