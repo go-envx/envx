@@ -10,29 +10,6 @@ import (
 	"github.com/go-envx/envx/app/internal/shared/status"
 )
 
-// ProjectManager pairs a project name with the envmerge Manager that resolves
-// it, so validate can diagnose every project without depending on the config
-// package.
-type ProjectManager struct {
-	// Name is the manifest project name, used to attribute findings.
-	Name string
-	// Manager resolves and diagnoses the project's environments.
-	Manager *env.Manager
-}
-
-// Workspace is the resolved input Validate iterates: one manager per project,
-// the declared environments, and the shared secrets manager. A nil Secrets
-// manager skips the store-level checks, running only per-environment resolution.
-type Workspace struct {
-	// Projects is every project to diagnose.
-	Projects []ProjectManager
-	// Environments is the declared environment list every project is diagnosed
-	// against.
-	Environments []string
-	// Secrets provides the store-level findings; nil skips them.
-	Secrets *secrets.Service
-}
-
 // storeRef identifies one stored secret for orphan matching. The group is
 // lowercased to match how references index the store; the key is verbatim.
 type storeRef struct {
@@ -50,7 +27,7 @@ type storeRef struct {
 // failure: every finding is collected and the verdict is graded at the end.
 // Structural failures (a malformed manifest or unreadable YAML) are returned as
 // errors because there is no valid workspace to grade.
-func Validate(w Workspace, params Params) (Report, error) {
+func (s *Service) Validate(params ValidateParams) (Report, error) {
 	var report Report
 
 	// Diagnose each project × environment, collecting reference findings and the
@@ -59,9 +36,9 @@ func Validate(w Workspace, params Params) (Report, error) {
 	// merge and no network I/O.
 	referenced := make(map[storeRef]bool)
 	if params.needsMerge() {
-		for _, project := range w.Projects {
-			for _, environment := range w.Environments {
-				if err := diagnoseEnvironment(
+		for _, project := range s.params.Projects {
+			for _, environment := range s.params.Environments {
+				if err := s.diagnoseEnvironment(
 					&report, params, referenced, project, environment,
 				); err != nil {
 					return Report{}, err
@@ -71,8 +48,8 @@ func Validate(w Workspace, params Params) (Report, error) {
 	}
 
 	// Add the store-level findings the per-environment view cannot produce.
-	if w.Secrets != nil {
-		if err := addStoreFindings(&report, params, w.Secrets, referenced); err != nil {
+	if s.params.Store != nil {
+		if err := s.addStoreFindings(&report, params, referenced); err != nil {
 			return Report{}, err
 		}
 	}
@@ -84,20 +61,22 @@ func Validate(w Workspace, params Params) (Report, error) {
 // diagnoseEnvironment explains one project in one environment, appending a
 // finding for every non-OK resolution and recording every secret reference the
 // environment uses so orphan detection can subtract it from the store.
-func diagnoseEnvironment(
+func (s *Service) diagnoseEnvironment(
 	report *Report,
-	params Params,
+	params ValidateParams,
 	referenced map[storeRef]bool,
-	project ProjectManager,
+	project string,
 	environment string,
 ) error {
-	explanation, err := project.Manager.Explain(env.ExplainParams{
+	explanation, err := s.params.Environment.Explain(env.ExplainParams{
+		Project:     project,
 		Environment: environment,
 		Reveal:      false,
+		Options:     params.Options,
 	})
 	if err != nil {
 		return fmt.Errorf(
-			"diagnosing project %q environment %q: %w", project.Name, environment, err,
+			"diagnosing project %q environment %q: %w", project, environment, err,
 		)
 	}
 
@@ -109,8 +88,8 @@ func diagnoseEnvironment(
 		// merge regardless of how the value resolved.
 		if params.runs(status.PropertyNotDeclaredInBase) &&
 			!declaredInBase(entry.Origin, environment) {
-			report.record(params, Finding{
-				Project:     project.Name,
+			report.record(s.params.Severity, Finding{
+				Project:     project,
 				Environment: environment,
 				Key:         entry.Key,
 				Code:        status.PropertyNotDeclaredInBase,
@@ -128,8 +107,8 @@ func diagnoseEnvironment(
 		if !ok || group != GroupResolution || !params.runs(entry.Resolution.Code) {
 			continue
 		}
-		report.record(params, Finding{
-			Project:     project.Name,
+		report.record(s.params.Severity, Finding{
+			Project:     project,
 			Environment: environment,
 			Key:         entry.Key,
 			Code:        entry.Resolution.Code,
@@ -181,8 +160,8 @@ func collectReferences(referenced map[storeRef]bool, items []string) {
 // without decrypting any value. It splits the work by the store artifact each
 // check reads — the stored secrets and the group keypairs — and skips an artifact
 // entirely when none of its checks are selected.
-func addStoreFindings(
-	report *Report, params Params, manager *secrets.Service, referenced map[storeRef]bool,
+func (s *Service) addStoreFindings(
+	report *Report, params ValidateParams, referenced map[storeRef]bool,
 ) error {
 	// The encryption, algorithm, orphan, and missing-public-key checks all read the
 	// stored secrets; read them once when any of those checks runs.
@@ -190,7 +169,7 @@ func addStoreFindings(
 		params.runs(status.SecretAlgorithmMismatch) ||
 		params.runs(status.SecretIsNotReferenced) ||
 		params.runs(status.PublicKeyIsMissing) {
-		if err := addSecretFindings(report, params, manager, referenced); err != nil {
+		if err := s.addSecretFindings(report, params, referenced); err != nil {
 			return err
 		}
 	}
@@ -198,7 +177,7 @@ func addStoreFindings(
 	// The keypair-health checks read the group keypairs.
 	if params.runs(status.PrivateKeyIsInvalid) ||
 		params.runs(status.PrivateKeyIsUnavailable) {
-		if err := addKeypairFindings(report, params, manager); err != nil {
+		if err := s.addKeypairFindings(report, params); err != nil {
 			return err
 		}
 	}
@@ -210,10 +189,10 @@ func addStoreFindings(
 // decrypting any value. Each finding is gated by its own selection so a hook pays
 // only for the checks it lists, and the orphan check reuses the referenced set
 // gathered during the per-environment merge.
-func addSecretFindings(
-	report *Report, params Params, manager *secrets.Service, referenced map[storeRef]bool,
+func (s *Service) addSecretFindings(
+	report *Report, params ValidateParams, referenced map[storeRef]bool,
 ) error {
-	stored, err := manager.StoredSecrets()
+	stored, err := s.params.Store.StoredSecrets()
 	if err != nil {
 		return fmt.Errorf("reading secrets store: %w", err)
 	}
@@ -222,7 +201,7 @@ func addSecretFindings(
 		switch {
 		case !secret.Encrypted:
 			if params.runs(status.SecretIsNotEncrypted) {
-				report.record(params, Finding{
+				report.record(s.params.Severity, Finding{
 					Key:     identity,
 					Code:    status.SecretIsNotEncrypted,
 					Message: "stored value is not encrypted",
@@ -230,7 +209,7 @@ func addSecretFindings(
 			}
 		case secret.AlgorithmMismatch:
 			if params.runs(status.SecretAlgorithmMismatch) {
-				report.record(params, Finding{
+				report.record(s.params.Severity, Finding{
 					Key:     identity,
 					Code:    status.SecretAlgorithmMismatch,
 					Message: "stored under a different algorithm than the configured cipher",
@@ -240,7 +219,7 @@ func addSecretFindings(
 		if params.runs(status.SecretIsNotReferenced) {
 			ref := storeRef{group: strings.ToLower(secret.Group), key: secret.Key}
 			if !referenced[ref] {
-				report.record(params, Finding{
+				report.record(s.params.Severity, Finding{
 					Key:     identity,
 					Code:    status.SecretIsNotReferenced,
 					Message: "stored value is never referenced by any environment",
@@ -250,12 +229,12 @@ func addSecretFindings(
 	}
 
 	if params.runs(status.PublicKeyIsMissing) {
-		groups, err := manager.GroupsMissingPublicKey()
+		groups, err := s.params.Store.GroupsMissingPublicKey()
 		if err != nil {
 			return fmt.Errorf("reading public keys: %w", err)
 		}
 		for _, group := range groups {
-			report.record(params, Finding{
+			report.record(s.params.Severity, Finding{
 				Key:     group,
 				Code:    status.PublicKeyIsMissing,
 				Message: "the group has stored secrets but no public key",
@@ -269,8 +248,8 @@ func addSecretFindings(
 // private key — reading the group keypairs without exposing key material. Each
 // finding is gated by its own selection so one keypair check can run without the
 // other.
-func addKeypairFindings(report *Report, params Params, manager *secrets.Service) error {
-	keypairs, err := manager.ListKeypairs()
+func (s *Service) addKeypairFindings(report *Report, params ValidateParams) error {
+	keypairs, err := s.params.Store.ListKeypairs()
 	if err != nil {
 		return fmt.Errorf("reading keypairs: %w", err)
 	}
@@ -279,7 +258,7 @@ func addKeypairFindings(report *Report, params Params, manager *secrets.Service)
 		if !ok || !params.runs(finding.Code) {
 			continue
 		}
-		report.record(params, finding)
+		report.record(s.params.Severity, finding)
 	}
 	return nil
 }

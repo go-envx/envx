@@ -48,14 +48,14 @@ func NewRootCmd(info BuildInfo) *cobra.Command {
 		scaffoldcli.NewCreateCommand(app),
 		envcli.NewGetCommand(app),
 		secretscli.NewKeypairCmd(app),
-		packcli.NewPackCmd(),
+		packcli.NewPackCommand(app),
 		runnercli.NewRunCommand(app),
 		envcli.NewSetCommand(app),
 		envcli.NewExplainCommand(app),
 		emitcli.NewEmitCommand(app),
 		envcli.NewDiffCommand(app),
 		secretscli.NewSecretsCommand(app),
-		validatecli.NewValidateCmd(),
+		validatecli.NewValidateCommand(app),
 	)
 	return root
 }

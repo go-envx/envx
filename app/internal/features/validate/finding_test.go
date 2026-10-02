@@ -64,21 +64,21 @@ func TestReportRecordGradesByCode(t *testing.T) {
 
 	// Defaults: orphan is an error, an unavailable key is a warning.
 	var byDefault Report
-	byDefault.record(Params{}, Finding{Code: status.SecretIsNotReferenced})
-	byDefault.record(Params{}, Finding{Code: status.PrivateKeyIsUnavailable})
+	byDefault.record(nil, Finding{Code: status.SecretIsNotReferenced})
+	byDefault.record(nil, Finding{Code: status.PrivateKeyIsUnavailable})
 	if byDefault.Errors != 1 || byDefault.Warnings != 1 {
 		t.Errorf("defaults graded %d errors %d warnings, want 1 and 1",
 			byDefault.Errors, byDefault.Warnings)
 	}
 
 	// Overrides: suppress the orphan, promote the unavailable key to an error.
-	params := Params{Severity: map[string]status.Severity{
+	overrides := map[string]status.Severity{
 		status.SecretIsNotReferenced:   status.Off,
 		status.PrivateKeyIsUnavailable: status.Error,
-	}}
+	}
 	var overridden Report
-	overridden.record(params, Finding{Code: status.SecretIsNotReferenced})
-	overridden.record(params, Finding{Code: status.PrivateKeyIsUnavailable})
+	overridden.record(overrides, Finding{Code: status.SecretIsNotReferenced})
+	overridden.record(overrides, Finding{Code: status.PrivateKeyIsUnavailable})
 	if len(overridden.Findings) != 1 {
 		t.Fatalf("off code should be dropped, got %d findings", len(overridden.Findings))
 	}

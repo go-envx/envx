@@ -1,6 +1,7 @@
 package validate
 
 import (
+	"github.com/go-envx/envx/app/internal/features/env"
 	"github.com/go-envx/envx/app/internal/shared/status"
 	"github.com/go-envx/envx/app/internal/utils/severity"
 )
@@ -39,25 +40,25 @@ type Finding struct {
 	Message string
 }
 
-// Params controls how validation grades its outcome.
-type Params struct {
+// ValidateParams controls how one validation run selects checks and grades its
+// outcome.
+type ValidateParams struct {
 	// Strict fails the run on warnings as well as errors. Errors always fail.
 	Strict bool
-	// Severity overrides the default reporting level per status code, keyed by
-	// canonical code. A nil map leaves every code at its default; a code mapped to
-	// status.Off suppresses its findings entirely.
-	Severity map[string]status.Severity
 	// Selected lists the checks to run, keyed by canonical status code. A nil or
 	// empty map runs every check; a non-empty map runs only the selected checks and
 	// skips the cost of the rest, so a hook can run only the offline store checks.
 	Selected map[string]bool
+	// Options provides optional resolution setting overrides applied to every
+	// project environment diagnosed.
+	Options env.Options
 }
 
 // level resolves the reporting level for a status code: the configured override
 // if present, else the code's built-in default. An unknown code defaults to
 // error so a new, unmapped code fails loudly rather than passing silently.
-func (p Params) level(code string) status.Severity {
-	if s, ok := p.Severity[code]; ok {
+func level(overrides map[string]status.Severity, code string) status.Severity {
+	if s, ok := overrides[code]; ok {
 		return s
 	}
 	if s, ok := status.DefaultSeverity(code); ok {
@@ -81,11 +82,11 @@ type Report struct {
 }
 
 // record grades a finding by its code and adds it unless the code is configured
-// off. The severity is assigned from the code's resolved level, not from the
-// caller, so one code carries one severity across every check. A finding whose
-// code resolves to status.Off is dropped entirely.
-func (r *Report) record(params Params, f Finding) {
-	switch params.level(f.Code) {
+// off. The severity is assigned from the code's resolved level under the given
+// overrides, not from the caller, so one code carries one severity across every
+// check. A finding whose code resolves to status.Off is dropped entirely.
+func (r *Report) record(overrides map[string]status.Severity, f Finding) {
+	switch level(overrides, f.Code) {
 	case status.Off:
 		return
 	case status.Warn:

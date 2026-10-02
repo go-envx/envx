@@ -98,7 +98,7 @@ func TestNeedsMerge(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
-			if got := (Params{Selected: tc.selected}).needsMerge(); got != tc.want {
+			if got := (ValidateParams{Selected: tc.selected}).needsMerge(); got != tc.want {
 				t.Errorf("needsMerge() = %v, want %v", got, tc.want)
 			}
 		})
@@ -110,12 +110,12 @@ func TestNeedsMerge(t *testing.T) {
 func TestRuns(t *testing.T) {
 	t.Parallel()
 
-	all := Params{}
+	all := ValidateParams{}
 	if !all.runs(status.PublicKeyIsMissing) {
 		t.Error("no selection must run every check")
 	}
 
-	one := Params{Selected: map[string]bool{status.PublicKeyIsMissing: true}}
+	one := ValidateParams{Selected: map[string]bool{status.PublicKeyIsMissing: true}}
 	if !one.runs(status.PublicKeyIsMissing) {
 		t.Error("a selected check must run")
 	}

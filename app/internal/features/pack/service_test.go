@@ -2,6 +2,7 @@ package pack
 
 import (
 	"bytes"
+	"errors"
 	"os"
 	"path/filepath"
 	"slices"
@@ -9,6 +10,7 @@ import (
 	"strings"
 	"testing"
 
+	secfilestore "github.com/go-envx/envx/app/internal/features/secrets/filestore"
 	"gopkg.in/yaml.v3"
 )
 
@@ -138,10 +140,37 @@ func readFile(t *testing.T, path string) []byte {
 	return data
 }
 
-// mustPack runs Pack and fails the test on error, returning the result.
-func mustPack(t *testing.T, ws Workspace, p Params) Result {
+// newService constructs a Service over ws backed by real secrets filestores.
+func newService(t *testing.T, ws Workspace) *Service {
 	t.Helper()
-	result, err := Pack(ws, p)
+
+	// The reader is unused when the workspace has no store, so any path suffices.
+	sourcePath := ws.SecretsPath
+	if sourcePath == "" {
+		sourcePath = filepath.Join(t.TempDir(), "secrets.yaml")
+	}
+	reader, err := secfilestore.New(secfilestore.Params{Path: sourcePath})
+	if err != nil {
+		t.Fatalf("secfilestore.New(): %v", err)
+	}
+
+	service, err := NewService(ServiceParams{
+		Workspace:     ws,
+		SecretsReader: reader,
+		NewSecretsWriter: func(path string) (SecretsWriter, error) {
+			return secfilestore.New(secfilestore.Params{Path: path})
+		},
+	})
+	if err != nil {
+		t.Fatalf("NewService(): %v", err)
+	}
+	return service
+}
+
+// mustPack runs Pack and fails the test on error, returning the result.
+func mustPack(t *testing.T, ws Workspace, p PackParams) PackResult {
+	t.Helper()
+	result, err := newService(t, ws).Pack(p)
 	if err != nil {
 		t.Fatalf("Pack: %v", err)
 	}
@@ -177,7 +206,10 @@ func TestPackWritesPerProjectDirectories(t *testing.T) {
 	writeSource(t, root, "envx.keys", "shared: PRIVATE\n") // must never be copied
 	out := filepath.Join(t.TempDir(), "dist")
 
-	result := mustPack(t, ws, Params{Environments: []string{"production"}, OutDir: out})
+	result := mustPack(t, ws, PackParams{
+		Environments: []string{"production"},
+		OutDir:       out,
+	})
 
 	want := []string{
 		"api/api.yaml",
@@ -206,7 +238,7 @@ func TestPackRewritesManifestIncludes(t *testing.T) {
 	_, ws := newWorkspace(t)
 	out := filepath.Join(t.TempDir(), "dist")
 
-	mustPack(t, ws, Params{OutDir: out})
+	mustPack(t, ws, PackParams{OutDir: out})
 
 	bundleManifest := filepath.Join(out, "envx.yaml")
 	api := projectIncludes(t, bundleManifest, "api")
@@ -243,7 +275,7 @@ func TestPackSeparatesCollidingBasenamesByProject(t *testing.T) {
 	}
 	out := filepath.Join(t.TempDir(), "dist")
 
-	mustPack(t, ws, Params{OutDir: out})
+	mustPack(t, ws, PackParams{OutDir: out})
 
 	// Each project keeps the plain "app.yaml" name inside its own directory.
 	present(t, out, "one/app.yaml")
@@ -287,7 +319,7 @@ func TestPackDisambiguatesIntraProjectCollision(t *testing.T) {
 	}
 	out := filepath.Join(t.TempDir(), "dist")
 
-	mustPack(t, ws, Params{OutDir: out})
+	mustPack(t, ws, PackParams{OutDir: out})
 
 	// "env/app" comes first and keeps "app"; "svc/app" becomes "app-2".
 	present(t, out, "one/app.yaml")
@@ -326,7 +358,7 @@ func TestPackDisambiguatesBaseOverlayCollision(t *testing.T) {
 	}
 	out := filepath.Join(t.TempDir(), "dist")
 
-	mustPack(t, ws, Params{OutDir: out})
+	mustPack(t, ws, PackParams{OutDir: out})
 
 	present(t, out, "one/app.production.yaml")
 	present(t, out, "one/app.production-2.yaml")
@@ -367,7 +399,7 @@ func TestPackSanitizesProjectDirectoryName(t *testing.T) {
 	}
 	out := filepath.Join(t.TempDir(), "dist")
 
-	mustPack(t, ws, Params{OutDir: out})
+	mustPack(t, ws, PackParams{OutDir: out})
 
 	present(t, out, "team_api/app.yaml")
 	got := projectIncludes(t, filepath.Join(out, "envx.yaml"), "team/api")
@@ -395,7 +427,7 @@ func TestPackHandlesEscapingInclude(t *testing.T) {
 	}
 	out := filepath.Join(t.TempDir(), "dist")
 
-	mustPack(t, ws, Params{Environments: []string{"development"}, OutDir: out})
+	mustPack(t, ws, PackParams{Environments: []string{"development"}, OutDir: out})
 	present(t, out, "escape/outside.yaml")
 	got := projectIncludes(t, filepath.Join(out, "envx.yaml"), "escape")
 	if !equal(got, []string{"escape/outside"}) {
@@ -410,7 +442,7 @@ func TestPackMultipleEnvironmentsKeepsEveryOverlay(t *testing.T) {
 	_, ws := newWorkspace(t)
 	out := filepath.Join(t.TempDir(), "dist")
 
-	mustPack(t, ws, Params{
+	mustPack(t, ws, PackParams{
 		Environments: []string{"production", "development"},
 		OutDir:       out,
 	})
@@ -428,7 +460,7 @@ func TestPackDefaultsToAllDeclaredEnvironments(t *testing.T) {
 	_, ws := newWorkspace(t)
 	out := filepath.Join(t.TempDir(), "dist")
 
-	result := mustPack(t, ws, Params{OutDir: out})
+	result := mustPack(t, ws, PackParams{OutDir: out})
 	if !equal(result.Environments, []string{"development", "production"}) {
 		t.Errorf("environments = %v, want all declared", result.Environments)
 	}
@@ -441,7 +473,7 @@ func TestPackProjectNarrowsIncludes(t *testing.T) {
 	_, ws := newWorkspace(t)
 	out := filepath.Join(t.TempDir(), "dist")
 
-	mustPack(t, ws, Params{Projects: []string{"web"}, OutDir: out})
+	mustPack(t, ws, PackParams{Projects: []string{"web"}, OutDir: out})
 
 	// Only the web project directory is written; api is not selected at all.
 	present(t, out, "web/app.yaml")
@@ -457,7 +489,7 @@ func TestPackPrunesUnselectedProjectsFromManifest(t *testing.T) {
 	_, ws := newWorkspace(t)
 	out := filepath.Join(t.TempDir(), "dist")
 
-	mustPack(t, ws, Params{Projects: []string{"web"}, OutDir: out})
+	mustPack(t, ws, PackParams{Projects: []string{"web"}, OutDir: out})
 
 	got := manifestProjects(t, filepath.Join(out, "envx.yaml"))
 	if !equal(got, []string{"web"}) {
@@ -472,7 +504,10 @@ func TestPackDuplicatesSharedNamespace(t *testing.T) {
 	_, ws := newWorkspace(t)
 	out := filepath.Join(t.TempDir(), "dist")
 
-	result := mustPack(t, ws, Params{Environments: []string{"development"}, OutDir: out})
+	result := mustPack(t, ws, PackParams{
+		Environments: []string{"development"},
+		OutDir:       out,
+	})
 
 	// env/app is included by both api and web, so it lands in both directories.
 	present(t, out, "api/app.yaml")
@@ -495,8 +530,12 @@ func TestPackRejectsUnknownEnvironment(t *testing.T) {
 	_, ws := newWorkspace(t)
 	out := filepath.Join(t.TempDir(), "dist")
 
-	_, err := Pack(ws, Params{Environments: []string{"ghost"}, OutDir: out})
-	if err == nil || !strings.Contains(err.Error(), "ghost") {
+	_, err := newService(t, ws).Pack(PackParams{
+		Environments: []string{"ghost"},
+		OutDir:       out,
+	})
+	if !errors.Is(err, ErrEnvironmentNotDeclared) ||
+		!strings.Contains(err.Error(), "ghost") {
 		t.Fatalf("err = %v, want an unknown-environment error", err)
 	}
 	if _, statErr := os.Stat(out); !os.IsNotExist(statErr) {
@@ -510,8 +549,8 @@ func TestPackRejectsUnknownProject(t *testing.T) {
 	_, ws := newWorkspace(t)
 
 	out := filepath.Join(t.TempDir(), "dist")
-	_, err := Pack(ws, Params{Projects: []string{"nope"}, OutDir: out})
-	if err == nil || !strings.Contains(err.Error(), "nope") {
+	_, err := newService(t, ws).Pack(PackParams{Projects: []string{"nope"}, OutDir: out})
+	if !errors.Is(err, ErrProjectNotDeclared) || !strings.Contains(err.Error(), "nope") {
 		t.Fatalf("err = %v, want an unknown-project error", err)
 	}
 }
@@ -520,8 +559,27 @@ func TestPackRejectsUnknownProject(t *testing.T) {
 func TestPackRequiresOutDir(t *testing.T) {
 	t.Parallel()
 	_, ws := newWorkspace(t)
-	if _, err := Pack(ws, Params{}); err == nil {
-		t.Fatal("expected an error for an empty output directory")
+	if _, err := newService(t, ws).Pack(PackParams{}); !errors.Is(err, ErrOutputRequired) {
+		t.Fatalf("err = %v, want ErrOutputRequired", err)
+	}
+}
+
+// TestNewServiceRequiresDependencies verifies construction rejects a missing
+// secrets reader or writer factory.
+func TestNewServiceRequiresDependencies(t *testing.T) {
+	t.Parallel()
+
+	reader, err := secfilestore.New(secfilestore.Params{Path: "secrets.yaml"})
+	if err != nil {
+		t.Fatalf("secfilestore.New(): %v", err)
+	}
+	writer := func(string) (SecretsWriter, error) { return nil, nil }
+
+	if _, err := NewService(ServiceParams{NewSecretsWriter: writer}); err == nil {
+		t.Error("NewService() accepted a nil secrets reader")
+	}
+	if _, err := NewService(ServiceParams{SecretsReader: reader}); err == nil {
+		t.Error("NewService() accepted a nil secrets writer factory")
 	}
 }
 
@@ -535,7 +593,9 @@ func TestPackFailsOnEmptyInclude(t *testing.T) {
 		Includes: []string{"env/missing"},
 	})
 
-	_, err := Pack(ws, Params{OutDir: filepath.Join(t.TempDir(), "dist")})
+	_, err := newService(t, ws).Pack(PackParams{
+		OutDir: filepath.Join(t.TempDir(), "dist"),
+	})
 	if err == nil || !strings.Contains(err.Error(), "env/missing") {
 		t.Fatalf("err = %v, want an empty-include error", err)
 	}
@@ -551,7 +611,7 @@ func TestPackWithoutSecretsStore(t *testing.T) {
 	}
 	out := filepath.Join(t.TempDir(), "dist")
 
-	mustPack(t, ws, Params{Environments: []string{"development"}, OutDir: out})
+	mustPack(t, ws, PackParams{Environments: []string{"development"}, OutDir: out})
 	absent(t, out, "secrets.yaml")
 }
 
@@ -563,7 +623,7 @@ func TestPackFiltersSecrets(t *testing.T) {
 	_, ws := newWorkspace(t)
 	out := filepath.Join(t.TempDir(), "dist")
 
-	mustPack(t, ws, Params{Environments: []string{"development"}, OutDir: out})
+	mustPack(t, ws, PackParams{Environments: []string{"development"}, OutDir: out})
 
 	got := string(readFile(t, filepath.Join(out, "secrets.yaml")))
 	// The referenced value survives with its content intact.
@@ -599,7 +659,7 @@ func TestPackOmitsStoreWhenNothingReferenced(t *testing.T) {
 	}
 	out := filepath.Join(t.TempDir(), "dist")
 
-	mustPack(t, ws, Params{OutDir: out})
+	mustPack(t, ws, PackParams{OutDir: out})
 	absent(t, out, "secrets.yaml")
 }
 
@@ -625,7 +685,7 @@ func TestPackStandardizesManifestAndStoreNames(t *testing.T) {
 	}
 	out := filepath.Join(t.TempDir(), "dist")
 
-	mustPack(t, ws, Params{OutDir: out})
+	mustPack(t, ws, PackParams{OutDir: out})
 
 	// The bundle uses the standardized names, not config.yaml / vault.yaml.
 	present(t, out, "envx.yaml")
@@ -670,7 +730,7 @@ func TestPackDropsEmptySecretsBlock(t *testing.T) {
 	}
 	out := filepath.Join(t.TempDir(), "dist")
 
-	mustPack(t, ws, Params{OutDir: out})
+	mustPack(t, ws, PackParams{OutDir: out})
 
 	bundleManifest := string(readFile(t, filepath.Join(out, "envx.yaml")))
 	if strings.Contains(bundleManifest, "secrets:") {
@@ -686,8 +746,11 @@ func TestPackRejectsNonEmptyOutDir(t *testing.T) {
 	out := filepath.Join(t.TempDir(), "dist")
 	stale := writeSource(t, out, "leftover.txt", "keep me\n")
 
-	_, err := Pack(ws, Params{Environments: []string{"production"}, OutDir: out})
-	if err == nil || !strings.Contains(err.Error(), "not empty") {
+	_, err := newService(t, ws).Pack(PackParams{
+		Environments: []string{"production"},
+		OutDir:       out,
+	})
+	if !errors.Is(err, ErrOutputNotEmpty) {
 		t.Fatalf("err = %v, want a non-empty-directory error", err)
 	}
 	if _, statErr := os.Stat(stale); statErr != nil {
@@ -704,8 +767,11 @@ func TestPackRejectsOutPathThatIsAFile(t *testing.T) {
 	_, ws := newWorkspace(t)
 	out := writeSource(t, t.TempDir(), "dist", "i am a file\n")
 
-	_, err := Pack(ws, Params{Environments: []string{"production"}, OutDir: out})
-	if err == nil || !strings.Contains(err.Error(), "not a directory") {
+	_, err := newService(t, ws).Pack(PackParams{
+		Environments: []string{"production"},
+		OutDir:       out,
+	})
+	if !errors.Is(err, ErrOutputNotDirectory) {
 		t.Fatalf("err = %v, want a not-a-directory error", err)
 	}
 }
@@ -720,7 +786,7 @@ func TestPackAllowsEmptyExistingOutDir(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	mustPack(t, ws, Params{Environments: []string{"production"}, OutDir: out})
+	mustPack(t, ws, PackParams{Environments: []string{"production"}, OutDir: out})
 	present(t, out, "envx.yaml")
 }
 
@@ -732,7 +798,11 @@ func TestPackForceReplacesNonEmptyOutDir(t *testing.T) {
 	out := filepath.Join(t.TempDir(), "dist")
 	writeSource(t, out, "leftover.txt", "delete me\n")
 
-	mustPack(t, ws, Params{Environments: []string{"production"}, OutDir: out, Force: true})
+	mustPack(t, ws, PackParams{
+		Environments: []string{"production"},
+		OutDir:       out,
+		Force:        true,
+	})
 
 	absent(t, out, "leftover.txt")
 	present(t, out, "envx.yaml")
@@ -747,7 +817,11 @@ func TestPackForceLeavesExistingBundleOnPrewriteError(t *testing.T) {
 	out := filepath.Join(t.TempDir(), "dist")
 	stale := writeSource(t, out, "leftover.txt", "keep me\n")
 
-	_, err := Pack(ws, Params{Environments: []string{"ghost"}, OutDir: out, Force: true})
+	_, err := newService(t, ws).Pack(PackParams{
+		Environments: []string{"ghost"},
+		OutDir:       out,
+		Force:        true,
+	})
 	if err == nil || !strings.Contains(err.Error(), "ghost") {
 		t.Fatalf("err = %v, want an unknown-environment error", err)
 	}
@@ -774,7 +848,7 @@ func TestPackSingleProjectStillNests(t *testing.T) {
 	}
 	out := filepath.Join(t.TempDir(), "dist")
 
-	mustPack(t, ws, Params{OutDir: out})
+	mustPack(t, ws, PackParams{OutDir: out})
 
 	present(t, out, "solo/app.yaml")
 	absent(t, out, "app.yaml")
@@ -811,7 +885,7 @@ func TestPackStoreCoversUnionOfProjects(t *testing.T) {
 	}
 	out := filepath.Join(t.TempDir(), "dist")
 
-	mustPack(t, ws, Params{OutDir: out})
+	mustPack(t, ws, PackParams{OutDir: out})
 
 	// A single store at the root holds both projects' references but not the unused
 	// one.

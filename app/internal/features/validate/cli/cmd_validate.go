@@ -2,14 +2,14 @@ package cli
 
 import (
 	"errors"
+	"fmt"
 
-	"github.com/go-envx/envx/app/internal/core"
-	"github.com/go-envx/envx/app/internal/features/env"
-	engine "github.com/go-envx/envx/app/internal/features/validate"
+	"github.com/go-envx/envx/app/internal/features/validate"
 	"github.com/go-envx/envx/app/internal/shared/flags"
 	"github.com/go-envx/envx/app/internal/utils/printer"
 	"github.com/go-envx/envx/app/internal/utils/str"
 	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
 )
 
 // errValidationFailed is returned when the graded report fails, so the process
@@ -18,9 +18,9 @@ import (
 var errValidationFailed = errors.New("validation failed")
 
 const (
-	usage = "validate"
-	short = "Check every project and environment for resolution and store problems"
-	long  = `
+	validateUsage = "validate"
+	validateShort = "Check every project and environment for resolution and store problems"
+	validateLong  = `
 		Validate resolves every project against every declared environment and
 		reports the problems a workspace-wide gate should catch before deploy. Its
 		checks fall into two groups by the files they read, which is also their cost:
@@ -48,7 +48,7 @@ const (
 		this context, which is normal on a developer laptop but a failure for a
 		full-CI gate). Use --output=json for machine-readable output.
 	`
-	example = `
+	validateExample = `
 		envx validate
 		envx validate --strict
 		envx validate --output=json
@@ -58,10 +58,8 @@ const (
 	`
 )
 
-// NewValidateCmd builds the "validate" command. It resolves the whole workspace,
-// runs the workspace-wide diagnosis, renders the findings, and returns a failure
-// error when the graded report fails so the process exits non-zero.
-func NewValidateCmd() *cobra.Command {
+// NewValidateCommand builds the "validate" command.
+func NewValidateCommand(f Factory) *cobra.Command {
 	// Register one boolean selection flag per check, named identically to the
 	// check's envx.yaml severity key (kebab-case), so --secret-is-not-encrypted
 	// selects the check configured by validate.secret_is_not_encrypted. The value
@@ -69,39 +67,49 @@ func NewValidateCmd() *cobra.Command {
 	selections := make(map[string]*bool)
 
 	cmd := &cobra.Command{
-		Use:     usage,
-		Short:   short,
-		Long:    str.Dedent(long),
-		Example: str.Dedent(example, 2),
+		Use:     validateUsage,
+		Short:   validateShort,
+		Long:    str.Dedent(validateLong),
+		Example: str.Dedent(validateExample, 2),
 		Args:    cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			// get the flag inputs
+			// Extract command-line flag values.
 			fs := cmd.Flags()
-			input := core.GetInput(fs)
+			configPath := flags.Config.Get(fs)
+			strict := strictFlag.Get(fs)
+			output := flags.Output.Get(fs)
+			envOptions := getEnvOptions(fs)
 
-			// execute the action, selecting only the checks whose flags were set
-			report, err := execute(actionParams{
-				Strict:   Strict.Get(fs),
-				Selected: selectedChecks(selections),
-			}, input)
+			// Obtain the validate service using the configuration path.
+			validateService, err := f.ValidateService(configPath)
 			if err != nil {
 				return err
 			}
 
-			// render the findings through the shared printer
-			pr := printer.New(printer.Options{
+			// Perform the workspace validation, selecting only the checks whose
+			// flags were set.
+			report, err := validateService.Validate(validate.ValidateParams{
+				Strict:   strict,
+				Selected: selectedChecks(selections),
+				Options:  envOptions,
+			})
+			if err != nil {
+				return err
+			}
+			report.Sort()
+
+			// Initialize the console printer for output.
+			console := printer.New(printer.Options{
 				Out: cmd.OutOrStdout(),
 				Err: cmd.ErrOrStderr(),
 			})
-			if err := render(&renderParams{
-				Printer: pr,
-				Report:  report,
-				Format:  flags.Output.Get(fs),
-			}); err != nil {
+
+			// Output the result of the workspace validation.
+			if err := outputValidate(console, report, output); err != nil {
 				return err
 			}
 
-			// signal a non-zero exit when the graded report fails; the findings are
+			// Signal a non-zero exit when the graded report fails; the findings are
 			// already rendered, so only the verdict propagates.
 			if report.Failed {
 				return errValidationFailed
@@ -110,42 +118,58 @@ func NewValidateCmd() *cobra.Command {
 		},
 	}
 
-	env.RegisterFlags(cmd.Flags(),
-		env.WithRequireOverlays,
-		env.WithPrefix,
-		env.WithSuffix,
-		env.WithDelimiter,
-		env.WithOverload,
-		env.WithReferencePattern,
-	)
-
-	flags.Bind(cmd.Flags(), &flags.Output)
-	flags.Bind(cmd.Flags(), &Strict)
-
-	registerSelectionFlags(cmd, selections)
+	// Bind the command-line flags.
+	{
+		fs := cmd.Flags()
+		flags.Bind(fs, &flags.Output)
+		flags.Bind(fs, &strictFlag)
+		bindEnvOptionsFlags(fs)
+		bindSelectionFlags(fs, selections)
+	}
 
 	return cmd
 }
 
-// NewCommand is an alias for NewValidateCmd.
-func NewCommand() *cobra.Command {
-	return NewValidateCmd()
+// validateRenderer renders a validate.Report to the console.
+type validateRenderer struct {
+	console *printer.Printer
 }
 
-// registerSelectionFlags adds one boolean selection flag per check, binding each
+// outputValidate renders the findings in table or JSON format. An unrecognized
+// format is rejected so a typo like --output=jsonn fails loudly.
+func outputValidate(
+	console *printer.Printer,
+	report validate.Report,
+	format string,
+) error {
+	render := validateRenderer{
+		console: console,
+	}
+
+	switch format {
+	case "", "table":
+		return render.table(report)
+	case "json":
+		return render.json(report)
+	default:
+		return fmt.Errorf("invalid output format %q (want table or json)", format)
+	}
+}
+
+// bindSelectionFlags adds one boolean selection flag per check, binding each
 // into selections keyed by the check's canonical code so RunE can read which were
 // set. The flag name is the check code's kebab-case form, matching its envx.yaml
 // severity key so the flag and the config property can never drift apart.
-func registerSelectionFlags(cmd *cobra.Command, selections map[string]*bool) {
-	for _, check := range engine.Checks() {
+func bindSelectionFlags(fs *pflag.FlagSet, selections map[string]*bool) {
+	for _, check := range validate.Checks() {
 		usage := "run only this check: " + check.Summary + " [" + string(check.Group) + "]"
-		selections[check.Code] = cmd.Flags().Bool(engine.FlagName(check.Code), false, usage)
+		selections[check.Code] = fs.Bool(validate.FlagName(check.Code), false, usage)
 	}
 }
 
 // selectedChecks collapses the bound selection-flag pointers into a set of the
 // codes whose flags were set. An empty result means no selection was made, which
-// the engine reads as "run every check".
+// the service reads as "run every check".
 func selectedChecks(selections map[string]*bool) map[string]bool {
 	selected := make(map[string]bool)
 	for code, value := range selections {

@@ -5,16 +5,20 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 
 	"github.com/go-envx/envx/app/internal/features/env"
 	envfilestore "github.com/go-envx/envx/app/internal/features/env/filestore"
+	"github.com/go-envx/envx/app/internal/features/pack"
 	"github.com/go-envx/envx/app/internal/features/privatekey"
 	pkfilestore "github.com/go-envx/envx/app/internal/features/privatekey/filestore"
 	"github.com/go-envx/envx/app/internal/features/secrets"
 	secfilestore "github.com/go-envx/envx/app/internal/features/secrets/filestore"
+	"github.com/go-envx/envx/app/internal/features/validate"
 	"github.com/go-envx/envx/app/internal/features/workspace"
 	wsfilestore "github.com/go-envx/envx/app/internal/features/workspace/filestore"
 	"github.com/go-envx/envx/app/internal/resources/cipher"
+	"github.com/go-envx/envx/app/internal/shared/status"
 )
 
 // NewConfiguredCipher resolves the workspace cipher when a manifest is present,
@@ -218,5 +222,86 @@ func NewWorkspaceEnvService(res *Result) (*env.Service, error) {
 		Settings:           globalSettings,
 		ResolverFactory:    resolverFact,
 		OSEnvironment:      osEnvironment(),
+	})
+}
+
+// NewPackService composes a pack.Service over a resolved workspace layout,
+// reading the workspace secrets store and writing bundled stores through secrets
+// filestores.
+func NewPackService(layout *WorkspaceLayout) (*pack.Service, error) {
+	if layout == nil {
+		return nil, errors.New("workspace layout is required")
+	}
+
+	projects := make([]pack.Project, 0, len(layout.Projects))
+	for _, project := range layout.Projects {
+		projects = append(projects, pack.Project{
+			Name:     project.Name,
+			Includes: project.Includes,
+		})
+	}
+
+	secStore, err := secfilestore.New(secfilestore.Params{Path: layout.SecretsPath})
+	if err != nil {
+		return nil, fmt.Errorf("creating secrets store: %w", err)
+	}
+
+	return pack.NewService(pack.ServiceParams{
+		Workspace: pack.Workspace{
+			ManifestPath: layout.ManifestPath,
+			Root:         layout.Root,
+			SecretsPath:  layout.SecretsPath,
+			Environments: layout.Environments,
+			Projects:     projects,
+		},
+		SecretsReader: secStore,
+		NewSecretsWriter: func(path string) (pack.SecretsWriter, error) {
+			bundleStore, err := secfilestore.New(secfilestore.Params{Path: path})
+			if err != nil {
+				return nil, err
+			}
+			return bundleStore, nil
+		},
+	})
+}
+
+// NewValidateService composes a validate.Service from a resolved workspace: the
+// workspace-level env.Service diagnoses each project environment and the secrets
+// service supplies the store-level findings.
+func NewValidateService(res *Result) (*validate.Service, error) {
+	if res == nil || res.workspace == nil {
+		return nil, errors.New("workspace is required")
+	}
+
+	envService, err := NewWorkspaceEnvService(res)
+	if err != nil {
+		return nil, err
+	}
+
+	secretsService, err := NewSecretsManager(res.Secrets, res.Cipher)
+	if err != nil {
+		return nil, err
+	}
+
+	// The manifest already validated the validate block at load, so this only
+	// re-keys it by canonical code.
+	severity, err := status.Resolve(res.workspace.ValidateSeverities)
+	if err != nil {
+		return nil, err
+	}
+
+	// Diagnose projects in sorted name order for deterministic output.
+	projects := make([]string, 0, len(res.workspace.Projects))
+	for name := range res.workspace.Projects {
+		projects = append(projects, name)
+	}
+	sort.Strings(projects)
+
+	return validate.NewService(validate.ServiceParams{
+		Environment:  envService,
+		Store:        secretsService,
+		Projects:     projects,
+		Environments: res.workspace.Environments,
+		Severity:     severity,
 	})
 }

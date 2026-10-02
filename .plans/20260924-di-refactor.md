@@ -1158,7 +1158,7 @@ flowchart LR
     Sub83 --> Sub84["✅ 8.4: env<br/>(NamespaceStore)"]
     Sub84 --> Sub85["✅ 8.5: runner<br/>(Process Supervision)"]
     Sub85 --> Sub86["✅ 8.6: emit<br/>(Serialization Engine)"]
-    Sub86 --> Sub87["8.7: pack & validate<br/>(Bundling & Checks)"]
+    Sub86 --> Sub87["✅ 8.7: pack & validate<br/>(Bundling & Checks)"]
     Sub87 --> Sub88["8.8: core<br/>(Composition Clean)"]
     Sub88 --> Sub89["8.9: Polish<br/>(Mocks & Verification)"]
 ```
@@ -1208,11 +1208,11 @@ flowchart LR
 4. **Update CLI caller**: `core.App` exposes `EmitService(writer)`, wired through `emitcli.NewEmitCommand(app)` in [app/internal/cli/root.go](app/internal/cli/root.go).
 5. **Update tests & verify**: Migrated tests to `emit.Service` and command-level tests with a mock `Factory`. Verified with `task envx:test`.
 
-### Phase 8.7: Bundling & Diagnostics DI Refactoring (`pack` & `validate`)
-1. **Refactor pack Service**: Encapsulate workspace layout bundling, path rewriting, and store filtering into `pack.Service`.
-2. **Refactor validate Service & Consumer Interfaces**: Define `EnvironmentDiagnoser` and `StoreDiagnoser` interfaces in `validate`, decoupling it from concrete services.
-3. **Update CLI callers**: Wire `pack.Service` and `validate.Service` into their presentation CLI adapters.
-4. **Update tests & verify**: Run `task envx:test`.
+### ✅ Phase 8.7: Bundling & Diagnostics DI Refactoring (`pack` & `validate`)
+1. **Refactor pack Service**: Framed workspace bundling in `pack.Service` with `ServiceParams` (the file-level `Workspace` layout, a consumer-defined `SecretsReader`, and a `NewSecretsWriter` factory for the bundled store) and `Pack(params PackParams) (PackResult, error)` in [app/internal/features/pack/service.go](app/internal/features/pack/service.go). Models live in [app/internal/features/pack/bundle.go](app/internal/features/pack/bundle.go), planning helpers in [app/internal/features/pack/plan.go](app/internal/features/pack/plan.go), and sentinel errors (`ErrOutputRequired`, `ErrOutputNotEmpty`, `ErrOutputNotDirectory`, `ErrNoEnvironments`, `ErrEnvironmentNotDeclared`, `ErrProjectNotDeclared`) in [app/internal/features/pack/errors.go](app/internal/features/pack/errors.go). `pack` no longer imports the secrets filestore.
+2. **Refactor validate Service & Consumer Interfaces**: Defined `EnvironmentDiagnoser` and `StoreDiagnoser` in [app/internal/features/validate/service.go](app/internal/features/validate/service.go), decoupling `validate` from the concrete `env` and `secrets` services. `validate.Service` (`ServiceParams`: diagnosers, project and environment names, severity overrides) exposes `Validate(params ValidateParams) (Report, error)`, replacing `Params`, `Workspace`, and `ProjectManager`.
+3. **Update CLI callers**: `pack/cli` and `validate/cli` consume a `Factory` (`PackService(configPath)` and `ValidateService(configPath)`) and follow the `cli.go`, `cmd_*.go`, `env_options.go`, `render_*` layout used by `env/cli`, `secrets/cli`, and `emit/cli`. `core.App` composes both through `NewPackService` and `NewValidateService`, wired via `packcli.NewPackCommand(app)` and `validatecli.NewValidateCommand(app)` in [app/internal/cli/root.go](app/internal/cli/root.go). The superseded `core.ResolveWorkspaceProjects` was removed.
+4. **Update tests & verify**: Added in-memory fake diagnoser tests in [app/internal/features/validate/service_test.go](app/internal/features/validate/service_test.go), composition tests in [app/internal/core/app_test.go](app/internal/core/app_test.go), and command-level tests with a mock `Factory`. Verified with `task envx:test`.
 
 ### Phase 8.8: Core Composition Root Streamlining
 1. **Consolidate builder methods**: Review and simplify builder functions across [app/internal/core/config.go](app/internal/core/config.go), [app/internal/core/composer.go](app/internal/core/composer.go), and [app/internal/core/workspace.go](app/internal/core/workspace.go).

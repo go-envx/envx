@@ -5,9 +5,11 @@ import (
 
 	"github.com/go-envx/envx/app/internal/features/emit"
 	"github.com/go-envx/envx/app/internal/features/env"
+	"github.com/go-envx/envx/app/internal/features/pack"
 	"github.com/go-envx/envx/app/internal/features/runner"
 	"github.com/go-envx/envx/app/internal/features/scaffold"
 	"github.com/go-envx/envx/app/internal/features/secrets"
+	"github.com/go-envx/envx/app/internal/features/validate"
 )
 
 // App is the application-level factory created once at process startup.
@@ -65,4 +67,36 @@ func (a *App) EnvService(configPath string) (*env.Service, error) {
 		return nil, err
 	}
 	return NewWorkspaceEnvService(res)
+}
+
+// PackService resolves the workspace layout and returns the domain bundling
+// service.
+func (a *App) PackService(configPath string) (*pack.Service, error) {
+	var in *Input
+	if configPath != "" {
+		in = &Input{ConfigPath: &configPath}
+	} else {
+		in = &Input{}
+	}
+	layout, err := ResolveWorkspaceLayout(in)
+	if err != nil {
+		return nil, err
+	}
+	return NewPackService(layout)
+}
+
+// ValidateService resolves workspace configuration and returns the domain
+// workspace diagnostics service.
+func (a *App) ValidateService(configPath string) (*validate.Service, error) {
+	var in *Input
+	if configPath != "" {
+		in = &Input{ConfigPath: &configPath}
+	} else {
+		in = &Input{}
+	}
+	res, err := ResolveWorkspace(in)
+	if err != nil {
+		return nil, err
+	}
+	return NewValidateService(res)
 }

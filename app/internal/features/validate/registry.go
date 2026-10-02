@@ -171,7 +171,7 @@ func groupRank(code string) int {
 // runs reports whether the check with the given code should run. With no
 // selection every check runs; with a selection only the named checks run, so a
 // hook pays only for the checks it lists.
-func (p Params) runs(code string) bool {
+func (p ValidateParams) runs(code string) bool {
 	if len(p.Selected) == 0 {
 		return true
 	}
@@ -181,7 +181,7 @@ func (p Params) runs(code string) bool {
 // needsMerge reports whether any selected check reads the per-environment merge.
 // A store-only selection returns false, so validate performs no merge and no
 // network I/O for a pre-commit hook that runs only the offline store checks.
-func (p Params) needsMerge() bool {
+func (p ValidateParams) needsMerge() bool {
 	for _, check := range registry {
 		if check.RequiresMerge && p.runs(check.Code) {
 			return true
