@@ -3,50 +3,47 @@ package runner
 import (
 	"bytes"
 	"errors"
-	"os"
 	"strings"
 	"testing"
 
 	"github.com/go-envx/envx/app/internal/shared/exitcode"
 )
 
-// TestNewServiceDefaultsStreams verifies that nil streams fall back to the process's
-// standard streams.
-func TestNewServiceDefaultsStreams(t *testing.T) {
+// TestRunDefaultsNilStreams verifies that nil streams fall back to the process's
+// standard streams rather than failing.
+func TestRunDefaultsNilStreams(t *testing.T) {
 	t.Parallel()
 
-	svc := NewService(ServiceParams{})
-	if svc.params.Stdout != os.Stdout {
-		t.Errorf("Stdout = %v, want os.Stdout", svc.params.Stdout)
-	}
-	if svc.params.Stderr != os.Stderr {
-		t.Errorf("Stderr = %v, want os.Stderr", svc.params.Stderr)
-	}
-	if svc.params.Stdin != os.Stdin {
-		t.Errorf("Stdin = %v, want os.Stdin", svc.params.Stdin)
+	svc := NewService()
+	err := svc.Run(RunParams{
+		Args: []string{"sh", "-c", "exit 0"},
+	})
+	if err != nil {
+		t.Fatalf("Run: %v", err)
 	}
 }
 
-// TestNewServicePreservesStreams verifies that explicit streams are left untouched.
-func TestNewServicePreservesStreams(t *testing.T) {
+// TestRunUsesInjectedStreams verifies the supplied stdin reaches the child and
+// its stdout and stderr land in the supplied writers.
+func TestRunUsesInjectedStreams(t *testing.T) {
 	t.Parallel()
 
-	var out, errBuf bytes.Buffer
-	in := strings.NewReader("input")
-	svc := NewService(ServiceParams{
-		Stdout: &out,
-		Stderr: &errBuf,
-		Stdin:  in,
+	var stdout, stderr bytes.Buffer
+	svc := NewService()
+	err := svc.Run(RunParams{
+		Args:   []string{"sh", "-c", "cat; echo err >&2"},
+		Stdout: &stdout,
+		Stderr: &stderr,
+		Stdin:  strings.NewReader("input"),
 	})
-
-	if svc.params.Stdout != &out {
-		t.Error("Stdout was replaced, want the provided writer")
+	if err != nil {
+		t.Fatalf("Run: %v", err)
 	}
-	if svc.params.Stderr != &errBuf {
-		t.Error("Stderr was replaced, want the provided writer")
+	if got := stdout.String(); got != "input" {
+		t.Errorf("stdout = %q, want %q", got, "input")
 	}
-	if svc.params.Stdin != in {
-		t.Error("Stdin was replaced, want the provided reader")
+	if got := stderr.String(); got != "err\n" {
+		t.Errorf("stderr = %q, want %q", got, "err\n")
 	}
 }
 
@@ -56,13 +53,12 @@ func TestRunInjectsEnv(t *testing.T) {
 	t.Parallel()
 
 	var stdout bytes.Buffer
-	svc := NewService(ServiceParams{
+	svc := NewService()
+	err := svc.Run(RunParams{
+		Args:   []string{"printenv", "FROM_FILE"},
+		Env:    map[string]string{"FROM_FILE": "yes"},
 		Stdout: &stdout,
 		Stderr: &bytes.Buffer{},
-	})
-	err := svc.Run(RunParams{
-		Args: []string{"printenv", "FROM_FILE"},
-		Env:  map[string]string{"FROM_FILE": "yes"},
 	})
 	if err != nil {
 		t.Fatalf("Run: %v", err)
@@ -77,12 +73,11 @@ func TestRunInjectsEnv(t *testing.T) {
 func TestRunPropagatesExitCode(t *testing.T) {
 	t.Parallel()
 
-	svc := NewService(ServiceParams{
+	svc := NewService()
+	err := svc.Run(RunParams{
+		Args:   []string{"sh", "-c", "exit 3"},
 		Stdout: &bytes.Buffer{},
 		Stderr: &bytes.Buffer{},
-	})
-	err := svc.Run(RunParams{
-		Args: []string{"sh", "-c", "exit 3"},
 	})
 	var ec *exitcode.Error
 	if !errors.As(err, &ec) {
@@ -97,7 +92,7 @@ func TestRunPropagatesExitCode(t *testing.T) {
 func TestRunNoCommand(t *testing.T) {
 	t.Parallel()
 
-	svc := NewService(ServiceParams{})
+	svc := NewService()
 	err := svc.Run(RunParams{})
 	if !errors.Is(err, ErrNoCommandSpecified) {
 		t.Fatalf("expected ErrNoCommandSpecified, got %v", err)
@@ -110,12 +105,11 @@ func TestRunCommandNotFound(t *testing.T) {
 	t.Parallel()
 
 	var stderr bytes.Buffer
-	svc := NewService(ServiceParams{
+	svc := NewService()
+	err := svc.Run(RunParams{
+		Args:   []string{"envx-nonexistent-command-xyz"},
 		Stdout: &bytes.Buffer{},
 		Stderr: &stderr,
-	})
-	err := svc.Run(RunParams{
-		Args: []string{"envx-nonexistent-command-xyz"},
 	})
 	if !errors.Is(err, ErrProcessStartFailed) {
 		t.Fatalf("expected ErrProcessStartFailed, got %v", err)
@@ -139,12 +133,11 @@ func TestRunSignaledExitCode(t *testing.T) {
 	t.Parallel()
 
 	// The child signals only its own PID ($$), so the test process is unaffected.
-	svc := NewService(ServiceParams{
+	svc := NewService()
+	err := svc.Run(RunParams{
+		Args:   []string{"sh", "-c", "kill -INT $$"},
 		Stdout: &bytes.Buffer{},
 		Stderr: &bytes.Buffer{},
-	})
-	err := svc.Run(RunParams{
-		Args: []string{"sh", "-c", "kill -INT $$"},
 	})
 	var ec *exitcode.Error
 	if !errors.As(err, &ec) {

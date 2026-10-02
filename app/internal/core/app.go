@@ -2,6 +2,7 @@ package core
 
 import (
 	"github.com/go-envx/envx/app/internal/features/env"
+	"github.com/go-envx/envx/app/internal/features/runner"
 	"github.com/go-envx/envx/app/internal/features/scaffold"
 	"github.com/go-envx/envx/app/internal/features/secrets"
 )
@@ -20,6 +21,11 @@ func (a *App) ScaffoldService() (*scaffold.Service, error) {
 	return scaffold.NewService(scaffold.ServiceParams{
 		Source: scaffold.TemplatesFS,
 	})
+}
+
+// RunnerService returns the domain process execution service.
+func (a *App) RunnerService() (*runner.Service, error) {
+	return runner.NewService(), nil
 }
 
 // SecretsService resolves the workspace and returns the domain secrets service.

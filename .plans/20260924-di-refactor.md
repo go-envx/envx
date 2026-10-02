@@ -1156,7 +1156,7 @@ flowchart LR
     Sub81["✅ 8.1: privatekey<br/>(Lighthouse)"] --> Sub82["✅ 8.2: workspace & scaffold<br/>(Workspace & Scaffolder)"]
     Sub82 --> Sub83["✅ 8.3: secrets<br/>(Store & Service)"]
     Sub83 --> Sub84["✅ 8.4: env<br/>(NamespaceStore)"]
-    Sub84 --> Sub85["8.5: runner<br/>(Process Supervision)"]
+    Sub84 --> Sub85["✅ 8.5: runner<br/>(Process Supervision)"]
     Sub85 --> Sub86["8.6: emit<br/>(Serialization Engine)"]
     Sub86 --> Sub87["8.7: pack & validate<br/>(Bundling & Checks)"]
     Sub87 --> Sub88["8.8: core<br/>(Composition Clean)"]
@@ -1194,10 +1194,10 @@ flowchart LR
 4. **Wire in core**: Added `NewEnvService` in [app/internal/core/composer.go](app/internal/core/composer.go) and updated `ResolveProject` in [app/internal/core/config.go](app/internal/core/config.go) to construct and inject the env filestore.
 5. **Update tests & verify**: Migrated unit tests in `features/env` to use fast in-memory fake repositories without disk I/O or import cycles. Added comprehensive filestore tests in [app/internal/features/env/filestore/repository_test.go](app/internal/features/env/filestore/repository_test.go). Verified with `task envx:all`.
 
-### Phase 8.5: Process Execution DI Refactoring (`runner`)
+### ✅ Phase 8.5: Process Execution DI Refactoring (`runner`)
 1. **Refactor RunParams and stream injection**: Move process stream dependencies (`Stdout`, `Stderr`, `Stdin`) from `ServiceParams` to `RunParams` so streams are supplied directly to `runnerService.Run(params RunParams)` instead of `NewService()`, achieving true dependency inversion. Default nil streams to OS streams within `Run`.
 2. **Decouple environment resolution in CLI**: Extract environment resolution and materialization in [app/internal/features/runner/cli/action.go](app/internal/features/runner/cli/action.go) behind a consumer-defined interface (e.g. `environmentService`), decoupling `execute` from direct invocation of `core.ResolveProject`.
-3. **Inject runnerService at composition root**: With streams moved to `RunParams`, `runner.Service` is stateless and can be constructed once in [app/internal/cli/root.go](app/internal/cli/root.go) and injected via `runnercli.NewRunCmd(svc)`.
+3. **Inject runnerService via the app factory**: With streams moved to `RunParams`, `runner.Service` is stateless. `core.App` exposes `RunnerService()` and `EnvService(configPath)`, which the `runner/cli` `Factory` consumes through `runnercli.NewRunCommand(app)` in [app/internal/cli/root.go](app/internal/cli/root.go), matching the `env/cli` and `secrets/cli` layout (`cli.go`, `cmd_run.go`, `env_options.go`).
 4. **Define domain models and errors**: Keep sentinel errors (`ErrNoCommandSpecified`, `ErrProcessStartFailed`) in [app/internal/features/runner/errors.go](app/internal/features/runner/errors.go).
 5. **Update CLI callers & tests**: Wire the updated service and consumer interfaces into `runner/cli`, update test doubles, and run `task envx:test`.
 

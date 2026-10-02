@@ -112,8 +112,8 @@ func outputExplain(
 	absolute bool,
 ) error {
 	render := explainRenderer{
-		console: console,
-		reveal: reveal,
+		console:  console,
+		reveal:   reveal,
 		absolute: absolute,
 	}
 

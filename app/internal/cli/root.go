@@ -49,7 +49,7 @@ func NewRootCmd(info BuildInfo) *cobra.Command {
 		envcli.NewGetCommand(app),
 		secretscli.NewKeypairCmd(app),
 		packcli.NewPackCmd(),
-		runnercli.NewRunCmd(),
+		runnercli.NewRunCommand(app),
 		envcli.NewSetCommand(app),
 		envcli.NewExplainCommand(app),
 		emitcli.NewEmitCmd(),

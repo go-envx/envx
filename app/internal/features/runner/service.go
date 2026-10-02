@@ -11,20 +11,21 @@ import (
 	"github.com/go-envx/envx/app/internal/shared/exitcode"
 )
 
-// ServiceParams provides stream dependencies to the process execution service.
-type ServiceParams struct {
-	Stdout io.Writer
-	Stderr io.Writer
-	Stdin  io.Reader
-}
-
 // Service supervises child process lifecycle, signal propagation, and exit status.
-type Service struct {
-	params ServiceParams
-}
+// It is stateless: the command, environment, and streams arrive with each Run.
+type Service struct{}
 
 // NewService constructs a process execution domain service.
-func NewService(params ServiceParams) *Service {
+func NewService() *Service {
+	return &Service{}
+}
+
+// Run executes the command with injected environment and relays received signals.
+// Nil streams in params fall back to the process's standard streams.
+func (s *Service) Run(params RunParams) error {
+	if len(params.Args) == 0 {
+		return ErrNoCommandSpecified
+	}
 	if params.Stdout == nil {
 		params.Stdout = os.Stdout
 	}
@@ -34,14 +35,6 @@ func NewService(params ServiceParams) *Service {
 	if params.Stdin == nil {
 		params.Stdin = os.Stdin
 	}
-	return &Service{params: params}
-}
-
-// Run executes the command with injected environment and relays received signals.
-func (s *Service) Run(params RunParams) error {
-	if len(params.Args) == 0 {
-		return ErrNoCommandSpecified
-	}
 
 	// exec.Command (not CommandContext) is deliberate: envx stays transparent by
 	// forwarding signals to the child and mirroring its exit status, so the child
@@ -49,16 +42,16 @@ func (s *Service) Run(params RunParams) error {
 	// SIGKILL it out from under a graceful shutdown — the surprise we avoid here.
 	//nolint:gosec,noctx // intentional; see comment above
 	cmd := exec.Command(params.Args[0], params.Args[1:]...)
-	cmd.Stdin = s.params.Stdin
-	cmd.Stdout = s.params.Stdout
-	cmd.Stderr = s.params.Stderr
+	cmd.Stdin = params.Stdin
+	cmd.Stdout = params.Stdout
+	cmd.Stderr = params.Stderr
 	cmd.Env = mapToEnv(params.Env)
 
 	if err := cmd.Start(); err != nil {
 		// Mirror a shell: report the failure and exit with its conventional code
 		// (127 not-found, 126 found-but-not-executable) rather than the generic
 		// runtime code, so scripts wrapping `envx run` can branch on it.
-		_, _ = fmt.Fprintf(s.params.Stderr, "envx: %v\n", err)
+		_, _ = fmt.Fprintf(params.Stderr, "envx: %v\n", err)
 		ec := &exitcode.Error{Code: startFailureCode(err)}
 		return fmt.Errorf("%w: %w", ErrProcessStartFailed, ec)
 	}
@@ -67,7 +60,7 @@ func (s *Service) Run(params RunParams) error {
 	// keeps envx alive (rather than dying on the signal and orphaning the child)
 	// so it can wait for the child and mirror its final status. Terminal signals
 	// the tty already delivered to an interactive child are not re-forwarded.
-	interactive := s.stdinIsTerminal()
+	interactive := stdinIsTerminal(params.Stdin)
 
 	sigCh := make(chan os.Signal, 1)
 	signal.Notify(sigCh, forwardedSignals...)
@@ -104,8 +97,8 @@ func (s *Service) Run(params RunParams) error {
 // tells Run whether the tty will deliver SIGINT/SIGQUIT to the child directly. A
 // non-tty character device such as /dev/null is a harmless false positive: at
 // worst envx skips forwarding a SIGINT a supervisor would otherwise send itself.
-func (s *Service) stdinIsTerminal() bool {
-	if f, ok := s.params.Stdin.(*os.File); ok {
+func stdinIsTerminal(stdin io.Reader) bool {
+	if f, ok := stdin.(*os.File); ok {
 		info, err := f.Stat()
 		if err != nil {
 			return false
