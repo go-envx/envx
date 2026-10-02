@@ -28,8 +28,6 @@ const (
 
 // newSecretsSetCommand builds the command that securely enters one secret value.
 func newSecretsSetCommand(f Factory) *cobra.Command {
-	var noConfirm bool
-
 	cmd := &cobra.Command{
 		Use:     setUsage,
 		Short:   setShort,
@@ -37,7 +35,7 @@ func newSecretsSetCommand(f Factory) *cobra.Command {
 		Example: str.Dedent(setExample, 2),
 		Args:    cobra.RangeArgs(2, 3),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			// Extract command-line arguments for group, key, and optional plaintext.
+			// Extract command-line arguments.
 			group := args[0]
 			key := args[1]
 			var plaintext *string
@@ -45,11 +43,9 @@ func newSecretsSetCommand(f Factory) *cobra.Command {
 				plaintext = &args[2]
 			}
 
-			// Extract the configuration path from the command flags.
-			configPath, err := cmd.Flags().GetString(flags.Config.Name)
-			if err != nil {
-				return err
-			}
+			// Extract command-line flag values.
+			fs := cmd.Flags()
+			configPath := flags.Config.Get(fs)
 
 			// Obtain the secrets service using the configuration path.
 			secretsService, err := f.SecretsService(configPath)
@@ -66,7 +62,7 @@ func newSecretsSetCommand(f Factory) *cobra.Command {
 				return newSecretPrompt(secretPromptParams{
 					Stdin:     cmd.InOrStdin(),
 					Stderr:    cmd.ErrOrStderr(),
-					NoConfirm: noConfirm,
+					NoConfirm: noConfirmFlag.Get(fs),
 				}).readSecret()
 			}
 
@@ -87,7 +83,11 @@ func newSecretsSetCommand(f Factory) *cobra.Command {
 		},
 	}
 
-	flags.Bind(cmd.Flags(), &noConfirm, &noConfirmFlag)
+	// Bind the command-line flags.
+	{
+		fs := cmd.Flags()
+		flags.Bind(fs, &noConfirmFlag)
+	}
 
 	return cmd
 }

@@ -62,9 +62,6 @@ const (
 // runs the workspace-wide diagnosis, renders the findings, and returns a failure
 // error when the graded report fails so the process exits non-zero.
 func NewValidateCmd() *cobra.Command {
-	var output string
-	var strict bool
-
 	// Register one boolean selection flag per check, named identically to the
 	// check's envx.yaml severity key (kebab-case), so --secret-is-not-encrypted
 	// selects the check configured by validate.secret_is_not_encrypted. The value
@@ -79,11 +76,12 @@ func NewValidateCmd() *cobra.Command {
 		Args:    cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			// get the flag inputs
-			input := core.GetInput(cmd.Flags())
+			fs := cmd.Flags()
+			input := core.GetInput(fs)
 
 			// execute the action, selecting only the checks whose flags were set
 			report, err := execute(actionParams{
-				Strict:   strict,
+				Strict:   Strict.Get(fs),
 				Selected: selectedChecks(selections),
 			}, input)
 			if err != nil {
@@ -98,7 +96,7 @@ func NewValidateCmd() *cobra.Command {
 			if err := render(&renderParams{
 				Printer: pr,
 				Report:  report,
-				Format:  output,
+				Format:  flags.Output.Get(fs),
 			}); err != nil {
 				return err
 			}
@@ -121,8 +119,8 @@ func NewValidateCmd() *cobra.Command {
 		env.WithReferencePattern,
 	)
 
-	flags.Bind(cmd.Flags(), &output, &flags.Output)
-	flags.Bind(cmd.Flags(), &strict, &Strict)
+	flags.Bind(cmd.Flags(), &flags.Output)
+	flags.Bind(cmd.Flags(), &Strict)
 
 	registerSelectionFlags(cmd, selections)
 

@@ -13,6 +13,8 @@ type Explanation = ExplainResult
 type Entry = GetResult
 
 // New is a deprecated alias for NewService.
+//
+//nolint:gocritic // Deprecated alias matches original signature.
 func New(params ServiceParams) (*Service, error) {
 	return NewService(params)
 }

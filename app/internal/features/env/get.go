@@ -3,16 +3,24 @@ package env
 import (
 	"fmt"
 	"strings"
+
+	"github.com/go-envx/envx/app/internal/features/env/syntax"
 )
 
 // GetParams selects one key, environment, and reveal policy for a single lookup.
 type GetParams struct {
+	// Project selects the declared project to resolve.
+	Project string
 	// Key is the env-var key to look up; it is normalized to uppercase.
 	Key string
 	// Environment overrides the configured default; an empty value uses it.
 	Environment string
 	// Reveal controls whether the opened resolver decrypts references.
 	Reveal bool
+	// Options provides optional resolution setting overrides.
+	Options Options
+	// Settings provides direct resolution setting values.
+	Settings Settings
 }
 
 // Get loads the requested environment, selects the single winning value for the
@@ -26,19 +34,30 @@ type GetParams struct {
 // resolver so implicit references are canonicalized and escaped references are
 // unescaped, but it never substitutes: the {{ }} template is shown as declared.
 func (s *Service) Get(params GetParams) (GetResult, error) {
-	environment, err := s.normalizeEnvironment(params.Environment)
+	var envOpt *string
+	if params.Environment != "" {
+		envOpt = &params.Environment
+	}
+	ctx, err := s.resolveContext(
+		params.Project, envOpt, params.Options, params.Settings,
+	)
 	if err != nil {
 		return GetResult{}, err
 	}
 
-	state, err := s.merge(environment)
+	namespaces, err := s.loadNamespaces(ctx.includes)
+	if err != nil {
+		return GetResult{}, err
+	}
+
+	state, err := s.mergeLoaded(namespaces, ctx.environment, ctx.settings)
 	if err != nil {
 		return GetResult{}, err
 	}
 
 	// Apply OS source selection over the namespace keys, without unioning OS-only
 	// keys, so a get reflects an OS override exactly as run would.
-	s.applyOSEnvironment(state, false)
+	s.applyOSEnvironment(state, false, ctx.settings.Overload)
 
 	key := strings.ToUpper(params.Key)
 	value, ok := state.values[key]
@@ -53,7 +72,8 @@ func (s *Service) Get(params GetParams) (GetResult, error) {
 	}
 
 	rendered, err := s.getValue(
-		params.Reveal, state, resolver, environment, key, value, origin,
+		params.Reveal, state, resolver, ctx.environment, key, value, origin,
+		ctx.settings, ctx.grammar,
 	)
 	if err != nil {
 		return GetResult{}, err
@@ -78,9 +98,15 @@ func (s *Service) getValue(
 	environment, key string,
 	value leafValue,
 	origin Origin,
+	settings Settings,
+	grammar *syntax.Grammar,
 ) (string, error) {
 	if reveal {
-		engine := s.newSubstituter(s.getSymbols(state, resolver, environment))
+		engine := s.newSubstituterWith(
+			s.getSymbols(state, resolver, environment, settings.Delimiter),
+			grammar,
+			settings.Overload,
+		)
 		return engine.Resolve(key)
 	}
 
@@ -88,5 +114,5 @@ func (s *Service) getValue(
 	if err != nil {
 		return "", err
 	}
-	return renderLeafValue(resolved, origin.Winner.Key, s.params.Settings.Delimiter)
+	return renderLeafValue(resolved, origin.Winner.Key, settings.Delimiter)
 }

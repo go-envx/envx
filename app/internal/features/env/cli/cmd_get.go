@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/go-envx/envx/app/internal/core"
 	"github.com/go-envx/envx/app/internal/features/env"
 	"github.com/go-envx/envx/app/internal/shared/flags"
 	"github.com/go-envx/envx/app/internal/utils/str"
@@ -34,8 +33,6 @@ const (
 
 // NewGetCommand builds the "get" command.
 func NewGetCommand(f Factory) *cobra.Command {
-	var reveal bool
-
 	cmd := &cobra.Command{
 		Use:     getUsage,
 		Short:   getShort,
@@ -43,39 +40,44 @@ func NewGetCommand(f Factory) *cobra.Command {
 		Example: str.Dedent(getExample, 2),
 		Args:    cobra.ExactArgs(2),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			// Extract command-line arguments.
 			project := args[0]
 			key := args[1]
 
-			in := core.GetInput(cmd.Flags())
+			// Extract command-line flag values.
+			fs := cmd.Flags()
+			configPath := flags.Config.Get(fs)
+			reveal := revealFlag.Get(fs)
+			envOptions := getEnvOptions(fs)
 
-			envService, err := f.EnvService(in, project)
+			// Obtain the environment service using the configuration path.
+			envService, err := f.EnvService(configPath)
 			if err != nil {
 				return err
 			}
 
+			// Perform the environment get operation.
 			result, err := envService.Get(env.GetParams{
-				Key:    key,
-				Reveal: reveal,
+				Project: project,
+				Key:     key,
+				Reveal:  reveal,
+				Options: envOptions,
 			})
 			if err != nil {
 				return err
 			}
 
+			// Output the result of the environment get operation.
 			return outputGet(cmd.OutOrStdout(), result.Value)
 		},
 	}
 
-	env.RegisterFlags(cmd.Flags(),
-		env.WithEnv,
-		env.WithRequireOverlays,
-		env.WithPrefix,
-		env.WithSuffix,
-		env.WithDelimiter,
-		env.WithOverload,
-		env.WithReferencePattern,
-	)
-
-	flags.Bind(cmd.Flags(), &reveal, &env.Reveal)
+	// Bind the command-line flags.
+	{
+		fs := cmd.Flags()
+		flags.Bind(fs, &revealFlag)
+		bindEnvOptionsFlags(fs)
+	}
 
 	return cmd
 }

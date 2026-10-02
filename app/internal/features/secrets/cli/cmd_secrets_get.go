@@ -37,10 +37,8 @@ func newSecretsGetCommand(f Factory) *cobra.Command {
 			key := args[1]
 
 			// Extract the configuration path from the command flags.
-			configPath, err := cmd.Flags().GetString(flags.Config.Name)
-			if err != nil {
-				return err
-			}
+			fs := cmd.Flags()
+			configPath := flags.Config.Get(fs)
 
 			// Obtain the secrets service using the configuration path.
 			secretsService, err := f.SecretsService(configPath)

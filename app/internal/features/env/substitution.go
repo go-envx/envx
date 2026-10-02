@@ -34,22 +34,28 @@ func mapSymbols(
 // newSubstituter builds a syntax.Substituter over the provided symbol table,
 // wired to the manager's grammar, OS environment getter, and overload setting.
 func (s *Service) newSubstituter(symbols syntax.SymbolTable) *syntax.Substituter {
+	return s.newSubstituterWith(symbols, s.grammar, s.params.Settings.Overload)
+}
+
+// newSubstituterWith builds a substituter using the specified grammar and
+// overload setting.
+func (s *Service) newSubstituterWith(
+	symbols syntax.SymbolTable, grammar *syntax.Grammar, overload bool,
+) *syntax.Substituter {
 	return syntax.NewSubstituter(syntax.SubstituterParams{
-		Grammar:  s.grammar,
+		Grammar:  grammar,
 		Symbols:  symbols,
 		Getenv:   s.getenv(),
-		Overload: s.params.Settings.Overload,
+		Overload: overload,
 	})
 }
 
-// substituteAll composes every {{ }} reference over a fully resolved effective
-// environment, transitively, returning the substituted values. An OS-sourced
-// value is opaque and passes through untouched. A missing reference or a
-// reference cycle is fatal and yields no partial map.
+// substituteAll composes references using the specified grammar and overload.
 func (s *Service) substituteAll(
 	values map[string]string, origins map[string]Origin,
+	grammar *syntax.Grammar, overload bool,
 ) (map[string]string, error) {
-	engine := s.newSubstituter(mapSymbols(values, origins))
+	engine := s.newSubstituterWith(mapSymbols(values, origins), grammar, overload)
 	out := make(map[string]string, len(values))
 	for key := range values {
 		composed, err := engine.Resolve(key)
@@ -61,37 +67,36 @@ func (s *Service) substituteAll(
 	return out, nil
 }
 
-// resolveEffective materializes every winning value and then substitutes every
-// {{ }} reference over the resulting effective environment. It is the reveal-path
-// core shared by Materialize and a revealed Diff: both reveal every value, so a
-// dangling reference or a cycle anywhere is fatal and no partial result escapes.
+// resolveEffective materializes and substitutes with specified settings and
+// grammar.
 func (s *Service) resolveEffective(
 	state *mergeState, resolver ValueResolver, environment string,
+	settings Settings, grammar *syntax.Grammar,
 ) (map[string]string, error) {
-	result := materialize(state, s.params.Settings, resolver, environment)
+	result := materialize(state, settings, resolver, environment)
 	if err := materializationError(result.errs); err != nil {
 		return nil, err
 	}
-	return s.substituteAll(result.values, result.origins)
+	return s.substituteAll(
+		result.values, result.origins, grammar, settings.Overload,
+	)
 }
 
-// resolveEffectiveTolerant mirrors resolveEffective but downgrades every per-key
-// failure to a returned warning and omits the failing key instead of aborting.
-// materialize already omits a key whose secret fails to decrypt or whose list
-// fails to render; this stage additionally omits any key whose {{ }} reference is
-// missing or forms a cycle. Because each member of a cycle independently fails to
-// resolve, the whole cycle is omitted. A failed key that the OS environment still
-// defines falls back to that value so a broken file value never clobbers it.
+// resolveEffectiveTolerant resolves effective values tolerating errors using
+// specified settings and grammar.
 func (s *Service) resolveEffectiveTolerant(
 	state *mergeState, resolver ValueResolver, environment string,
+	settings Settings, grammar *syntax.Grammar,
 ) (map[string]string, []error) {
-	result := materialize(state, s.params.Settings, resolver, environment)
+	result := materialize(state, settings, resolver, environment)
 
 	// materialize leaves every failed key out of result.values; carry those
 	// failures forward and add any substitution failure to them.
 	failures := result.errs
 
-	engine := s.newSubstituter(mapSymbols(result.values, result.origins))
+	engine := s.newSubstituterWith(
+		mapSymbols(result.values, result.origins), grammar, settings.Overload,
+	)
 	out := make(map[string]string, len(result.values))
 	for key := range result.values {
 		composed, err := engine.Resolve(key)
@@ -136,13 +141,10 @@ func (s *Service) downgradeFailures(
 	return warnings
 }
 
-// getSymbols builds a lazy syntax.SymbolTable over a merged state that resolves each
-// referenced key's leaf on demand under the call's reveal policy. Only the keys
-// reachable from the requested key are materialized, so an unrelated dangling
-// reference never blocks the read while a dangling reference behind a referenced
-// key surfaces its real error.
+// getSymbols builds a lazy syntax.SymbolTable over a merged state using the
+// specified delimiter.
 func (s *Service) getSymbols(
-	state *mergeState, resolver ValueResolver, environment string,
+	state *mergeState, resolver ValueResolver, environment string, delimiter string,
 ) syntax.SymbolTable {
 	return syntax.SymbolTable{
 		Declared: func(name string) bool { _, ok := state.values[name]; return ok },
@@ -155,7 +157,7 @@ func (s *Service) getSymbols(
 				return "", err
 			}
 			return renderLeafValue(
-				resolved, state.origins[name].Winner.Key, s.params.Settings.Delimiter,
+				resolved, state.origins[name].Winner.Key, delimiter,
 			)
 		},
 	}

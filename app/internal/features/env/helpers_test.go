@@ -211,6 +211,8 @@ func managerFor(t *testing.T, params Params) *Manager {
 
 // mergeEnv constructs a Manager from p and materializes its default environment,
 // exercising the shared merge kernel exactly as a Manager operation does.
+//
+//nolint:gocritic // Test helper matches Params signature.
 func mergeEnv(t *testing.T, p Params) (*Environment, error) {
 	t.Helper()
 	if p.Repository == nil {

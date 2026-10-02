@@ -85,37 +85,37 @@ func RegisterFlags(fs *pflag.FlagSet, opts ...Option) {
 
 // WithEnv registers the --env flag on fs.
 func WithEnv(fs *pflag.FlagSet) {
-	flags.Bind(fs, new(string), &Env)
+	flags.Bind(fs, &Env)
 }
 
 // WithRequireOverlays registers the --require-overlays flag on fs.
 func WithRequireOverlays(fs *pflag.FlagSet) {
-	flags.Bind(fs, new(bool), &RequireOverlays)
+	flags.Bind(fs, &RequireOverlays)
 }
 
 // WithPrefix registers the --prefix flag on fs.
 func WithPrefix(fs *pflag.FlagSet) {
-	flags.Bind(fs, new(string), &Prefix)
+	flags.Bind(fs, &Prefix)
 }
 
 // WithSuffix registers the --suffix flag on fs.
 func WithSuffix(fs *pflag.FlagSet) {
-	flags.Bind(fs, new(string), &Suffix)
+	flags.Bind(fs, &Suffix)
 }
 
 // WithDelimiter registers the --delimiter flag on fs.
 func WithDelimiter(fs *pflag.FlagSet) {
-	flags.Bind(fs, new(string), &Delimiter)
+	flags.Bind(fs, &Delimiter)
 }
 
 // WithOverload registers the --overload flag on fs.
 func WithOverload(fs *pflag.FlagSet) {
-	flags.Bind(fs, new(bool), &Overload)
+	flags.Bind(fs, &Overload)
 }
 
 // WithReferencePattern registers the --reference-pattern flag on fs.
 func WithReferencePattern(fs *pflag.FlagSet) {
-	flags.Bind(fs, new(string), &ReferencePattern)
+	flags.Bind(fs, &ReferencePattern)
 }
 
 // PrecedenceString resolves a string setting: the explicit value wins when present,

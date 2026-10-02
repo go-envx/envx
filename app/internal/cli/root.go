@@ -40,7 +40,7 @@ func NewRootCmd(info BuildInfo) *cobra.Command {
 		},
 	}
 
-	flags.Bind(root.PersistentFlags(), new(string), &flags.Config)
+	flags.Bind(root.PersistentFlags(), &flags.Config)
 
 	app := core.NewApp()
 

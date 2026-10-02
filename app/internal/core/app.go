@@ -37,12 +37,18 @@ func (a *App) SecretsService(configPath string) (*secrets.Service, error) {
 	return NewSecretsManager(c.Secrets, c.Cipher)
 }
 
-// EnvService resolves project/workspace configuration and returns the domain
-// env service.
-func (a *App) EnvService(in *Input, project string) (*env.Service, error) {
-	resolved, err := ResolveProject(in, project)
+// EnvService resolves workspace configuration and returns the domain env
+// service.
+func (a *App) EnvService(configPath string) (*env.Service, error) {
+	var in *Input
+	if configPath != "" {
+		in = &Input{ConfigPath: &configPath}
+	} else {
+		in = &Input{}
+	}
+	res, err := ResolveWorkspace(in)
 	if err != nil {
 		return nil, err
 	}
-	return resolved.Envmerge, nil
+	return NewWorkspaceEnvService(res)
 }

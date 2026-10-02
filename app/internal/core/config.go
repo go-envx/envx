@@ -109,6 +109,7 @@ func ResolveProject(in *Input, project string) (*Result, error) {
 	if err != nil {
 		return nil, err
 	}
+	service.SetDefaultProject(project)
 	res.Envmerge = service
 	return res, nil
 }
@@ -272,10 +273,35 @@ func resolveEnvmergeParams(
 	pl projectLayer,
 ) env.Params {
 	proj, global := pl.settings, mc.workspace.Settings
+	var projects map[string]env.ProjectConfig
+	if mc.workspace != nil && len(mc.workspace.Projects) > 0 {
+		projects = make(map[string]env.ProjectConfig, len(mc.workspace.Projects))
+		for name, p := range mc.workspace.Projects {
+			absIncludes := make([]string, len(p.Includes))
+			for i, inc := range p.Includes {
+				absIncludes[i] = filepath.Join(mc.dir, inc)
+			}
+			projects[name] = env.ProjectConfig{
+				Name:     name,
+				Includes: absIncludes,
+				Settings: env.Options{
+					Delimiter:        p.Settings.Delimiter,
+					Env:              p.Settings.Env,
+					Overload:         p.Settings.Overload,
+					Prefix:           p.Settings.Prefix,
+					ReferencePattern: p.Settings.ReferencePattern,
+					RequireOverlays:  p.Settings.RequireOverlays,
+					Suffix:           p.Settings.Suffix,
+				},
+			}
+		}
+	}
 	return env.Params{
-		WorkspaceDir: mc.dir,
-		Includes:     pl.includes,
-		Environments: mc.workspace.Environments,
+		WorkspaceDir:   mc.dir,
+		Projects:       projects,
+		DefaultProject: mc.project,
+		Includes:       pl.includes,
+		Environments:   mc.workspace.Environments,
 		DefaultEnvironment: env.PrecedenceString(&env.Env,
 			in.Env,
 			proj.Env,

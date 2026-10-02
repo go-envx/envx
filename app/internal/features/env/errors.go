@@ -7,6 +7,8 @@ import (
 )
 
 var (
+	// ErrProjectNotFound indicates that a requested project is not declared.
+	ErrProjectNotFound = errors.New("project not declared")
 	// ErrEnvironmentNotDeclared indicates that a requested environment is not declared.
 	ErrEnvironmentNotDeclared = errors.New("environment not declared")
 	// ErrOverlayNotFound indicates a required environment overlay file is missing.

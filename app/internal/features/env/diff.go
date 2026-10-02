@@ -1,6 +1,10 @@
 package env
 
-import "sort"
+import (
+	"sort"
+
+	"github.com/go-envx/envx/app/internal/features/env/syntax"
+)
 
 // Change records one differing key and its rendered literal on each side.
 type Change struct {
@@ -33,6 +37,8 @@ type DiffResult struct {
 // diff mirrors get: masked it compares declarations, revealed it compares
 // resolved values.
 type DiffParams struct {
+	// Project selects the declared project to resolve.
+	Project string
 	// EnvironmentA is the first ("before") environment name.
 	EnvironmentA string
 	// EnvironmentB is the second ("after") environment name.
@@ -40,6 +46,10 @@ type DiffParams struct {
 	// Reveal controls whether each side is resolved and substituted before the
 	// comparison.
 	Reveal bool
+	// Options provides optional resolution setting overrides.
+	Options Options
+	// Settings provides direct resolution setting values.
+	Settings Settings
 }
 
 // Diff validates both environment names, loads and flattens every base namespace
@@ -52,6 +62,13 @@ type DiffParams struct {
 // flatten, and render failures on either side are fatal and yield no partial
 // result.
 func (s *Service) Diff(params DiffParams) (*DiffResult, error) {
+	ctx, err := s.resolveContext(
+		params.Project, nil, params.Options, params.Settings,
+	)
+	if err != nil {
+		return nil, err
+	}
+
 	envA, err := s.normalizeEnvironment(params.EnvironmentA)
 	if err != nil {
 		return nil, err
@@ -61,26 +78,28 @@ func (s *Service) Diff(params DiffParams) (*DiffResult, error) {
 		return nil, err
 	}
 
-	namespaces, err := s.loadNamespaces()
+	namespaces, err := s.loadNamespaces(ctx.includes)
 	if err != nil {
 		return nil, err
 	}
 
-	stateA, err := s.mergeLoaded(namespaces, envA)
+	stateA, err := s.mergeLoaded(namespaces, envA, ctx.settings)
 	if err != nil {
 		return nil, err
 	}
-	stateB, err := s.mergeLoaded(namespaces, envB)
+	stateB, err := s.mergeLoaded(namespaces, envB, ctx.settings)
 	if err != nil {
 		return nil, err
 	}
 
 	// Apply OS source selection to each side so an OS override is compared exactly
 	// as run would see it; OS-only keys are excluded from the comparison.
-	s.applyOSEnvironment(stateA, false)
-	s.applyOSEnvironment(stateB, false)
+	s.applyOSEnvironment(stateA, false, ctx.settings.Overload)
+	s.applyOSEnvironment(stateB, false, ctx.settings.Overload)
 
-	valuesA, valuesB, err := s.diffValues(params.Reveal, stateA, stateB, envA, envB)
+	valuesA, valuesB, err := s.diffValues(
+		params.Reveal, stateA, stateB, envA, envB, ctx.settings, ctx.grammar,
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -94,9 +113,10 @@ func (s *Service) Diff(params DiffParams) (*DiffResult, error) {
 // revealing resolver.
 func (s *Service) diffValues(
 	reveal bool, stateA, stateB *mergeState, envA, envB string,
+	settings Settings, grammar *syntax.Grammar,
 ) (mapA, mapB map[string]string, err error) {
 	if !reveal {
-		delimiter := s.params.Settings.Delimiter
+		delimiter := settings.Delimiter
 		literalsA, lerr := renderLiterals(stateA, delimiter)
 		if lerr != nil {
 			return nil, nil, lerr
@@ -112,11 +132,15 @@ func (s *Service) diffValues(
 	if rerr != nil {
 		return nil, nil, rerr
 	}
-	valuesA, rerr := s.resolveEffective(stateA, resolver, envA)
+	valuesA, rerr := s.resolveEffective(
+		stateA, resolver, envA, settings, grammar,
+	)
 	if rerr != nil {
 		return nil, nil, rerr
 	}
-	valuesB, rerr := s.resolveEffective(stateB, resolver, envB)
+	valuesB, rerr := s.resolveEffective(
+		stateB, resolver, envB, settings, grammar,
+	)
 	if rerr != nil {
 		return nil, nil, rerr
 	}

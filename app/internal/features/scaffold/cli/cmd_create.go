@@ -28,13 +28,6 @@ const (
 	`
 )
 
-// templateSpec describes the metadata for a single template subcommand.
-type templateSpec struct {
-	Name  string
-	Short string
-	Long  string
-}
-
 // NewCreateCommand builds the "create" command and its per-template subcommands.
 func NewCreateCommand(factory Factory) *cobra.Command {
 	cmd := &cobra.Command{
@@ -57,18 +50,18 @@ func NewCreateCommand(factory Factory) *cobra.Command {
 }
 
 // newTemplateCommand builds one "create <template>" subcommand.
-func newTemplateCommand(f Factory, spec templateSpec) *cobra.Command {
-	var (
-		targetDir string
-		force     bool
-	)
+func newTemplateCommand(f Factory, template templateSpec) *cobra.Command {
+	templateDirFlag := template.targetDirFlag()
 
 	cmd := &cobra.Command{
-		Use:   spec.Name,
-		Short: spec.Short,
-		Long:  str.Dedent(spec.Long),
+		Use:   template.Name,
+		Short: template.Short,
+		Long:  str.Dedent(template.Long),
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
+			fs := cmd.Flags()
+			targetDir := templateDirFlag.Get(fs)
+
 			// Obtain the scaffold service from the factory.
 			scaffoldService, err := f.ScaffoldService()
 			if err != nil {
@@ -77,9 +70,9 @@ func newTemplateCommand(f Factory, spec templateSpec) *cobra.Command {
 
 			// Create the workspace template using the scaffold service.
 			result, err := scaffoldService.Create(scaffold.CreateParams{
-				Template:  spec.Name,
+				Template:  template.Name,
 				TargetDir: targetDir,
-				Force:     force,
+				Force:     forceFlag.Get(fs),
 			})
 			if err != nil {
 				return err
@@ -94,15 +87,15 @@ func newTemplateCommand(f Factory, spec templateSpec) *cobra.Command {
 			// Output the result of the scaffold operation.
 			return outputCreate(
 				console,
-				spec.Name,
+				template.Name,
 				targetDir,
 				result,
 			)
 		},
 	}
 
-	flags.Bind(cmd.Flags(), &targetDir, targetDirFor(spec.Name))
-	flags.Bind(cmd.Flags(), &force, &forceFlag)
+	flags.Bind(cmd.Flags(), &templateDirFlag)
+	flags.Bind(cmd.Flags(), &forceFlag)
 
 	return cmd
 }

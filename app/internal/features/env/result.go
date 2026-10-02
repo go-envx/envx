@@ -25,6 +25,8 @@ type SetResult struct {
 // ExplainResult is a sorted diagnostic view of selected winning values and
 // summary.
 type ExplainResult struct {
+	// WorkspaceDir is the workspace root that source paths are relative to.
+	WorkspaceDir string
 	// Entries holds one diagnostic row per selected key, sorted by key.
 	Entries []ExplanationEntry
 	// Summary aggregates the resolution severities across the selected entries.

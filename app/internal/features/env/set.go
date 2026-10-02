@@ -10,6 +10,8 @@ import (
 // SetParams defines input parameters for setting an environment variable in an
 // overlay.
 type SetParams struct {
+	// Project optionally limits the target overlay search to one declared project.
+	Project string
 	// IncludePath identifies the target overlay from a project's includes list.
 	IncludePath string
 	// Key is the dot-separated key path to write.
@@ -41,11 +43,35 @@ func (s *Service) Set(params SetParams) (SetResult, error) {
 		targetPath = filepath.Join(s.params.WorkspaceDir, targetPath)
 	}
 
-	if len(s.params.Includes) > 0 {
+	var allowedIncludes []string
+	switch {
+	case params.Project != "":
+		if s.params.Projects == nil {
+			return SetResult{}, fmt.Errorf(
+				"%w: %q", ErrProjectNotFound, params.Project,
+			)
+		}
+		proj, ok := s.params.Projects[params.Project]
+		if !ok {
+			return SetResult{}, fmt.Errorf(
+				"%w: project %q not found in manifest",
+				ErrProjectNotFound, params.Project,
+			)
+		}
+		allowedIncludes = proj.Includes
+	case len(s.params.Projects) > 0:
+		for _, proj := range s.params.Projects {
+			allowedIncludes = append(allowedIncludes, proj.Includes...)
+		}
+	default:
+		allowedIncludes = s.params.Includes
+	}
+
+	if len(allowedIncludes) > 0 {
 		found := false
 		cleanTarget := strings.TrimSuffix(targetPath, ".yaml")
 		cleanParam := strings.TrimSuffix(params.IncludePath, ".yaml")
-		for _, inc := range s.params.Includes {
+		for _, inc := range allowedIncludes {
 			cleanInc := strings.TrimSuffix(inc, ".yaml")
 			if cleanInc == cleanTarget || cleanInc == cleanParam ||
 				strings.HasSuffix(cleanInc, "/"+cleanParam) {

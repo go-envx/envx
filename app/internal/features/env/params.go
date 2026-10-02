@@ -34,11 +34,33 @@ type Settings struct {
 	ReferencePattern string
 }
 
+// ProjectConfig defines one declared project's namespace includes and setting
+// options.
+type ProjectConfig struct {
+	Name     string
+	Includes []string
+	Settings Options
+}
+
+// Options provides optional resolution setting overrides for an operation or
+// project.
+type Options struct {
+	Delimiter        *string
+	Env              *string
+	Overload         *bool
+	Prefix           *string
+	ReferencePattern *string
+	RequireOverlays  *bool
+	Suffix           *string
+}
+
 // normalizeParams applies envmerge's structural terminal defaults, copies the
 // caller-owned slices so later mutation cannot change service behavior, and
 // returns the normalized params. It does not validate the environment: each
 // operation validates the environment it actually uses, so an irrelevant default
 // cannot block an operation that overrides it.
+//
+//nolint:gocritic // Internal normalizer copies caller parameters.
 func normalizeParams(params ServiceParams) (ServiceParams, error) {
 	// Apply the default list delimiter when none was configured.
 	if params.Settings.Delimiter == "" {
@@ -50,6 +72,15 @@ func normalizeParams(params ServiceParams) (ServiceParams, error) {
 	params.Includes = slices.Clone(params.Includes)
 	params.Environments = slices.Clone(params.Environments)
 	params.OSEnvironment = maps.Clone(params.OSEnvironment)
+
+	if params.Projects != nil {
+		cloned := make(map[string]ProjectConfig, len(params.Projects))
+		for k, v := range params.Projects {
+			v.Includes = slices.Clone(v.Includes)
+			cloned[k] = v
+		}
+		params.Projects = cloned
+	}
 
 	return params, nil
 }

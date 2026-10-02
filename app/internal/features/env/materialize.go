@@ -82,11 +82,17 @@ type materializedState struct {
 // policy. It mirrors GetParams and DiffParams so every Manager operation is
 // driven by one struct.
 type MaterializeParams struct {
+	// Project selects the declared project to resolve.
+	Project string
 	// Environment overrides the configured default; an empty value uses it.
 	Environment string
 	// IgnoreErrors downgrades every per-key resolution failure to a warning and
 	// omits the failing key instead of aborting, so the child process still starts.
 	IgnoreErrors bool
+	// Options provides optional resolution setting overrides.
+	Options Options
+	// Settings provides direct resolution setting values.
+	Settings Settings
 }
 
 // MaterializeResult is a complete materialized environment plus any downgraded
@@ -114,13 +120,40 @@ type MaterializeResult struct {
 // YAML, or a flatten collision) remain fatal in both modes because they leave no
 // salvageable environment.
 func (s *Service) Materialize(params MaterializeParams) (*MaterializeResult, error) {
-	state, resolver, environment, err := s.prepareMaterialize(params.Environment)
+	var envOpt *string
+	if params.Environment != "" {
+		envOpt = &params.Environment
+	}
+	ctx, err := s.resolveContext(
+		params.Project, envOpt, params.Options, params.Settings,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	namespaces, err := s.loadNamespaces(ctx.includes)
+	if err != nil {
+		return nil, err
+	}
+
+	state, err := s.mergeLoaded(namespaces, ctx.environment, ctx.settings)
+	if err != nil {
+		return nil, err
+	}
+
+	// Compose the complete effective environment: overlay OS overrides and union
+	// OS-only keys so the child receives every variable it would see under a shell.
+	s.applyOSEnvironment(state, true, ctx.settings.Overload)
+
+	resolver, err := s.openResolver(true)
 	if err != nil {
 		return nil, err
 	}
 
 	if params.IgnoreErrors {
-		values, warnings := s.resolveEffectiveTolerant(state, resolver, environment)
+		values, warnings := s.resolveEffectiveTolerant(
+			state, resolver, ctx.environment, ctx.settings, ctx.grammar,
+		)
 		return &MaterializeResult{
 			Environment: &Environment{values: values, origins: state.origins},
 			Warnings:    warnings,
@@ -129,41 +162,15 @@ func (s *Service) Materialize(params MaterializeParams) (*MaterializeResult, err
 
 	// Resolve every winning value and then substitute every {{ }} reference over
 	// the composed effective environment; a materialized child always reveals.
-	values, err := s.resolveEffective(state, resolver, environment)
+	values, err := s.resolveEffective(
+		state, resolver, ctx.environment, ctx.settings, ctx.grammar,
+	)
 	if err != nil {
 		return nil, err
 	}
 	return &MaterializeResult{
 		Environment: &Environment{values: values, origins: state.origins},
 	}, nil
-}
-
-// prepareMaterialize runs the shared front half of materialization: it normalizes
-// the environment, merges the namespaces and composes the effective environment,
-// and opens a revealing resolver. Structural failures are fatal here, before
-// either the strict or the lenient path resolves any value.
-func (s *Service) prepareMaterialize(
-	environment string,
-) (state *mergeState, resolver ValueResolver, env string, err error) {
-	env, err = s.normalizeEnvironment(environment)
-	if err != nil {
-		return nil, nil, "", err
-	}
-
-	state, err = s.merge(env)
-	if err != nil {
-		return nil, nil, "", err
-	}
-
-	// Compose the complete effective environment: overlay OS overrides and union
-	// OS-only keys so the child receives every variable it would see under a shell.
-	s.applyOSEnvironment(state, true)
-
-	resolver, err = s.openResolver(true)
-	if err != nil {
-		return nil, nil, "", err
-	}
-	return state, resolver, env, nil
 }
 
 // resolveLeaf dereferences each scalar item in one winning leaf value. List

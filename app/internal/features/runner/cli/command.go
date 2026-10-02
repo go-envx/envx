@@ -44,8 +44,6 @@ const (
 // params/config, executes the action, and runs the specified command with the
 // merged environment for a project.
 func NewRunCmd() *cobra.Command {
-	var ignoreErrors bool
-
 	cmd := &cobra.Command{
 		Use:     usage,
 		Short:   short,
@@ -53,17 +51,17 @@ func NewRunCmd() *cobra.Command {
 		Example: str.Dedent(example, 2),
 		Args:    validateArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
+			// get the flag inputs
+			flagset := cmd.Flags()
+			input := core.GetInput(flagset)
+
 			// validateArgs guarantees exactly one project before "--", so args[0]
 			// is the project and args[1:] is the command to run.
 			p := actionParams{
 				Project:      args[0],
 				ExecArgs:     args[1:],
-				IgnoreErrors: ignoreErrors,
+				IgnoreErrors: ignoreErrorsFlag.Get(flagset),
 			}
-
-			// get the flag inputs
-			flagset := cmd.Flags()
-			input := core.GetInput(flagset)
 
 			pr := printer.New(printer.Options{
 				Out: cmd.OutOrStdout(),
@@ -97,7 +95,7 @@ func NewRunCmd() *cobra.Command {
 
 	// --ignore-errors is a command-local flag, not a precedence-resolved setting,
 	// so it binds directly rather than through RegisterFlags.
-	flags.Bind(cmd.Flags(), &ignoreErrors, &ignoreErrorsFlag)
+	flags.Bind(cmd.Flags(), &ignoreErrorsFlag)
 
 	return cmd
 }

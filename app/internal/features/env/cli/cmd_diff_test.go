@@ -37,10 +37,9 @@ func TestNewDiffCommandTable(t *testing.T) {
 	t.Parallel()
 
 	manifest, _ := writeDiffManifest(t)
-	input := &core.Input{ConfigPath: &manifest}
 	app := core.NewApp()
 
-	svc, err := app.EnvService(input, "app")
+	svc, err := app.EnvService(manifest)
 	if err != nil {
 		t.Fatalf("EnvService(): %v", err)
 	}
@@ -73,10 +72,9 @@ func TestNewDiffCommandJSON(t *testing.T) {
 	t.Parallel()
 
 	manifest, _ := writeDiffManifest(t)
-	input := &core.Input{ConfigPath: &manifest}
 	app := core.NewApp()
 
-	svc, err := app.EnvService(input, "app")
+	svc, err := app.EnvService(manifest)
 	if err != nil {
 		t.Fatalf("EnvService(): %v", err)
 	}

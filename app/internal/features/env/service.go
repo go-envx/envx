@@ -54,8 +54,12 @@ type ServiceParams struct {
 	WorkspaceDir string
 	// Repository loads base and overlay namespace data. Required.
 	Repository NamespaceRepository
-	// Includes is an ordered chain of namespaces to merge, given as include paths
-	// the caller has already resolved.
+	// Projects maps declared project names to their definitions.
+	Projects map[string]ProjectConfig
+	// DefaultProject is the fallback project name when none is specified.
+	DefaultProject string
+	// Includes is an ordered chain of namespaces to merge when no project is
+	// declared.
 	Includes []string
 	// Environments lists the declared environments, used to validate the target.
 	Environments []string
@@ -113,6 +117,201 @@ func NewService(params ServiceParams) (*Service, error) {
 // WorkspaceDir returns the configured workspace directory.
 func (s *Service) WorkspaceDir() string {
 	return s.params.WorkspaceDir
+}
+
+// SetDefaultProject sets the fallback project name used by operations when no
+// project is explicitly specified in params.
+func (s *Service) SetDefaultProject(project string) {
+	s.params.DefaultProject = project
+}
+
+// operationContext holds resolved includes, environment, settings, and grammar
+// for a single operation.
+type operationContext struct {
+	environment string
+	includes    []string
+	settings    Settings
+	grammar     *syntax.Grammar
+}
+
+// resolveContext determines the effective project includes, target environment,
+// settings, and grammar for an operation.
+func (s *Service) resolveContext(
+	project string,
+	envOverride *string,
+	opts Options,
+	direct Settings,
+) (operationContext, error) {
+	projectName := project
+	if projectName == "" && s.params.DefaultProject != "" {
+		projectName = s.params.DefaultProject
+	}
+
+	var includes []string
+	var projOpts Options
+	switch {
+	case projectName != "":
+		if proj, ok := s.params.Projects[projectName]; ok {
+			includes = proj.Includes
+			projOpts = proj.Settings
+		} else if len(s.params.Projects) == 0 && len(s.params.Includes) > 0 {
+			includes = s.params.Includes
+		} else {
+			return operationContext{}, fmt.Errorf(
+				"%w: project %q not found in manifest",
+				ErrProjectNotFound, projectName,
+			)
+		}
+	case len(s.params.Projects) == 1:
+		for _, proj := range s.params.Projects {
+			includes = proj.Includes
+			projOpts = proj.Settings
+			break
+		}
+	default:
+		includes = s.params.Includes
+	}
+
+	targetEnv := s.resolveEnvironment(envOverride, opts.Env, projOpts.Env)
+	if targetEnv == "" && len(s.params.Environments) > 0 {
+		targetEnv = s.params.Environments[0]
+	}
+	if len(s.params.Environments) > 0 &&
+		!slices.Contains(s.params.Environments, targetEnv) {
+		return operationContext{}, fmt.Errorf(
+			"%w: %q (available: %v)",
+			ErrEnvironmentNotDeclared, targetEnv, s.params.Environments,
+		)
+	}
+
+	settings := s.resolveSettings(opts, direct, projOpts)
+
+	grammar := s.grammar
+	if settings.ReferencePattern != s.params.Settings.ReferencePattern ||
+		grammar == nil {
+		g, err := syntax.NewGrammar(syntax.GrammarParams{
+			ReferencePattern: settings.ReferencePattern,
+		})
+		if err != nil {
+			return operationContext{}, err
+		}
+		grammar = g
+	}
+
+	return operationContext{
+		environment: targetEnv,
+		includes:    includes,
+		settings:    settings,
+		grammar:     grammar,
+	}, nil
+}
+
+// resolveEnvironment determines the target environment following precedence:
+// explicit param > options flag > ENVX_ENV > project setting > global setting >
+// default environment > first declared environment.
+func (s *Service) resolveEnvironment(
+	explicit, optsEnv, projEnv *string,
+) string {
+	val := PrecedenceString(&Env, explicit, optsEnv, projEnv)
+	if val != "" {
+		return val
+	}
+	if s.params.DefaultEnvironment != "" {
+		return s.params.DefaultEnvironment
+	}
+	if len(s.params.Environments) > 0 {
+		return s.params.Environments[0]
+	}
+	return ""
+}
+
+// resolveSettings merges settings with precedence:
+// explicit opts > direct settings > ENVX_* > project settings > global options >
+// base settings.
+func (s *Service) resolveSettings(
+	opts Options, direct Settings, projOpts Options,
+) Settings {
+	var directPrefix, basePrefix *string
+	if direct.Prefix != "" {
+		directPrefix = &direct.Prefix
+	}
+	if s.params.Settings.Prefix != "" {
+		basePrefix = &s.params.Settings.Prefix
+	}
+	prefix := PrecedenceString(
+		&Prefix, opts.Prefix, directPrefix, projOpts.Prefix, basePrefix,
+	)
+
+	var directSuffix, baseSuffix *string
+	if direct.Suffix != "" {
+		directSuffix = &direct.Suffix
+	}
+	if s.params.Settings.Suffix != "" {
+		baseSuffix = &s.params.Settings.Suffix
+	}
+	suffix := PrecedenceString(
+		&Suffix, opts.Suffix, directSuffix, projOpts.Suffix, baseSuffix,
+	)
+
+	var directDelimiter, baseDelimiter *string
+	if direct.Delimiter != "" {
+		directDelimiter = &direct.Delimiter
+	}
+	if s.params.Settings.Delimiter != "" {
+		baseDelimiter = &s.params.Settings.Delimiter
+	}
+	delimiter := PrecedenceString(
+		&Delimiter, opts.Delimiter, directDelimiter, projOpts.Delimiter,
+		baseDelimiter,
+	)
+	if delimiter == "" {
+		delimiter = defaultDelimiter
+	}
+
+	var directPattern, basePattern *string
+	if direct.ReferencePattern != "" {
+		directPattern = &direct.ReferencePattern
+	}
+	if s.params.Settings.ReferencePattern != "" {
+		basePattern = &s.params.Settings.ReferencePattern
+	}
+	refPattern := PrecedenceString(
+		&ReferencePattern, opts.ReferencePattern, directPattern,
+		projOpts.ReferencePattern, basePattern,
+	)
+
+	var directOverlays, baseOverlays *bool
+	if direct.RequireOverlays {
+		directOverlays = &direct.RequireOverlays
+	}
+	if s.params.Settings.RequireOverlays {
+		baseOverlays = &s.params.Settings.RequireOverlays
+	}
+	requireOverlays := PrecedenceBool(
+		&RequireOverlays, opts.RequireOverlays, directOverlays,
+		projOpts.RequireOverlays, baseOverlays,
+	)
+
+	var directOverload, baseOverload *bool
+	if direct.Overload {
+		directOverload = &direct.Overload
+	}
+	if s.params.Settings.Overload {
+		baseOverload = &s.params.Settings.Overload
+	}
+	overload := PrecedenceBool(
+		&Overload, opts.Overload, directOverload, projOpts.Overload,
+		baseOverload,
+	)
+
+	return Settings{
+		RequireOverlays:  requireOverlays,
+		Prefix:           prefix,
+		Suffix:           suffix,
+		Delimiter:        delimiter,
+		Overload:         overload,
+		ReferencePattern: refPattern,
+	}
 }
 
 // normalizeEnvironment applies the configured default when the call is empty,

@@ -21,11 +21,17 @@ var (
 	}
 )
 
-// targetDirFor returns a targetDirFlag specification defaulted to templateName.
-func targetDirFor(templateName string) *flags.Spec[string] {
+// templateSpec describes the metadata for a single template subcommand.
+type templateSpec struct {
+	Name  string
+	Short string
+	Long  string
+}
+
+func (t templateSpec) targetDirFlag() flags.Spec[string] {
 	spec := targetDirFlag
-	spec.Default = templateName
-	return &spec
+	spec.Default = t.Name
+	return spec
 }
 
 // Factory defines the capabilities required for the scaffold commands.

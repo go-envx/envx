@@ -14,6 +14,8 @@ import (
 // ExplainParams selects all keys or one case-insensitive key from an environment
 // and chooses the reveal policy for a diagnostic explanation.
 type ExplainParams struct {
+	// Project selects the declared project to resolve.
+	Project string
 	// Key selects one case-insensitive key; an empty value explains every key.
 	Key string
 	// Environment overrides the configured default; an empty value uses it.
@@ -21,6 +23,10 @@ type ExplainParams struct {
 	// Reveal controls whether the opened resolver materializes plaintext into
 	// each entry's Resolution.
 	Reveal bool
+	// Options provides optional resolution setting overrides.
+	Options Options
+	// Settings provides direct resolution setting values.
+	Settings Settings
 }
 
 // ExplanationEntry records one winning literal, its provenance, and its
@@ -71,19 +77,30 @@ func (s ExplanationSummary) Severity() Severity {
 // diagnosis still attempts decryption when masked so status stays meaningful;
 // plaintext is retained only when reveal is requested.
 func (s *Service) Explain(params ExplainParams) (*ExplainResult, error) {
-	environment, err := s.normalizeEnvironment(params.Environment)
+	var envOpt *string
+	if params.Environment != "" {
+		envOpt = &params.Environment
+	}
+	ctx, err := s.resolveContext(
+		params.Project, envOpt, params.Options, params.Settings,
+	)
 	if err != nil {
 		return nil, err
 	}
 
-	state, err := s.merge(environment)
+	namespaces, err := s.loadNamespaces(ctx.includes)
+	if err != nil {
+		return nil, err
+	}
+
+	state, err := s.mergeLoaded(namespaces, ctx.environment, ctx.settings)
 	if err != nil {
 		return nil, err
 	}
 
 	// Apply OS source selection over the namespace keys so an override surfaces as
 	// an "OS environment" source; OS-only keys are left out of the enumeration.
-	s.applyOSEnvironment(state, false)
+	s.applyOSEnvironment(state, false, ctx.settings.Overload)
 
 	keys, err := explainKeys(state, params.Key)
 	if err != nil {
@@ -98,16 +115,20 @@ func (s *Service) Explain(params ExplainParams) (*ExplainResult, error) {
 	if err != nil {
 		return nil, err
 	}
-	engine := s.newSubstituter(s.getSymbols(state, resolver, environment))
+	engine := s.newSubstituterWith(
+		s.getSymbols(state, resolver, ctx.environment, ctx.settings.Delimiter),
+		ctx.grammar,
+		ctx.settings.Overload,
+	)
 
-	delimiter := s.params.Settings.Delimiter
+	delimiter := ctx.settings.Delimiter
 	entries := make([]ExplanationEntry, 0, len(keys))
 	var summary ExplanationSummary
 	for _, key := range keys {
 		val := state.values[key]
 		literal := literalValue(val, delimiter)
 		resolution := diagnoseEntry(
-			val, literal, key, diagnoser, engine, environment, delimiter,
+			val, literal, key, diagnoser, engine, ctx.environment, delimiter,
 			params.Reveal,
 		)
 		switch resolution.Severity {
@@ -126,7 +147,11 @@ func (s *Service) Explain(params ExplainParams) (*ExplainResult, error) {
 		})
 	}
 
-	return &ExplainResult{Entries: entries, Summary: summary}, nil
+	return &ExplainResult{
+		WorkspaceDir: s.params.WorkspaceDir,
+		Entries:      entries,
+		Summary:      summary,
+	}, nil
 }
 
 // itemsOf returns a copy of a leaf's raw pre-resolution items, or nil for an

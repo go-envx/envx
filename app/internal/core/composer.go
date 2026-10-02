@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"path/filepath"
 
 	"github.com/go-envx/envx/app/internal/features/env"
 	envfilestore "github.com/go-envx/envx/app/internal/features/env/filestore"
@@ -138,9 +139,84 @@ func NewSecretsManager(s SecretsParams, c cipher.Params) (*secrets.Service, erro
 }
 
 // NewEnvService constructs an env.Service with a local filestore repository.
+//
+//nolint:gocritic // constructor parameter matches domain convention.
 func NewEnvService(params env.ServiceParams) (*env.Service, error) {
 	if params.Repository == nil {
 		params.Repository = envfilestore.New(envfilestore.Params{})
 	}
 	return env.NewService(params)
+}
+
+// NewWorkspaceEnvService composes a workspace-level env.Service from a resolved
+// workspace.
+func NewWorkspaceEnvService(res *Result) (*env.Service, error) {
+	if res == nil || res.workspace == nil {
+		return nil, errors.New("workspace is required")
+	}
+
+	projects := make(map[string]env.ProjectConfig, len(res.workspace.Projects))
+	for name, p := range res.workspace.Projects {
+		absIncludes := make([]string, len(p.Includes))
+		for i, inc := range p.Includes {
+			absIncludes[i] = filepath.Join(res.dir, inc)
+		}
+		projects[name] = env.ProjectConfig{
+			Name:     name,
+			Includes: absIncludes,
+			Settings: env.Options{
+				Delimiter:        p.Settings.Delimiter,
+				Env:              p.Settings.Env,
+				Overload:         p.Settings.Overload,
+				Prefix:           p.Settings.Prefix,
+				ReferencePattern: p.Settings.ReferencePattern,
+				RequireOverlays:  p.Settings.RequireOverlays,
+				Suffix:           p.Settings.Suffix,
+			},
+		}
+	}
+
+	repo := envfilestore.New(envfilestore.Params{})
+
+	resolverFact := resolverFactory{
+		secrets: res.Secrets,
+		cipher:  res.Cipher,
+	}
+
+	defaultEnv := res.workspace.DefaultEnvironment()
+	if res.workspace.Settings.Env != nil && *res.workspace.Settings.Env != "" {
+		defaultEnv = *res.workspace.Settings.Env
+	}
+
+	globalSettings := env.Settings{
+		Delimiter: env.PrecedenceString(
+			&env.Delimiter, res.workspace.Settings.Delimiter,
+		),
+		Prefix: env.PrecedenceString(
+			&env.Prefix, res.workspace.Settings.Prefix,
+		),
+		Suffix: env.PrecedenceString(
+			&env.Suffix, res.workspace.Settings.Suffix,
+		),
+		ReferencePattern: env.PrecedenceString(
+			&env.ReferencePattern, res.workspace.Settings.ReferencePattern,
+		),
+		RequireOverlays: env.PrecedenceBool(
+			&env.RequireOverlays, res.workspace.Settings.RequireOverlays,
+		),
+		Overload: env.PrecedenceBool(
+			&env.Overload, res.workspace.Settings.Overload,
+		),
+	}
+
+	return env.NewService(env.ServiceParams{
+		WorkspaceDir:       res.dir,
+		Repository:         repo,
+		Projects:           projects,
+		Environments:       res.workspace.Environments,
+		DefaultEnvironment: defaultEnv,
+		Settings:           globalSettings,
+		ResolverFactory:    resolverFact,
+		OSEnvironment:      osEnvironment(),
+	})
 }

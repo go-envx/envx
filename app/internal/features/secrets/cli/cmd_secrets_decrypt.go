@@ -36,11 +36,6 @@ const (
 
 // newSecretsDecryptCommand builds the command that decrypts stored values in place.
 func newSecretsDecryptCommand(f Factory) *cobra.Command {
-	var (
-		group, key string
-		verbose    bool
-	)
-
 	cmd := &cobra.Command{
 		Use:     decryptUsage,
 		Short:   decryptShort,
@@ -48,11 +43,12 @@ func newSecretsDecryptCommand(f Factory) *cobra.Command {
 		Example: str.Dedent(decryptExample, 2),
 		Args:    cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			// Extract the configuration path from the command flags.
-			configPath, err := cmd.Flags().GetString(flags.Config.Name)
-			if err != nil {
-				return err
-			}
+			// Extract command-line flag values.
+			fs := cmd.Flags()
+			configPath := flags.Config.Get(fs)
+			group := groupFlag.Get(fs)
+			key := keyFlag.Get(fs)
+			verbose := flags.Verbose.Get(fs)
 
 			// Obtain the secrets service using the configuration path.
 			secretsService, err := f.SecretsService(configPath)
@@ -77,9 +73,13 @@ func newSecretsDecryptCommand(f Factory) *cobra.Command {
 		},
 	}
 
-	flags.Bind(cmd.Flags(), &group, &groupFlag)
-	flags.Bind(cmd.Flags(), &key, &keyFlag)
-	flags.Bind(cmd.Flags(), &verbose, &flags.Verbose)
+	// Bind the command-line flags.
+	{
+		fs := cmd.Flags()
+		flags.Bind(fs, &groupFlag)
+		flags.Bind(fs, &keyFlag)
+		flags.Bind(fs, &flags.Verbose)
+	}
 
 	return cmd
 }

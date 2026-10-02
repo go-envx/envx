@@ -32,29 +32,13 @@ func writeExplainManifest(t *testing.T) (manifestPath, dir string) {
 	return manifestPath, dir
 }
 
-func TestSourcePath(t *testing.T) {
-	t.Parallel()
-
-	ws := "/workspace"
-	inside := filepath.Join(ws, "env", "postgres.yaml")
-	if got := sourcePath(inside, ws); got != filepath.Join("env", "postgres.yaml") {
-		t.Errorf("sourcePath(inside) = %q, want env/postgres.yaml", got)
-	}
-
-	outside := "/other/path/file.yaml"
-	if got := sourcePath(outside, ws); got != outside {
-		t.Errorf("sourcePath(outside) = %q, want %q", got, outside)
-	}
-}
-
 func TestNewExplainCommandTable(t *testing.T) {
 	t.Parallel()
 
 	manifest, _ := writeExplainManifest(t)
-	input := &core.Input{ConfigPath: &manifest}
 	app := core.NewApp()
 
-	svc, err := app.EnvService(input, "app")
+	svc, err := app.EnvService(manifest)
 	if err != nil {
 		t.Fatalf("EnvService(): %v", err)
 	}
@@ -85,10 +69,9 @@ func TestNewExplainCommandJSON(t *testing.T) {
 	t.Parallel()
 
 	manifest, _ := writeExplainManifest(t)
-	input := &core.Input{ConfigPath: &manifest}
 	app := core.NewApp()
 
-	svc, err := app.EnvService(input, "app")
+	svc, err := app.EnvService(manifest)
 	if err != nil {
 		t.Fatalf("EnvService(): %v", err)
 	}
@@ -128,7 +111,7 @@ func TestOutputExplainInvalidFormatFails(t *testing.T) {
 	})
 
 	err := outputExplain(
-		console, &env.ExplainResult{}, "/workspace", "invalid_format", false, false,
+		console, &env.ExplainResult{}, "invalid_format", false, false,
 	)
 	if err == nil {
 		t.Fatal("expected error for invalid output format")

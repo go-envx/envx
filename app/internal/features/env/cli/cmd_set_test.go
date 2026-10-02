@@ -61,10 +61,9 @@ func TestNewSetCommand(t *testing.T) {
 	t.Parallel()
 
 	manifest, dir := writeSetManifest(t)
-	input := &core.Input{ConfigPath: &manifest}
 	app := core.NewApp()
 
-	svc, err := app.EnvService(input, "")
+	svc, err := app.EnvService(manifest)
 	if err != nil {
 		t.Fatalf("EnvService(): %v", err)
 	}

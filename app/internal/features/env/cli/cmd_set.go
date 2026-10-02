@@ -3,8 +3,8 @@ package cli
 import (
 	"fmt"
 
-	"github.com/go-envx/envx/app/internal/core"
 	"github.com/go-envx/envx/app/internal/features/env"
+	"github.com/go-envx/envx/app/internal/shared/flags"
 	"github.com/go-envx/envx/app/internal/utils/printer"
 	"github.com/go-envx/envx/app/internal/utils/str"
 	"github.com/spf13/cobra"
@@ -41,22 +41,28 @@ func NewSetCommand(f Factory) *cobra.Command {
 		Example: str.Dedent(setExample, 2),
 		Args:    cobra.ExactArgs(3),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			// Extract command-line arguments.
 			includePath := args[0]
 			key := args[1]
 			value := args[2]
 
-			in := core.GetInput(cmd.Flags())
+			// Extract command-line flag values.
+			fs := cmd.Flags()
+			configPath := flags.Config.Get(fs)
+			envOptions := getEnvOptions(fs)
 
-			envService, err := f.EnvService(in, "")
+			// Obtain the environment service using the configuration path.
+			envService, err := f.EnvService(configPath)
 			if err != nil {
 				return err
 			}
 
 			var envTarget string
-			if in.Env != nil {
-				envTarget = *in.Env
+			if envOptions.Env != nil {
+				envTarget = *envOptions.Env
 			}
 
+			// Perform the environment set operation.
 			result, err := envService.Set(env.SetParams{
 				IncludePath: includePath,
 				Environment: envTarget,
@@ -67,16 +73,22 @@ func NewSetCommand(f Factory) *cobra.Command {
 				return err
 			}
 
+			// Initialize the console printer for output.
 			console := printer.New(printer.Options{
 				Out: cmd.OutOrStdout(),
 				Err: cmd.ErrOrStderr(),
 			})
 
+			// Output the result of the environment set operation.
 			return outputSet(console, result)
 		},
 	}
 
-	env.RegisterFlags(cmd.Flags(), env.WithEnv)
+	// Bind the command-line flags.
+	{
+		fs := cmd.Flags()
+		flags.Bind(fs, &envFlag)
+	}
 
 	return cmd
 }

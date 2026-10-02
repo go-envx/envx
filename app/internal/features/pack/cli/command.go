@@ -51,13 +51,6 @@ const (
 // subset of the workspace, copies it into --out, and renders a summary of the
 // files written.
 func NewPackCmd() *cobra.Command {
-	var (
-		out          string
-		environments []string
-		projects     []string
-		force        bool
-	)
-
 	cmd := &cobra.Command{
 		Use:     usage,
 		Short:   short,
@@ -65,15 +58,17 @@ func NewPackCmd() *cobra.Command {
 		Example: str.Dedent(example, 2),
 		Args:    cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
+			fs := cmd.Flags()
+
 			// resolve the manifest path from the inherited --config flag
-			input := core.GetInput(cmd.Flags())
+			input := core.GetInput(fs)
 
 			// copy the selected environments' and projects' files into --out
 			result, err := execute(actionParams{
-				Environments: environments,
-				Projects:     projects,
-				OutDir:       out,
-				Force:        force,
+				Environments: Env.Get(fs),
+				Projects:     Project.Get(fs),
+				OutDir:       Out.Get(fs),
+				Force:        Force.Get(fs),
 			}, input)
 			if err != nil {
 				return err
@@ -88,10 +83,10 @@ func NewPackCmd() *cobra.Command {
 		},
 	}
 
-	flags.Bind(cmd.Flags(), &out, &Out)
-	flags.Bind(cmd.Flags(), &environments, &Env)
-	flags.Bind(cmd.Flags(), &projects, &Project)
-	flags.Bind(cmd.Flags(), &force, &Force)
+	flags.Bind(cmd.Flags(), &Out)
+	flags.Bind(cmd.Flags(), &Env)
+	flags.Bind(cmd.Flags(), &Project)
+	flags.Bind(cmd.Flags(), &Force)
 	_ = cmd.MarkFlagRequired(Out.Name)
 
 	return cmd

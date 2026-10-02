@@ -29,9 +29,12 @@ type mergeState struct {
 // operation-local snapshot. It performs the base-file I/O that a multi-environment
 // operation would otherwise repeat per side. Malformed base YAML and flatten
 // collisions are operation-fatal.
-func (s *Service) loadNamespaces() ([]loadedNamespace, error) {
-	loaded := make([]loadedNamespace, 0, len(s.params.Includes))
-	for _, inc := range s.params.Includes {
+func (s *Service) loadNamespaces(includes []string) ([]loadedNamespace, error) {
+	if len(includes) == 0 {
+		includes = s.params.Includes
+	}
+	loaded := make([]loadedNamespace, 0, len(includes))
+	for _, inc := range includes {
 		baseData, err := s.params.Repository.LoadBase(inc)
 		if err != nil {
 			return nil, err
@@ -51,22 +54,11 @@ func (s *Service) loadNamespaces() ([]loadedNamespace, error) {
 	return loaded, nil
 }
 
-// merge loads a fresh base snapshot for one environment and selects unresolved
-// winners. An ordinary single-environment operation calls it; Diff reuses one
-// snapshot across both sides via loadNamespaces and mergeLoaded directly.
-func (s *Service) merge(environment string) (*mergeState, error) {
-	namespaces, err := s.loadNamespaces()
-	if err != nil {
-		return nil, err
-	}
-	return s.mergeLoaded(namespaces, environment)
-}
-
 // mergeLoaded applies one environment's overlays to an operation-local base
 // snapshot, selecting winners and tracking provenance in declaration order
 // (deterministic last-wins), then applies the global prefix and suffix.
 func (s *Service) mergeLoaded(
-	namespaces []loadedNamespace, environment string,
+	namespaces []loadedNamespace, environment string, settings Settings,
 ) (*mergeState, error) {
 	state := &mergeState{
 		values:  make(map[string]leafValue),
@@ -74,12 +66,12 @@ func (s *Service) mergeLoaded(
 	}
 
 	for _, ns := range namespaces {
-		if err := s.loadNamespace(ns, environment, s.params.Settings, state); err != nil {
+		if err := s.loadNamespace(ns, environment, settings, state); err != nil {
 			return nil, err
 		}
 	}
 
-	applyAffixes(state, s.params.Settings)
+	applyAffixes(state, settings)
 	return state, nil
 }
 

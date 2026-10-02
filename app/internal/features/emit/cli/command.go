@@ -58,14 +58,6 @@ const (
 // resolves and reveals the environment, and renders it to the selected target on
 // stdout or a chosen file.
 func NewEmitCmd() *cobra.Command {
-	var (
-		target string
-		name   string
-		output string
-		only   string
-		key    string
-	)
-
 	cmd := &cobra.Command{
 		Use:     usage,
 		Short:   short,
@@ -73,17 +65,24 @@ func NewEmitCmd() *cobra.Command {
 		Example: str.Dedent(example, 2),
 		Args:    cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			fs := cmd.Flags()
+			target := Target.Get(fs)
+			name := Name.Get(fs)
+			output := Output.Get(fs)
+			only := Only.Get(fs)
+			key := Key.Get(fs)
+
 			// Validate the target and its --name relationship up front so an unknown
 			// format or a misused --name fails before any resolution work.
 			parsedTarget, err := engine.ParseTarget(target)
 			if err != nil {
 				return err
 			}
-			nameSet := cmd.Flags().Changed(Name.Name)
+			nameSet := fs.Changed(Name.Name)
 			if err := validateNameUsage(parsedTarget, nameSet); err != nil {
 				return err
 			}
-			keySet := cmd.Flags().Changed(Key.Name)
+			keySet := fs.Changed(Key.Name)
 			if err := validateKeyUsage(parsedTarget, key, keySet); err != nil {
 				return err
 			}
@@ -95,7 +94,7 @@ func NewEmitCmd() *cobra.Command {
 				return err
 			}
 
-			input := core.GetInput(cmd.Flags())
+			input := core.GetInput(fs)
 
 			// The printer carries the secret-file warning to stderr, styled
 			// consistently with the rest of the CLI; the rendered manifest itself
@@ -127,11 +126,11 @@ func NewEmitCmd() *cobra.Command {
 		env.WithReferencePattern,
 	)
 
-	flags.Bind(cmd.Flags(), &target, &Target)
-	flags.Bind(cmd.Flags(), &name, &Name)
-	flags.Bind(cmd.Flags(), &output, &Output)
-	flags.Bind(cmd.Flags(), &only, &Only)
-	flags.Bind(cmd.Flags(), &key, &Key)
+	flags.Bind(cmd.Flags(), &Target)
+	flags.Bind(cmd.Flags(), &Name)
+	flags.Bind(cmd.Flags(), &Output)
+	flags.Bind(cmd.Flags(), &Only)
+	flags.Bind(cmd.Flags(), &Key)
 	_ = cmd.MarkFlagRequired(Target.Name)
 
 	return cmd
