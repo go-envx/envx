@@ -21,9 +21,6 @@ type Params struct{}
 // Repository implements env.NamespaceRepository using local YAML file loading.
 type Repository struct{}
 
-// Store is an alias for Repository.
-type Store = Repository
-
 // New constructs a file-backed namespace repository.
 func New(params Params) *Repository {
 	return &Repository{}
