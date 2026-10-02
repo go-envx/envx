@@ -132,7 +132,7 @@ func renderK8sCombined(
 // material), a secrets-only bundle is a Secret named base-secrets, and a
 // config-only bundle is a ConfigMap named base-config. The body under the key is
 // the slice rendered in the format its extension names (.json or .env).
-func renderK8sBundle(w io.Writer, sorted []Entry, params Params) error {
+func renderK8sBundle(w io.Writer, sorted []Entry, params RenderParams) error {
 	if err := requireNameBase(params); err != nil {
 		return err
 	}

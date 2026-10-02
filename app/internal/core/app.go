@@ -1,6 +1,9 @@
 package core
 
 import (
+	"io"
+
+	"github.com/go-envx/envx/app/internal/features/emit"
 	"github.com/go-envx/envx/app/internal/features/env"
 	"github.com/go-envx/envx/app/internal/features/runner"
 	"github.com/go-envx/envx/app/internal/features/scaffold"
@@ -26,6 +29,11 @@ func (a *App) ScaffoldService() (*scaffold.Service, error) {
 // RunnerService returns the domain process execution service.
 func (a *App) RunnerService() (*runner.Service, error) {
 	return runner.NewService(), nil
+}
+
+// EmitService returns the domain target serialization service writing to writer.
+func (a *App) EmitService(writer io.Writer) (*emit.Service, error) {
+	return emit.NewService(emit.ServiceParams{Writer: writer}), nil
 }
 
 // SecretsService resolves the workspace and returns the domain secrets service.

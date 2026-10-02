@@ -3,6 +3,7 @@ package emit
 import (
 	"bytes"
 	"encoding/base64"
+	"errors"
 	"strings"
 	"testing"
 )
@@ -11,16 +12,26 @@ import (
 // any render error so each case asserts only on output. When a case selects
 // neither slice it defaults to both, mirroring the command's "emit everything"
 // default so the all-values cases stay terse.
-func render(t *testing.T, entries []Entry, params Params) string {
+func render(t *testing.T, entries []Entry, params RenderParams) string {
 	t.Helper()
 	if !params.IncludeSecrets && !params.IncludeConfig {
 		params.IncludeSecrets, params.IncludeConfig = true, true
 	}
+	params.Entries = entries
 	var buffer bytes.Buffer
-	if err := Render(&buffer, entries, params); err != nil {
+	if err := NewService(ServiceParams{Writer: &buffer}).Render(params); err != nil {
 		t.Fatalf("Render(%s): %v", params.Target, err)
 	}
 	return buffer.String()
+}
+
+// renderErr renders params to a buffer and returns the written output with any
+// render error, for the cases that assert on failure.
+func renderErr(entries []Entry, params RenderParams) (string, error) {
+	params.Entries = entries
+	var buffer bytes.Buffer
+	err := NewService(ServiceParams{Writer: &buffer}).Render(params)
+	return buffer.String(), err
 }
 
 // sampleEntries is a mixed set of secret-derived and plain values in unsorted
@@ -40,7 +51,7 @@ func sampleEntries() []Entry {
 func TestRenderDotenv(t *testing.T) {
 	t.Parallel()
 
-	got := render(t, sampleEntries(), Params{Target: TargetDotenv})
+	got := render(t, sampleEntries(), RenderParams{Target: TargetDotenv})
 	want := "API_KEY=abc123\n" +
 		"APP_NAME=api\n" +
 		"DB_PASSWORD=s3cr3t\n" +
@@ -62,7 +73,7 @@ func TestRenderDotenvQuoting(t *testing.T) {
 		{Key: "NEWLINE", Value: "line1\nline2"},
 		{Key: "EMPTY", Value: ""},
 	}
-	got := render(t, entries, Params{Target: TargetDotenv})
+	got := render(t, entries, RenderParams{Target: TargetDotenv})
 	want := "EMPTY=\"\"\n" +
 		"NEWLINE=\"line1\\nline2\"\n" +
 		"PLAIN=http://host:8080/path\n" +
@@ -78,7 +89,7 @@ func TestRenderDotenvQuoting(t *testing.T) {
 func TestRenderJSON(t *testing.T) {
 	t.Parallel()
 
-	got := render(t, sampleEntries(), Params{Target: TargetJSON})
+	got := render(t, sampleEntries(), RenderParams{Target: TargetJSON})
 	want := "{\n" +
 		"  \"API_KEY\": \"abc123\",\n" +
 		"  \"APP_NAME\": \"api\",\n" +
@@ -96,7 +107,7 @@ func TestRenderJSON(t *testing.T) {
 func TestRenderK8sSecret(t *testing.T) {
 	t.Parallel()
 
-	got := render(t, sampleEntries(), Params{
+	got := render(t, sampleEntries(), RenderParams{
 		Target: TargetK8s, NameBase: "app", IncludeSecrets: true,
 	})
 	for _, line := range []string{
@@ -125,7 +136,7 @@ func TestRenderK8sSecret(t *testing.T) {
 func TestRenderK8sConfigMap(t *testing.T) {
 	t.Parallel()
 
-	params := Params{Target: TargetK8s, NameBase: "app", IncludeConfig: true}
+	params := RenderParams{Target: TargetK8s, NameBase: "app", IncludeConfig: true}
 	got := render(t, sampleEntries(), params)
 	for _, line := range []string{
 		"apiVersion: v1",
@@ -152,7 +163,7 @@ func TestRenderK8sConfigMap(t *testing.T) {
 func TestRenderK8sCombined(t *testing.T) {
 	t.Parallel()
 
-	got := render(t, sampleEntries(), Params{Target: TargetK8s, NameBase: "api"})
+	got := render(t, sampleEntries(), RenderParams{Target: TargetK8s, NameBase: "api"})
 	// Both documents, separated by a YAML document marker, ConfigMap before Secret.
 	if !strings.Contains(got, "kind: ConfigMap") ||
 		!strings.Contains(got, "kind: Secret") {
@@ -186,18 +197,18 @@ func TestRenderK8sCombinedSkipsEmpty(t *testing.T) {
 	t.Parallel()
 
 	onlyPlain := []Entry{{Key: "APP_NAME", Value: "api", Secret: false}}
-	got := render(t, onlyPlain, Params{Target: TargetK8s, NameBase: "api"})
+	got := render(t, onlyPlain, RenderParams{Target: TargetK8s, NameBase: "api"})
 	if !strings.Contains(got, "kind: ConfigMap") || strings.Contains(got, "kind: Secret") {
 		t.Errorf("all-plain environment should emit only a ConfigMap\n%s", got)
 	}
 
 	onlySecret := []Entry{{Key: "API_KEY", Value: "abc123", Secret: true}}
-	got = render(t, onlySecret, Params{Target: TargetK8s, NameBase: "api"})
+	got = render(t, onlySecret, RenderParams{Target: TargetK8s, NameBase: "api"})
 	if !strings.Contains(got, "kind: Secret") || strings.Contains(got, "kind: ConfigMap") {
 		t.Errorf("all-secret environment should emit only a Secret\n%s", got)
 	}
 
-	if got := render(t, nil, Params{Target: TargetK8s, NameBase: "api"}); got != "" {
+	if got := render(t, nil, RenderParams{Target: TargetK8s, NameBase: "api"}); got != "" {
 		t.Errorf("empty environment should emit nothing for the combined target, got %q", got)
 	}
 }
@@ -207,20 +218,19 @@ func TestRenderK8sCombinedSkipsEmpty(t *testing.T) {
 func TestRenderK8sRequiresName(t *testing.T) {
 	t.Parallel()
 
-	slices := []Params{
+	slices := []RenderParams{
 		{IncludeSecrets: true, IncludeConfig: true},
 		{IncludeSecrets: true},
 		{IncludeConfig: true},
 	}
 	for _, sel := range slices {
 		sel.Target = TargetK8s
-		var buffer bytes.Buffer
-		err := Render(&buffer, sampleEntries(), sel)
-		if err == nil {
-			t.Errorf("Render(k8s, %+v) without a name should fail", sel)
+		got, err := renderErr(sampleEntries(), sel)
+		if !errors.Is(err, ErrMissingNameBase) {
+			t.Errorf("Render(k8s, %+v) error = %v, want ErrMissingNameBase", sel, err)
 		}
-		if buffer.Len() != 0 {
-			t.Errorf("Render(k8s) wrote output despite the missing name: %q", buffer.String())
+		if got != "" {
+			t.Errorf("Render(k8s) wrote output despite the missing name: %q", got)
 		}
 	}
 }
@@ -235,7 +245,7 @@ func TestRenderK8sBundle(t *testing.T) {
 	t.Parallel()
 
 	// config-only, JSON body, ConfigMap (plaintext), named api-config.
-	cm := render(t, sampleEntries(), Params{
+	cm := render(t, sampleEntries(), RenderParams{
 		Target: TargetK8sBundle, NameBase: "api", IncludeConfig: true, Key: "config.json",
 	})
 	if !strings.Contains(cm, "kind: ConfigMap") ||
@@ -248,7 +258,7 @@ func TestRenderK8sBundle(t *testing.T) {
 	}
 
 	// secrets-only, dotenv body, Secret (base64), named api-secrets.
-	sec := render(t, sampleEntries(), Params{
+	sec := render(t, sampleEntries(), RenderParams{
 		Target: TargetK8sBundle, NameBase: "api", IncludeSecrets: true, Key: "secrets.env",
 	})
 	if !strings.Contains(sec, "kind: Secret") ||
@@ -262,7 +272,7 @@ func TestRenderK8sBundle(t *testing.T) {
 	}
 
 	// unrestricted → merged into one Secret named api-config-secrets.
-	merged := render(t, sampleEntries(), Params{
+	merged := render(t, sampleEntries(), RenderParams{
 		Target: TargetK8sBundle, NameBase: "api",
 		IncludeSecrets: true, IncludeConfig: true, Key: "app.json",
 	})
@@ -278,15 +288,14 @@ func TestRenderK8sBundle(t *testing.T) {
 func TestRenderK8sBundleBadExtension(t *testing.T) {
 	t.Parallel()
 
-	var buffer bytes.Buffer
-	err := Render(&buffer, sampleEntries(), Params{
+	got, err := renderErr(sampleEntries(), RenderParams{
 		Target: TargetK8sBundle, NameBase: "api", IncludeConfig: true, Key: "config.yaml",
 	})
 	if err == nil {
 		t.Error("a bundle with an unknown extension should fail")
 	}
-	if buffer.Len() != 0 {
-		t.Errorf("bundle error wrote output: %q", buffer.String())
+	if got != "" {
+		t.Errorf("bundle error wrote output: %q", got)
 	}
 }
 
@@ -295,12 +304,12 @@ func TestRenderK8sBundleBadExtension(t *testing.T) {
 func TestRenderRequiresASlice(t *testing.T) {
 	t.Parallel()
 
-	var buffer bytes.Buffer
-	if err := Render(&buffer, sampleEntries(), Params{Target: TargetJSON}); err == nil {
-		t.Error("Render with neither slice selected should fail")
+	got, err := renderErr(sampleEntries(), RenderParams{Target: TargetJSON})
+	if !errors.Is(err, ErrNoSliceSelected) {
+		t.Errorf("Render error = %v, want ErrNoSliceSelected", err)
 	}
-	if buffer.Len() != 0 {
-		t.Errorf("Render wrote output despite no slice selection: %q", buffer.String())
+	if got != "" {
+		t.Errorf("Render wrote output despite no slice selection: %q", got)
 	}
 }
 
@@ -309,12 +318,14 @@ func TestRenderRequiresASlice(t *testing.T) {
 func TestRenderUnknownTarget(t *testing.T) {
 	t.Parallel()
 
-	var buffer bytes.Buffer
-	if err := Render(&buffer, sampleEntries(), Params{Target: "toml"}); err == nil {
-		t.Error("Render with an unknown target should fail")
+	got, err := renderErr(sampleEntries(), RenderParams{
+		Target: "toml", IncludeSecrets: true, IncludeConfig: true,
+	})
+	if !errors.Is(err, ErrUnknownTarget) {
+		t.Errorf("Render error = %v, want ErrUnknownTarget", err)
 	}
-	if buffer.Len() != 0 {
-		t.Errorf("Render wrote output for an unknown target: %q", buffer.String())
+	if got != "" {
+		t.Errorf("Render wrote output for an unknown target: %q", got)
 	}
 }
 
@@ -332,8 +343,8 @@ func TestParseTarget(t *testing.T) {
 			t.Errorf("ParseTarget(%q) = %q, want %q", target, got, target)
 		}
 	}
-	if _, err := ParseTarget("yaml"); err == nil {
-		t.Error("ParseTarget(\"yaml\") should fail")
+	if _, err := ParseTarget("yaml"); !errors.Is(err, ErrUnknownTarget) {
+		t.Errorf("ParseTarget(\"yaml\") error = %v, want ErrUnknownTarget", err)
 	} else if !strings.Contains(err.Error(), "yaml") {
 		t.Errorf("error %q should name the rejected value", err)
 	}
@@ -352,13 +363,13 @@ func TestRenderEmptyEnvironment(t *testing.T) {
 		{TargetJSON, "{}\n"},
 	}
 	for _, tt := range tests {
-		if got := render(t, nil, Params{Target: tt.target}); got != tt.want {
+		if got := render(t, nil, RenderParams{Target: tt.target}); got != tt.want {
 			t.Errorf("Render(%s) empty = %q, want %q", tt.target, got, tt.want)
 		}
 	}
 	// An explicitly-selected single slice renders its resource even when empty,
 	// since the caller asked for that kind.
-	got := render(t, nil, Params{
+	got := render(t, nil, RenderParams{
 		Target: TargetK8s, NameBase: "empty", IncludeSecrets: true,
 	})
 	if !strings.Contains(got, "kind: Secret") || !strings.Contains(got, "data: {}") {

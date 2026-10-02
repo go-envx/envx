@@ -1157,7 +1157,7 @@ flowchart LR
     Sub82 --> Sub83["✅ 8.3: secrets<br/>(Store & Service)"]
     Sub83 --> Sub84["✅ 8.4: env<br/>(NamespaceStore)"]
     Sub84 --> Sub85["✅ 8.5: runner<br/>(Process Supervision)"]
-    Sub85 --> Sub86["8.6: emit<br/>(Serialization Engine)"]
+    Sub85 --> Sub86["✅ 8.6: emit<br/>(Serialization Engine)"]
     Sub86 --> Sub87["8.7: pack & validate<br/>(Bundling & Checks)"]
     Sub87 --> Sub88["8.8: core<br/>(Composition Clean)"]
     Sub88 --> Sub89["8.9: Polish<br/>(Mocks & Verification)"]
@@ -1201,12 +1201,12 @@ flowchart LR
 4. **Define domain models and errors**: Keep sentinel errors (`ErrNoCommandSpecified`, `ErrProcessStartFailed`) in [app/internal/features/runner/errors.go](app/internal/features/runner/errors.go).
 5. **Update CLI callers & tests**: Wire the updated service and consumer interfaces into `runner/cli`, update test doubles, and run `task envx:test`.
 
-### Phase 8.6: Target Serialization DI Refactoring (`emit`)
-1. **Refactor emit Service**: Frame target serialization in `emit.Service` with `ServiceParams` (`Writer`).
-2. **Define domain models and errors**: Declare `RenderParams` and extract sentinel errors (`ErrUnknownTarget`, `ErrMissingNameBase`, `ErrNoEntries`) into [app/internal/features/emit/errors.go](app/internal/features/emit/errors.go).
-3. **Decouple environment resolution in CLI**: Define an environment resolution consumer interface matching the pattern established in runner.
-4. **Update CLI caller**: Wire `emit.Service` into its presentation CLI adapter and define consumer interface.
-5. **Update tests & verify**: Run `task envx:test`.
+### ✅ Phase 8.6: Target Serialization DI Refactoring (`emit`)
+1. **Refactor emit Service**: Framed target serialization in `emit.Service` with `ServiceParams` (`Writer`, defaulting to `os.Stdout`) and `Render(params RenderParams) error` in [app/internal/features/emit/service.go](app/internal/features/emit/service.go).
+2. **Define domain models and errors**: Declared `RenderParams` (carrying `Entries`) in [app/internal/features/emit/target.go](app/internal/features/emit/target.go) and extracted sentinel errors (`ErrUnknownTarget`, `ErrMissingNameBase`, `ErrNoSliceSelected`) into [app/internal/features/emit/errors.go](app/internal/features/emit/errors.go). `ErrNoSliceSelected` replaces the planned `ErrNoEntries`, since an empty entry set is still a valid render.
+3. **Decouple environment resolution in CLI**: `emit/cli` consumes `Factory` (`EnvService(configPath)` and `EmitService(writer)`) instead of calling `core.ResolveProject`, reveals values through `env.Service.Explain`, and follows the `cli.go`, `cmd_emit.go`, `env_options.go` layout used by `runner/cli`.
+4. **Update CLI caller**: `core.App` exposes `EmitService(writer)`, wired through `emitcli.NewEmitCommand(app)` in [app/internal/cli/root.go](app/internal/cli/root.go).
+5. **Update tests & verify**: Migrated tests to `emit.Service` and command-level tests with a mock `Factory`. Verified with `task envx:test`.
 
 ### Phase 8.7: Bundling & Diagnostics DI Refactoring (`pack` & `validate`)
 1. **Refactor pack Service**: Encapsulate workspace layout bundling, path rewriting, and store filtering into `pack.Service`.
