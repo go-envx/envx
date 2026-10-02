@@ -7,287 +7,148 @@ import (
 	"github.com/go-envx/envx/app/internal/features/env"
 	"github.com/go-envx/envx/app/internal/features/workspace"
 	"github.com/go-envx/envx/app/internal/resources/cipher"
-	"github.com/go-envx/envx/app/internal/shared/flags"
 	"github.com/go-envx/envx/app/test/fixtures"
 )
 
-// strPtr returns a pointer to s, for building optional Input values in tests.
-func strPtr(s string) *string { return &s }
+// TestResolveWorkspace verifies the resolved secrets store, key file, and cipher
+// defaults for a fixture manifest.
+func TestResolveWorkspace(t *testing.T) {
+	t.Parallel()
 
-// boolPtr returns a pointer to b, for building optional Input values in tests.
-func boolPtr(b bool) *bool { return &b }
+	res, err := resolveWorkspace(fixtures.Manifest("basic"))
+	if err != nil {
+		t.Fatalf("resolveWorkspace: %v", err)
+	}
+	if filepath.Base(res.secrets.SecretsPath) != "secrets.yaml" {
+		t.Errorf("SecretsPath = %q, want .../secrets.yaml", res.secrets.SecretsPath)
+	}
+	wantKeys := filepath.Join(filepath.Dir(res.secrets.SecretsPath), "envx.keys")
+	if res.secrets.KeysPath != wantKeys {
+		t.Errorf("KeysPath = %q, want %q", res.secrets.KeysPath, wantKeys)
+	}
+	if res.cipher.Algorithm != defaultCipherAlgorithm {
+		t.Errorf("Algorithm = %q, want %q", res.cipher.Algorithm, defaultCipherAlgorithm)
+	}
+	if res.cipher.Options != nil {
+		t.Errorf("Cipher.Options = %T, want nil defaults", res.cipher.Options)
+	}
+}
 
-// testManifest builds an in-memory manifest with global and project-level env
-// settings for exercising the precedence chain.
-func testManifest() *workspace.Workspace {
-	return &workspace.Workspace{
-		Environments: []string{"development", "staging", "production"},
-		Settings:     workspace.Settings{Env: strPtr("staging")},
-		Projects: map[string]workspace.Project{
-			"api": {
-				Includes: []string{"env/x"},
-				Settings: workspace.Settings{Env: strPtr("production")},
+// TestResolveSecretsParams verifies store, key, and indent resolution against an
+// in-memory workspace.
+func TestResolveSecretsParams(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+	absoluteKeys := filepath.Join(t.TempDir(), "envx.keys")
+
+	tests := []struct {
+		name    string
+		secrets workspace.SecretsConfig
+		indent  int
+		want    SecretsParams
+	}{
+		{
+			name:   "defaults beside the manifest",
+			indent: 2,
+			want: SecretsParams{
+				SecretsPath:   filepath.Join(dir, "secrets.yaml"),
+				KeysPath:      filepath.Join(dir, "envx.keys"),
+				DefaultIndent: 2,
 			},
-			"web": {Includes: []string{"env/y"}},
+		},
+		{
+			name:    "keys default beside a custom store",
+			secrets: workspace.SecretsConfig{SecretsPath: "private/secrets.yaml"},
+			indent:  2,
+			want: SecretsParams{
+				SecretsPath:   filepath.Join(dir, "private", "secrets.yaml"),
+				KeysPath:      filepath.Join(dir, "private", "envx.keys"),
+				DefaultIndent: 2,
+			},
+		},
+		{
+			name: "relative keys resolve against the manifest",
+			secrets: workspace.SecretsConfig{
+				SecretsPath: "private/secrets.yaml",
+				KeysPath:    "keys/envx.keys",
+			},
+			indent: 2,
+			want: SecretsParams{
+				SecretsPath:   filepath.Join(dir, "private", "secrets.yaml"),
+				KeysPath:      filepath.Join(dir, "keys", "envx.keys"),
+				DefaultIndent: 2,
+			},
+		},
+		{
+			name:    "absolute keys stay rooted",
+			secrets: workspace.SecretsConfig{KeysPath: absoluteKeys},
+			indent:  2,
+			want: SecretsParams{
+				SecretsPath:   filepath.Join(dir, "secrets.yaml"),
+				KeysPath:      absoluteKeys,
+				DefaultIndent: 2,
+			},
+		},
+		{
+			name:   "detected indent flows through",
+			indent: 4,
+			want: SecretsParams{
+				SecretsPath:   filepath.Join(dir, "secrets.yaml"),
+				KeysPath:      filepath.Join(dir, "envx.keys"),
+				DefaultIndent: 4,
+			},
+		},
+		{
+			name:   "out-of-range indent falls back",
+			indent: 12,
+			want: SecretsParams{
+				SecretsPath:   filepath.Join(dir, "secrets.yaml"),
+				KeysPath:      filepath.Join(dir, "envx.keys"),
+				DefaultIndent: defaultIndent,
+			},
 		},
 	}
-}
 
-// TestResolveManifest verifies project lookup, the env precedence (explicit >
-// project > global), setting layering, and pass-through of includes/environments
-// into the env.Params against an in-memory manifest. An empty project
-// resolves the global context only. Terminal defaults are left to envmerge, so an
-// unset env stays empty here.
-func TestResolveManifest(t *testing.T) {
-	m := testManifest()
-
-	t.Run("explicit wins", func(t *testing.T) {
-		_, params, err := resolveManifest(
-			manifestContext{workspace: m, project: "api"},
-			&Input{Env: strPtr("from-flag")},
-		)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if params.DefaultEnvironment != "from-flag" {
-			t.Errorf("Env = %q, want from-flag", params.DefaultEnvironment)
-		}
-	})
-	t.Run("project default", func(t *testing.T) {
-		_, params, err := resolveManifest(
-			manifestContext{workspace: m, project: "api"}, &Input{},
-		)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if params.DefaultEnvironment != "production" {
-			t.Errorf("Env = %q, want production", params.DefaultEnvironment)
-		}
-	})
-	t.Run("global default", func(t *testing.T) {
-		_, params, err := resolveManifest(
-			manifestContext{workspace: m, project: "web"}, &Input{},
-		)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if params.DefaultEnvironment != "staging" {
-			t.Errorf("Env = %q, want staging", params.DefaultEnvironment)
-		}
-	})
-	t.Run("env left empty for envmerge default", func(t *testing.T) {
-		bare := &workspace.Workspace{
-			Environments: []string{"development"},
-			Projects: map[string]workspace.Project{
-				"api": {Includes: []string{"env/x"}},
-			},
-		}
-		_, params, err := resolveManifest(
-			manifestContext{workspace: bare, project: "api"}, &Input{},
-		)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if params.DefaultEnvironment != "" {
-			t.Errorf(
-				"Env = %q, want empty (envmerge applies the default)",
-				params.DefaultEnvironment,
-			)
-		}
-	})
-	t.Run("settings and includes pass through", func(t *testing.T) {
-		_, params, err := resolveManifest(
-			manifestContext{workspace: m, project: "api"},
-			&Input{Prefix: strPtr("APP"), RequireOverlays: boolPtr(true)},
-		)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if params.Settings.Prefix != "APP" || !params.Settings.RequireOverlays {
-			t.Errorf("settings not applied: %+v", params.Settings)
-		}
-		if len(params.Includes) != 1 || params.Includes[0] != "env/x" {
-			t.Errorf("Includes = %v, want [env/x]", params.Includes)
-		}
-		if len(params.Environments) != 3 {
-			t.Errorf("Environments = %v", params.Environments)
-		}
-	})
-	t.Run("delimiter explicit flows through", func(t *testing.T) {
-		_, params, err := resolveManifest(
-			manifestContext{workspace: m, project: "api"},
-			&Input{Delimiter: strPtr("|")},
-		)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if params.Settings.Delimiter != "|" {
-			t.Errorf("Delimiter = %q, want |", params.Settings.Delimiter)
-		}
-	})
-	t.Run("unknown project errors", func(t *testing.T) {
-		_, _, err := resolveManifest(
-			manifestContext{workspace: m, project: "ghost"},
-			&Input{},
-		)
-		if err == nil {
-			t.Error("expected error for unknown project")
-		}
-	})
-	t.Run("empty project resolves global only", func(t *testing.T) {
-		_, params, err := resolveManifest(
-			manifestContext{workspace: m, project: ""},
-			&Input{},
-		)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if params.DefaultEnvironment != "staging" {
-			t.Errorf("Env = %q, want staging (global)", params.DefaultEnvironment)
-		}
-		if len(params.Includes) != 0 {
-			t.Errorf("Includes = %v, want empty for no project", params.Includes)
-		}
-	})
-}
-
-// TestOverloadResolution verifies overload now layers through the manifest
-// (explicit > project > global), the precedence that was previously dropped.
-func TestOverloadResolution(t *testing.T) {
-	t.Parallel()
-
-	manifestWith := func(global, project *bool) *workspace.Workspace {
-		return &workspace.Workspace{
-			Environments: []string{"development"},
-			Settings:     workspace.Settings{Overload: global},
-			Projects: map[string]workspace.Project{
-				"api": {
-					Includes: []string{"env/x"},
-					Settings: workspace.Settings{Overload: project},
-				},
-			},
-		}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+			ws := &workspace.Workspace{
+				Root:    dir,
+				Indent:  test.indent,
+				Secrets: test.secrets,
+			}
+			if got := resolveSecretsParams(ws); got != test.want {
+				t.Errorf("resolveSecretsParams() = %+v, want %+v", got, test.want)
+			}
+		})
 	}
-
-	t.Run("explicit wins over manifest", func(t *testing.T) {
-		_, params, err := resolveManifest(
-			manifestContext{workspace: manifestWith(boolPtr(false), nil), project: "api"},
-			&Input{Overload: boolPtr(true)},
-		)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if !params.Settings.Overload {
-			t.Error("explicit overload true should win")
-		}
-	})
-	t.Run("manifest global layer honored", func(t *testing.T) {
-		_, params, err := resolveManifest(
-			manifestContext{workspace: manifestWith(boolPtr(true), nil), project: "api"},
-			&Input{},
-		)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if !params.Settings.Overload {
-			t.Error("manifest global overload=true should be honored")
-		}
-	})
-	t.Run("project layer over global", func(t *testing.T) {
-		_, params, err := resolveManifest(
-			manifestContext{
-				workspace: manifestWith(boolPtr(false), boolPtr(true)),
-				project:   "api",
-			},
-			&Input{},
-		)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if !params.Settings.Overload {
-			t.Error("project overload=true should win over global false")
-		}
-	})
 }
 
-// TestReferencePatternResolution verifies the internal and OS reference-pattern
-// settings layer through the manifest (explicit > project > global) into the
-// resolved envmerge settings.
-func TestReferencePatternResolution(t *testing.T) {
+// TestResolveCipherParams verifies the manifest cipher overrides the default.
+func TestResolveCipherParams(t *testing.T) {
 	t.Parallel()
 
-	manifestWith := func(global, project *string) *workspace.Workspace {
-		return &workspace.Workspace{
-			Environments: []string{"development"},
-			Settings:     workspace.Settings{ReferencePattern: global},
-			Projects: map[string]workspace.Project{
-				"api": {
-					Includes: []string{"env/x"},
-					Settings: workspace.Settings{ReferencePattern: project},
-				},
-			},
-		}
+	ws := &workspace.Workspace{}
+	if got := resolveCipherParams(ws).Algorithm; got != defaultCipherAlgorithm {
+		t.Errorf("Algorithm = %q, want default %q", got, defaultCipherAlgorithm)
 	}
-
-	t.Run("explicit wins over manifest", func(t *testing.T) {
-		_, params, err := resolveManifest(
-			manifestContext{workspace: manifestWith(strPtr("global"), nil), project: "api"},
-			&Input{ReferencePattern: strPtr("flag")},
-		)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if params.Settings.ReferencePattern != "flag" {
-			t.Errorf("ReferencePattern = %q, want flag", params.Settings.ReferencePattern)
-		}
-	})
-	t.Run("project layer over global", func(t *testing.T) {
-		_, params, err := resolveManifest(
-			manifestContext{
-				workspace: manifestWith(strPtr("global"), strPtr("project")),
-				project:   "api",
-			},
-			&Input{},
-		)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if params.Settings.ReferencePattern != "project" {
-			t.Errorf("ReferencePattern = %q, want project", params.Settings.ReferencePattern)
-		}
-	})
-	t.Run("reference pattern explicit flows through", func(t *testing.T) {
-		_, params, err := resolveManifest(
-			manifestContext{workspace: manifestWith(nil, nil), project: "api"},
-			&Input{ReferencePattern: strPtr(`\$env\{([^}]*)\}`)},
-		)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if params.Settings.ReferencePattern != `\$env\{([^}]*)\}` {
-			t.Errorf(
-				"ReferencePattern = %q, want the custom regex",
-				params.Settings.ReferencePattern,
-			)
-		}
-	})
+	ws.Secrets.Cipher = string(cipher.NaClBox)
+	if got := resolveCipherParams(ws).Algorithm; got != cipher.NaClBox {
+		t.Errorf("Algorithm = %q, want %q", got, cipher.NaClBox)
+	}
 }
 
-// TestResolveProject verifies ResolveProject loads the manifest from the input's
-// config path and constructs a Manager that resolves a known fixture project end
-// to end.
-func TestResolveProject(t *testing.T) {
+// TestEnvServiceResolvesFixtureProject verifies the composed env service
+// resolves a known fixture project end to end.
+func TestEnvServiceResolvesFixtureProject(t *testing.T) {
 	t.Parallel()
 
-	path := fixtures.Manifest("basic")
-	r, err := ResolveProject(&Input{ConfigPath: &path}, "api-core")
+	service, err := NewApp().EnvService(fixtures.Manifest("basic"))
 	if err != nil {
-		t.Fatalf("ResolveProject: %v", err)
+		t.Fatalf("EnvService: %v", err)
 	}
-	if r.Envmerge == nil {
-		t.Fatal("expected a constructed manager")
-	}
-	entry, err := r.Envmerge.Get(env.GetParams{Key: "APP_NAME"})
+	entry, err := service.Get(env.GetParams{Project: "api-core", Key: "APP_NAME"})
 	if err != nil {
 		t.Fatalf("Get APP_NAME: %v", err)
 	}
@@ -296,136 +157,23 @@ func TestResolveProject(t *testing.T) {
 	}
 }
 
-// TestResolveWorkspace verifies ResolveWorkspace surfaces the resolved secrets
-// store location as data, resolves no project, and never constructs a Manager —
-// building it and opening the store are ResolveProject's jobs.
-func TestResolveWorkspace(t *testing.T) {
+// TestEnvServiceMasksSecretReference verifies read commands mask secret
+// references by default without decrypting or requiring a private key.
+func TestEnvServiceMasksSecretReference(t *testing.T) {
 	t.Parallel()
 
-	// Default: secrets.yaml beside the manifest, no project.
-	base := fixtures.Manifest("basic")
-	r, err := ResolveWorkspace(&Input{ConfigPath: &base})
+	service, err := NewApp().EnvService(fixtures.Manifest("resolve/secret-reference"))
 	if err != nil {
-		t.Fatalf("ResolveWorkspace basic: %v", err)
+		t.Fatalf("EnvService: %v", err)
 	}
-	if filepath.Base(r.Secrets.SecretsPath) != "secrets.yaml" {
-		t.Errorf(
-			"Secrets.SecretsPath = %q, want .../secrets.yaml",
-			r.Secrets.SecretsPath,
-		)
-	}
-	wantDefaultKeys := filepath.Join(filepath.Dir(r.Secrets.SecretsPath), "envx.keys")
-	if r.Secrets.KeysPath != wantDefaultKeys {
-		t.Errorf("Secrets.KeysPath = %q, want %q", r.Secrets.KeysPath, wantDefaultKeys)
-	}
-	if r.Cipher.Algorithm != defaultCipherAlgorithm {
-		t.Errorf(
-			"Cipher.Algorithm = %q, want %q",
-			r.Cipher.Algorithm,
-			defaultCipherAlgorithm,
-		)
-	}
-	if r.Cipher.Options != nil {
-		t.Errorf("Cipher.Options = %T, want nil defaults", r.Cipher.Options)
-	}
-	if r.Envmerge != nil {
-		t.Error("ResolveWorkspace must not construct a manager")
-	}
-
-	// A workspace secrets path flows through to the secrets input.
-	m := testManifest()
-	m.Secrets.SecretsPath = "private/secrets.yaml"
-	dir := t.TempDir()
-	r2, _, err := resolveManifest(manifestContext{workspace: m, dir: dir}, &Input{})
-	if err != nil {
-		t.Fatalf("resolveManifest secrets path: %v", err)
-	}
-	wantPath := filepath.Join(dir, "private", "secrets.yaml")
-	if r2.Secrets.SecretsPath != wantPath {
-		t.Errorf("Secrets.SecretsPath = %q, want %q", r2.Secrets.SecretsPath, wantPath)
-	}
-	wantKeysPath := filepath.Join(dir, "private", "envx.keys")
-	if r2.Secrets.KeysPath != wantKeysPath {
-		t.Errorf("Secrets.KeysPath = %q, want %q", r2.Secrets.KeysPath, wantKeysPath)
-	}
-	m.Secrets.Cipher = string(cipher.NaClBox)
-	r2, _, err = resolveManifest(manifestContext{workspace: m, dir: dir}, &Input{})
-	if err != nil {
-		t.Fatalf("resolveManifest cipher setting: %v", err)
-	}
-	if r2.Cipher.Algorithm != cipher.NaClBox {
-		t.Errorf(
-			"Cipher.Algorithm = %q, want %q",
-			r2.Cipher.Algorithm,
-			cipher.NaClBox,
-		)
-	}
-	if r2.Cipher.Options != nil {
-		t.Errorf("Cipher.Options = %T, want nil defaults", r2.Cipher.Options)
-	}
-
-	// An explicit relative key path is resolved against the manifest directory,
-	// not against the custom secrets store directory.
-	m.Secrets.KeysPath = "keys/envx.keys"
-	r3, _, err := resolveManifest(manifestContext{workspace: m, dir: dir}, &Input{})
-	if err != nil {
-		t.Fatalf("resolveManifest relative keys path: %v", err)
-	}
-	wantRelativeKeysPath := filepath.Join(dir, "keys", "envx.keys")
-	if r3.Secrets.KeysPath != wantRelativeKeysPath {
-		t.Errorf(
-			"Secrets.KeysPath = %q, want %q",
-			r3.Secrets.KeysPath,
-			wantRelativeKeysPath,
-		)
-	}
-
-	// An explicit absolute key path remains rooted at its own location.
-	absoluteKeysPath := filepath.Join(t.TempDir(), "envx.keys")
-	m.Secrets.KeysPath = absoluteKeysPath
-	r4, _, err := resolveManifest(manifestContext{workspace: m, dir: dir}, &Input{})
-	if err != nil {
-		t.Fatalf("resolveManifest absolute keys path: %v", err)
-	}
-	if r4.Secrets.KeysPath != absoluteKeysPath {
-		t.Errorf(
-			"Secrets.KeysPath = %q, want %q",
-			r4.Secrets.KeysPath,
-			absoluteKeysPath,
-		)
-	}
-
-	// The manifest's detected indent flows through as the secrets fallback indent.
-	r5, _, err := resolveManifest(
-		manifestContext{workspace: m, dir: dir, indent: 4}, &Input{},
-	)
-	if err != nil {
-		t.Fatalf("resolveManifest indent: %v", err)
-	}
-	if r5.Secrets.DefaultIndent != 4 {
-		t.Errorf("Secrets.DefaultIndent = %d, want 4", r5.Secrets.DefaultIndent)
-	}
-}
-
-// TestResolveProjectMasksSecretReference verifies read commands mask secret
-// references by default: a masked Get dereferences each reference to its
-// canonical form without decrypting or requiring a private key.
-func TestResolveProjectMasksSecretReference(t *testing.T) {
-	t.Parallel()
-
-	path := fixtures.Manifest("resolve/secret-reference")
-	resolved, err := ResolveProject(&Input{ConfigPath: &path}, "api")
-	if err != nil {
-		t.Fatalf("ResolveProject: %v", err)
-	}
-	password, err := resolved.Envmerge.Get(env.GetParams{Key: "PASSWORD"})
+	password, err := service.Get(env.GetParams{Project: "api", Key: "PASSWORD"})
 	if err != nil {
 		t.Fatalf("Get PASSWORD: %v", err)
 	}
 	if password.Value != "secret://development/api_key" {
 		t.Errorf("PASSWORD = %q, want masked development reference", password.Value)
 	}
-	token, err := resolved.Envmerge.Get(env.GetParams{Key: "TOKEN"})
+	token, err := service.Get(env.GetParams{Project: "api", Key: "TOKEN"})
 	if err != nil {
 		t.Fatalf("Get TOKEN: %v", err)
 	}
@@ -434,71 +182,35 @@ func TestResolveProjectMasksSecretReference(t *testing.T) {
 	}
 }
 
-// TestResolveWorkspaceIgnoresSecretsStore verifies a workspace resolution skips
-// the secrets store entirely — it neither reads a malformed store nor constructs
-// a manager.
-func TestResolveWorkspaceIgnoresSecretsStore(t *testing.T) {
+// TestEnvServiceIgnoresSecretsStoreAtConstruction verifies composing the env
+// service never reads a malformed secrets store.
+func TestEnvServiceIgnoresSecretsStoreAtConstruction(t *testing.T) {
 	t.Parallel()
 
-	path := fixtures.Manifest("resolve/global-ignores-store")
-	res, err := ResolveWorkspace(&Input{ConfigPath: &path})
+	_, err := NewApp().EnvService(fixtures.Manifest("resolve/global-ignores-store"))
 	if err != nil {
-		t.Fatalf("ResolveWorkspace: %v", err)
-	}
-	if res.Envmerge != nil {
-		t.Error("workspace resolution should not construct a manager")
+		t.Fatalf("EnvService: %v", err)
 	}
 }
 
-// TestResolveProjectDanglingSecretReference verifies a reference with no matching
+// TestEnvServiceDanglingSecretReference verifies a reference with no matching
 // store entry masks to its canonical form for a default read but fails loudly
-// once materialized, rather than leaking or silently dropping the reference.
-func TestResolveProjectDanglingSecretReference(t *testing.T) {
+// once materialized.
+func TestEnvServiceDanglingSecretReference(t *testing.T) {
 	t.Parallel()
 
-	path := fixtures.Manifest("resolve/dangling-reference")
-	resolved, err := ResolveProject(&Input{ConfigPath: &path}, "api")
+	service, err := NewApp().EnvService(fixtures.Manifest("resolve/dangling-reference"))
 	if err != nil {
-		t.Fatalf("ResolveProject: %v", err)
+		t.Fatalf("EnvService: %v", err)
 	}
-
-	// Masked: the dangling reference resolves to its own canonical text.
-	entry, err := resolved.Envmerge.Get(env.GetParams{Key: "PASSWORD"})
+	entry, err := service.Get(env.GetParams{Project: "api", Key: "PASSWORD"})
 	if err != nil {
 		t.Fatalf("Get masked: %v", err)
 	}
 	if entry.Value != "secret://development/missing" {
 		t.Errorf("PASSWORD = %q, want the masked reference", entry.Value)
 	}
-
-	// Revealed: materializing the environment fails loudly on the dangling
-	// reference, so a child process never receives an unresolved reference.
-	if _, err := resolved.Envmerge.Materialize(env.MaterializeParams{}); err == nil {
+	if _, err := service.Materialize(env.MaterializeParams{Project: "api"}); err == nil {
 		t.Fatal("expected dangling reference error when materialized")
 	}
-}
-
-// TestManifestPath verifies the manifest-location precedence: --config flag wins,
-// then ENVX_CONFIG, then empty (which defers to the manifest walk-up).
-func TestManifestPath(t *testing.T) {
-	t.Run("flag wins over env", func(t *testing.T) {
-		t.Setenv(flags.Config.Env, "from-env")
-		flag := "from-flag"
-		if got := resolveManifestPath(&Input{ConfigPath: &flag}); got != "from-flag" {
-			t.Errorf("got %q, want from-flag", got)
-		}
-	})
-	t.Run("env when flag empty", func(t *testing.T) {
-		t.Setenv(flags.Config.Env, "from-env")
-		empty := ""
-		if got := resolveManifestPath(&Input{ConfigPath: &empty}); got != "from-env" {
-			t.Errorf("got %q, want from-env", got)
-		}
-	})
-	t.Run("empty when neither set", func(t *testing.T) {
-		t.Setenv(flags.Config.Env, "")
-		if got := resolveManifestPath(&Input{}); got != "" {
-			t.Errorf("got %q, want empty", got)
-		}
-	})
 }

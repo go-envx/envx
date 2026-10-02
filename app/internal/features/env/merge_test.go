@@ -12,7 +12,7 @@ func buildNamespace(
 	t *testing.T, dir, name, env string, settings Settings,
 ) (*Environment, error) {
 	t.Helper()
-	return mergeEnv(t, Params{
+	return mergeEnv(t, ServiceParams{
 		Includes:           []string{filepath.Join(dir, name)},
 		Environments:       []string{"development", "production"},
 		DefaultEnvironment: env,

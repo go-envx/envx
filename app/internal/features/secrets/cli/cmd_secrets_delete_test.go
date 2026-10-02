@@ -7,7 +7,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/go-envx/envx/app/internal/core"
 	"github.com/go-envx/envx/app/internal/features/secrets"
 	"github.com/go-envx/envx/app/internal/utils/filex"
 	"github.com/go-envx/envx/app/internal/utils/printer"
@@ -26,16 +25,9 @@ func writeDeleteManifest(t *testing.T) string {
 }
 
 // seedDeleteSecret generates a group keypair and stores one secret for delete tests.
-func seedDeleteSecret(t *testing.T, input *core.Input, group, key, plaintext string) {
+func seedDeleteSecret(t *testing.T, manifest, group, key, plaintext string) {
 	t.Helper()
-	resolved, err := core.ResolveWorkspace(input)
-	if err != nil {
-		t.Fatalf("ResolveWorkspace(): %v", err)
-	}
-	manager, err := core.NewSecretsManager(resolved.Secrets, resolved.Cipher)
-	if err != nil {
-		t.Fatalf("NewSecretsManager(): %v", err)
-	}
+	manager := managerFor(t, manifest)
 	if _, err := manager.GenerateKeypair(group); err != nil {
 		t.Fatalf("GenerateKeypair(): %v", err)
 	}
@@ -52,23 +44,15 @@ func TestExecuteDeleteRemovesStoredSecret(t *testing.T) {
 	t.Parallel()
 
 	manifest := writeDeleteManifest(t)
-	input := &core.Input{ConfigPath: &manifest}
 	seedDeleteSecret(
 		t,
-		input,
+		manifest,
 		"production",
 		"database_password",
 		"database-password",
 	)
 
-	resolved, err := core.ResolveWorkspace(input)
-	if err != nil {
-		t.Fatalf("ResolveWorkspace(): %v", err)
-	}
-	manager, err := core.NewSecretsManager(resolved.Secrets, resolved.Cipher)
-	if err != nil {
-		t.Fatalf("NewSecretsManager(): %v", err)
-	}
+	manager := managerFor(t, manifest)
 
 	result, err := manager.DeleteSecret("Production", "database_password")
 	if err != nil {
@@ -77,11 +61,11 @@ func TestExecuteDeleteRemovesStoredSecret(t *testing.T) {
 	if result.Secret.Group != "production" || result.Secret.Key != "database_password" {
 		t.Errorf("result = %+v", result)
 	}
-	if result.Location != resolved.Secrets.SecretsPath {
+	if result.Location != secretsPathFor(manifest) {
 		t.Errorf(
 			"result.Location = %q, want %q",
 			result.Location,
-			resolved.Secrets.SecretsPath,
+			secretsPathFor(manifest),
 		)
 	}
 
@@ -93,7 +77,7 @@ func TestExecuteDeleteRemovesStoredSecret(t *testing.T) {
 		t.Error("DeleteSecret() left the removed secret in the store")
 	}
 
-	data, err := filex.Read(resolved.Secrets.SecretsPath)
+	data, err := filex.Read(secretsPathFor(manifest))
 	if err != nil {
 		t.Fatalf("Read(): %v", err)
 	}
@@ -107,23 +91,15 @@ func TestExecuteDeleteMissingSecretFails(t *testing.T) {
 	t.Parallel()
 
 	manifest := writeDeleteManifest(t)
-	input := &core.Input{ConfigPath: &manifest}
 	seedDeleteSecret(
 		t,
-		input,
+		manifest,
 		"production",
 		"database_password",
 		"database-password",
 	)
 
-	resolved, err := core.ResolveWorkspace(input)
-	if err != nil {
-		t.Fatalf("ResolveWorkspace(): %v", err)
-	}
-	manager, err := core.NewSecretsManager(resolved.Secrets, resolved.Cipher)
-	if err != nil {
-		t.Fatalf("NewSecretsManager(): %v", err)
-	}
+	manager := managerFor(t, manifest)
 
 	if _, err := manager.DeleteSecret("production", "missing"); err == nil {
 		t.Fatal("DeleteSecret() succeeded for a missing secret")
@@ -167,23 +143,15 @@ func TestOutputDeleteReportsKeyGroupAndStorePath(t *testing.T) {
 // through the factory.
 func TestNewSecretsDeleteCommand(t *testing.T) {
 	manifest := writeDeleteManifest(t)
-	input := &core.Input{ConfigPath: &manifest}
 	seedDeleteSecret(
 		t,
-		input,
+		manifest,
 		"production",
 		"database_password",
 		"database-password",
 	)
 
-	resolved, err := core.ResolveWorkspace(input)
-	if err != nil {
-		t.Fatalf("ResolveWorkspace(): %v", err)
-	}
-	manager, err := core.NewSecretsManager(resolved.Secrets, resolved.Cipher)
-	if err != nil {
-		t.Fatalf("NewSecretsManager(): %v", err)
-	}
+	manager := managerFor(t, manifest)
 
 	factory := &mockSecretsFactory{svc: manager}
 

@@ -9,9 +9,9 @@ import (
 // diffManager builds a Manager over a single "app" namespace in dir declaring the
 // development and production environments, with an optional resolver factory so a
 // test can prove Diff never opens one.
-func diffManager(t *testing.T, dir string, factory ValueResolverFactory) *Manager {
+func diffManager(t *testing.T, dir string, factory ValueResolverFactory) *Service {
 	t.Helper()
-	return managerFor(t, Params{
+	return managerFor(t, ServiceParams{
 		Includes:        []string{filepath.Join(dir, "app")},
 		ResolverFactory: factory,
 	})
@@ -36,7 +36,7 @@ var devToProd = DiffParams{EnvironmentA: "development", EnvironmentB: "productio
 func TestDiffValidatesEnvironmentsBeforeIO(t *testing.T) {
 	t.Parallel()
 
-	manager := managerFor(t, Params{
+	manager := managerFor(t, ServiceParams{
 		Includes:     []string{filepath.Join(t.TempDir(), "missing")},
 		Environments: []string{"development", "production"},
 	})

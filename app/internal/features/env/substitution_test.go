@@ -12,9 +12,9 @@ import (
 // resolver factory (nil for identity behavior) and injected OS environment.
 func subManager(
 	t *testing.T, dir string, factory ValueResolverFactory, osEnv map[string]string,
-) *Manager {
+) *Service {
 	t.Helper()
-	return managerFor(t, Params{
+	return managerFor(t, ServiceParams{
 		Includes:        []string{filepath.Join(dir, "app")},
 		ResolverFactory: factory,
 		OSEnvironment:   osEnv,

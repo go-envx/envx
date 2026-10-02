@@ -7,7 +7,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/go-envx/envx/app/internal/core"
 	"github.com/go-envx/envx/app/internal/features/secrets"
 	"github.com/go-envx/envx/app/internal/utils/filex"
 	"github.com/go-envx/envx/app/internal/utils/printer"
@@ -31,21 +30,13 @@ func TestExecuteDecryptsCiphertextInPlace(t *testing.T) {
 	t.Parallel()
 
 	manifest := writeDecryptManifest(t)
-	input := &core.Input{ConfigPath: &manifest}
-	resolved, err := core.ResolveWorkspace(input)
-	if err != nil {
-		t.Fatalf("ResolveWorkspace(): %v", err)
-	}
-	manager, err := core.NewSecretsManager(resolved.Secrets, resolved.Cipher)
-	if err != nil {
-		t.Fatalf("NewSecretsManager(): %v", err)
-	}
+	manager := managerFor(t, manifest)
 	if _, err := manager.GenerateKeypair("production"); err != nil {
 		t.Fatalf("GenerateKeypair(): %v", err)
 	}
 
 	const plaintext = "database-password"
-	_, err = manager.SetSecret(
+	_, err := manager.SetSecret(
 		"production", "database_password", func() (string, error) {
 			return plaintext, nil
 		},
@@ -62,7 +53,7 @@ func TestExecuteDecryptsCiphertextInPlace(t *testing.T) {
 		t.Fatalf("len(Secrets) = %d, want 1", len(result.Secrets))
 	}
 
-	data, err := filex.Read(resolved.Secrets.SecretsPath)
+	data, err := filex.Read(secretsPathFor(manifest))
 	if err != nil {
 		t.Fatalf("Read(): %v", err)
 	}
@@ -77,19 +68,11 @@ func TestExecuteDecryptUnavailableGroupReportsSkipped(t *testing.T) {
 	t.Parallel()
 
 	manifest := writeDecryptManifest(t)
-	input := &core.Input{ConfigPath: &manifest}
-	resolved, err := core.ResolveWorkspace(input)
-	if err != nil {
-		t.Fatalf("ResolveWorkspace(): %v", err)
-	}
-	manager, err := core.NewSecretsManager(resolved.Secrets, resolved.Cipher)
-	if err != nil {
-		t.Fatalf("NewSecretsManager(): %v", err)
-	}
+	manager := managerFor(t, manifest)
 	if _, err := manager.GenerateKeypair("production"); err != nil {
 		t.Fatalf("GenerateKeypair(): %v", err)
 	}
-	_, err = manager.SetSecret(
+	_, err := manager.SetSecret(
 		"production", "database_password", func() (string, error) {
 			return "secret-val", nil
 		},
@@ -99,7 +82,7 @@ func TestExecuteDecryptUnavailableGroupReportsSkipped(t *testing.T) {
 	}
 
 	// Remove keys file so group is unavailable
-	if err := os.Remove(resolved.Secrets.KeysPath); err != nil {
+	if err := os.Remove(keysPathFor(manifest)); err != nil {
 		t.Fatalf("Remove keys file: %v", err)
 	}
 
@@ -159,19 +142,11 @@ func (m *mockSecretsFactory) SecretsService(
 // TestNewDecryptCommand verifies the command builds and dispatches through the factory.
 func TestNewDecryptCommand(t *testing.T) {
 	manifest := writeDecryptManifest(t)
-	input := &core.Input{ConfigPath: &manifest}
-	resolved, err := core.ResolveWorkspace(input)
-	if err != nil {
-		t.Fatalf("ResolveWorkspace(): %v", err)
-	}
-	manager, err := core.NewSecretsManager(resolved.Secrets, resolved.Cipher)
-	if err != nil {
-		t.Fatalf("NewSecretsManager(): %v", err)
-	}
+	manager := managerFor(t, manifest)
 	if _, err := manager.GenerateKeypair("production"); err != nil {
 		t.Fatalf("GenerateKeypair(): %v", err)
 	}
-	_, err = manager.SetSecret(
+	_, err := manager.SetSecret(
 		"production", "database_password", func() (string, error) {
 			return "secret-value", nil
 		},

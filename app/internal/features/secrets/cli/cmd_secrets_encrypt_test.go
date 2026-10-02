@@ -7,7 +7,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/go-envx/envx/app/internal/core"
 	"github.com/go-envx/envx/app/internal/features/secrets"
 	"github.com/go-envx/envx/app/internal/utils/filex"
 	"github.com/go-envx/envx/app/internal/utils/printer"
@@ -31,15 +30,7 @@ func TestExecuteEncryptsPlaintextInPlace(t *testing.T) {
 	t.Parallel()
 
 	manifest := writeEncryptManifest(t)
-	input := &core.Input{ConfigPath: &manifest}
-	resolved, err := core.ResolveWorkspace(input)
-	if err != nil {
-		t.Fatalf("ResolveWorkspace(): %v", err)
-	}
-	manager, err := core.NewSecretsManager(resolved.Secrets, resolved.Cipher)
-	if err != nil {
-		t.Fatalf("NewSecretsManager(): %v", err)
-	}
+	manager := managerFor(t, manifest)
 	if _, err := manager.GenerateKeypair("production"); err != nil {
 		t.Fatalf("GenerateKeypair(): %v", err)
 	}
@@ -65,7 +56,7 @@ func TestExecuteEncryptsPlaintextInPlace(t *testing.T) {
 		t.Errorf("Secrets = %+v", result.Secrets)
 	}
 
-	data, err := filex.Read(resolved.Secrets.SecretsPath)
+	data, err := filex.Read(secretsPathFor(manifest))
 	if err != nil {
 		t.Fatalf("Read(): %v", err)
 	}
@@ -79,15 +70,7 @@ func TestExecuteEncryptNoMatchesFails(t *testing.T) {
 	t.Parallel()
 
 	manifest := writeEncryptManifest(t)
-	input := &core.Input{ConfigPath: &manifest}
-	resolved, err := core.ResolveWorkspace(input)
-	if err != nil {
-		t.Fatalf("ResolveWorkspace(): %v", err)
-	}
-	manager, err := core.NewSecretsManager(resolved.Secrets, resolved.Cipher)
-	if err != nil {
-		t.Fatalf("NewSecretsManager(): %v", err)
-	}
+	manager := managerFor(t, manifest)
 
 	if _, err := manager.EncryptSecrets("missing", ""); err == nil {
 		t.Fatal("EncryptSecrets() succeeded for missing group")
@@ -152,15 +135,7 @@ func TestOutputEncryptReportsNothingToEncrypt(t *testing.T) {
 // through the factory.
 func TestNewSecretsEncryptCommand(t *testing.T) {
 	manifest := writeEncryptManifest(t)
-	input := &core.Input{ConfigPath: &manifest}
-	resolved, err := core.ResolveWorkspace(input)
-	if err != nil {
-		t.Fatalf("ResolveWorkspace(): %v", err)
-	}
-	manager, err := core.NewSecretsManager(resolved.Secrets, resolved.Cipher)
-	if err != nil {
-		t.Fatalf("NewSecretsManager(): %v", err)
-	}
+	manager := managerFor(t, manifest)
 	if _, err := manager.GenerateKeypair("production"); err != nil {
 		t.Fatalf("GenerateKeypair(): %v", err)
 	}

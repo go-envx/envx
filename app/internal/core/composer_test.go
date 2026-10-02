@@ -9,75 +9,18 @@ import (
 	"github.com/go-envx/envx/app/internal/resources/cipher"
 )
 
-// TestNewConfiguredCipherUsesConfiguredAlgorithm verifies the config composer
-// selects the manifest cipher and retains the age default without a manifest.
-func TestNewConfiguredCipherUsesConfiguredAlgorithm(t *testing.T) {
-	t.Parallel()
-
-	tests := []struct {
-		name       string
-		configPath string
-		prefix     string
-	}{
-		{
-			name:       "age default",
-			configPath: filepath.Join(t.TempDir(), "missing.yaml"),
-			prefix:     "age-public-key:",
-		},
-		{
-			name:       "nacl box manifest",
-			configPath: writeCipherManifest(t, string(cipher.NaClBox)),
-			prefix:     "nacl-box-public-key:",
-		},
-	}
-
-	for _, test := range tests {
-		test := test
-		t.Run(test.name, func(t *testing.T) {
-			t.Parallel()
-			selected, err := NewConfiguredCipher(
-				&Input{ConfigPath: &test.configPath},
-			)
-			if err != nil {
-				t.Fatalf("NewConfiguredCipher(): %v", err)
-			}
-			pair, err := selected.Keypair()
-			if err != nil {
-				t.Fatalf("Keypair(): %v", err)
-			}
-			if !strings.HasPrefix(pair.PublicKey, test.prefix) {
-				t.Errorf("PublicKey = %q, want prefix %q", pair.PublicKey, test.prefix)
-			}
-		})
-	}
-}
-
-// writeCipherManifest creates a minimal manifest selecting algorithm.
-func writeCipherManifest(t *testing.T, algorithm string) string {
-	t.Helper()
-	path := filepath.Join(t.TempDir(), "envx.yaml")
-	body := "environments: [production]\n" +
-		"secrets:\n  cipher: " + algorithm + "\n" +
-		"projects:\n  app:\n    includes: [env/app]\n"
-	if err := os.WriteFile(path, []byte(body), 0o600); err != nil {
-		t.Fatal(err)
-	}
-	return path
-}
-
-// TestNewSecretsManagerUsesConfiguredAlgorithm verifies manager composition
+// TestNewSecretsServiceUsesConfiguredAlgorithm verifies service composition
 // passes the selected cipher into the root secrets workflow.
-func TestNewSecretsManagerUsesConfiguredAlgorithm(t *testing.T) {
+func TestNewSecretsServiceUsesConfiguredAlgorithm(t *testing.T) {
 	dir := t.TempDir()
-	manager, err := NewSecretsManager(SecretsParams{
-		SecretsPath:   filepath.Join(dir, "secrets.yaml"),
-		KeysPath:      filepath.Join(dir, "envx.keys"),
-		DefaultIndent: 2,
-	}, cipher.Params{
-		Algorithm: cipher.NaClBox,
-	})
+	manager, err := NewSecretsService(
+		filepath.Join(dir, "secrets.yaml"),
+		filepath.Join(dir, "envx.keys"),
+		cipher.Params{Algorithm: cipher.NaClBox},
+		2,
+	)
 	if err != nil {
-		t.Fatalf("NewSecretsManager(): %v", err)
+		t.Fatalf("NewSecretsService(): %v", err)
 	}
 	result, err := manager.GenerateKeypair("production")
 	if err != nil {

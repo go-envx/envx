@@ -5,8 +5,6 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
-
-	"github.com/go-envx/envx/app/internal/core"
 )
 
 // writeGetManifest creates a valid workspace manifest for get action tests.
@@ -24,18 +22,10 @@ func writeGetManifest(t *testing.T) string {
 // seedGetSecret generates a group keypair and stores one secret for get tests.
 func seedGetSecret(
 	t *testing.T,
-	input *core.Input,
-	group, key, plaintext string,
+	manifest, group, key, plaintext string,
 ) {
 	t.Helper()
-	resolved, err := core.ResolveWorkspace(input)
-	if err != nil {
-		t.Fatalf("ResolveWorkspace(): %v", err)
-	}
-	manager, err := core.NewSecretsManager(resolved.Secrets, resolved.Cipher)
-	if err != nil {
-		t.Fatalf("NewSecretsManager(): %v", err)
-	}
+	manager := managerFor(t, manifest)
 	if _, err := manager.GenerateKeypair(group); err != nil {
 		t.Fatalf("GenerateKeypair(): %v", err)
 	}
@@ -52,18 +42,10 @@ func TestServiceGetDecryptsStoredSecret(t *testing.T) {
 	t.Parallel()
 
 	manifest := writeGetManifest(t)
-	input := &core.Input{ConfigPath: &manifest}
 	const plaintext = "database-password"
-	seedGetSecret(t, input, "production", "database_password", plaintext)
+	seedGetSecret(t, manifest, "production", "database_password", plaintext)
 
-	resolved, err := core.ResolveWorkspace(input)
-	if err != nil {
-		t.Fatalf("ResolveWorkspace(): %v", err)
-	}
-	manager, err := core.NewSecretsManager(resolved.Secrets, resolved.Cipher)
-	if err != nil {
-		t.Fatalf("NewSecretsManager(): %v", err)
-	}
+	manager := managerFor(t, manifest)
 
 	result, err := manager.GetSecret("Production", "database_password")
 	if err != nil {
@@ -72,11 +54,11 @@ func TestServiceGetDecryptsStoredSecret(t *testing.T) {
 	if result.Value != plaintext {
 		t.Errorf("GetSecret() value = %q, want %q", result.Value, plaintext)
 	}
-	if result.Location != resolved.Secrets.SecretsPath {
+	if result.Location != secretsPathFor(manifest) {
 		t.Errorf(
 			"GetSecret() location = %q, want %q",
 			result.Location,
-			resolved.Secrets.SecretsPath,
+			secretsPathFor(manifest),
 		)
 	}
 }
@@ -86,17 +68,9 @@ func TestServiceGetMissingSecretFails(t *testing.T) {
 	t.Parallel()
 
 	manifest := writeGetManifest(t)
-	input := &core.Input{ConfigPath: &manifest}
-	seedGetSecret(t, input, "production", "database_password", "database-password")
+	seedGetSecret(t, manifest, "production", "database_password", "database-password")
 
-	resolved, err := core.ResolveWorkspace(input)
-	if err != nil {
-		t.Fatalf("ResolveWorkspace(): %v", err)
-	}
-	manager, err := core.NewSecretsManager(resolved.Secrets, resolved.Cipher)
-	if err != nil {
-		t.Fatalf("NewSecretsManager(): %v", err)
-	}
+	manager := managerFor(t, manifest)
 
 	if _, err := manager.GetSecret("production", "missing"); err == nil {
 		t.Fatal("GetSecret() succeeded for a missing secret")
@@ -125,18 +99,10 @@ func TestOutputGetPrintsPlaintextWithNewline(t *testing.T) {
 // the factory.
 func TestNewSecretsGetCommand(t *testing.T) {
 	manifest := writeGetManifest(t)
-	input := &core.Input{ConfigPath: &manifest}
 	const plaintext = "database-password"
-	seedGetSecret(t, input, "production", "database_password", plaintext)
+	seedGetSecret(t, manifest, "production", "database_password", plaintext)
 
-	resolved, err := core.ResolveWorkspace(input)
-	if err != nil {
-		t.Fatalf("ResolveWorkspace(): %v", err)
-	}
-	manager, err := core.NewSecretsManager(resolved.Secrets, resolved.Cipher)
-	if err != nil {
-		t.Fatalf("NewSecretsManager(): %v", err)
-	}
+	manager := managerFor(t, manifest)
 
 	factory := &mockSecretsFactory{svc: manager}
 

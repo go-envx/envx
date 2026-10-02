@@ -40,45 +40,28 @@ func (a *App) EmitService(writer io.Writer) (*emit.Service, error) {
 
 // SecretsService resolves the workspace and returns the domain secrets service.
 func (a *App) SecretsService(configPath string) (*secrets.Service, error) {
-	var in *Input
-	if configPath != "" {
-		in = &Input{ConfigPath: &configPath}
-	} else {
-		in = &Input{}
-	}
-	c, err := ResolveWorkspace(in)
+	res, err := resolveWorkspace(configPath)
 	if err != nil {
 		return nil, err
 	}
-	return NewSecretsManager(c.Secrets, c.Cipher)
+	s := res.secrets
+	return NewSecretsService(s.SecretsPath, s.KeysPath, res.cipher, s.DefaultIndent)
 }
 
 // EnvService resolves workspace configuration and returns the domain env
 // service.
 func (a *App) EnvService(configPath string) (*env.Service, error) {
-	var in *Input
-	if configPath != "" {
-		in = &Input{ConfigPath: &configPath}
-	} else {
-		in = &Input{}
-	}
-	res, err := ResolveWorkspace(in)
+	res, err := resolveWorkspace(configPath)
 	if err != nil {
 		return nil, err
 	}
-	return NewWorkspaceEnvService(res)
+	return newWorkspaceEnvService(res)
 }
 
 // PackService resolves the workspace layout and returns the domain bundling
 // service.
 func (a *App) PackService(configPath string) (*pack.Service, error) {
-	var in *Input
-	if configPath != "" {
-		in = &Input{ConfigPath: &configPath}
-	} else {
-		in = &Input{}
-	}
-	layout, err := ResolveWorkspaceLayout(in)
+	layout, err := ResolveWorkspaceLayout(configPath)
 	if err != nil {
 		return nil, err
 	}
@@ -88,15 +71,9 @@ func (a *App) PackService(configPath string) (*pack.Service, error) {
 // ValidateService resolves workspace configuration and returns the domain
 // workspace diagnostics service.
 func (a *App) ValidateService(configPath string) (*validate.Service, error) {
-	var in *Input
-	if configPath != "" {
-		in = &Input{ConfigPath: &configPath}
-	} else {
-		in = &Input{}
-	}
-	res, err := ResolveWorkspace(in)
+	res, err := resolveWorkspace(configPath)
 	if err != nil {
 		return nil, err
 	}
-	return NewValidateService(res)
+	return newValidateService(res)
 }

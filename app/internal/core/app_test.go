@@ -74,7 +74,7 @@ func TestNewPackServiceRequiresLayout(t *testing.T) {
 func TestNewValidateServiceRequiresWorkspace(t *testing.T) {
 	t.Parallel()
 
-	if _, err := NewValidateService(nil); err == nil {
-		t.Fatal("NewValidateService(nil) succeeded")
+	if _, err := newValidateService(nil); err == nil {
+		t.Fatal("newValidateService(nil) succeeded")
 	}
 }

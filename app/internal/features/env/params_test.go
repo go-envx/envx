@@ -10,7 +10,7 @@ import (
 func TestNormalizeParamsDefaultsDelimiter(t *testing.T) {
 	t.Parallel()
 
-	def, err := normalizeParams(Params{Environments: []string{"development"}})
+	def, err := normalizeParams(ServiceParams{Environments: []string{"development"}})
 	if err != nil {
 		t.Fatalf("normalizeParams: %v", err)
 	}
@@ -18,7 +18,7 @@ func TestNormalizeParamsDefaultsDelimiter(t *testing.T) {
 		t.Errorf("Delimiter = %q, want , (default)", def.Settings.Delimiter)
 	}
 
-	custom, err := normalizeParams(Params{
+	custom, err := normalizeParams(ServiceParams{
 		Environments: []string{"development"},
 		Settings:     Settings{Delimiter: ":"},
 	})
@@ -37,7 +37,7 @@ func TestNormalizeParamsCopiesSlices(t *testing.T) {
 
 	includes := []string{"a", "b"}
 	environments := []string{"development", "production"}
-	normalized, err := normalizeParams(Params{
+	normalized, err := normalizeParams(ServiceParams{
 		Includes:     includes,
 		Environments: environments,
 	})
@@ -61,7 +61,7 @@ func TestNormalizeParamsCopiesSlices(t *testing.T) {
 func TestNormalizeParamsDoesNotValidateEnvironment(t *testing.T) {
 	t.Parallel()
 
-	if _, err := normalizeParams(Params{
+	if _, err := normalizeParams(ServiceParams{
 		Environments:       []string{"development"},
 		DefaultEnvironment: "undeclared",
 	}); err != nil {

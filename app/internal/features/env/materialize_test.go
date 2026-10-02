@@ -17,7 +17,7 @@ func TestMaterializeResolvesEveryWinner(t *testing.T) {
 	factory := &recordingFactory{
 		resolver: fakeResolver{values: map[string]string{"secret://x": "pw"}},
 	}
-	manager := managerFor(t, Params{
+	manager := managerFor(t, ServiceParams{
 		Includes:        []string{filepath.Join(dir, "app")},
 		ResolverFactory: factory,
 	})
@@ -46,7 +46,7 @@ func TestMaterializeOpensOneRevealingResolver(t *testing.T) {
 	writeYAML(t, dir, "app.yaml", "plain: keep\n")
 
 	factory := &recordingFactory{resolver: fakeResolver{}}
-	manager := managerFor(t, Params{
+	manager := managerFor(t, ServiceParams{
 		Includes:        []string{filepath.Join(dir, "app")},
 		ResolverFactory: factory,
 	})
@@ -73,7 +73,7 @@ func TestMaterializeAggregatesFailures(t *testing.T) {
 	writeYAML(t, dir, "app.yaml", "alpha: secret://a\nbeta: secret://b\n")
 
 	factory := &recordingFactory{resolver: fakeResolver{failAll: true}}
-	manager := managerFor(t, Params{
+	manager := managerFor(t, ServiceParams{
 		Includes:        []string{filepath.Join(dir, "app")},
 		ResolverFactory: factory,
 	})
@@ -102,7 +102,7 @@ func TestMaterializeObservesFileEdits(t *testing.T) {
 	writeYAML(t, dir, "app.yaml", "host: localhost\nsecret: secret://x\n")
 
 	factory := &mutableFactory{value: "first"}
-	manager := managerFor(t, Params{
+	manager := managerFor(t, ServiceParams{
 		Includes:        []string{filepath.Join(dir, "app")},
 		ResolverFactory: factory,
 	})
@@ -139,7 +139,7 @@ func TestMaterializeSkipsShadowedReferences(t *testing.T) {
 	writeYAML(t, dir, "app.production.yaml", "password: replacement\n")
 
 	factory := &recordingFactory{resolver: fakeResolver{fail: "secret://stale"}}
-	manager := managerFor(t, Params{
+	manager := managerFor(t, ServiceParams{
 		Includes:        []string{filepath.Join(dir, "app")},
 		ResolverFactory: factory,
 	})
@@ -161,7 +161,7 @@ func TestMaterializeRedactsResolvedListItemErrors(t *testing.T) {
 	factory := &recordingFactory{resolver: fakeResolver{values: map[string]string{
 		"secret://sensitive": "plaintext,secret",
 	}}}
-	manager := managerFor(t, Params{
+	manager := managerFor(t, ServiceParams{
 		Includes:        []string{filepath.Join(dir, "app")},
 		ResolverFactory: factory,
 	})
@@ -189,7 +189,7 @@ func TestMaterializeJoinsListWithDefaultDelimiter(t *testing.T) {
 	dir := t.TempDir()
 	writeYAML(t, dir, "app.yaml", "hosts:\n  - a\n  - b\n")
 
-	res, err := mergeEnv(t, Params{
+	res, err := mergeEnv(t, ServiceParams{
 		Includes:     []string{filepath.Join(dir, "app")},
 		Environments: []string{"development"},
 	})
@@ -213,7 +213,7 @@ func TestMaterializeResolvesListReferences(t *testing.T) {
 		"secret://a": "tok-a",
 		"secret://b": "tok-b",
 	}}}
-	res, err := mergeEnv(t, Params{
+	res, err := mergeEnv(t, ServiceParams{
 		Includes:        []string{filepath.Join(dir, "app")},
 		Environments:    []string{"development"},
 		ResolverFactory: factory,

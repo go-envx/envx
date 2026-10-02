@@ -15,51 +15,9 @@ import (
 	"github.com/go-envx/envx/app/internal/features/secrets"
 	secfilestore "github.com/go-envx/envx/app/internal/features/secrets/filestore"
 	"github.com/go-envx/envx/app/internal/features/validate"
-	"github.com/go-envx/envx/app/internal/features/workspace"
-	wsfilestore "github.com/go-envx/envx/app/internal/features/workspace/filestore"
 	"github.com/go-envx/envx/app/internal/resources/cipher"
 	"github.com/go-envx/envx/app/internal/shared/status"
 )
-
-// NewConfiguredCipher resolves the workspace cipher when a manifest is present,
-// or constructs the application's default cipher without a workspace.
-func NewConfiguredCipher(in *Input) (cipher.Cipher, error) {
-	// Bind the resolved manifest path and conventional filename into a repository.
-	wsRepo, err := wsfilestore.New(wsfilestore.Params{
-		Path:     resolveManifestPath(in),
-		Filename: defaultManifestFilename,
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	wsService, err := workspace.NewService(workspace.ServiceParams{
-		Repository: wsRepo,
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	// Replace the default with the manifest's algorithm when a workspace exists.
-	cipherParams := cipher.Params{Algorithm: defaultCipherAlgorithm}
-	ws, err := wsService.Load()
-	if err != nil {
-		if !errors.Is(err, workspace.ErrNotFound) {
-			return nil, err
-		}
-	} else {
-		cipherParams = resolveCipherParams(manifestContext{
-			workspace: ws,
-		})
-	}
-
-	// Construct the selected implementation and add context if construction fails.
-	selectedCipher, err := cipher.New(cipherParams)
-	if err != nil {
-		return nil, fmt.Errorf("creating configured cipher: %w", err)
-	}
-	return selectedCipher, nil
-}
 
 // cipherAdapter adapts a cipher.Cipher to the secrets.CipherClient interface.
 type cipherAdapter struct {
@@ -136,34 +94,43 @@ func NewSecretsService(
 	})
 }
 
-// NewSecretsManager composes the configured cipher and private-key ports into
-// a secrets service for one resolved workspace.
-func NewSecretsManager(s SecretsParams, c cipher.Params) (*secrets.Service, error) {
-	return NewSecretsService(s.SecretsPath, s.KeysPath, c, s.DefaultIndent)
+// resolverFactory opens a fresh secrets service and operation-scoped resolver for
+// each resolving env operation, so no store snapshot or private-key cache
+// survives it. It implements env.ValueResolverFactory.
+type resolverFactory struct {
+	secrets SecretsParams
+	cipher  cipher.Params
 }
 
-// NewEnvService constructs an env.Service with a local filestore repository.
-//
-//nolint:gocritic // constructor parameter matches domain convention.
-func NewEnvService(params env.ServiceParams) (*env.Service, error) {
-	if params.Repository == nil {
-		params.Repository = envfilestore.New(envfilestore.Params{})
+// Resolver composes a fresh secrets service and opens a resolver under the
+// reveal policy.
+func (f resolverFactory) Resolver(reveal bool) (env.ValueResolver, error) {
+	manager, err := NewSecretsService(
+		f.secrets.SecretsPath, f.secrets.KeysPath, f.cipher, f.secrets.DefaultIndent,
+	)
+	if err != nil {
+		return nil, err
 	}
-	return env.NewService(params)
+	resolver, err := manager.Resolver(secrets.ResolverParams{Reveal: reveal})
+	if err != nil {
+		return nil, err
+	}
+	return resolver, nil
 }
 
-// NewWorkspaceEnvService composes a workspace-level env.Service from a resolved
+// newWorkspaceEnvService composes a workspace-level env.Service from a resolved
 // workspace.
-func NewWorkspaceEnvService(res *Result) (*env.Service, error) {
+func newWorkspaceEnvService(res *resolvedWorkspace) (*env.Service, error) {
 	if res == nil || res.workspace == nil {
 		return nil, errors.New("workspace is required")
 	}
+	ws := res.workspace
 
-	projects := make(map[string]env.ProjectConfig, len(res.workspace.Projects))
-	for name, p := range res.workspace.Projects {
+	projects := make(map[string]env.ProjectConfig, len(ws.Projects))
+	for name, p := range ws.Projects {
 		absIncludes := make([]string, len(p.Includes))
 		for i, inc := range p.Includes {
-			absIncludes[i] = filepath.Join(res.dir, inc)
+			absIncludes[i] = filepath.Join(ws.Root, inc)
 		}
 		projects[name] = env.ProjectConfig{
 			Name:     name,
@@ -183,41 +150,29 @@ func NewWorkspaceEnvService(res *Result) (*env.Service, error) {
 	repo := envfilestore.New(envfilestore.Params{})
 
 	resolverFact := resolverFactory{
-		secrets: res.Secrets,
-		cipher:  res.Cipher,
+		secrets: res.secrets,
+		cipher:  res.cipher,
 	}
 
-	defaultEnv := res.workspace.DefaultEnvironment()
-	if res.workspace.Settings.Env != nil && *res.workspace.Settings.Env != "" {
-		defaultEnv = *res.workspace.Settings.Env
+	defaultEnv := ws.DefaultEnvironment()
+	if ws.Settings.Env != nil && *ws.Settings.Env != "" {
+		defaultEnv = *ws.Settings.Env
 	}
 
 	globalSettings := env.Settings{
-		Delimiter: env.PrecedenceString(
-			&env.Delimiter, res.workspace.Settings.Delimiter,
-		),
-		Prefix: env.PrecedenceString(
-			&env.Prefix, res.workspace.Settings.Prefix,
-		),
-		Suffix: env.PrecedenceString(
-			&env.Suffix, res.workspace.Settings.Suffix,
-		),
-		ReferencePattern: env.PrecedenceString(
-			&env.ReferencePattern, res.workspace.Settings.ReferencePattern,
-		),
-		RequireOverlays: env.PrecedenceBool(
-			&env.RequireOverlays, res.workspace.Settings.RequireOverlays,
-		),
-		Overload: env.PrecedenceBool(
-			&env.Overload, res.workspace.Settings.Overload,
-		),
+		Delimiter:        env.PrecedenceString(ws.Settings.Delimiter),
+		Prefix:           env.PrecedenceString(ws.Settings.Prefix),
+		Suffix:           env.PrecedenceString(ws.Settings.Suffix),
+		ReferencePattern: env.PrecedenceString(ws.Settings.ReferencePattern),
+		RequireOverlays:  env.PrecedenceBool(ws.Settings.RequireOverlays),
+		Overload:         env.PrecedenceBool(ws.Settings.Overload),
 	}
 
 	return env.NewService(env.ServiceParams{
-		WorkspaceDir:       res.dir,
+		WorkspaceDir:       ws.Root,
 		Repository:         repo,
 		Projects:           projects,
-		Environments:       res.workspace.Environments,
+		Environments:       ws.Environments,
 		DefaultEnvironment: defaultEnv,
 		Settings:           globalSettings,
 		ResolverFactory:    resolverFact,
@@ -265,20 +220,23 @@ func NewPackService(layout *WorkspaceLayout) (*pack.Service, error) {
 	})
 }
 
-// NewValidateService composes a validate.Service from a resolved workspace: the
+// newValidateService composes a validate.Service from a resolved workspace: the
 // workspace-level env.Service diagnoses each project environment and the secrets
 // service supplies the store-level findings.
-func NewValidateService(res *Result) (*validate.Service, error) {
+func newValidateService(res *resolvedWorkspace) (*validate.Service, error) {
 	if res == nil || res.workspace == nil {
 		return nil, errors.New("workspace is required")
 	}
 
-	envService, err := NewWorkspaceEnvService(res)
+	envService, err := newWorkspaceEnvService(res)
 	if err != nil {
 		return nil, err
 	}
 
-	secretsService, err := NewSecretsManager(res.Secrets, res.Cipher)
+	secretsService, err := NewSecretsService(
+		res.secrets.SecretsPath, res.secrets.KeysPath, res.cipher,
+		res.secrets.DefaultIndent,
+	)
 	if err != nil {
 		return nil, err
 	}

@@ -12,9 +12,9 @@ import (
 // grammar through the real merge pipeline.
 func customPatternManager(
 	t *testing.T, dir string, osEnv map[string]string,
-) *Manager {
+) *Service {
 	t.Helper()
-	return managerFor(t, Params{
+	return managerFor(t, ServiceParams{
 		Includes:      []string{filepath.Join(dir, "app")},
 		OSEnvironment: osEnv,
 		Settings: Settings{
@@ -28,7 +28,7 @@ func customPatternManager(
 func TestCustomGrammarResolvesThroughManager(t *testing.T) {
 	t.Parallel()
 
-	m, err := New(Params{
+	m, err := NewService(ServiceParams{
 		Repository: testRepo,
 		Settings:   Settings{ReferencePattern: `\$\{([^}]*)\}`},
 	})
@@ -54,7 +54,7 @@ func TestCustomGrammarResolvesThroughManager(t *testing.T) {
 func TestNewManagerInvalidPatternFails(t *testing.T) {
 	t.Parallel()
 
-	if _, err := New(Params{
+	if _, err := NewService(ServiceParams{
 		Repository: testRepo,
 		Settings:   Settings{ReferencePattern: `(unterminated`},
 	}); err == nil {

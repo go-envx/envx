@@ -9,9 +9,9 @@ import (
 // injected OS-environment snapshot and overload setting.
 func osManager(
 	t *testing.T, dir string, osEnv map[string]string, overload bool,
-) *Manager {
+) *Service {
 	t.Helper()
-	return managerFor(t, Params{
+	return managerFor(t, ServiceParams{
 		Includes:      []string{filepath.Join(dir, "app")},
 		OSEnvironment: osEnv,
 		Settings:      Settings{Overload: overload},
@@ -186,7 +186,7 @@ func TestMaterializeOSValueIsOpaque(t *testing.T) {
 
 	// A revealing factory would fail every reference; an opaque OS value must not
 	// reach it, so materialization succeeds with the reference kept verbatim.
-	manager := managerFor(t, Params{
+	manager := managerFor(t, ServiceParams{
 		Includes:        []string{filepath.Join(dir, "app")},
 		OSEnvironment:   map[string]string{"HOST": "secret://group/key"},
 		ResolverFactory: &recordingFactory{resolver: fakeResolver{failAll: true}},

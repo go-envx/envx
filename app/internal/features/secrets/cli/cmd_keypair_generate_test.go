@@ -7,7 +7,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/go-envx/envx/app/internal/core"
 	"github.com/go-envx/envx/app/internal/features/secrets"
 	"github.com/go-envx/envx/app/internal/utils/filex"
 	"github.com/go-envx/envx/app/internal/utils/printer"
@@ -29,15 +28,7 @@ func writeKeypairGenerateManifest(t *testing.T) string {
 // not render private-key bytes.
 func TestGenerateAndRender(t *testing.T) {
 	manifest := writeKeypairGenerateManifest(t)
-	input := &core.Input{ConfigPath: &manifest}
-	resolved, err := core.ResolveWorkspace(input)
-	if err != nil {
-		t.Fatalf("ResolveWorkspace(): %v", err)
-	}
-	manager, err := core.NewSecretsManager(resolved.Secrets, resolved.Cipher)
-	if err != nil {
-		t.Fatalf("NewSecretsManager(): %v", err)
-	}
+	manager := managerFor(t, manifest)
 	result, err := manager.GenerateKeypair("Production")
 	if err != nil {
 		t.Fatalf("GenerateKeypair(): %v", err)
@@ -52,7 +43,7 @@ func TestGenerateAndRender(t *testing.T) {
 		)
 	}
 
-	privateData, err := filex.Read(resolved.Secrets.KeysPath)
+	privateData, err := filex.Read(keysPathFor(manifest))
 	if err != nil {
 		t.Fatalf("read private-key file: %v", err)
 	}
@@ -74,15 +65,7 @@ func TestGenerateUsesConfiguredCipher(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	input := &core.Input{ConfigPath: &manifest}
-	resolved, err := core.ResolveWorkspace(input)
-	if err != nil {
-		t.Fatalf("ResolveWorkspace(): %v", err)
-	}
-	manager, err := core.NewSecretsManager(resolved.Secrets, resolved.Cipher)
-	if err != nil {
-		t.Fatalf("NewSecretsManager(): %v", err)
-	}
+	manager := managerFor(t, manifest)
 	result, err := manager.GenerateKeypair("production")
 	if err != nil {
 		t.Fatalf("GenerateKeypair(): %v", err)
@@ -93,7 +76,7 @@ func TestGenerateUsesConfiguredCipher(t *testing.T) {
 			result.Keypair.PublicKey,
 		)
 	}
-	privateData, err := filex.Read(resolved.Secrets.KeysPath)
+	privateData, err := filex.Read(keysPathFor(manifest))
 	if err != nil {
 		t.Fatalf("read private-key file: %v", err)
 	}
@@ -105,15 +88,7 @@ func TestGenerateUsesConfiguredCipher(t *testing.T) {
 // TestNewKeypairGenerateCommand verifies generation dispatches through the factory.
 func TestNewKeypairGenerateCommand(t *testing.T) {
 	manifest := writeKeypairGenerateManifest(t)
-	input := &core.Input{ConfigPath: &manifest}
-	resolved, err := core.ResolveWorkspace(input)
-	if err != nil {
-		t.Fatalf("ResolveWorkspace(): %v", err)
-	}
-	manager, err := core.NewSecretsManager(resolved.Secrets, resolved.Cipher)
-	if err != nil {
-		t.Fatalf("NewSecretsManager(): %v", err)
-	}
+	manager := managerFor(t, manifest)
 
 	parent := NewKeypairCmd(&mockSecretsFactory{svc: manager})
 	parent.PersistentFlags().String("config", manifest, "")

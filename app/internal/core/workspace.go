@@ -20,10 +20,10 @@ type ProjectIncludes = workspace.ProjectRef
 // workspace-level secrets and private-key paths, and returns each project's
 // includes sorted by name. It constructs no envmerge Manager and opens no
 // secrets store, because pack copies files without resolving or decrypting them.
-func ResolveWorkspaceLayout(in *Input) (*WorkspaceLayout, error) {
+func ResolveWorkspaceLayout(configPath string) (*WorkspaceLayout, error) {
 	// Resolve manifest-level config once to read the projects, environments, and
 	// the workspace-level secrets and private-key locations.
-	base, err := ResolveWorkspace(in)
+	base, err := resolveWorkspace(configPath)
 	if err != nil {
 		return nil, err
 	}
@@ -45,10 +45,10 @@ func ResolveWorkspaceLayout(in *Input) (*WorkspaceLayout, error) {
 	}
 
 	return &WorkspaceLayout{
-		ManifestPath: base.path,
-		Root:         base.dir,
-		SecretsPath:  base.Secrets.SecretsPath,
-		KeysPath:     base.Secrets.KeysPath,
+		ManifestPath: base.workspace.Path,
+		Root:         base.workspace.Root,
+		SecretsPath:  base.secrets.SecretsPath,
+		KeysPath:     base.secrets.KeysPath,
 		Environments: base.workspace.Environments,
 		Projects:     projects,
 	}, nil

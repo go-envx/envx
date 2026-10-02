@@ -7,7 +7,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/go-envx/envx/app/internal/core"
 	"github.com/go-envx/envx/app/internal/features/secrets"
 	"github.com/go-envx/envx/app/internal/utils/filex"
 	"github.com/go-envx/envx/app/internal/utils/printer"
@@ -26,30 +25,11 @@ func writeKeypairRotateManifest(t *testing.T) string {
 	return path
 }
 
-// managerFor builds a secrets manager for the resolved workspace of in.
-func managerFor(t *testing.T, in *core.Input) *secrets.Service {
-	t.Helper()
-	resolved, err := core.ResolveWorkspace(in)
-	if err != nil {
-		t.Fatalf("ResolveWorkspace(): %v", err)
-	}
-	manager, err := core.NewSecretsManager(resolved.Secrets, resolved.Cipher)
-	if err != nil {
-		t.Fatalf("NewSecretsManager(): %v", err)
-	}
-	return manager
-}
-
 // TestRotateGroup verifies rotation re-encrypts the group through the
 // manager and reports safe metadata without private-key bytes.
 func TestRotateGroup(t *testing.T) {
 	manifest := writeKeypairRotateManifest(t)
-	in := &core.Input{ConfigPath: &manifest}
-	manager := managerFor(t, in)
-	resolved, err := core.ResolveWorkspace(in)
-	if err != nil {
-		t.Fatalf("ResolveWorkspace(): %v", err)
-	}
+	manager := managerFor(t, manifest)
 
 	if _, err := manager.GenerateKeypair("production"); err != nil {
 		t.Fatalf("GenerateKeypair(): %v", err)
@@ -78,7 +58,7 @@ func TestRotateGroup(t *testing.T) {
 	}
 
 	// The rotated store must still decrypt through the manager.
-	res, err := managerFor(t, in).GetSecret("production", "api_key")
+	res, err := managerFor(t, manifest).GetSecret("production", "api_key")
 	if err != nil {
 		t.Fatalf("GetSecret() after rotation: %v", err)
 	}
@@ -86,7 +66,7 @@ func TestRotateGroup(t *testing.T) {
 		t.Errorf("GetSecret() = %q, want plain-api", res.Value)
 	}
 
-	privateData, err := filex.Read(resolved.Secrets.KeysPath)
+	privateData, err := filex.Read(keysPathFor(manifest))
 	if err != nil {
 		t.Fatalf("read private-key file: %v", err)
 	}
@@ -99,8 +79,7 @@ func TestRotateGroup(t *testing.T) {
 func TestRotateFailsForMissingGroup(t *testing.T) {
 	manifest := writeKeypairRotateManifest(t)
 
-	in := &core.Input{ConfigPath: &manifest}
-	manager := managerFor(t, in)
+	manager := managerFor(t, manifest)
 	_, err := manager.RotateKeypair("production")
 	if err == nil {
 		t.Fatal("RotateKeypair() succeeded for a missing group")
@@ -113,15 +92,7 @@ func TestRotateFailsForMissingGroup(t *testing.T) {
 // TestNewKeypairRotateCommand verifies rotation dispatches through the factory.
 func TestNewKeypairRotateCommand(t *testing.T) {
 	manifest := writeKeypairRotateManifest(t)
-	input := &core.Input{ConfigPath: &manifest}
-	resolved, err := core.ResolveWorkspace(input)
-	if err != nil {
-		t.Fatalf("ResolveWorkspace(): %v", err)
-	}
-	manager, err := core.NewSecretsManager(resolved.Secrets, resolved.Cipher)
-	if err != nil {
-		t.Fatalf("NewSecretsManager(): %v", err)
-	}
+	manager := managerFor(t, manifest)
 	if _, err := manager.GenerateKeypair("production"); err != nil {
 		t.Fatalf("GenerateKeypair(): %v", err)
 	}

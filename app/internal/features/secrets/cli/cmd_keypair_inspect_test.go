@@ -7,7 +7,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/go-envx/envx/app/internal/core"
 	"github.com/go-envx/envx/app/internal/features/secrets"
 	"github.com/go-envx/envx/app/internal/utils/filex"
 	"github.com/go-envx/envx/app/internal/utils/printer"
@@ -30,18 +29,7 @@ func writeKeypairInspectManifest(t *testing.T) string {
 // private-key material.
 func TestInspectAndRender(t *testing.T) {
 	manifest := writeKeypairInspectManifest(t)
-	in := &core.Input{ConfigPath: &manifest}
-	resolved, err := core.ResolveWorkspace(in)
-	if err != nil {
-		t.Fatalf("ResolveWorkspace(): %v", err)
-	}
-	secretManager, err := core.NewSecretsManager(
-		resolved.Secrets,
-		resolved.Cipher,
-	)
-	if err != nil {
-		t.Fatalf("NewSecretsManager(): %v", err)
-	}
+	secretManager := managerFor(t, manifest)
 	if _, err := secretManager.GenerateKeypair("production"); err != nil {
 		t.Fatalf("GenerateKeypair(): %v", err)
 	}
@@ -54,7 +42,7 @@ func TestInspectAndRender(t *testing.T) {
 		t.Errorf("PrivateKeyStatus = %q, want valid", metadata.PrivateKeyStatus)
 	}
 
-	privateData, err := filex.Read(resolved.Secrets.KeysPath)
+	privateData, err := filex.Read(keysPathFor(manifest))
 	if err != nil {
 		t.Fatalf("read private-key file: %v", err)
 	}
@@ -62,7 +50,7 @@ func TestInspectAndRender(t *testing.T) {
 		t.Fatal("private-key file is empty")
 	}
 
-	if err := os.Remove(resolved.Secrets.KeysPath); err != nil {
+	if err := os.Remove(keysPathFor(manifest)); err != nil {
 		t.Fatalf("remove private-key file: %v", err)
 	}
 	metadata, err = secretManager.InspectKeypair("production")
@@ -80,15 +68,7 @@ func TestInspectAndRender(t *testing.T) {
 // TestNewKeypairInspectCommand verifies inspection dispatches through the factory.
 func TestNewKeypairInspectCommand(t *testing.T) {
 	manifest := writeKeypairInspectManifest(t)
-	input := &core.Input{ConfigPath: &manifest}
-	resolved, err := core.ResolveWorkspace(input)
-	if err != nil {
-		t.Fatalf("ResolveWorkspace(): %v", err)
-	}
-	manager, err := core.NewSecretsManager(resolved.Secrets, resolved.Cipher)
-	if err != nil {
-		t.Fatalf("NewSecretsManager(): %v", err)
-	}
+	manager := managerFor(t, manifest)
 	if _, err := manager.GenerateKeypair("production"); err != nil {
 		t.Fatalf("GenerateKeypair(): %v", err)
 	}

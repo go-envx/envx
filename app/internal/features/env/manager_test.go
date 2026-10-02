@@ -21,10 +21,10 @@ func setupWorkspace(t *testing.T) string {
 	return dir
 }
 
-// baseParams builds env.Params for the temp workspace declaring the
+// baseParams builds env.ServiceParams for the temp workspace declaring the
 // development and production environments.
-func baseParams(dir string) Params {
-	return Params{
+func baseParams(dir string) ServiceParams {
+	return ServiceParams{
 		Repository:   testRepo,
 		Includes:     []string{filepath.Join(dir, "env", "postgres")},
 		Environments: []string{"development", "production"},
@@ -36,7 +36,7 @@ func baseParams(dir string) Params {
 func TestNewAppliesStructuralDefaults(t *testing.T) {
 	t.Parallel()
 
-	manager := managerFor(t, Params{DefaultEnvironment: "undeclared"})
+	manager := managerFor(t, ServiceParams{DefaultEnvironment: "undeclared"})
 	if manager.params.Settings.Delimiter != "," {
 		t.Errorf("Delimiter = %q, want , (default)", manager.params.Settings.Delimiter)
 	}
@@ -48,7 +48,7 @@ func TestNewPerformsNoNamespaceIO(t *testing.T) {
 	t.Parallel()
 
 	dir := t.TempDir()
-	if _, err := New(Params{
+	if _, err := NewService(ServiceParams{
 		Repository:   testRepo,
 		Includes:     []string{filepath.Join(dir, "missing")},
 		Environments: []string{"development"},
@@ -63,7 +63,7 @@ func TestNewDoesNotOpenResolver(t *testing.T) {
 	t.Parallel()
 
 	factory := &recordingFactory{resolver: fakeResolver{}}
-	if _, err := New(Params{
+	if _, err := NewService(ServiceParams{
 		Repository:      testRepo,
 		Environments:    []string{"development"},
 		ResolverFactory: factory,
@@ -83,7 +83,7 @@ func TestNormalizeEnvironment(t *testing.T) {
 
 	t.Run("empty uses configured default", func(t *testing.T) {
 		t.Parallel()
-		m := managerFor(t, Params{DefaultEnvironment: "production"})
+		m := managerFor(t, ServiceParams{DefaultEnvironment: "production"})
 		got, err := m.normalizeEnvironment("")
 		if err != nil || got != "production" {
 			t.Fatalf("normalizeEnvironment(\"\") = %q, %v; want production", got, err)
@@ -91,7 +91,7 @@ func TestNormalizeEnvironment(t *testing.T) {
 	})
 	t.Run("empty default falls back to first declared", func(t *testing.T) {
 		t.Parallel()
-		m := managerFor(t, Params{})
+		m := managerFor(t, ServiceParams{})
 		got, err := m.normalizeEnvironment("")
 		if err != nil || got != "development" {
 			t.Fatalf("normalizeEnvironment(\"\") = %q, %v; want development", got, err)
@@ -99,7 +99,7 @@ func TestNormalizeEnvironment(t *testing.T) {
 	})
 	t.Run("explicit supersedes unrelated default", func(t *testing.T) {
 		t.Parallel()
-		m := managerFor(t, Params{DefaultEnvironment: "undeclared"})
+		m := managerFor(t, ServiceParams{DefaultEnvironment: "undeclared"})
 		got, err := m.normalizeEnvironment("production")
 		if err != nil || got != "production" {
 			t.Fatalf("normalizeEnvironment = %q, %v; want production", got, err)
@@ -107,7 +107,7 @@ func TestNormalizeEnvironment(t *testing.T) {
 	})
 	t.Run("undeclared environment errors", func(t *testing.T) {
 		t.Parallel()
-		m := managerFor(t, Params{})
+		m := managerFor(t, ServiceParams{})
 		if _, err := m.normalizeEnvironment("ghost"); err == nil {
 			t.Error("expected error for undeclared environment")
 		}

@@ -82,9 +82,9 @@ func (f *diagnoserFactory) Resolver(reveal bool) (ValueResolver, error) {
 
 // explainManager builds a Manager over a single "app" namespace in dir with the
 // given resolver factory.
-func explainManager(t *testing.T, dir string, factory ValueResolverFactory) *Manager {
+func explainManager(t *testing.T, dir string, factory ValueResolverFactory) *Service {
 	t.Helper()
-	return managerFor(t, Params{
+	return managerFor(t, ServiceParams{
 		Includes:        []string{filepath.Join(dir, "app")},
 		ResolverFactory: factory,
 	})
@@ -304,7 +304,7 @@ func TestExplainListAggregatesWorstSeverity(t *testing.T) {
 }
 
 // findExplanation returns the entry with the given key and whether it exists.
-func findExplanation(exp *Explanation, key string) (ExplanationEntry, bool) {
+func findExplanation(exp *ExplainResult, key string) (ExplanationEntry, bool) {
 	for i := range exp.Entries {
 		if exp.Entries[i].Key == key {
 			return exp.Entries[i], true

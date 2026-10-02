@@ -1,17 +1,13 @@
 package core
 
 import (
-	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
 
-	"github.com/go-envx/envx/app/internal/features/env"
-	"github.com/go-envx/envx/app/internal/features/secrets"
 	"github.com/go-envx/envx/app/internal/features/workspace"
 	wsfilestore "github.com/go-envx/envx/app/internal/features/workspace/filestore"
 	"github.com/go-envx/envx/app/internal/resources/cipher"
-	"github.com/go-envx/envx/app/internal/shared/flags"
 	"github.com/go-envx/envx/app/internal/utils/filex"
 )
 
@@ -28,322 +24,44 @@ const (
 	defaultIndent = 2
 )
 
-// Input is the raw user input one action gathers at the frontend edge (a cobra
-// command today, an HTTP handler tomorrow). Each setting is optional: a non-nil
-// value means the user provided it explicitly and it wins the precedence chain,
-// while nil means "fall through" to the ENVX_* var and then the manifest layers.
-// ConfigPath selects the manifest. ResolveProject and ResolveWorkspace turn it
-// into a *Result.
-type Input struct {
-	// ConfigPath selects the manifest file; nil or empty triggers auto-discovery.
-	ConfigPath *string
-	// Env is the explicitly requested target environment.
-	Env *string
-	// RequireOverlays, when set, requires every overlay file in the chain to exist.
-	RequireOverlays *bool
-	// Prefix is the explicitly requested key prefix.
-	Prefix *string
-	// Suffix is the explicitly requested key suffix.
-	Suffix *string
-	// Delimiter is the explicitly requested list-join delimiter.
-	Delimiter *string
-	// Overload, when set, lets file values win over existing OS env vars.
-	Overload *bool
-	// ReferencePattern is the explicitly requested {{VAR}} reference-syntax regex.
-	ReferencePattern *string
-}
-
-// manifestContext bundles the loaded manifest, the directory it was loaded from,
-// and the project being resolved: the shared input resolveManifest and
-// resolveProjectLayer both read, and which Result retains so OverlayPath can
-// validate and join a target without re-loading.
-type manifestContext struct {
-	// workspace is the parsed, validated workspace.
+// resolvedWorkspace is a loaded manifest with the secrets and cipher parameters
+// derived from it.
+type resolvedWorkspace struct {
 	workspace *workspace.Workspace
-	// path is the absolute path the manifest was loaded from.
-	path string
-	// dir is the absolute directory the manifest was loaded from.
-	dir string
-	// indent is the block indentation detected in the manifest source document.
-	indent int
-	// project is the project name being resolved ("" resolves the global context).
-	project string
+	secrets   SecretsParams
+	cipher    cipher.Params
 }
 
-// projectLayer is the project's contribution to resolution: its setting overrides
-// and its includes resolved to absolute paths. The zero value is the global-only
-// context — no overrides and no includes.
-type projectLayer struct {
-	// settings are the project-level setting overrides layered over the global ones.
-	settings workspace.Settings
-	// includes are the project's namespaces resolved to absolute paths.
-	includes []string
-}
-
-// ResolveProject resolves a project's build-ready configuration: it loads the
-// manifest, meshes it with the input and ENVX_* vars, binds a resolver factory,
-// and constructs the envmerge Manager the environment-building actions (get, run,
-// explain, diff) operate through. Construction performs no namespace or secrets
-// I/O: each Manager operation opens a fresh, operation-scoped resolver from the
-// factory and selects its own environment and reveal policy, so run reveals while
-// the read commands mask by default. A missing store yields an empty resolver, so
-// a reference with no matching entry fails loudly as a dangling reference rather
-// than leaking the raw reference string.
-func ResolveProject(in *Input, project string) (*Result, error) {
-	res, params, err := resolve(in, project)
-	if err != nil {
-		return nil, err
-	}
-
-	// Bind a resolver factory so an env.Service operation can open a fresh,
-	// operation-scoped resolver on demand without construction-time secrets I/O.
-	params.ResolverFactory = resolverFactory{
-		secrets: res.Secrets,
-		cipher:  res.Cipher,
-	}
-
-	// Construct the Service from the resolved params. NewEnvService wires
-	// the filestore repository and validates params without reading files or
-	// opening the store.
-	service, err := NewEnvService(params)
-	if err != nil {
-		return nil, err
-	}
-	service.SetDefaultProject(project)
-	res.Envmerge = service
-	return res, nil
-}
-
-// resolverFactory lazily constructs a fresh secrets manager and resolver for one
-// resolving envmerge operation under the requested reveal policy. It holds only
-// construction params, so no store I/O, cipher construction, or private-key
-// resolution happens until an operation asks for a resolver — keeping the store
-// snapshot and private-key cache operation-scoped. It is the config-owned adapter
-// that implements env.ValueResolverFactory, preserving the dependency
-// direction in which envmerge defines the consumed interface and config composes
-// the provider.
-type resolverFactory struct {
-	// secrets locates the workspace secrets store and private-key file.
-	secrets SecretsParams
-	// cipher holds the configured cipher construction parameters.
-	cipher cipher.Params
-}
-
-// Resolver constructs a fresh secrets manager and opens an operation-scoped
-// resolver under the reveal policy.
-func (f resolverFactory) Resolver(reveal bool) (env.ValueResolver, error) {
-	manager, err := NewSecretsManager(f.secrets, f.cipher)
-	if err != nil {
-		return nil, err
-	}
-	resolver, err := manager.Resolver(secrets.ResolverParams{Reveal: reveal})
-	if err != nil {
-		return nil, err
-	}
-	return resolver, nil
-}
-
-// ResolveWorkspace resolves manifest-level configuration without selecting a
-// project, opening the secrets store, or constructing an envmerge Manager,
-// leaving Result.Envmerge nil. The set action calls it to locate and edit a
-// single overlay file, which needs no project merge and no secrets I/O.
-func ResolveWorkspace(in *Input) (*Result, error) {
-	res, _, err := resolve(in, "")
-	return res, err
-}
-
-// resolve is the shared core of ResolveProject and ResolveWorkspace: it loads the
-// manifest (honoring --config, then ENVX_CONFIG, then a walk-up search) and
-// meshes it with the input's values and ENVX_* vars into a single *Result,
-// applying the precedence explicit > ENVX_* > project > global. An empty project
-// resolves the global context only (no project layer, no includes, and no
-// "project not found" error). Terminal fallbacks (e.g. the default environment)
-// are applied downstream, so an unset env stays empty here.
-func resolve(in *Input, project string) (*Result, env.Params, error) {
-	// Bind the resolved manifest path and conventional filename into a filestore.
+// resolveWorkspace loads the manifest at configPath (empty walks up from the
+// working directory) and derives the secrets and cipher parameters.
+func resolveWorkspace(configPath string) (*resolvedWorkspace, error) {
 	repo, err := wsfilestore.New(wsfilestore.Params{
-		Path:     resolveManifestPath(in),
+		Path:     configPath,
 		Filename: defaultManifestFilename,
 	})
 	if err != nil {
-		return nil, env.Params{}, err
+		return nil, err
 	}
 
-	// Construct the workspace service and load the workspace.
 	wsService, err := workspace.NewService(workspace.ServiceParams{
 		Repository: repo,
 	})
 	if err != nil {
-		return nil, env.Params{}, err
+		return nil, err
 	}
 	ws, err := wsService.Load()
 	if err != nil {
-		return nil, env.Params{}, err
+		return nil, err
 	}
 
-	// Construct the manifest context.
-	mc := manifestContext{
+	return &resolvedWorkspace{
 		workspace: ws,
-		path:      ws.Path,
-		dir:       ws.Root,
-		indent:    ws.Indent,
-		project:   project,
-	}
-
-	// Resolve the manifest context and input into a single Result.
-	return resolveManifest(mc, in)
-}
-
-// resolveManifestPath resolves where the manifest lives, honoring the precedence
-// --config flag > ENVX_CONFIG env var > "" (an empty result lets the manifest
-// package walk up from the working directory).
-func resolveManifestPath(in *Input) string {
-	if in.ConfigPath != nil && *in.ConfigPath != "" {
-		return *in.ConfigPath
-	}
-	if v := os.Getenv(flags.Config.Env); v != "" {
-		return v
-	}
-	return ""
-}
-
-// resolveManifest assembles a *Result from an already-loaded manifest: it computes
-// the project layer, then delegates to the envmerge and runner param builders that
-// layer each setting through the precedence chain. It returns the resolved
-// envmerge params alongside the Result so ResolveProject can construct the
-// Manager while ResolveWorkspace discards them. It is split from resolve so the
-// precedence stays unit-testable with an in-memory manifest.
-func resolveManifest(mc manifestContext, in *Input) (*Result, env.Params, error) {
-	// Compute the project layer (settings + includes) from the manifest context.
-	pl, err := resolveProjectLayer(mc)
-	if err != nil {
-		return nil, env.Params{}, err
-	}
-
-	// Resolve the envmerge params; ResolveProject builds a Manager from them.
-	params := resolveEnvmergeParams(mc, in, pl)
-
-	// Build the config Result from the manifest context, Input, and project layer.
-	// Envmerge is left nil here; ResolveProject constructs and assigns the Manager.
-	return &Result{
-		Secrets:            resolveSecretsParams(mc),
-		Cipher:             resolveCipherParams(mc),
-		defaultEnvironment: params.DefaultEnvironment,
-		manifestContext:    mc,
-	}, params, nil
-}
-
-// resolveProjectLayer computes the project layer from the manifest context. An
-// empty project yields the zero layer (the global-only context); a named project
-// absent from the manifest is an error.
-func resolveProjectLayer(mc manifestContext) (projectLayer, error) {
-	// Empty project yields the zero layer (the global-only context).
-	if mc.project == "" {
-		return projectLayer{}, nil
-	}
-
-	// Look up the project in the manifest.
-	project, ok := mc.workspace.LookupProject(mc.project)
-	if !ok {
-		return projectLayer{}, fmt.Errorf(
-			"project %q not found in manifest", mc.project,
-		)
-	}
-
-	// Resolve the project's includes to absolute paths.
-	includes := make([]string, len(project.Includes))
-	for i, inc := range project.Includes {
-		includes[i] = filepath.Join(mc.dir, inc)
-	}
-
-	// Return the project layer: its settings and its includes.
-	return projectLayer{
-		settings: project.Settings,
-		includes: includes,
+		secrets:   resolveSecretsParams(ws),
+		cipher:    resolveCipherParams(ws),
 	}, nil
 }
 
-// resolveEnvmergeParams builds the envmerge input: the project's includes, the
-// declared environments, and every setting layered through the precedence chain
-// explicit (input) > ENVX_* > project > global. Terminal defaults (such as the
-// first-declared environment) are left to envmerge downstream.
-func resolveEnvmergeParams(
-	mc manifestContext,
-	in *Input,
-	pl projectLayer,
-) env.Params {
-	proj, global := pl.settings, mc.workspace.Settings
-	var projects map[string]env.ProjectConfig
-	if mc.workspace != nil && len(mc.workspace.Projects) > 0 {
-		projects = make(map[string]env.ProjectConfig, len(mc.workspace.Projects))
-		for name, p := range mc.workspace.Projects {
-			absIncludes := make([]string, len(p.Includes))
-			for i, inc := range p.Includes {
-				absIncludes[i] = filepath.Join(mc.dir, inc)
-			}
-			projects[name] = env.ProjectConfig{
-				Name:     name,
-				Includes: absIncludes,
-				Settings: env.Options{
-					Delimiter:        p.Settings.Delimiter,
-					Env:              p.Settings.Env,
-					Overload:         p.Settings.Overload,
-					Prefix:           p.Settings.Prefix,
-					ReferencePattern: p.Settings.ReferencePattern,
-					RequireOverlays:  p.Settings.RequireOverlays,
-					Suffix:           p.Settings.Suffix,
-				},
-			}
-		}
-	}
-	return env.Params{
-		WorkspaceDir:   mc.dir,
-		Projects:       projects,
-		DefaultProject: mc.project,
-		Includes:       pl.includes,
-		Environments:   mc.workspace.Environments,
-		DefaultEnvironment: env.PrecedenceString(&env.Env,
-			in.Env,
-			proj.Env,
-			global.Env,
-		),
-		Settings: env.Settings{
-			RequireOverlays: env.PrecedenceBool(&env.RequireOverlays,
-				in.RequireOverlays,
-				proj.RequireOverlays,
-				global.RequireOverlays,
-			),
-			Prefix: env.PrecedenceString(&env.Prefix,
-				in.Prefix,
-				proj.Prefix,
-				global.Prefix,
-			),
-			Suffix: env.PrecedenceString(&env.Suffix,
-				in.Suffix,
-				proj.Suffix,
-				global.Suffix,
-			),
-			Delimiter: env.PrecedenceString(&env.Delimiter,
-				in.Delimiter,
-				proj.Delimiter,
-				global.Delimiter,
-			),
-			Overload: env.PrecedenceBool(&env.Overload,
-				in.Overload,
-				proj.Overload,
-				global.Overload,
-			),
-			ReferencePattern: env.PrecedenceString(&env.ReferencePattern,
-				in.ReferencePattern,
-				proj.ReferencePattern,
-				global.ReferencePattern,
-			),
-		},
-		OSEnvironment: osEnvironment(),
-	}
-}
-
-// osEnvironment snapshots the process environment into a map so envmerge can
+// osEnvironment snapshots the process environment into a map so env can
 // compose the effective environment from an injected value rather than reading
 // os.Environ() inside its core.
 func osEnvironment() map[string]string {
@@ -357,37 +75,30 @@ func osEnvironment() map[string]string {
 	return out
 }
 
-// resolveSecretsParams builds the secrets input: the resolved workspace store
-// and private-key paths. Secrets are workspace-level — not project- or
-// flag-overridable — so it reads only the workspace-level manifest secrets
-// block; constructing the manager and opening the store are ResolveProject's
-// jobs.
-func resolveSecretsParams(mc manifestContext) SecretsParams {
-	// Look up the secrets path in the manifest; use the default filename if unset.
-	secretsPath := mc.workspace.Secrets.SecretsPath
+// resolveSecretsParams builds the secrets input from the workspace-level
+// manifest secrets block: the resolved store and private-key paths and the
+// default indent.
+func resolveSecretsParams(ws *workspace.Workspace) SecretsParams {
+	secretsPath := ws.Secrets.SecretsPath
 	if secretsPath == "" {
 		secretsPath = defaultSecretsFilename
 	}
-	resolvedSecretsPath := filex.ResolvePath(mc.dir, secretsPath)
+	resolvedSecretsPath := filex.ResolvePath(ws.Root, secretsPath)
 
-	// Look up the private-key path in the manifest; default beside the resolved
-	// secrets store and resolve explicit relative paths beside the manifest.
-	keysPath := mc.workspace.Secrets.KeysPath
+	// The default key file sits beside the store; an explicit one is relative to
+	// the manifest.
+	keysPath := ws.Secrets.KeysPath
 	if keysPath == "" {
 		keysPath = filepath.Join(filepath.Dir(resolvedSecretsPath), defaultKeysFilename)
 	} else {
-		keysPath = filex.ResolvePath(mc.dir, keysPath)
+		keysPath = filex.ResolvePath(ws.Root, keysPath)
 	}
 
-	// Resolve the secrets default indent from the manifest's own detected
-	// indentation, applying the workspace default when the manifest has none.
-	indent := mc.indent
+	indent := ws.Indent
 	if indent < 2 || indent > 9 {
 		indent = defaultIndent
 	}
 
-	// Return the secrets parameters. DefaultIndent is applied only when the
-	// secrets store has no block indentation of its own.
 	return SecretsParams{
 		SecretsPath:   resolvedSecretsPath,
 		KeysPath:      keysPath,
@@ -395,10 +106,10 @@ func resolveSecretsParams(mc manifestContext) SecretsParams {
 	}
 }
 
-// resolveCipherParams resolves the configured algorithm and its construction
-// options while keeping cipher selection outside the secrets package.
-func resolveCipherParams(mc manifestContext) cipher.Params {
-	algorithm := cipher.Algorithm(mc.workspace.Secrets.Cipher)
+// resolveCipherParams resolves the configured algorithm, defaulting when the
+// manifest names none.
+func resolveCipherParams(ws *workspace.Workspace) cipher.Params {
+	algorithm := cipher.Algorithm(ws.Secrets.Cipher)
 	if algorithm == "" {
 		algorithm = defaultCipherAlgorithm
 	}

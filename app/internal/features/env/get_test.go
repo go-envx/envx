@@ -8,9 +8,9 @@ import (
 
 // getManager builds a Manager over a single "app" namespace in dir with the given
 // resolver factory (nil for identity behavior).
-func getManager(t *testing.T, dir string, factory ValueResolverFactory) *Manager {
+func getManager(t *testing.T, dir string, factory ValueResolverFactory) *Service {
 	t.Helper()
-	return managerFor(t, Params{
+	return managerFor(t, ServiceParams{
 		Includes:        []string{filepath.Join(dir, "app")},
 		ResolverFactory: factory,
 	})
@@ -49,7 +49,7 @@ func TestGetEnvironment(t *testing.T) {
 	writeYAML(t, dir, "app.yaml", "host: base\n")
 	writeYAML(t, dir, "app.production.yaml", "host: prod\n")
 
-	manager := managerFor(t, Params{
+	manager := managerFor(t, ServiceParams{
 		Includes:           []string{filepath.Join(dir, "app")},
 		DefaultEnvironment: "production",
 	})

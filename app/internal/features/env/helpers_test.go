@@ -194,7 +194,7 @@ func (f *mutableFactory) Resolver(bool) (ValueResolver, error) {
 
 // managerFor builds a Manager over a single namespace declaring development and
 // production, without validating the environment at construction.
-func managerFor(t *testing.T, params Params) *Manager {
+func managerFor(t *testing.T, params ServiceParams) *Service {
 	t.Helper()
 	if params.Environments == nil {
 		params.Environments = []string{"development", "production"}
@@ -202,7 +202,7 @@ func managerFor(t *testing.T, params Params) *Manager {
 	if params.Repository == nil {
 		params.Repository = testRepo
 	}
-	manager, err := New(params)
+	manager, err := NewService(params)
 	if err != nil {
 		t.Fatalf("New: %v", err)
 	}
@@ -213,12 +213,12 @@ func managerFor(t *testing.T, params Params) *Manager {
 // exercising the shared merge kernel exactly as a Manager operation does.
 //
 //nolint:gocritic // Test helper matches Params signature.
-func mergeEnv(t *testing.T, p Params) (*Environment, error) {
+func mergeEnv(t *testing.T, p ServiceParams) (*Environment, error) {
 	t.Helper()
 	if p.Repository == nil {
 		p.Repository = testRepo
 	}
-	manager, err := New(p)
+	manager, err := NewService(p)
 	if err != nil {
 		return nil, err
 	}
@@ -231,7 +231,7 @@ func mergeEnv(t *testing.T, p Params) (*Environment, error) {
 
 // materializeEnv materializes environment through manager, failing the test on
 // error and returning the resulting environment for assertions.
-func materializeEnv(t *testing.T, manager *Manager, environment string) *Environment {
+func materializeEnv(t *testing.T, manager *Service, environment string) *Environment {
 	t.Helper()
 	result, err := manager.Materialize(MaterializeParams{Environment: environment})
 	if err != nil {

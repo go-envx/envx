@@ -56,8 +56,6 @@ type ServiceParams struct {
 	Repository NamespaceRepository
 	// Projects maps declared project names to their definitions.
 	Projects map[string]ProjectConfig
-	// DefaultProject is the fallback project name when none is specified.
-	DefaultProject string
 	// Includes is an ordered chain of namespaces to merge when no project is
 	// declared.
 	Includes []string
@@ -119,12 +117,6 @@ func (s *Service) WorkspaceDir() string {
 	return s.params.WorkspaceDir
 }
 
-// SetDefaultProject sets the fallback project name used by operations when no
-// project is explicitly specified in params.
-func (s *Service) SetDefaultProject(project string) {
-	s.params.DefaultProject = project
-}
-
 // operationContext holds resolved includes, environment, settings, and grammar
 // for a single operation.
 type operationContext struct {
@@ -143,9 +135,6 @@ func (s *Service) resolveContext(
 	direct Settings,
 ) (operationContext, error) {
 	projectName := project
-	if projectName == "" && s.params.DefaultProject != "" {
-		projectName = s.params.DefaultProject
-	}
 
 	var includes []string
 	var projOpts Options
@@ -207,12 +196,12 @@ func (s *Service) resolveContext(
 }
 
 // resolveEnvironment determines the target environment following precedence:
-// explicit param > options flag > ENVX_ENV > project setting > global setting >
-// default environment > first declared environment.
+// explicit param > options flag > project setting > default environment > first
+// declared environment.
 func (s *Service) resolveEnvironment(
 	explicit, optsEnv, projEnv *string,
 ) string {
-	val := PrecedenceString(&Env, explicit, optsEnv, projEnv)
+	val := PrecedenceString(explicit, optsEnv, projEnv)
 	if val != "" {
 		return val
 	}
@@ -226,8 +215,8 @@ func (s *Service) resolveEnvironment(
 }
 
 // resolveSettings merges settings with precedence:
-// explicit opts > direct settings > ENVX_* > project settings > global options >
-// base settings.
+// explicit opts > direct settings > project settings > base settings. ENVX_*
+// values are resolved by the CLI into opts.
 func (s *Service) resolveSettings(
 	opts Options, direct Settings, projOpts Options,
 ) Settings {
@@ -239,7 +228,7 @@ func (s *Service) resolveSettings(
 		basePrefix = &s.params.Settings.Prefix
 	}
 	prefix := PrecedenceString(
-		&Prefix, opts.Prefix, directPrefix, projOpts.Prefix, basePrefix,
+		opts.Prefix, directPrefix, projOpts.Prefix, basePrefix,
 	)
 
 	var directSuffix, baseSuffix *string
@@ -250,7 +239,7 @@ func (s *Service) resolveSettings(
 		baseSuffix = &s.params.Settings.Suffix
 	}
 	suffix := PrecedenceString(
-		&Suffix, opts.Suffix, directSuffix, projOpts.Suffix, baseSuffix,
+		opts.Suffix, directSuffix, projOpts.Suffix, baseSuffix,
 	)
 
 	var directDelimiter, baseDelimiter *string
@@ -261,7 +250,7 @@ func (s *Service) resolveSettings(
 		baseDelimiter = &s.params.Settings.Delimiter
 	}
 	delimiter := PrecedenceString(
-		&Delimiter, opts.Delimiter, directDelimiter, projOpts.Delimiter,
+		opts.Delimiter, directDelimiter, projOpts.Delimiter,
 		baseDelimiter,
 	)
 	if delimiter == "" {
@@ -276,7 +265,7 @@ func (s *Service) resolveSettings(
 		basePattern = &s.params.Settings.ReferencePattern
 	}
 	refPattern := PrecedenceString(
-		&ReferencePattern, opts.ReferencePattern, directPattern,
+		opts.ReferencePattern, directPattern,
 		projOpts.ReferencePattern, basePattern,
 	)
 
@@ -288,7 +277,7 @@ func (s *Service) resolveSettings(
 		baseOverlays = &s.params.Settings.RequireOverlays
 	}
 	requireOverlays := PrecedenceBool(
-		&RequireOverlays, opts.RequireOverlays, directOverlays,
+		opts.RequireOverlays, directOverlays,
 		projOpts.RequireOverlays, baseOverlays,
 	)
 
@@ -300,7 +289,7 @@ func (s *Service) resolveSettings(
 		baseOverload = &s.params.Settings.Overload
 	}
 	overload := PrecedenceBool(
-		&Overload, opts.Overload, directOverload, projOpts.Overload,
+		opts.Overload, directOverload, projOpts.Overload,
 		baseOverload,
 	)
 

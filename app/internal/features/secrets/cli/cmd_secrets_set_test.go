@@ -7,7 +7,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/go-envx/envx/app/internal/core"
 	"github.com/go-envx/envx/app/internal/features/secrets"
 	"github.com/go-envx/envx/app/internal/utils/filex"
 	"github.com/go-envx/envx/app/internal/utils/printer"
@@ -31,15 +30,7 @@ func TestExecuteSetEncryptsAndStoresSafeMetadata(t *testing.T) {
 	t.Parallel()
 
 	manifest := writeSetManifest(t)
-	input := &core.Input{ConfigPath: &manifest}
-	resolved, err := core.ResolveWorkspace(input)
-	if err != nil {
-		t.Fatalf("ResolveWorkspace(): %v", err)
-	}
-	manager, err := core.NewSecretsManager(resolved.Secrets, resolved.Cipher)
-	if err != nil {
-		t.Fatalf("NewSecretsManager(): %v", err)
-	}
+	manager := managerFor(t, manifest)
 	if _, err := manager.GenerateKeypair("production"); err != nil {
 		t.Fatalf("GenerateKeypair(): %v", err)
 	}
@@ -60,15 +51,15 @@ func TestExecuteSetEncryptsAndStoresSafeMetadata(t *testing.T) {
 	if result.Secret.Group != "production" || result.Secret.Key != "database_password" {
 		t.Errorf("result = %+v", result)
 	}
-	if result.Location != resolved.Secrets.SecretsPath {
+	if result.Location != secretsPathFor(manifest) {
 		t.Errorf(
 			"result.Location = %q, want %q",
 			result.Location,
-			resolved.Secrets.SecretsPath,
+			secretsPathFor(manifest),
 		)
 	}
 
-	data, err := filex.Read(resolved.Secrets.SecretsPath)
+	data, err := filex.Read(secretsPathFor(manifest))
 	if err != nil {
 		t.Fatalf("Read(): %v", err)
 	}
@@ -86,19 +77,11 @@ func TestExecuteSetRejectsUnconfirmedTerminalInputWithoutMutation(t *testing.T) 
 	t.Parallel()
 
 	manifest := writeSetManifest(t)
-	input := &core.Input{ConfigPath: &manifest}
-	resolved, err := core.ResolveWorkspace(input)
-	if err != nil {
-		t.Fatalf("ResolveWorkspace(): %v", err)
-	}
-	manager, err := core.NewSecretsManager(resolved.Secrets, resolved.Cipher)
-	if err != nil {
-		t.Fatalf("NewSecretsManager(): %v", err)
-	}
+	manager := managerFor(t, manifest)
 	if _, err := manager.GenerateKeypair("production"); err != nil {
 		t.Fatalf("GenerateKeypair(): %v", err)
 	}
-	before, err := filex.Read(resolved.Secrets.SecretsPath)
+	before, err := filex.Read(secretsPathFor(manifest))
 	if err != nil {
 		t.Fatalf("Read() before execute: %v", err)
 	}
@@ -128,7 +111,7 @@ func TestExecuteSetRejectsUnconfirmedTerminalInputWithoutMutation(t *testing.T) 
 	if err == nil || err.Error() != "secret was not confirmed" {
 		t.Fatalf("SetSecret() error = %v, want mismatch error", err)
 	}
-	after, err := filex.Read(resolved.Secrets.SecretsPath)
+	after, err := filex.Read(secretsPathFor(manifest))
 	if err != nil {
 		t.Fatalf("Read() after execute: %v", err)
 	}
@@ -176,15 +159,7 @@ func TestOutputSetReportsKeyGroupAndStorePath(t *testing.T) {
 // the factory.
 func TestNewSecretsSetCommand(t *testing.T) {
 	manifest := writeSetManifest(t)
-	input := &core.Input{ConfigPath: &manifest}
-	resolved, err := core.ResolveWorkspace(input)
-	if err != nil {
-		t.Fatalf("ResolveWorkspace(): %v", err)
-	}
-	manager, err := core.NewSecretsManager(resolved.Secrets, resolved.Cipher)
-	if err != nil {
-		t.Fatalf("NewSecretsManager(): %v", err)
-	}
+	manager := managerFor(t, manifest)
 	if _, err := manager.GenerateKeypair("production"); err != nil {
 		t.Fatalf("GenerateKeypair(): %v", err)
 	}

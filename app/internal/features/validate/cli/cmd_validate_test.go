@@ -593,16 +593,14 @@ func writeWarningOnlyWorkspace(t *testing.T) string {
 
 	// A valid keypair keeps the store readable; "shared" is available and produces
 	// no finding.
-	manager, err := core.NewSecretsManager(
-		core.SecretsParams{
-			SecretsPath:   secretsPath,
-			KeysPath:      filepath.Join(dir, "envx.keys"),
-			DefaultIndent: 2,
-		},
+	manager, err := core.NewSecretsService(
+		secretsPath,
+		filepath.Join(dir, "envx.keys"),
 		cipher.Params{Algorithm: cipher.Age},
+		2,
 	)
 	if err != nil {
-		t.Fatalf("NewSecretsManager(): %v", err)
+		t.Fatalf("NewSecretsService(): %v", err)
 	}
 	if _, err := manager.GenerateKeypair("shared"); err != nil {
 		t.Fatalf("GenerateKeypair(): %v", err)
