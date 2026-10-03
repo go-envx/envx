@@ -11,7 +11,6 @@ import (
 
 	"github.com/go-envx/envx/app/internal/core"
 	"github.com/go-envx/envx/app/internal/features/validate"
-	"github.com/go-envx/envx/app/internal/resources/cipher"
 	"github.com/go-envx/envx/app/internal/shared/flags"
 	"github.com/go-envx/envx/app/internal/shared/status"
 	"github.com/go-envx/envx/app/internal/utils/printer"
@@ -29,7 +28,11 @@ func (m *mockValidateFactory) ValidateService(
 	if m.err != nil {
 		return nil, m.err
 	}
-	return core.NewApp().ValidateService(configPath)
+	app, err := core.NewAppFactory()
+	if err != nil {
+		return nil, err
+	}
+	return app.ValidateService(configPath)
 }
 
 // executeValidate builds the validate command, executes it with args, and returns
@@ -59,7 +62,11 @@ func validateManifest(
 ) validate.Report {
 	t.Helper()
 
-	service, err := core.NewApp().ValidateService(path)
+	app, err := core.NewAppFactory()
+	if err != nil {
+		t.Fatalf("NewAppFactory(): %v", err)
+	}
+	service, err := app.ValidateService(path)
 	if err != nil {
 		t.Fatalf("ValidateService(): %v", err)
 	}
@@ -336,7 +343,11 @@ func TestValidateStoreOnlySelectionSkipsMerge(t *testing.T) {
 		"secrets:\n  db:\n    leaked: just-plaintext\n")
 
 	// A full run reaches the merge and aborts on the malformed base file.
-	service, err := core.NewApp().ValidateService(manifestPath)
+	app, err := core.NewAppFactory()
+	if err != nil {
+		t.Fatalf("NewAppFactory(): %v", err)
+	}
+	service, err := app.ValidateService(manifestPath)
 	if err != nil {
 		t.Fatalf("ValidateService(): %v", err)
 	}
@@ -590,17 +601,24 @@ func writeWarningOnlyWorkspace(t *testing.T) string {
 	t.Helper()
 	dir := t.TempDir()
 	secretsPath := filepath.Join(dir, "secrets.yaml")
+	manifestPath := filepath.Join(dir, "envx.yaml")
+
+	writeFile(t, manifestPath,
+		"environments: [development, production]\n"+
+			"projects:\n"+
+			"  api:\n"+
+			"    includes: [env/app]\n")
+	writeFile(t, filepath.Join(dir, "env", "app.yaml"), "name: app-value\n")
 
 	// A valid keypair keeps the store readable; "shared" is available and produces
 	// no finding.
-	manager, err := core.NewSecretsService(
-		secretsPath,
-		filepath.Join(dir, "envx.keys"),
-		cipher.Params{Algorithm: cipher.Age},
-		2,
-	)
+	app, err := core.NewAppFactory()
 	if err != nil {
-		t.Fatalf("NewSecretsService(): %v", err)
+		t.Fatalf("NewAppFactory(): %v", err)
+	}
+	manager, err := app.SecretsService(manifestPath)
+	if err != nil {
+		t.Fatalf("SecretsService(): %v", err)
 	}
 	if _, err := manager.GenerateKeypair("shared"); err != nil {
 		t.Fatalf("GenerateKeypair(): %v", err)
@@ -610,14 +628,7 @@ func writeWarningOnlyWorkspace(t *testing.T) string {
 	// keys file, so validate reports it as an unavailable-key warning.
 	addUnavailableGroup(t, secretsPath, "legacy")
 
-	writeFile(t, filepath.Join(dir, "envx.yaml"),
-		"environments: [development, production]\n"+
-			"projects:\n"+
-			"  api:\n"+
-			"    includes: [env/app]\n")
-	writeFile(t, filepath.Join(dir, "env", "app.yaml"), "name: app-value\n")
-
-	return filepath.Join(dir, "envx.yaml")
+	return manifestPath
 }
 
 // addUnavailableGroup appends a public-key entry for group to the store at path,

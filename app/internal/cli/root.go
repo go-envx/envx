@@ -1,6 +1,8 @@
 package cli
 
 import (
+	"fmt"
+
 	"github.com/go-envx/envx/app/internal/core"
 	emitcli "github.com/go-envx/envx/app/internal/features/emit/cli"
 	envcli "github.com/go-envx/envx/app/internal/features/env/cli"
@@ -21,7 +23,12 @@ const (
 // NewRootCmd builds the command tree. It registers the persistent --config flag,
 // which every action reads back through flags.Config to locate the manifest.
 // The build metadata in info is rendered by the --version flag.
-func NewRootCmd(info BuildInfo) *cobra.Command {
+func NewRootCmd(info BuildInfo) (*cobra.Command, error) {
+	appFactory, err := core.NewAppFactory()
+	if err != nil {
+		return nil, fmt.Errorf("composing application: %w", err)
+	}
+
 	root := &cobra.Command{
 		Use:           rootUsage,
 		Short:         rootShort,
@@ -42,20 +49,18 @@ func NewRootCmd(info BuildInfo) *cobra.Command {
 
 	flags.Bind(root.PersistentFlags(), &flags.Config)
 
-	app := core.NewApp()
-
 	root.AddCommand(
-		scaffoldcli.NewCreateCommand(app),
-		envcli.NewGetCommand(app),
-		secretscli.NewKeypairCmd(app),
-		packcli.NewPackCommand(app),
-		runnercli.NewRunCommand(app),
-		envcli.NewSetCommand(app),
-		envcli.NewExplainCommand(app),
-		emitcli.NewEmitCommand(app),
-		envcli.NewDiffCommand(app),
-		secretscli.NewSecretsCommand(app),
-		validatecli.NewValidateCommand(app),
+		scaffoldcli.NewCreateCommand(appFactory),
+		envcli.NewGetCommand(appFactory),
+		secretscli.NewKeypairCmd(appFactory),
+		packcli.NewPackCommand(appFactory),
+		runnercli.NewRunCommand(appFactory),
+		envcli.NewSetCommand(appFactory),
+		envcli.NewExplainCommand(appFactory),
+		emitcli.NewEmitCommand(appFactory),
+		envcli.NewDiffCommand(appFactory),
+		secretscli.NewSecretsCommand(appFactory),
+		validatecli.NewValidateCommand(appFactory),
 	)
-	return root
+	return root, nil
 }

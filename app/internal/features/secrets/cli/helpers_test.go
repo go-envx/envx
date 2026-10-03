@@ -11,7 +11,11 @@ import (
 // managerFor composes the secrets service for the workspace at manifest.
 func managerFor(t *testing.T, manifest string) *secrets.Service {
 	t.Helper()
-	manager, err := core.NewApp().SecretsService(manifest)
+	app, err := core.NewAppFactory()
+	if err != nil {
+		t.Fatalf("NewAppFactory(): %v", err)
+	}
+	manager, err := app.SecretsService(manifest)
 	if err != nil {
 		t.Fatalf("SecretsService(): %v", err)
 	}

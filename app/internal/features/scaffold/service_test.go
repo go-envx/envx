@@ -139,7 +139,11 @@ func TestQuickStartResolves(t *testing.T) {
 	}
 
 	manifestPath := filepath.Join(dir, "envx.yaml")
-	envService, err := core.NewApp().EnvService(manifestPath)
+	app, err := core.NewAppFactory()
+	if err != nil {
+		t.Fatalf("NewAppFactory: %v", err)
+	}
+	envService, err := app.EnvService(manifestPath)
 	if err != nil {
 		t.Fatalf("resolve: %v", err)
 	}

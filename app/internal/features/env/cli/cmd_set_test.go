@@ -61,7 +61,10 @@ func TestNewSetCommand(t *testing.T) {
 	t.Parallel()
 
 	manifest, dir := writeSetManifest(t)
-	app := core.NewApp()
+	app, err := core.NewAppFactory()
+	if err != nil {
+		t.Fatalf("NewAppFactory(): %v", err)
+	}
 
 	svc, err := app.EnvService(manifest)
 	if err != nil {

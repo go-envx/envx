@@ -27,14 +27,22 @@ func (m *mockEmitFactory) EnvService(configPath string) (*env.Service, error) {
 	if m.err != nil {
 		return nil, m.err
 	}
-	return core.NewApp().EnvService(configPath)
+	app, err := core.NewAppFactory()
+	if err != nil {
+		return nil, err
+	}
+	return app.EnvService(configPath)
 }
 
 func (m *mockEmitFactory) EmitService() (*emit.Service, error) {
 	if m.emitErr != nil {
 		return nil, m.emitErr
 	}
-	return core.NewApp().EmitService()
+	app, err := core.NewAppFactory()
+	if err != nil {
+		return nil, err
+	}
+	return app.EmitService()
 }
 
 // executeEmit builds the emit command, executes it with args, and returns its

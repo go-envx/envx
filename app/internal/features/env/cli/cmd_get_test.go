@@ -24,7 +24,11 @@ func (m *mockEnvFactory) EnvService(
 	if m.svc != nil {
 		return m.svc, nil
 	}
-	return core.NewApp().EnvService(configPath)
+	app, err := core.NewAppFactory()
+	if err != nil {
+		return nil, err
+	}
+	return app.EnvService(configPath)
 }
 
 func writeGetManifest(t *testing.T) (manifestPath, dir string) {
@@ -72,7 +76,10 @@ func TestNewGetCommand(t *testing.T) {
 	t.Parallel()
 
 	manifest, _ := writeGetManifest(t)
-	app := core.NewApp()
+	app, err := core.NewAppFactory()
+	if err != nil {
+		t.Fatalf("NewAppFactory(): %v", err)
+	}
 
 	svc, err := app.EnvService(manifest)
 	if err != nil {
@@ -105,7 +112,10 @@ func TestNewGetCommandMissingKey(t *testing.T) {
 	t.Parallel()
 
 	manifest, _ := writeGetManifest(t)
-	app := core.NewApp()
+	app, err := core.NewAppFactory()
+	if err != nil {
+		t.Fatalf("NewAppFactory(): %v", err)
+	}
 
 	svc, err := app.EnvService(manifest)
 	if err != nil {

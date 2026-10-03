@@ -11,7 +11,10 @@ import (
 func execCmd(args ...string) (stdout, stderr *bytes.Buffer, err error) {
 	stdout = new(bytes.Buffer)
 	stderr = new(bytes.Buffer)
-	cmd := NewRootCmd(BuildInfo{Version: "test"})
+	cmd, err := NewRootCmd(BuildInfo{Version: "test"})
+	if err != nil {
+		return stdout, stderr, err
+	}
 	cmd.SetOut(stdout)
 	cmd.SetErr(stderr)
 	cmd.SetArgs(args)

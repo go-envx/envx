@@ -36,7 +36,10 @@ func TestNewExplainCommandTable(t *testing.T) {
 	t.Parallel()
 
 	manifest, _ := writeExplainManifest(t)
-	app := core.NewApp()
+	app, err := core.NewAppFactory()
+	if err != nil {
+		t.Fatalf("NewAppFactory(): %v", err)
+	}
 
 	svc, err := app.EnvService(manifest)
 	if err != nil {
@@ -69,7 +72,10 @@ func TestNewExplainCommandJSON(t *testing.T) {
 	t.Parallel()
 
 	manifest, _ := writeExplainManifest(t)
-	app := core.NewApp()
+	app, err := core.NewAppFactory()
+	if err != nil {
+		t.Fatalf("NewAppFactory(): %v", err)
+	}
 
 	svc, err := app.EnvService(manifest)
 	if err != nil {

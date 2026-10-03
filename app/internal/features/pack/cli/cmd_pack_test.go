@@ -23,7 +23,11 @@ func (m *mockPackFactory) PackService(configPath string) (*pack.Service, error) 
 	if m.err != nil {
 		return nil, m.err
 	}
-	return core.NewApp().PackService(configPath)
+	app, err := core.NewAppFactory()
+	if err != nil {
+		return nil, err
+	}
+	return app.PackService(configPath)
 }
 
 // executePack builds the pack command, executes it with args, and returns its

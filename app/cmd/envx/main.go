@@ -34,11 +34,15 @@ func main() {
 // any other failure maps to exitcode.Runtime. Child-process signal handling lives
 // in the runner, so no root-level signal trapping is required here.
 func run() int {
-	root := cli.NewRootCmd(cli.BuildInfo{
+	root, err := cli.NewRootCmd(cli.BuildInfo{
 		Version: version,
 		Commit:  commit,
 		Date:    date,
 	})
+	if err != nil {
+		_ = reportError(os.Stderr, err)
+		return exitcode.Runtime
+	}
 
 	cmd, err := root.ExecuteC()
 	if err == nil {

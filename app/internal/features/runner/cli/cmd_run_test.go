@@ -28,14 +28,22 @@ func (m *mockRunFactory) EnvService(configPath string) (*env.Service, error) {
 	if m.err != nil {
 		return nil, m.err
 	}
-	return core.NewApp().EnvService(configPath)
+	app, err := core.NewAppFactory()
+	if err != nil {
+		return nil, err
+	}
+	return app.EnvService(configPath)
 }
 
 func (m *mockRunFactory) RunnerService() (*runner.Service, error) {
 	if m.runnerErr != nil {
 		return nil, m.runnerErr
 	}
-	return core.NewApp().RunnerService()
+	app, err := core.NewAppFactory()
+	if err != nil {
+		return nil, err
+	}
+	return app.RunnerService()
 }
 
 // executeRun builds the run command, executes it with args, and returns its
