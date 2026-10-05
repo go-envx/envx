@@ -1,6 +1,7 @@
 package filestore
 
 import (
+	"maps"
 	"path/filepath"
 
 	"github.com/go-envx/envx/app/internal/features/workspace"
@@ -23,7 +24,7 @@ type manifestYAML struct {
 	Settings           settingsYAML           `yaml:"settings"`
 	Environments       []string               `yaml:"environments"`
 	Projects           map[string]projectYAML `yaml:"projects"`
-	Secrets            secretsYAML            `yaml:"secrets"`
+	Secrets            secretsConfigYAML            `yaml:"secrets"`
 	ValidateSeverities map[string]string      `yaml:"validate"`
 }
 
@@ -40,9 +41,7 @@ func (m manifestYAML) toWorkspace(path string, indent int) *workspace.Workspace 
 	}
 
 	severities := make(map[string]string, len(m.ValidateSeverities))
-	for k, v := range m.ValidateSeverities {
-		severities[k] = v
-	}
+	maps.Copy(severities, m.ValidateSeverities)
 
 	return &workspace.Workspace{
 		Path:               path,
@@ -53,6 +52,23 @@ func (m manifestYAML) toWorkspace(path string, indent int) *workspace.Workspace 
 		Settings:           m.Settings.toDomain(),
 		Secrets:            m.Secrets.toDomain(root),
 		ValidateSeverities: severities,
+	}
+}
+
+type projectYAML struct {
+	Includes []string     `yaml:"includes"`
+	Settings settingsYAML `yaml:"settings"`
+}
+
+func (p projectYAML) toDomain(root string) workspace.Project {
+	paths := make([]string, len(p.Includes))
+	for i, include := range p.Includes {
+		paths[i] = filepath.Join(root, include)
+	}
+	return workspace.Project{
+		Includes:     p.Includes,
+		IncludePaths: paths,
+		Settings:     p.Settings.toDomain(),
 	}
 }
 
@@ -78,24 +94,7 @@ func (s settingsYAML) toDomain() workspace.Settings {
 	}
 }
 
-type projectYAML struct {
-	Includes []string     `yaml:"includes"`
-	Settings settingsYAML `yaml:"settings"`
-}
-
-func (p projectYAML) toDomain(root string) workspace.Project {
-	paths := make([]string, len(p.Includes))
-	for i, include := range p.Includes {
-		paths[i] = filepath.Join(root, include)
-	}
-	return workspace.Project{
-		Includes:     p.Includes,
-		IncludePaths: paths,
-		Settings:     p.Settings.toDomain(),
-	}
-}
-
-type secretsYAML struct {
+type secretsConfigYAML struct {
 	SecretsPath string `yaml:"path"`
 	KeysPath    string `yaml:"keys-path"`
 	Cipher      string `yaml:"cipher"`
@@ -103,7 +102,7 @@ type secretsYAML struct {
 
 // toDomain resolves store and key paths against root; the key file defaults
 // beside the store.
-func (s secretsYAML) toDomain(root string) workspace.SecretsConfig {
+func (s secretsConfigYAML) toDomain(root string) workspace.SecretsConfig {
 	secretsPath := s.SecretsPath
 	if secretsPath == "" {
 		secretsPath = defaultSecretsFilename

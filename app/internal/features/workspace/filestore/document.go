@@ -41,7 +41,7 @@ func parseDocument(data []byte, path string) (*workspace.Workspace, error) {
 		dec := strictyaml.New(
 			strictyaml.WithSchema[manifestYAML]("manifest key"),
 			strictyaml.WithSchema[settingsYAML]("setting"),
-			strictyaml.WithSchema[secretsYAML]("secrets setting"),
+			strictyaml.WithSchema[secretsConfigYAML]("secrets setting"),
 			strictyaml.WithSchema[projectYAML]("project key"),
 			strictyaml.WithSuggestionThreshold(defaultSuggestionThreshold),
 		)

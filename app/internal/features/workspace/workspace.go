@@ -13,34 +13,6 @@ import (
 // internal Go types.
 const SchemaDocsURL = "https://go-envx.github.io/envx/configuration/schema/"
 
-// Settings holds global and project-level workspace resolution options.
-type Settings struct {
-	Delimiter        *string
-	Env              *string
-	Overload         *bool
-	Prefix           *string
-	ReferencePattern *string
-	RequireOverlays  *bool
-	Suffix           *string
-}
-
-// Project defines one project's environment configuration within a workspace.
-type Project struct {
-	// Includes are the namespace prefixes as declared, relative to the workspace root.
-	Includes []string
-	// IncludePaths are Includes joined onto the workspace root, in the same order.
-	IncludePaths []string
-	Settings     Settings
-}
-
-// SecretsConfig configures the workspace-level secrets store. A loaded workspace
-// carries absolute paths and a non-empty Cipher.
-type SecretsConfig struct {
-	SecretsPath string
-	KeysPath    string
-	Cipher      string
-}
-
 // Workspace represents the validated workspace domain entity.
 type Workspace struct {
 	Path string
@@ -52,6 +24,34 @@ type Workspace struct {
 	Settings           Settings
 	Secrets            SecretsConfig
 	ValidateSeverities map[string]string
+}
+
+// Project defines one project's environment configuration within a workspace.
+type Project struct {
+	// Includes are the namespace prefixes as declared, relative to the workspace root.
+	Includes []string
+	// IncludePaths are Includes joined onto the workspace root, in the same order.
+	IncludePaths []string
+	Settings     Settings
+}
+
+// Settings holds global and project-level workspace resolution options.
+type Settings struct {
+	Delimiter        *string
+	Env              *string
+	Overload         *bool
+	Prefix           *string
+	ReferencePattern *string
+	RequireOverlays  *bool
+	Suffix           *string
+}
+
+// SecretsConfig configures the workspace-level secrets store. A loaded workspace
+// carries absolute paths and a non-empty Cipher.
+type SecretsConfig struct {
+	SecretsPath string
+	KeysPath    string
+	Cipher      string
 }
 
 // DefaultEnvironment returns the first declared environment, or an empty string.
