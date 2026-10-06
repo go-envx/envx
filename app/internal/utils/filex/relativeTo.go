@@ -8,10 +8,11 @@ import (
 // RelativeTo returns path relative to base when path lies inside base. Paths
 // outside base are returned unchanged; this function does not access the filesystem.
 func RelativeTo(base, path string) string {
-	rel, err := filepath.Rel(base, path)
-	sep := string(filepath.Separator)
-	if err != nil || rel == ".." || strings.HasPrefix(rel, ".."+sep) {
+	relativePath, err := filepath.Rel(base, path)
+	filePathSeparator := string(filepath.Separator)
+	prefix := ".." + filePathSeparator
+	if err != nil || relativePath == ".." || strings.HasPrefix(relativePath, prefix) {
 		return path
 	}
-	return rel
+	return relativePath
 }
