@@ -44,6 +44,12 @@ type SecretsService interface {
 	OpenResolver(reveal bool) (value.Resolver, error)
 }
 
+// HostEnvironment provides access to the host's environment snapshot.
+type HostEnvironment interface {
+	Get(name string) (value string, ok bool)
+	All() map[string]string
+}
+
 // ServiceParams provides dependencies to the environment domain service.
 type ServiceParams struct {
 	// Config is the manifest-derived workspace configuration.
@@ -56,9 +62,9 @@ type ServiceParams struct {
 	// SecretsService opens a fresh, operation-scoped value resolver on demand. A
 	// nil service is identity behavior for callers with no reference syntax.
 	SecretsService SecretsService
-	// OSEnvironment is the injected snapshot of the process environment used to
+	// HostEnvironment provides access to the host environment snapshot used to
 	// compose the effective environment.
-	OSEnvironment map[string]string
+	HostEnvironment HostEnvironment
 }
 
 // Service coordinates overlay merging, key canonicalization, and variable

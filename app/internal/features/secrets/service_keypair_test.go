@@ -39,6 +39,13 @@ func (c keypairTestCipher) ValidateKeypair(publicKey, privateKey string) error {
 	return nil
 }
 
+type fakeEnv map[string]string
+
+func (f fakeEnv) Get(name string) (string, bool) {
+	val, ok := f[name]
+	return val, ok
+}
+
 // Encrypt is unused by keypair workflow tests.
 func (keypairTestCipher) Encrypt(string, string) ([]byte, error) {
 	return nil, errors.New("test cipher encryption is unused")
@@ -243,8 +250,8 @@ func TestGenerateDefaultKeypairRoundTrip(t *testing.T) {
 		t.Fatalf("pkfilestore.New: %v", err)
 	}
 	pkService, err := privatekey.NewService(privatekey.ServiceParams{
-		Repository: pkStore,
-		LookupEnv:  func(string) (string, bool) { return "", false },
+		Repository:  pkStore,
+		Environment: fakeEnv{},
 	})
 	if err != nil {
 		t.Fatalf("privatekey.NewService: %v", err)
@@ -299,8 +306,8 @@ func newLocalKeypairManager(t *testing.T, storePath, keysPath string) *Service {
 		t.Fatalf("pkfilestore.New: %v", err)
 	}
 	pkService, err := privatekey.NewService(privatekey.ServiceParams{
-		Repository: pkStore,
-		LookupEnv:  func(string) (string, bool) { return "", false },
+		Repository:  pkStore,
+		Environment: fakeEnv{},
 	})
 	if err != nil {
 		t.Fatalf("privatekey.NewService: %v", err)
@@ -375,19 +382,16 @@ func TestRotateKeypairRejectsHigherPriorityKeyOrigin(t *testing.T) {
 	pubKey, privKey := testKeys(t, selected)
 	storePath := writeStore(t, "public-keys:\n  production: "+pubKey+"\n")
 	keysPath := filepath.Join(filepath.Dir(storePath), "envx.keys")
-	lookupEnv := func(name string) (string, bool) {
-		if name == "ENVX_PRIVATE_KEY_PRODUCTION" {
-			return privKey, true
-		}
-		return "", false
+	envMap := fakeEnv{
+		"ENVX_PRIVATE_KEY_PRODUCTION": privKey,
 	}
 	pkStore, err := pkfilestore.New(pkfilestore.Params{Path: keysPath})
 	if err != nil {
 		t.Fatalf("pkfilestore.New: %v", err)
 	}
 	pkService, err := privatekey.NewService(privatekey.ServiceParams{
-		Repository: pkStore,
-		LookupEnv:  lookupEnv,
+		Repository:  pkStore,
+		Environment: envMap,
 	})
 	if err != nil {
 		t.Fatalf("privatekey.NewService: %v", err)

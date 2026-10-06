@@ -51,11 +51,11 @@ func (f *fakeRepository) SetPrivateKey(group, privateKey string) error {
 	return nil
 }
 
-func lookup(values map[string]string) func(string) (string, bool) {
-	return func(name string) (string, bool) {
-		value, ok := values[name]
-		return value, ok
-	}
+type fakeEnv map[string]string
+
+func (f fakeEnv) Get(name string) (string, bool) {
+	val, ok := f[name]
+	return val, ok
 }
 
 // TestServicePrecedence verifies specific environment, combined environment,
@@ -102,8 +102,8 @@ func TestServicePrecedence(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			svc, err := NewService(ServiceParams{
-				Repository: repo,
-				LookupEnv:  lookup(tt.env),
+				Repository:  repo,
+				Environment: fakeEnv(tt.env),
 			})
 			if err != nil {
 				t.Fatalf("NewService(): %v", err)
@@ -154,8 +154,8 @@ func TestServiceFailsClosed(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			svc, err := NewService(ServiceParams{
-				Repository: repo,
-				LookupEnv:  lookup(tt.env),
+				Repository:  repo,
+				Environment: fakeEnv(tt.env),
 			})
 			if err != nil {
 				t.Fatalf("NewService(): %v", err)
@@ -174,7 +174,7 @@ func TestServiceNotAvailableIsDistinct(t *testing.T) {
 	t.Parallel()
 
 	svc, err := NewService(ServiceParams{
-		LookupEnv: lookup(map[string]string{}),
+		Environment: fakeEnv(map[string]string{}),
 	})
 	if err != nil {
 		t.Fatalf("NewService(): %v", err)
@@ -186,8 +186,8 @@ func TestServiceNotAvailableIsDistinct(t *testing.T) {
 
 	repo := &fakeRepository{keys: map[string]string{}}
 	svcWithRepo, err := NewService(ServiceParams{
-		Repository: repo,
-		LookupEnv:  lookup(map[string]string{}),
+		Repository:  repo,
+		Environment: fakeEnv(map[string]string{}),
 	})
 	if err != nil {
 		t.Fatalf("NewService(): %v", err)
@@ -198,15 +198,15 @@ func TestServiceNotAvailableIsDistinct(t *testing.T) {
 	}
 }
 
-// TestServiceRequiresLookupEnv verifies NewService rejects a nil LookupEnv.
-func TestServiceRequiresLookupEnv(t *testing.T) {
+// TestServiceRequiresEnvironment verifies NewService rejects a nil Environment.
+func TestServiceRequiresEnvironment(t *testing.T) {
 	t.Parallel()
 
 	_, err := NewService(ServiceParams{
 		Repository: &fakeRepository{},
 	})
-	if err == nil || err.Error() != "lookupEnv is required" {
-		t.Fatalf("NewService() error = %v, want lookupEnv is required", err)
+	if err == nil || err.Error() != "environment is required" {
+		t.Fatalf("NewService() error = %v, want environment is required", err)
 	}
 }
 
@@ -215,7 +215,7 @@ func TestServiceResolveRejectsInvalidGroup(t *testing.T) {
 	t.Parallel()
 
 	svc, err := NewService(ServiceParams{
-		LookupEnv: lookup(map[string]string{}),
+		Environment: fakeEnv(map[string]string{}),
 	})
 	if err != nil {
 		t.Fatalf("NewService(): %v", err)
@@ -237,8 +237,8 @@ func TestServiceSet(t *testing.T) {
 
 	repo := &fakeRepository{}
 	svc, err := NewService(ServiceParams{
-		Repository: repo,
-		LookupEnv:  lookup(map[string]string{}),
+		Repository:  repo,
+		Environment: fakeEnv(map[string]string{}),
 	})
 	if err != nil {
 		t.Fatalf("NewService(): %v", err)
@@ -266,7 +266,7 @@ func TestServiceSet(t *testing.T) {
 
 	// Service without repository fails
 	svcNoRepo, err := NewService(ServiceParams{
-		LookupEnv: lookup(map[string]string{}),
+		Environment: fakeEnv(map[string]string{}),
 	})
 	if err != nil {
 		t.Fatalf("NewService(): %v", err)

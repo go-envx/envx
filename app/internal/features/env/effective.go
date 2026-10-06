@@ -28,7 +28,10 @@ func osOriginSource(key string) Source {
 func (s *Service) applyOSEnvironment(
 	state *mergeState, unionOSKeys bool, overload bool,
 ) {
-	for key, osValue := range s.params.OSEnvironment {
+	if s.params.HostEnvironment == nil {
+		return
+	}
+	for key, osValue := range s.params.HostEnvironment.All() {
 		_, isNamespace := state.values[key]
 		switch {
 		case isNamespace && !overload:

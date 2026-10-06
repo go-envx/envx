@@ -15,9 +15,9 @@ func subManager(
 ) *Service {
 	t.Helper()
 	return managerFor(t, ServiceParams{
-		Includes:       []string{filepath.Join(dir, "app")},
-		SecretsService: factory,
-		OSEnvironment:  osEnv,
+		Includes:        []string{filepath.Join(dir, "app")},
+		SecretsService:  factory,
+		HostEnvironment: fakeHostEnv(osEnv),
 	})
 }
 

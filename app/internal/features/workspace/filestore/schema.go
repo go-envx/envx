@@ -24,7 +24,7 @@ type manifestYAML struct {
 	Settings           settingsYAML           `yaml:"settings"`
 	Environments       []string               `yaml:"environments"`
 	Projects           map[string]projectYAML `yaml:"projects"`
-	Secrets            secretsConfigYAML            `yaml:"secrets"`
+	Secrets            secretsConfigYAML      `yaml:"secrets"`
 	ValidateSeverities map[string]string      `yaml:"validate"`
 }
 

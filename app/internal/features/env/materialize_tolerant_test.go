@@ -103,9 +103,9 @@ func TestMaterializeIgnoringErrorsFallsBackToOSValue(t *testing.T) {
 	dir := t.TempDir()
 	writeYAML(t, dir, "app.yaml", "broken: \"{{MISSING}}\"\n")
 	manager := managerFor(t, ServiceParams{
-		Includes:      []string{filepath.Join(dir, "app")},
-		OSEnvironment: map[string]string{"BROKEN": "from-os"},
-		Config:        Config{Settings: Settings{Overload: true}},
+		Includes:        []string{filepath.Join(dir, "app")},
+		HostEnvironment: fakeHostEnv(map[string]string{"BROKEN": "from-os"}),
+		Config:          Config{Settings: Settings{Overload: true}},
 	})
 
 	result, err := manager.Materialize(MaterializeParams{IgnoreErrors: true})

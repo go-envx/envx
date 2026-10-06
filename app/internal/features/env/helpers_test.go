@@ -192,6 +192,21 @@ func (f *mutableFactory) OpenResolver(bool) (ValueResolver, error) {
 	return fakeResolver{values: map[string]string{"secret://x": f.value}}, nil
 }
 
+type fakeHostEnv map[string]string
+
+func (f fakeHostEnv) Get(name string) (string, bool) {
+	val, ok := f[name]
+	return val, ok
+}
+
+func (f fakeHostEnv) All() map[string]string {
+	cp := make(map[string]string, len(f))
+	for k, v := range f {
+		cp[k] = v
+	}
+	return cp
+}
+
 // managerFor builds a Manager over a single namespace declaring development and
 // production, without validating the environment at construction.
 func managerFor(t *testing.T, params ServiceParams) *Service {

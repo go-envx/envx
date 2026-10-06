@@ -1,7 +1,6 @@
 package env
 
 import (
-	"maps"
 	"slices"
 )
 
@@ -67,11 +66,9 @@ func normalizeParams(params ServiceParams) (ServiceParams, error) {
 		params.Config.Settings.Delimiter = defaultDelimiter
 	}
 
-	// Copy caller-owned slices and the OS snapshot so caller mutation cannot
-	// change service behavior.
+	// Copy caller-owned slices so later mutation cannot change service behavior.
 	params.Includes = slices.Clone(params.Includes)
 	params.Config.Environments = slices.Clone(params.Config.Environments)
-	params.OSEnvironment = maps.Clone(params.OSEnvironment)
 
 	if params.Config.Projects != nil {
 		cloned := make(map[string]ProjectConfig, len(params.Config.Projects))

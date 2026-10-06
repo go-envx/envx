@@ -9,7 +9,8 @@ import (
 // outside base are returned unchanged; this function does not access the filesystem.
 func RelativeTo(base, path string) string {
 	rel, err := filepath.Rel(base, path)
-	if err != nil || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
+	sep := string(filepath.Separator)
+	if err != nil || rel == ".." || strings.HasPrefix(rel, ".."+sep) {
 		return path
 	}
 	return rel

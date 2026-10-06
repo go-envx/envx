@@ -7,13 +7,15 @@ import (
 	"github.com/go-envx/envx/app/internal/features/env/syntax"
 )
 
-// getenv returns a getenv seam backed by the injected OS-environment snapshot, so
+// getenv returns a getenv seam backed by the injected host-environment snapshot, so
 // a reference resolves against the same environment used for source selection. A
 // nil snapshot is an empty environment.
 func (s *Service) getenv() func(name string) (string, bool) {
 	return func(name string) (string, bool) {
-		value, ok := s.params.OSEnvironment[name]
-		return value, ok
+		if s.params.HostEnvironment == nil {
+			return "", false
+		}
+		return s.params.HostEnvironment.Get(name)
 	}
 }
 
@@ -129,12 +131,14 @@ func (s *Service) downgradeFailures(
 
 	warnings := make([]error, 0, len(keys))
 	for _, key := range keys {
-		if osValue, ok := s.params.OSEnvironment[key]; ok {
-			values[key] = osValue
-			warnings = append(warnings, fmt.Errorf(
-				"%s: %w; keeping the value set in the environment", key, failures[key],
-			))
-			continue
+		if s.params.HostEnvironment != nil {
+			if osValue, ok := s.params.HostEnvironment.Get(key); ok {
+				values[key] = osValue
+				warnings = append(warnings, fmt.Errorf(
+					"%s: %w; keeping the value set in the environment", key, failures[key],
+				))
+				continue
+			}
 		}
 		warnings = append(warnings, fmt.Errorf("omitting %s: %w", key, failures[key]))
 	}

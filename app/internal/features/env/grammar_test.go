@@ -15,8 +15,8 @@ func customPatternManager(
 ) *Service {
 	t.Helper()
 	return managerFor(t, ServiceParams{
-		Includes:      []string{filepath.Join(dir, "app")},
-		OSEnvironment: osEnv,
+		Includes:        []string{filepath.Join(dir, "app")},
+		HostEnvironment: fakeHostEnv(osEnv),
 		Config: Config{Settings: Settings{
 			ReferencePattern: `\$\{([^}]*)\}`,
 		}},

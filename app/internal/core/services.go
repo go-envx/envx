@@ -58,8 +58,8 @@ type AppServices struct {
 // composeAppServices constructs each service in dependency order.
 func composeAppServices(config *AppConfig, clients AppClients) (AppServices, error) {
 	privateKeyService, err := privatekey.NewService(privatekey.ServiceParams{
-		Repository: clients.PrivateKeyStore,
-		LookupEnv:  clients.ProcessEnv.LookupEnv,
+		Repository:  clients.PrivateKeyStore,
+		Environment: clients.HostEnv,
 	})
 	if err != nil {
 		return AppServices{}, fmt.Errorf("composing private key service: %w", err)
@@ -75,10 +75,10 @@ func composeAppServices(config *AppConfig, clients AppClients) (AppServices, err
 	}
 
 	envService, err := env.NewService(env.ServiceParams{
-		Config:         config.Env,
-		Repository:     clients.NamespaceStore,
-		OSEnvironment:  clients.ProcessEnv.Environ(),
-		SecretsService: secretsService,
+		Config:          config.Env,
+		Repository:      clients.NamespaceStore,
+		HostEnvironment: clients.HostEnv,
+		SecretsService:  secretsService,
 	})
 	if err != nil {
 		return AppServices{}, fmt.Errorf("composing env service: %w", err)

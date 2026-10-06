@@ -22,12 +22,17 @@ type Repository interface {
 	SetPrivateKey(group, privateKey string) error
 }
 
+// Environment provides access to environment variables.
+type Environment interface {
+	Get(name string) (value string, ok bool)
+}
+
 // ServiceParams provides dependencies to the private key domain service.
 type ServiceParams struct {
 	// Repository provides persistent key storage. Optional; nil skips repository lookup.
 	Repository Repository
-	// LookupEnv queries environment variables. Required.
-	LookupEnv func(string) (string, bool)
+	// Environment queries environment variables. Required.
+	Environment Environment
 }
 
 // Service coordinates private key resolution and persistence across
@@ -38,8 +43,8 @@ type Service struct {
 
 // NewService constructs a private key domain service.
 func NewService(params ServiceParams) (*Service, error) {
-	if params.LookupEnv == nil {
-		return nil, errors.New("lookupEnv is required")
+	if params.Environment == nil {
+		return nil, errors.New("environment is required")
 	}
 	return &Service{params: params}, nil
 }
@@ -61,7 +66,7 @@ func (s *Service) Resolve(group string) (PrivateKey, error) {
 	}
 
 	specificName := privateKeyEnv + "_" + strings.ToUpper(group)
-	if value, present := s.params.LookupEnv(specificName); present {
+	if value, present := s.params.Environment.Get(specificName); present {
 		if value == "" {
 			return PrivateKey{}, fmt.Errorf(
 				"%w: environment variable %s is empty", ErrInvalidKey, specificName,
@@ -70,7 +75,7 @@ func (s *Service) Resolve(group string) (PrivateKey, error) {
 		return PrivateKey{Value: value, Origin: specificName}, nil
 	}
 
-	if value, present := s.params.LookupEnv(privateKeyEnv); present {
+	if value, present := s.params.Environment.Get(privateKeyEnv); present {
 		if value == "" {
 			return PrivateKey{}, fmt.Errorf(
 				"%w: environment variable %s is empty", ErrInvalidKey, privateKeyEnv,

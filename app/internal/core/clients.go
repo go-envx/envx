@@ -7,13 +7,13 @@ import (
 	pkfilestore "github.com/go-envx/envx/app/internal/features/privatekey/filestore"
 	secfilestore "github.com/go-envx/envx/app/internal/features/secrets/filestore"
 	"github.com/go-envx/envx/app/internal/resources/cipher"
-	"github.com/go-envx/envx/app/internal/resources/procenv"
+	"github.com/go-envx/envx/app/internal/resources/hostenv"
 )
 
 // AppClients holds every client the workspace-bound services consume.
 type AppClients struct {
 	Cipher          cipher.Cipher
-	ProcessEnv      *procenv.Client
+	HostEnv         *hostenv.Client
 	PrivateKeyStore *pkfilestore.Repository
 	SecretsStore    *secfilestore.Repository
 	SecretsExporter *secfilestore.Exporter
@@ -29,10 +29,7 @@ func composeAppClients(config *AppConfig) (AppClients, error) {
 		return AppClients{}, fmt.Errorf("composing cipher: %w", err)
 	}
 
-	processEnv, err := procenv.New(procenv.Params{})
-	if err != nil {
-		return AppClients{}, fmt.Errorf("composing process environment client: %w", err)
-	}
+	hostEnv := hostenv.New()
 
 	keysPath := config.Secrets.KeysPath
 	privateKeyStore, err := pkfilestore.New(pkfilestore.Params{Path: keysPath})
@@ -62,7 +59,7 @@ func composeAppClients(config *AppConfig) (AppClients, error) {
 
 	return AppClients{
 		Cipher:          cipherClient,
-		ProcessEnv:      processEnv,
+		HostEnv:         hostEnv,
 		PrivateKeyStore: privateKeyStore,
 		SecretsStore:    secretsStore,
 		SecretsExporter: secretsExporter,
