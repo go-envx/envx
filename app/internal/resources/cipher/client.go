@@ -33,7 +33,7 @@ type Params struct {
 
 // Client manages cryptographic providers and routes cipher operations.
 type Client struct {
-	mu        sync.RWMutex
+	mutex     sync.RWMutex
 	providers map[string]Provider
 }
 
@@ -61,8 +61,8 @@ func (c *Client) Register(provider Provider) error {
 		return ErrEmptyAlgorithm
 	}
 
-	c.mu.Lock()
-	defer c.mu.Unlock()
+	c.mutex.Lock()
+	defer c.mutex.Unlock()
 
 	if _, exists := c.providers[alg]; exists {
 		return fmt.Errorf("%w: %q", ErrDuplicateAlgorithm, alg)
@@ -74,8 +74,8 @@ func (c *Client) Register(provider Provider) error {
 // For returns the cryptographic provider registered for the given algorithm name.
 // Returns an error if no provider is registered for that algorithm.
 func (c *Client) For(algorithm string) (Provider, error) {
-	c.mu.RLock()
-	defer c.mu.RUnlock()
+	c.mutex.RLock()
+	defer c.mutex.RUnlock()
 
 	provider, ok := c.providers[algorithm]
 	if !ok {
@@ -86,8 +86,8 @@ func (c *Client) For(algorithm string) (Provider, error) {
 
 // All returns a shallow copy of all registered providers keyed by algorithm name.
 func (c *Client) All() map[string]Provider {
-	c.mu.RLock()
-	defer c.mu.RUnlock()
+	c.mutex.RLock()
+	defer c.mutex.RUnlock()
 
 	return maps.Clone(c.providers)
 }
