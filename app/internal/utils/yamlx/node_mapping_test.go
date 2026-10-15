@@ -140,7 +140,7 @@ func TestFindMappingEntry(t *testing.T) {
 				t.Fatalf("FindMappingEntry() index = %d, want %d", entry.Index, test.wantIndex)
 			}
 			if !test.wantFound {
-				if !entry.IsEmpty() {
+				if entry.KeyNode != nil || entry.ValueNode != nil {
 					t.Fatalf("FindMappingEntry() entry = %#v, want empty", entry)
 				}
 				return
@@ -172,127 +172,11 @@ func TestFindMappingEntryReturnsNotFoundForInvalidNodes(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			entry, found := yamlx.FindMappingEntry(test.node, "key")
-			if found || !entry.IsEmpty() || entry.Index != -1 {
+			if found || entry.KeyNode != nil || entry.ValueNode != nil || entry.Index != -1 {
 				t.Errorf("FindMappingEntry() = (%#v, %v), want empty", entry, found)
 			}
 		})
 	}
-}
-
-func TestSetMappingEntry(t *testing.T) {
-	t.Parallel()
-
-	t.Run("appends when absent", func(t *testing.T) {
-		t.Parallel()
-		mapping := yamlx.NewMappingNode()
-		val := yamlx.NewScalarNode("value")
-		yamlx.SetMappingEntry(mapping, "key", val)
-
-		entry, found := yamlx.FindMappingEntry(mapping, "key")
-		if !found {
-			t.Fatal("key not found after SetMappingEntry")
-		}
-		if entry.ValueNode != val {
-			t.Errorf("entry.ValueNode = %#v, want %#v", entry.ValueNode, val)
-		}
-	})
-
-	t.Run("updates value and keeps key comment when present", func(t *testing.T) {
-		t.Parallel()
-		mapping := yamlx.NewMappingNode()
-		keyNode := &yaml.Node{
-			Kind:        yaml.ScalarNode,
-			Tag:         "!!str",
-			Value:       "myKey",
-			HeadComment: "# Key comment",
-			LineComment: "# inline comment",
-		}
-		valNode := &yaml.Node{
-			Kind:        yaml.ScalarNode,
-			Tag:         "!!str",
-			Value:       "oldValue",
-			HeadComment: "# Val head",
-			LineComment: "# Val inline",
-			FootComment: "# Val foot",
-		}
-		mapping.Content = []*yaml.Node{keyNode, valNode}
-
-		newVal := &yaml.Node{
-			Kind:  yaml.ScalarNode,
-			Tag:   "!!str",
-			Value: "newValue",
-		}
-
-		yamlx.SetMappingEntry(mapping, "mykey", newVal, yamlx.IgnoreCase)
-
-		entry, found := yamlx.FindMappingEntry(mapping, "mykey", yamlx.IgnoreCase)
-		if !found {
-			t.Fatal("key not found")
-		}
-		// Preserved key node and comments
-		if entry.KeyNode != keyNode {
-			t.Errorf("keyNode changed")
-		}
-		if entry.KeyNode.HeadComment != "# Key comment" ||
-			entry.KeyNode.LineComment != "# inline comment" {
-			t.Errorf("key comments changed: %#v", entry.KeyNode)
-		}
-		// Value replaced with comments copied from old value
-		if entry.ValueNode.Value != "newValue" {
-			t.Errorf("value = %q, want newValue", entry.ValueNode.Value)
-		}
-		if entry.ValueNode.HeadComment != "# Val head" ||
-			entry.ValueNode.LineComment != "# Val inline" ||
-			entry.ValueNode.FootComment != "# Val foot" {
-			t.Errorf("value comments not copied over: %#v", entry.ValueNode)
-		}
-	})
-
-	t.Run("does not overwrite new value comments if provided", func(t *testing.T) {
-		t.Parallel()
-		mapping := yamlx.NewMappingNode()
-		oldVal := &yaml.Node{
-			Kind:        yaml.ScalarNode,
-			Tag:         "!!str",
-			Value:       "oldValue",
-			HeadComment: "# Old head",
-		}
-		mapping.Content = []*yaml.Node{
-			{Kind: yaml.ScalarNode, Tag: "!!str", Value: "key"},
-			oldVal,
-		}
-
-		newVal := &yaml.Node{
-			Kind:        yaml.ScalarNode,
-			Tag:         "!!str",
-			Value:       "newValue",
-			HeadComment: "# New head",
-		}
-
-		yamlx.SetMappingEntry(mapping, "key", newVal)
-
-		entry, found := yamlx.FindMappingEntry(mapping, "key")
-		if !found {
-			t.Fatal("key not found")
-		}
-		if entry.ValueNode.HeadComment != "# New head" {
-			t.Errorf("headComment = %q, want '# New head'", entry.ValueNode.HeadComment)
-		}
-	})
-
-	t.Run("panics on invalid node", func(t *testing.T) {
-		t.Parallel()
-		assertPanics(t, func() {
-			yamlx.SetMappingEntry(nil, "key", yamlx.NewScalarNode("val"))
-		})
-		assertPanics(t, func() {
-			yamlx.SetMappingEntry(
-				&yaml.Node{Kind: yaml.ScalarNode},
-				"key",
-				yamlx.NewScalarNode("val"),
-			)
-		})
-	})
 }
 
 func TestDeleteMappingEntry(t *testing.T) {

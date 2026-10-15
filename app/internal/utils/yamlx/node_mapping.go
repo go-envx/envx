@@ -19,11 +19,6 @@ type MappingEntry struct {
 	ValueNode *yaml.Node
 }
 
-// IsEmpty reports whether the entry represents an uninitialized or empty entry.
-func (e MappingEntry) IsEmpty() bool {
-	return e.KeyNode == nil && e.ValueNode == nil
-}
-
 // MatchOption configures entry matching behavior.
 type MatchOption int
 
@@ -124,36 +119,4 @@ func FindMappingEntry(
 		}
 	}
 	return MappingEntry{Index: -1}, false
-}
-
-// SetMappingEntry sets key and value in mapping. If key exists, it replaces or updates
-// value (preserving key comments and copying existing value comments if replacement
-// has none); if absent, it appends a new key-value pair.
-// It panics if mapping is nil or not a MappingNode.
-func SetMappingEntry(
-	mapping *yaml.Node,
-	key string,
-	value *yaml.Node,
-	opts ...MatchOption,
-) {
-	if mapping == nil || mapping.Kind != yaml.MappingNode {
-		panic("yamlx: cannot set entry in non-mapping node")
-	}
-
-	entry, found := FindMappingEntry(mapping, key, opts...)
-	if !found {
-		AppendMappingEntry(mapping, key, value)
-		return
-	}
-
-	// Preserve comments if replacement has none
-	if value != nil && entry.ValueNode != nil {
-		if value.HeadComment == "" && value.LineComment == "" && value.FootComment == "" {
-			value.HeadComment = entry.ValueNode.HeadComment
-			value.LineComment = entry.ValueNode.LineComment
-			value.FootComment = entry.ValueNode.FootComment
-		}
-	}
-
-	mapping.Content[entry.Index+1] = value
 }

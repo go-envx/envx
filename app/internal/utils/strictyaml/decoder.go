@@ -65,10 +65,10 @@ func (e *DecodeError) HasUnknownFields() bool {
 	return len(e.UnknownFields) > 0
 }
 
-// FieldContext describes a struct schema for unknown-field error reporting.
-type FieldContext struct {
-	Label  string
-	Schema reflect.Type
+// fieldContext describes a struct schema for unknown-field error reporting.
+type fieldContext struct {
+	label  string
+	schema reflect.Type
 }
 
 // Option configures a Decoder instance.
@@ -83,9 +83,9 @@ func WithSchema[T any](label string) Option {
 			schema = schema.Elem()
 		}
 		name := schema.Name()
-		d.contexts[name] = FieldContext{
-			Label:  label,
-			Schema: schema,
+		d.contexts[name] = fieldContext{
+			label:  label,
+			schema: schema,
 		}
 	}
 }
@@ -103,7 +103,7 @@ func WithSuggestionThreshold(threshold int) Option {
 type Decoder struct {
 	pattern             *regexp.Regexp
 	suggestionThreshold int
-	contexts            map[string]FieldContext
+	contexts            map[string]fieldContext
 }
 
 // New constructs a Decoder configured with the given options.
@@ -111,7 +111,7 @@ func New(opts ...Option) *Decoder {
 	d := &Decoder{
 		pattern:             unknownFieldPattern,
 		suggestionThreshold: DefaultSuggestionThreshold,
-		contexts:            make(map[string]FieldContext),
+		contexts:            make(map[string]fieldContext),
 	}
 	for _, opt := range opts {
 		opt(d)
@@ -173,8 +173,8 @@ func (d *Decoder) parseUnknownField(raw string) (UnknownField, bool) {
 	}
 
 	label := "key"
-	if known && ctx.Label != "" {
-		label = ctx.Label
+	if known && ctx.label != "" {
+		label = ctx.label
 	}
 
 	uf := UnknownField{
@@ -184,8 +184,8 @@ func (d *Decoder) parseUnknownField(raw string) (UnknownField, bool) {
 		Label:    label,
 	}
 
-	if known && ctx.Schema != nil {
-		candidates := d.validKeys(ctx.Schema)
+	if known && ctx.schema != nil {
+		candidates := d.validKeys(ctx.schema)
 		if suggestion, found := str.Closest(
 			field, candidates, d.suggestionThreshold,
 		); found {

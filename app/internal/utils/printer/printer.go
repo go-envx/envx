@@ -112,13 +112,6 @@ func (p *Printer) LogError(message string) error {
 	return err
 }
 
-// LogNote writes a muted, non-severity hint to standard error, for guidance that
-// accompanies but is not part of the primary output (which stays on stdout).
-func (p *Printer) LogNote(message string) error {
-	_, err := fmt.Fprintln(p.err, p.errStyle.Muted(message))
-	return err
-}
-
 // colorEnabled decides whether to style a stream: an explicit override wins,
 // otherwise color is enabled only for a terminal with NO_COLOR unset.
 func colorEnabled(w io.Writer, override *bool) bool {

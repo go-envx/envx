@@ -1,10 +1,5 @@
 package severity
 
-import (
-	"errors"
-	"strings"
-)
-
 // Level represents an ordinal severity level.
 type Level int
 
@@ -18,9 +13,6 @@ const (
 	// Error marks a failing condition, invalid state, or fatal problem.
 	Error
 )
-
-// ErrInvalidLevel reports an unrecognized severity level string.
-var ErrInvalidLevel = errors.New("invalid severity level")
 
 // String returns the canonical lowercase name for the severity level.
 func (l Level) String() string {
@@ -45,23 +37,6 @@ func (l Level) DisplayString() string {
 		return "warning"
 	default:
 		return l.String()
-	}
-}
-
-// Parse converts a string ("none", "ok", "warn", "warning", "error", or "off")
-// into a Level. "off" and "none" map to None; "warn" and "warning" map to Warn.
-func Parse(s string) (Level, error) {
-	switch strings.ToLower(strings.TrimSpace(s)) {
-	case "none", "off":
-		return None, nil
-	case "ok":
-		return OK, nil
-	case "warn", "warning":
-		return Warn, nil
-	case "error":
-		return Error, nil
-	default:
-		return None, ErrInvalidLevel
 	}
 }
 

@@ -1,7 +1,6 @@
 package severity_test
 
 import (
-	"errors"
 	"testing"
 
 	"github.com/go-envx/envx/app/internal/utils/severity"
@@ -44,43 +43,6 @@ func TestLevelDisplayString(t *testing.T) {
 	for _, tc := range cases {
 		if got := tc.level.DisplayString(); got != tc.want {
 			t.Errorf("Level(%d).DisplayString() = %q, want %q", tc.level, got, tc.want)
-		}
-	}
-}
-
-func TestParse(t *testing.T) {
-	t.Parallel()
-
-	cases := []struct {
-		input   string
-		want    severity.Level
-		wantErr bool
-	}{
-		{"none", severity.None, false},
-		{"off", severity.None, false},
-		{"ok", severity.OK, false},
-		{"warn", severity.Warn, false},
-		{"warning", severity.Warn, false},
-		{"error", severity.Error, false},
-		{"WARN", severity.Warn, false},
-		{" WARNING ", severity.Warn, false},
-		{"invalid", severity.None, true},
-		{"", severity.None, true},
-	}
-
-	for _, tc := range cases {
-		got, err := severity.Parse(tc.input)
-		if tc.wantErr {
-			if err == nil || !errors.Is(err, severity.ErrInvalidLevel) {
-				t.Errorf("Parse(%q) err = %v, want ErrInvalidLevel", tc.input, err)
-			}
-		} else {
-			if err != nil {
-				t.Errorf("Parse(%q) unexpected err: %v", tc.input, err)
-			}
-			if got != tc.want {
-				t.Errorf("Parse(%q) = %v, want %v", tc.input, got, tc.want)
-			}
 		}
 	}
 }
