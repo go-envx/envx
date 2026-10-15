@@ -7,7 +7,7 @@ import (
 	"testing"
 
 	"github.com/go-envx/envx/app/internal/features/privatekey"
-	"github.com/go-envx/envx/app/internal/resources/cipher"
+	"github.com/go-envx/envx/app/internal/resources/cipher/age"
 	"github.com/go-envx/envx/app/internal/shared/value"
 	"gopkg.in/yaml.v3"
 )
@@ -79,10 +79,7 @@ func newTestStore(t *testing.T, id string) *fakeRepository {
 // newTestCipher creates the default cipher for service construction tests.
 func newTestCipher(t *testing.T) CipherClient {
 	t.Helper()
-	selected, err := cipher.New(cipher.Params{
-		Algorithm: cipher.Age,
-		Options:   cipher.AgeOptions{},
-	})
+	selected, err := age.New(age.Params{})
 	if err != nil {
 		t.Fatal(err)
 	}

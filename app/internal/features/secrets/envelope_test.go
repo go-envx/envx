@@ -5,7 +5,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/go-envx/envx/app/internal/resources/cipher"
+	"github.com/go-envx/envx/app/internal/resources/cipher/age"
+	"github.com/go-envx/envx/app/internal/resources/cipher/naclbox"
 )
 
 // TestEnvelopeRoundTrip verifies algorithm metadata and native bytes survive the
@@ -16,7 +17,7 @@ func TestEnvelopeRoundTrip(t *testing.T) {
 	codec := newEnvelopeCodec(envelopeParams{})
 
 	payload := []byte("age-encryption.org/v1\n\x00\xff")
-	value, err := codec.encode(string(cipher.Age), payload)
+	value, err := codec.encode(age.Algorithm, payload)
 	if err != nil {
 		t.Fatalf("encode() error = %v", err)
 	}
@@ -31,8 +32,8 @@ func TestEnvelopeRoundTrip(t *testing.T) {
 	if err != nil {
 		t.Fatalf("decode() error = %v", err)
 	}
-	if algorithm != string(cipher.Age) {
-		t.Fatalf("decode() algorithm = %q, want %q", algorithm, cipher.Age)
+	if algorithm != age.Algorithm {
+		t.Fatalf("decode() algorithm = %q, want %q", algorithm, age.Algorithm)
 	}
 	if !bytes.Equal(decoded, payload) {
 		t.Fatalf("decode() payload = %x, want %x", decoded, payload)
@@ -75,12 +76,9 @@ func TestEnvelopeComposesWithAge(t *testing.T) {
 
 	codec := newEnvelopeCodec(envelopeParams{})
 
-	selected, err := cipher.New(cipher.Params{
-		Algorithm: cipher.Age,
-		Options:   cipher.AgeOptions{},
-	})
+	selected, err := age.New(age.Params{})
 	if err != nil {
-		t.Fatalf("cipher.New() error = %v", err)
+		t.Fatalf("age.New() error = %v", err)
 	}
 	pair, err := selected.Keypair()
 	if err != nil {
@@ -90,7 +88,7 @@ func TestEnvelopeComposesWithAge(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Encrypt() error = %v", err)
 	}
-	storedValue, err := codec.encode(string(cipher.Age), nativeCiphertext)
+	storedValue, err := codec.encode(age.Algorithm, nativeCiphertext)
 	if err != nil {
 		t.Fatalf("encode() error = %v", err)
 	}
@@ -99,12 +97,8 @@ func TestEnvelopeComposesWithAge(t *testing.T) {
 	if err != nil {
 		t.Fatalf("decode() error = %v", err)
 	}
-	selected, err = cipher.New(cipher.Params{
-		Algorithm: cipher.Algorithm(algorithm),
-		Options:   cipher.AgeOptions{},
-	})
-	if err != nil {
-		t.Fatalf("cipher.New(decoded algorithm) error = %v", err)
+	if algorithm != age.Algorithm {
+		t.Fatalf("algorithm = %q, want %q", algorithm, age.Algorithm)
 	}
 	plaintext, err := selected.Decrypt(decodedCiphertext, pair.PrivateKey)
 	if err != nil {
@@ -122,12 +116,9 @@ func TestEnvelopeComposesWithNaClBox(t *testing.T) {
 
 	codec := newEnvelopeCodec(envelopeParams{})
 
-	selected, err := cipher.New(cipher.Params{
-		Algorithm: cipher.NaClBox,
-		Options:   cipher.NaClBoxOptions{},
-	})
+	selected, err := naclbox.New(naclbox.Params{})
 	if err != nil {
-		t.Fatalf("cipher.New() error = %v", err)
+		t.Fatalf("naclbox.New() error = %v", err)
 	}
 	pair, err := selected.Keypair()
 	if err != nil {
@@ -137,7 +128,7 @@ func TestEnvelopeComposesWithNaClBox(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Encrypt() error = %v", err)
 	}
-	storedValue, err := codec.encode(string(cipher.NaClBox), nativeCiphertext)
+	storedValue, err := codec.encode(naclbox.Algorithm, nativeCiphertext)
 	if err != nil {
 		t.Fatalf("encode() error = %v", err)
 	}
@@ -149,12 +140,8 @@ func TestEnvelopeComposesWithNaClBox(t *testing.T) {
 	if err != nil {
 		t.Fatalf("decode() error = %v", err)
 	}
-	selected, err = cipher.New(cipher.Params{
-		Algorithm: cipher.Algorithm(algorithm),
-		Options:   cipher.NaClBoxOptions{},
-	})
-	if err != nil {
-		t.Fatalf("cipher.New(decoded algorithm) error = %v", err)
+	if algorithm != naclbox.Algorithm {
+		t.Fatalf("algorithm = %q, want %q", algorithm, naclbox.Algorithm)
 	}
 	plaintext, err := selected.Decrypt(decodedCiphertext, pair.PrivateKey)
 	if err != nil {

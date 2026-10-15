@@ -9,7 +9,7 @@ import (
 	"github.com/go-envx/envx/app/internal/features/env"
 	"github.com/go-envx/envx/app/internal/features/pack"
 	"github.com/go-envx/envx/app/internal/features/validate"
-	"github.com/go-envx/envx/app/internal/resources/cipher"
+	"github.com/go-envx/envx/app/internal/resources/cipher/age"
 	"github.com/go-envx/envx/app/test/fixtures"
 )
 
@@ -39,8 +39,8 @@ func TestComposeAppConfigDerivesEverySlice(t *testing.T) {
 	if config.Secrets.KeysPath != wantKeys {
 		t.Errorf("KeysPath = %q, want %q", config.Secrets.KeysPath, wantKeys)
 	}
-	if config.Secrets.Cipher != string(cipher.Age) {
-		t.Errorf("Cipher = %q, want %q", config.Secrets.Cipher, cipher.Age)
+	if config.Secrets.Cipher != age.Algorithm {
+		t.Errorf("Cipher = %q, want %q", config.Secrets.Cipher, age.Algorithm)
 	}
 	if len(config.Env.Projects) == 0 || len(config.Pack.Projects) == 0 ||
 		len(config.Validate.Projects) == 0 {

@@ -3,7 +3,7 @@ package secrets
 import (
 	"testing"
 
-	"github.com/go-envx/envx/app/internal/resources/cipher"
+	"github.com/go-envx/envx/app/internal/resources/cipher/naclbox"
 	"github.com/go-envx/envx/app/internal/shared/status"
 	"github.com/go-envx/envx/app/internal/utils/severity"
 )
@@ -184,7 +184,7 @@ func TestDiagnoseAlgorithmMismatch(t *testing.T) {
 	t.Parallel()
 
 	codec := newEnvelopeCodec(envelopeParams{})
-	mismatched, err := codec.encode(string(cipher.NaClBox), []byte("payload-bytes"))
+	mismatched, err := codec.encode(naclbox.Algorithm, []byte("payload-bytes"))
 	if err != nil {
 		t.Fatalf("Encode(): %v", err)
 	}

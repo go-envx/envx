@@ -12,7 +12,7 @@ import (
 	"github.com/go-envx/envx/app/internal/core"
 	"github.com/go-envx/envx/app/internal/features/emit"
 	"github.com/go-envx/envx/app/internal/features/env"
-	"github.com/go-envx/envx/app/internal/resources/cipher"
+	"github.com/go-envx/envx/app/internal/resources/cipher/age"
 	"github.com/go-envx/envx/app/internal/shared/flags"
 	"github.com/go-envx/envx/app/test/fixtures"
 )
@@ -88,9 +88,9 @@ func encryptedWorkspace(t *testing.T) (cfgPath, privateKey string) {
 	t.Helper()
 	dir := t.TempDir()
 
-	selected, err := cipher.New(cipher.Params{Algorithm: cipher.Age})
+	selected, err := age.New(age.Params{})
 	if err != nil {
-		t.Fatalf("cipher.New(): %v", err)
+		t.Fatalf("age.New(): %v", err)
 	}
 	pair, err := selected.Keypair()
 	if err != nil {

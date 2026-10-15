@@ -65,9 +65,14 @@ func composeAppServices(config *AppConfig, clients AppClients) (AppServices, err
 		return AppServices{}, fmt.Errorf("composing private key service: %w", err)
 	}
 
+	cipherProvider, err := clients.Cipher.For(config.Secrets.Cipher)
+	if err != nil {
+		return AppServices{}, fmt.Errorf("resolving cipher: %w", err)
+	}
+
 	secretsService, err := secrets.NewService(secrets.ServiceParams{
 		Repository:        clients.SecretsStore,
-		Cipher:            clients.Cipher,
+		Cipher:            cipherProvider,
 		PrivateKeyService: privateKeyService,
 	})
 	if err != nil {

@@ -6,7 +6,7 @@ import (
 	"testing"
 
 	"github.com/go-envx/envx/app/internal/features/privatekey"
-	"github.com/go-envx/envx/app/internal/resources/cipher"
+	"github.com/go-envx/envx/app/internal/resources/cipher/naclbox"
 	"github.com/go-envx/envx/app/internal/shared/value"
 )
 
@@ -236,9 +236,9 @@ func TestSetEncryptsAndStoresSecret(t *testing.T) {
 func TestSetUsesCipherAlgorithm(t *testing.T) {
 	t.Parallel()
 
-	selected, err := cipher.New(cipher.Params{Algorithm: cipher.NaClBox})
+	selected, err := naclbox.New(naclbox.Params{})
 	if err != nil {
-		t.Fatalf("cipher.New(): %v", err)
+		t.Fatalf("naclbox.New(): %v", err)
 	}
 	pair, err := selected.Keypair()
 	if err != nil {

@@ -7,12 +7,14 @@ import (
 	pkfilestore "github.com/go-envx/envx/app/internal/features/privatekey/filestore"
 	secfilestore "github.com/go-envx/envx/app/internal/features/secrets/filestore"
 	"github.com/go-envx/envx/app/internal/resources/cipher"
+	"github.com/go-envx/envx/app/internal/resources/cipher/age"
+	"github.com/go-envx/envx/app/internal/resources/cipher/naclbox"
 	"github.com/go-envx/envx/app/internal/resources/hostenv"
 )
 
 // AppClients holds every client the workspace-bound services consume.
 type AppClients struct {
-	Cipher          cipher.Cipher
+	Cipher          *cipher.Client
 	HostEnv         *hostenv.Client
 	PrivateKeyStore *pkfilestore.Repository
 	SecretsStore    *secfilestore.Repository
@@ -22,8 +24,18 @@ type AppClients struct {
 
 // composeAppClients constructs each client from its config slice.
 func composeAppClients(config *AppConfig) (AppClients, error) {
+	ageProvider, err := age.New(age.Params{})
+	if err != nil {
+		return AppClients{}, fmt.Errorf("composing age cipher: %w", err)
+	}
+
+	naclProvider, err := naclbox.New(naclbox.Params{})
+	if err != nil {
+		return AppClients{}, fmt.Errorf("composing nacl-box cipher: %w", err)
+	}
+
 	cipherClient, err := cipher.New(cipher.Params{
-		Algorithm: cipher.Algorithm(config.Secrets.Cipher),
+		Providers: []cipher.Provider{ageProvider, naclProvider},
 	})
 	if err != nil {
 		return AppClients{}, fmt.Errorf("composing cipher: %w", err)

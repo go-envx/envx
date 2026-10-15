@@ -1,8 +1,12 @@
-package cipher
+package cipher_test
 
 import (
 	"errors"
 	"testing"
+
+	"github.com/go-envx/envx/app/internal/resources/cipher"
+	"github.com/go-envx/envx/app/internal/resources/cipher/age"
+	"github.com/go-envx/envx/app/internal/resources/cipher/naclbox"
 )
 
 // TestDecryptWrongKeyIsErrDecrypt verifies a ciphertext opened with a
@@ -10,21 +14,26 @@ import (
 func TestDecryptWrongKeyIsErrDecrypt(t *testing.T) {
 	t.Parallel()
 
-	for _, algorithm := range []Algorithm{Age, NaClBox} {
-		selected, err := New(Params{Algorithm: algorithm})
-		if err != nil {
-			t.Fatalf("New(%s) error = %v", algorithm, err)
-		}
-		first := newKeypair(t, selected)
-		second := newKeypair(t, selected)
-		ciphertext, err := selected.Encrypt("secret", first.PublicKey)
+	ageClient, err := age.New(age.Params{})
+	if err != nil {
+		t.Fatalf("age.New() error = %v", err)
+	}
+	naclClient, err := naclbox.New(naclbox.Params{})
+	if err != nil {
+		t.Fatalf("naclbox.New() error = %v", err)
+	}
+
+	for _, client := range []cipher.Provider{ageClient, naclClient} {
+		first := newKeypair(t, client)
+		second := newKeypair(t, client)
+		ciphertext, err := client.Encrypt("secret", first.PublicKey)
 		if err != nil {
 			t.Fatalf("Encrypt() error = %v", err)
 		}
 
-		_, err = selected.Decrypt(ciphertext, second.PrivateKey)
-		if !errors.Is(err, ErrDecrypt) {
-			t.Errorf("%s: Decrypt() error = %v, want ErrDecrypt", algorithm, err)
+		_, err = client.Decrypt(ciphertext, second.PrivateKey)
+		if !errors.Is(err, cipher.ErrDecrypt) {
+			t.Errorf("%s: Decrypt() error = %v, want ErrDecrypt", client.Algorithm(), err)
 		}
 	}
 }
@@ -34,20 +43,25 @@ func TestDecryptWrongKeyIsErrDecrypt(t *testing.T) {
 func TestDecryptMalformedKeyIsErrInvalidKey(t *testing.T) {
 	t.Parallel()
 
-	for _, algorithm := range []Algorithm{Age, NaClBox} {
-		selected, err := New(Params{Algorithm: algorithm})
-		if err != nil {
-			t.Fatalf("New(%s) error = %v", algorithm, err)
-		}
-		pair := newKeypair(t, selected)
-		ciphertext, err := selected.Encrypt("secret", pair.PublicKey)
+	ageClient, err := age.New(age.Params{})
+	if err != nil {
+		t.Fatalf("age.New() error = %v", err)
+	}
+	naclClient, err := naclbox.New(naclbox.Params{})
+	if err != nil {
+		t.Fatalf("naclbox.New() error = %v", err)
+	}
+
+	for _, client := range []cipher.Provider{ageClient, naclClient} {
+		pair := newKeypair(t, client)
+		ciphertext, err := client.Encrypt("secret", pair.PublicKey)
 		if err != nil {
 			t.Fatalf("Encrypt() error = %v", err)
 		}
 
-		_, err = selected.Decrypt(ciphertext, "not-a-valid-private-key")
-		if !errors.Is(err, ErrInvalidKey) {
-			t.Errorf("%s: Decrypt() error = %v, want ErrInvalidKey", algorithm, err)
+		_, err = client.Decrypt(ciphertext, "not-a-valid-private-key")
+		if !errors.Is(err, cipher.ErrInvalidKey) {
+			t.Errorf("%s: Decrypt() error = %v, want ErrInvalidKey", client.Algorithm(), err)
 		}
 	}
 }
