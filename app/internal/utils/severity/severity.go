@@ -45,11 +45,3 @@ func (l Level) DisplayString() string {
 func (l Level) Rank() int {
 	return int(l)
 }
-
-// Worst returns the higher severity between a and b.
-func Worst(a, b Level) Level {
-	if a.Rank() >= b.Rank() {
-		return a
-	}
-	return b
-}

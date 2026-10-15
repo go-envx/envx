@@ -47,16 +47,16 @@ func TestLevelDisplayString(t *testing.T) {
 	}
 }
 
-func TestWorst(t *testing.T) {
+func TestLevelRank(t *testing.T) {
 	t.Parallel()
 
-	if got := severity.Worst(severity.OK, severity.Warn); got != severity.Warn {
-		t.Errorf("Worst(OK, Warn) = %v, want Warn", got)
+	if severity.None.Rank() >= severity.OK.Rank() {
+		t.Errorf("Rank None (%d) should be < OK (%d)", severity.None.Rank(), severity.OK.Rank())
 	}
-	if got := severity.Worst(severity.Error, severity.Warn); got != severity.Error {
-		t.Errorf("Worst(Error, Warn) = %v, want Error", got)
+	if severity.OK.Rank() >= severity.Warn.Rank() {
+		t.Errorf("Rank OK (%d) should be < Warn (%d)", severity.OK.Rank(), severity.Warn.Rank())
 	}
-	if got := severity.Worst(severity.None, severity.OK); got != severity.OK {
-		t.Errorf("Worst(None, OK) = %v, want OK", got)
+	if severity.Warn.Rank() >= severity.Error.Rank() {
+		t.Errorf("Rank Warn (%d) should be < Error (%d)", severity.Warn.Rank(), severity.Error.Rank())
 	}
 }

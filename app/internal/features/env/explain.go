@@ -324,7 +324,7 @@ func diagnoseLeaf(
 		if outcome.Kind == KindSecretReference {
 			agg.Kind = KindSecretReference
 		}
-		if severityRank(outcome.Severity) > severityRank(agg.Severity) {
+		if outcome.Severity.Rank() > agg.Severity.Rank() {
 			agg.Severity = outcome.Severity
 			agg.Status = outcome.Status
 			agg.Code = outcome.Code
@@ -348,9 +348,4 @@ func diagnoseLeaf(
 		agg.HasResolved = true
 	}
 	return agg
-}
-
-// severityRank orders severities so aggregation can select the worst outcome.
-func severityRank(sev Severity) int {
-	return sev.Rank()
 }
