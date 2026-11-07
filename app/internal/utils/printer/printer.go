@@ -6,7 +6,7 @@ import (
 	"os"
 
 	"github.com/go-envx/envx/app/internal/lib/style"
-	"github.com/go-envx/envx/app/internal/utils/termx"
+	"github.com/go-envx/envx/app/internal/lib/terminal"
 )
 
 // Glyph and label prefixes applied to logged warnings and errors so severity is
@@ -121,5 +121,8 @@ func colorEnabled(w io.Writer, override *bool) bool {
 	if _, ok := os.LookupEnv("NO_COLOR"); ok {
 		return false
 	}
-	return termx.IsTerminal(w)
+	if file, ok := w.(*os.File); ok {
+		return terminal.IsTerminal(file)
+	}
+	return false
 }

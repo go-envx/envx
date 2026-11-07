@@ -2,6 +2,8 @@ package cli
 
 import (
 	"bytes"
+	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -101,10 +103,13 @@ func TestReadSecretFromTerminalWithConfirmation(t *testing.T) {
 	var stderr bytes.Buffer
 	file := terminalFile(t)
 	r := newSecretPrompt(secretPromptParams{
-		Stdin:            file,
-		Stderr:           &stderr,
-		IsTerminal:       func(int) bool { return true },
-		ReadPassword:     func(int) ([]byte, error) { return []byte("secret-value"), nil },
+		Stdin:      file,
+		Stderr:     &stderr,
+		IsTerminal: func(int) bool { return true },
+		readSecret: func(in io.Reader, out io.Writer, prompt string) (string, error) {
+			_, _ = fmt.Fprint(out, prompt)
+			return "secret-value", nil
+		},
 		ReadConfirmation: func(*os.File) (bool, error) { return true, nil },
 	})
 
@@ -131,10 +136,12 @@ func TestReadSecretFromTerminalRejectedConfirmation(t *testing.T) {
 	t.Parallel()
 
 	r := newSecretPrompt(secretPromptParams{
-		Stdin:            terminalFile(t),
-		Stderr:           new(bytes.Buffer),
-		IsTerminal:       func(int) bool { return true },
-		ReadPassword:     func(int) ([]byte, error) { return []byte("secret-value"), nil },
+		Stdin:      terminalFile(t),
+		Stderr:     new(bytes.Buffer),
+		IsTerminal: func(int) bool { return true },
+		readSecret: func(io.Reader, io.Writer, string) (string, error) {
+			return "secret-value", nil
+		},
 		ReadConfirmation: func(*os.File) (bool, error) { return false, nil },
 	})
 
@@ -151,10 +158,12 @@ func TestReadSecretFromTerminalSkipsConfirmationWhenRequested(t *testing.T) {
 	var stderr bytes.Buffer
 	confirmationCalled := false
 	r := newSecretPrompt(secretPromptParams{
-		Stdin:        terminalFile(t),
-		Stderr:       &stderr,
-		IsTerminal:   func(int) bool { return true },
-		ReadPassword: func(int) ([]byte, error) { return []byte("secret-value"), nil },
+		Stdin:      terminalFile(t),
+		Stderr:     &stderr,
+		IsTerminal: func(int) bool { return true },
+		readSecret: func(io.Reader, io.Writer, string) (string, error) {
+			return "secret-value", nil
+		},
 		ReadConfirmation: func(*os.File) (bool, error) {
 			confirmationCalled = true
 			return true, nil

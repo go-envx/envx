@@ -8,7 +8,7 @@ import (
 	"strings"
 	"unicode/utf8"
 
-	"github.com/go-envx/envx/app/internal/utils/termx"
+	"github.com/go-envx/envx/app/internal/lib/terminal"
 )
 
 // secretPromptParams supplies the input, output, and terminal dependencies for
@@ -20,12 +20,12 @@ type secretPromptParams struct {
 	Stderr io.Writer
 	// IsTerminal identifies terminal file descriptors for input selection.
 	IsTerminal func(int) bool
-	// ReadPassword reads one value from a terminal with echo disabled.
-	ReadPassword func(int) ([]byte, error)
 	// ReadConfirmation reads the interactive yes-or-no confirmation.
 	ReadConfirmation func(*os.File) (bool, error)
 	// NoConfirm skips the interactive confirmation after hidden input.
 	NoConfirm bool
+	// readSecret overrides terminal password reading for testing.
+	readSecret func(io.Reader, io.Writer, string) (string, error)
 }
 
 // secretPrompt owns secret input selection and interactive terminal reading.
@@ -40,7 +40,7 @@ type secretPrompt struct {
 func newSecretPrompt(params secretPromptParams) *secretPrompt {
 	sp := &secretPrompt{params: params}
 	if file, ok := params.Stdin.(*os.File); ok {
-		isTerm := termx.IsTerminal(file)
+		isTerm := terminal.IsTerminal(file)
 		if params.IsTerminal != nil {
 			isTerm = params.IsTerminal(int(file.Fd()))
 		}
@@ -77,12 +77,11 @@ func (p *secretPrompt) readPlaintext() (string, error) {
 // readTerminalPlaintext reads one hidden value and asks for confirmation before
 // returning it.
 func (p *secretPrompt) readTerminalPlaintext() (string, error) {
-	secret, err := termx.Password(termx.PasswordParams{
-		Out:          p.params.Stderr,
-		In:           p.terminal,
-		Prompt:       "Secret value: ",
-		ReadPassword: p.params.ReadPassword,
-	})
+	readSecret := terminal.Password
+	if p.params.readSecret != nil {
+		readSecret = p.params.readSecret
+	}
+	secret, err := readSecret(p.terminal, p.params.Stderr, "Secret value: ")
 	if err != nil {
 		return "", err
 	}
@@ -115,13 +114,12 @@ func (p *secretPrompt) confirmSecret(secret string) (bool, error) {
 		}
 		return p.params.ReadConfirmation(p.terminal)
 	}
-	return termx.ConfirmYesNo(termx.ConfirmYesNoParams{
-		Out: p.params.Stderr,
-		In:  p.terminal,
-		Prompt: fmt.Sprintf(
+	return terminal.ConfirmYesNo(
+		p.terminal,
+		p.params.Stderr,
+		fmt.Sprintf(
 			"Confirm secret of length %d? [Y/n] ",
 			utf8.RuneCountInString(secret),
 		),
-		DefaultYes: true,
-	})
+	)
 }

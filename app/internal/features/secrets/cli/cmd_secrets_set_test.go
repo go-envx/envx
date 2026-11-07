@@ -2,6 +2,8 @@ package cli
 
 import (
 	"bytes"
+	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -99,8 +101,10 @@ func TestExecuteSetRejectsUnconfirmedTerminalInputWithoutMutation(t *testing.T) 
 			IsTerminal: func(int) bool {
 				return true
 			},
-			ReadPassword: func(int) ([]byte, error) {
-				return []byte("secret"), nil
+			readSecret: func(in io.Reader, out io.Writer, prompt string) (string, error) {
+				_, _ = fmt.Fprint(out, prompt)
+				_, _ = fmt.Fprintln(out)
+				return "secret", nil
 			},
 			ReadConfirmation: func(*os.File) (bool, error) {
 				return false, nil
