@@ -4,8 +4,8 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/go-envx/envx/app/internal/lib/strictyaml"
 	"github.com/go-envx/envx/app/internal/lib/yamlx"
-	"github.com/go-envx/envx/app/internal/utils/strictyaml"
 	"gopkg.in/yaml.v3"
 )
 

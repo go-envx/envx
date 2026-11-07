@@ -5,12 +5,14 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/go-envx/envx/app/internal/utils/strictyaml"
+	"github.com/go-envx/envx/app/internal/lib/strictyaml"
 )
 
 type sampleRoot struct {
 	Name     string         `yaml:"name"`
 	Settings sampleSettings `yaml:"settings"`
+	Ignored  string         `yaml:"-"`
+	Untagged string
 }
 
 type sampleSettings struct {
@@ -24,6 +26,24 @@ func TestDecoderSuccess(t *testing.T) {
 	input := "name: test\nsettings:\n  timeout: 30\n  enabled: true\n"
 	dec := strictyaml.New(
 		strictyaml.WithSchema[sampleRoot]("root field"),
+	)
+
+	var target sampleRoot
+	if err := dec.Decode([]byte(input), &target); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if target.Name != "test" || target.Settings.Timeout != 30 {
+		t.Errorf("decoded struct = %+v", target)
+	}
+}
+
+func TestDecoderSuccessWithPointerSchema(t *testing.T) {
+	t.Parallel()
+
+	input := "name: test\nsettings:\n  timeout: 30\n  enabled: true\n"
+	dec := strictyaml.New(
+		strictyaml.WithSchema[*sampleRoot]("root field"),
+		strictyaml.WithSchema[*sampleSettings]("setting"),
 	)
 
 	var target sampleRoot
@@ -151,6 +171,7 @@ func TestDecoderCustomThreshold(t *testing.T) {
 	dec := strictyaml.New(
 		strictyaml.WithSchema[sampleSettings]("setting"),
 		strictyaml.WithSuggestionThreshold(1),
+		strictyaml.WithSuggestionThreshold(0), // non-positive ignored
 	)
 
 	var target sampleRoot
@@ -165,5 +186,57 @@ func TestDecoderCustomThreshold(t *testing.T) {
 	}
 	if decErr.UnknownFields[0].Suggestion != "timeout" {
 		t.Errorf("expected suggestion 'timeout', got %q", decErr.UnknownFields[0].Suggestion)
+	}
+}
+
+func TestDecoderOtherErrorsPassthrough(t *testing.T) {
+	t.Parallel()
+
+	// A type error that is not an unknown field error
+	// (e.g. string value where int expected).
+	input := "name: test\nsettings:\n  timeout: not-a-number\n"
+	dec := strictyaml.New(
+		strictyaml.WithSchema[sampleRoot]("root field"),
+		strictyaml.WithSchema[sampleSettings]("setting"),
+	)
+
+	var target sampleRoot
+	err := dec.Decode([]byte(input), &target)
+	if err == nil {
+		t.Fatal("expected error for type mismatch")
+	}
+
+	var decErr *strictyaml.DecodeError
+	if !errors.As(err, &decErr) {
+		t.Fatalf("expected *strictyaml.DecodeError, got %T: %v", err, err)
+	}
+
+	if decErr.HasUnknownFields() {
+		t.Errorf("expected HasUnknownFields() to be false, got true")
+	}
+	if len(decErr.OtherErrors) == 0 {
+		t.Fatal("expected OtherErrors to contain type mismatch error")
+	}
+	if !strings.Contains(decErr.Error(), "cannot unmarshal") {
+		t.Errorf("expected Error() to include type mismatch message, got: %q", decErr.Error())
+	}
+}
+
+func TestDecoderSyntaxError(t *testing.T) {
+	t.Parallel()
+
+	// Malformed YAML should return non-DecodeError directly
+	input := "name: [invalid yaml"
+	dec := strictyaml.New()
+
+	var target sampleRoot
+	err := dec.Decode([]byte(input), &target)
+	if err == nil {
+		t.Fatal("expected error for malformed yaml")
+	}
+
+	var decErr *strictyaml.DecodeError
+	if errors.As(err, &decErr) {
+		t.Fatalf("expected raw syntax error, got *strictyaml.DecodeError: %v", decErr)
 	}
 }
