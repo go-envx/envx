@@ -11,7 +11,7 @@ import (
 
 	"gopkg.in/yaml.v3"
 
-	"github.com/go-envx/envx/app/internal/utils/str"
+	"github.com/go-envx/envx/app/internal/lib/str"
 )
 
 // DefaultSuggestionThreshold is the default maximum edit distance for suggestions.

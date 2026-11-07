@@ -3,7 +3,7 @@ package str_test
 import (
 	"testing"
 
-	"github.com/go-envx/envx/app/internal/utils/str"
+	"github.com/go-envx/envx/app/internal/lib/str"
 )
 
 func TestLevenshtein(t *testing.T) {

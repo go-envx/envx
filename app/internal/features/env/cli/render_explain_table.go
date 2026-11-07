@@ -2,9 +2,9 @@ package cli
 
 import (
 	"github.com/go-envx/envx/app/internal/features/env"
+	"github.com/go-envx/envx/app/internal/lib/str"
 	"github.com/go-envx/envx/app/internal/utils/filex"
 	"github.com/go-envx/envx/app/internal/utils/printer"
-	"github.com/go-envx/envx/app/internal/utils/str"
 )
 
 // table writes an aligned table led by a banner when resolution is incomplete.

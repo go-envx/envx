@@ -5,9 +5,9 @@ import (
 
 	"github.com/go-envx/envx/app/internal/features/env"
 	"github.com/go-envx/envx/app/internal/lib/arg"
+	"github.com/go-envx/envx/app/internal/lib/str"
 	"github.com/go-envx/envx/app/internal/shared/flags"
 	"github.com/go-envx/envx/app/internal/utils/printer"
-	"github.com/go-envx/envx/app/internal/utils/str"
 	"github.com/spf13/cobra"
 )
 
