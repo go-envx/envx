@@ -8,8 +8,8 @@ import (
 	"testing"
 
 	"github.com/go-envx/envx/app/internal/features/secrets"
+	"github.com/go-envx/envx/app/internal/lib/printer"
 	"github.com/go-envx/envx/app/internal/utils/filex"
-	"github.com/go-envx/envx/app/internal/utils/printer"
 )
 
 // writeDeleteManifest creates a valid workspace manifest for delete action tests.

@@ -9,7 +9,7 @@ import (
 	"testing"
 
 	"github.com/go-envx/envx/app/internal/features/scaffold"
-	"github.com/go-envx/envx/app/internal/utils/printer"
+	"github.com/go-envx/envx/app/internal/lib/printer"
 )
 
 // mockScaffoldFactory implements Factory for unit testing.

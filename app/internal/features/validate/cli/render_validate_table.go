@@ -4,7 +4,7 @@ import (
 	"fmt"
 
 	"github.com/go-envx/envx/app/internal/features/validate"
-	"github.com/go-envx/envx/app/internal/utils/printer"
+	"github.com/go-envx/envx/app/internal/lib/printer"
 )
 
 // table writes an aligned table of findings led by a severity banner. A clean

@@ -11,9 +11,9 @@ import (
 
 	"github.com/go-envx/envx/app/internal/core"
 	"github.com/go-envx/envx/app/internal/features/validate"
+	"github.com/go-envx/envx/app/internal/lib/printer"
 	"github.com/go-envx/envx/app/internal/shared/flags"
 	"github.com/go-envx/envx/app/internal/shared/status"
-	"github.com/go-envx/envx/app/internal/utils/printer"
 	"github.com/go-envx/envx/app/test/fixtures"
 )
 

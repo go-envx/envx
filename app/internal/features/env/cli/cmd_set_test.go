@@ -9,8 +9,8 @@ import (
 
 	"github.com/go-envx/envx/app/internal/core"
 	"github.com/go-envx/envx/app/internal/features/env"
+	"github.com/go-envx/envx/app/internal/lib/printer"
 	"github.com/go-envx/envx/app/internal/utils/filex"
-	"github.com/go-envx/envx/app/internal/utils/printer"
 )
 
 func writeSetManifest(t *testing.T) (manifestPath, dir string) {

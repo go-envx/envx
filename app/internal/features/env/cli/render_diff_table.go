@@ -4,8 +4,8 @@ import (
 	"fmt"
 
 	"github.com/go-envx/envx/app/internal/features/env"
+	"github.com/go-envx/envx/app/internal/lib/printer"
 	"github.com/go-envx/envx/app/internal/lib/style"
-	"github.com/go-envx/envx/app/internal/utils/printer"
 )
 
 // table writes the diff as a headerless, sign-prefixed table.

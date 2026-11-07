@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"strings"
 	"testing"
+
+	"github.com/go-envx/envx/app/internal/lib/stdio"
 )
 
 // boolPtr returns a pointer to b for setting Options.Color explicitly.
@@ -159,6 +161,25 @@ func TestNewAutoDetectsNonTerminal(t *testing.T) {
 	}
 }
 
+// TestColorEnabledNoColor verifies NO_COLOR is honored when non-empty, and ignored
+// when empty.
+func TestColorEnabledNoColor(t *testing.T) {
+	var buf bytes.Buffer
+
+	// Explicit override always wins over environment.
+	enabled := true
+	t.Setenv("NO_COLOR", "1")
+	if !colorEnabled(&buf, &enabled) {
+		t.Error("colorEnabled with explicit true should be enabled despite NO_COLOR=1")
+	}
+
+	// Non-terminal writer should still disable color even when NO_COLOR is empty.
+	t.Setenv("NO_COLOR", "")
+	if colorEnabled(&buf, nil) {
+		t.Error("colorEnabled with non-terminal buffer should be false when NO_COLOR=\"\"")
+	}
+}
+
 // TestNewPlain verifies styling is disabled.
 func TestNewPlain(t *testing.T) {
 	t.Parallel()
@@ -183,5 +204,101 @@ func TestNewDiscard(t *testing.T) {
 	}
 	if err := p.LogError("boom"); err != nil {
 		t.Fatalf("LogError() error = %v", err)
+	}
+}
+
+// TestNewStreams verifies streams bundle initialization.
+func TestNewStreams(t *testing.T) {
+	t.Parallel()
+
+	var out, errStream bytes.Buffer
+	s := stdio.Streams{Out: &out, ErrOut: &errStream}
+	p := NewStreams(s)
+
+	if err := p.LogMessage("from streams"); err != nil {
+		t.Fatalf("LogMessage() error = %v", err)
+	}
+	if got := out.String(); got != "from streams\n" {
+		t.Errorf("out = %q, want %q", got, "from streams\n")
+	}
+
+	if err := p.LogError("err from streams"); err != nil {
+		t.Fatalf("LogError() error = %v", err)
+	}
+	if !strings.Contains(errStream.String(), "err from streams") {
+		t.Errorf("err = %q, want containing error", errStream.String())
+	}
+}
+
+// TestNewStreamsNilNormalized verifies nil streams normalize to io.Discard.
+func TestNewStreamsNilNormalized(t *testing.T) {
+	t.Parallel()
+
+	p := NewStreams(stdio.Streams{})
+	if err := p.LogMessage("discarded"); err != nil {
+		t.Fatalf("LogMessage() on nil streams error = %v", err)
+	}
+	if err := p.LogError("discarded"); err != nil {
+		t.Fatalf("LogError() on nil streams error = %v", err)
+	}
+}
+
+// TestNewPlainStreams verifies stream bundle initialization with styling off.
+func TestNewPlainStreams(t *testing.T) {
+	t.Parallel()
+
+	var out, errStream bytes.Buffer
+	s := stdio.Streams{Out: &out, ErrOut: &errStream}
+	p := NewPlainStreams(s)
+
+	if p.outStyle.Enabled() {
+		t.Error("outStyle enabled for NewPlainStreams")
+	}
+	if p.errStyle.Enabled() {
+		t.Error("errStyle enabled for NewPlainStreams")
+	}
+
+	if err := p.LogWarning("warn"); err != nil {
+		t.Fatalf("LogWarning() error = %v", err)
+	}
+	if strings.Contains(errStream.String(), "\033") {
+		t.Error("LogWarning() contained escape code")
+	}
+}
+
+// TestOptionsWithStreams verifies Options with Streams field.
+func TestOptionsWithStreams(t *testing.T) {
+	t.Parallel()
+
+	var out, errStream bytes.Buffer
+	s := stdio.Streams{Out: &out, ErrOut: &errStream}
+	p := New(Options{Streams: s})
+
+	if err := p.LogMessage("hello options streams"); err != nil {
+		t.Fatalf("LogMessage() error = %v", err)
+	}
+	if got := out.String(); got != "hello options streams\n" {
+		t.Errorf("out = %q, want %q", got, "hello options streams\n")
+	}
+}
+
+// TestPrinterAccessors verifies Out, Err, and Streams accessors.
+func TestPrinterAccessors(t *testing.T) {
+	t.Parallel()
+
+	var out, errStream bytes.Buffer
+	s := stdio.Streams{Out: &out, ErrOut: &errStream}
+	p := NewStreams(s)
+
+	if p.Out() != &out {
+		t.Errorf("p.Out() = %v, want %v", p.Out(), &out)
+	}
+	if p.Err() != &errStream {
+		t.Errorf("p.Err() = %v, want %v", p.Err(), &errStream)
+	}
+
+	streams := p.Streams()
+	if streams.Out != &out || streams.ErrOut != &errStream {
+		t.Errorf("p.Streams() = %+v, want out and errStream", streams)
 	}
 }

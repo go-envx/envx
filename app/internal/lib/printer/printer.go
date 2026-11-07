@@ -5,6 +5,7 @@ import (
 	"io"
 	"os"
 
+	"github.com/go-envx/envx/app/internal/lib/stdio"
 	"github.com/go-envx/envx/app/internal/lib/style"
 	"github.com/go-envx/envx/app/internal/lib/terminal"
 )
@@ -20,10 +21,14 @@ const (
 
 // Options configures a Printer's streams and color behavior.
 type Options struct {
+	// Streams supplies standard streams. When Out or Err are nil and Streams
+	// provides Out or ErrOut, they default to Streams.Out and Streams.ErrOut.
+	Streams stdio.Streams
 	// Out receives standard output: messages, tables, and JSON. Defaults to
-	// os.Stdout when nil.
+	// Streams.Out if non-nil, or os.Stdout when both are nil.
 	Out io.Writer
-	// Err receives warnings and errors. Defaults to os.Stderr when nil.
+	// Err receives warnings and errors. Defaults to Streams.ErrOut if non-nil,
+	// or os.Stderr when both are nil.
 	Err io.Writer
 	// Color forces styling on (true) or off (false) for both streams. When nil,
 	// each stream is auto-detected: color is enabled only for a terminal with
@@ -43,23 +48,55 @@ type Printer struct {
 	errStyle style.Styler
 }
 
-// New builds a Printer from opts, defaulting Out and Err to the process streams
-// and auto-detecting color per stream unless Options.Color overrides it.
+// New builds a Printer from opts. When opts.Streams is provided, its Out and
+// ErrOut are used as stream destinations if opts.Out or opts.Err are nil.
+// If neither is specified, Out and Err default to os.Stdout and os.Stderr.
+// Stream color is auto-detected unless Options.Color overrides it.
 func New(opts Options) *Printer {
 	out := opts.Out
+	if out == nil && opts.Streams.Out != nil {
+		out = opts.Streams.Out
+	}
 	if out == nil {
 		out = os.Stdout
 	}
+
 	errStream := opts.Err
+	if errStream == nil && opts.Streams.ErrOut != nil {
+		errStream = opts.Streams.ErrOut
+	}
 	if errStream == nil {
 		errStream = os.Stderr
 	}
+
 	return &Printer{
 		out:      out,
 		err:      errStream,
 		outStyle: style.New(colorEnabled(out, opts.Color)),
 		errStyle: style.New(colorEnabled(errStream, opts.Color)),
 	}
+}
+
+// NewStreams builds a Printer backed by the provided stream bundle, normalizing
+// nil streams to discard writers and auto-detecting color per stream.
+func NewStreams(streams stdio.Streams) *Printer {
+	normalized := streams.Normalized()
+	return New(Options{
+		Out: normalized.Out,
+		Err: normalized.ErrOut,
+	})
+}
+
+// NewPlainStreams builds a Printer backed by the provided stream bundle with
+// styling disabled.
+func NewPlainStreams(streams stdio.Streams) *Printer {
+	disabled := false
+	normalized := streams.Normalized()
+	return New(Options{
+		Out:   normalized.Out,
+		Err:   normalized.ErrOut,
+		Color: &disabled,
+	})
 }
 
 // NewPlain builds a Printer writing to out and err with styling disabled.
@@ -72,6 +109,24 @@ func NewPlain(out, err io.Writer) *Printer {
 // NewDiscard builds a Printer that silences all output.
 func NewDiscard() *Printer {
 	return New(Options{Out: io.Discard, Err: io.Discard})
+}
+
+// Out returns the underlying output stream destination.
+func (p *Printer) Out() io.Writer {
+	return p.out
+}
+
+// Err returns the underlying error stream destination.
+func (p *Printer) Err() io.Writer {
+	return p.err
+}
+
+// Streams returns the active standard stream bundle for this printer.
+func (p *Printer) Streams() stdio.Streams {
+	return stdio.Streams{
+		Out:    p.out,
+		ErrOut: p.err,
+	}
 }
 
 // LogBlank writes an empty line to standard error, separating a banner or
@@ -113,12 +168,12 @@ func (p *Printer) LogError(message string) error {
 }
 
 // colorEnabled decides whether to style a stream: an explicit override wins,
-// otherwise color is enabled only for a terminal with NO_COLOR unset.
+// otherwise color is enabled only for a terminal with NO_COLOR unset or empty.
 func colorEnabled(w io.Writer, override *bool) bool {
 	if override != nil {
 		return *override
 	}
-	if _, ok := os.LookupEnv("NO_COLOR"); ok {
+	if v, ok := os.LookupEnv("NO_COLOR"); ok && v != "" {
 		return false
 	}
 	if file, ok := w.(*os.File); ok {

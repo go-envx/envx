@@ -10,8 +10,8 @@ import (
 
 	"github.com/go-envx/envx/app/internal/core"
 	"github.com/go-envx/envx/app/internal/features/pack"
+	"github.com/go-envx/envx/app/internal/lib/printer"
 	"github.com/go-envx/envx/app/internal/shared/flags"
-	"github.com/go-envx/envx/app/internal/utils/printer"
 )
 
 // mockPackFactory implements Factory for unit testing.

@@ -9,7 +9,7 @@ import (
 
 	"github.com/go-envx/envx/app/internal/core"
 	"github.com/go-envx/envx/app/internal/features/env"
-	"github.com/go-envx/envx/app/internal/utils/printer"
+	"github.com/go-envx/envx/app/internal/lib/printer"
 )
 
 func writeExplainManifest(t *testing.T) (manifestPath, dir string) {
