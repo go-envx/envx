@@ -5,7 +5,7 @@ import (
 	"io"
 	"os"
 
-	"github.com/go-envx/envx/app/internal/utils/style"
+	"github.com/go-envx/envx/app/internal/lib/style"
 	"github.com/go-envx/envx/app/internal/utils/termx"
 )
 

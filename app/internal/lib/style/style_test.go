@@ -76,6 +76,7 @@ func TestStylerSeverity(t *testing.T) {
 		{"warning", severity.Warn, s.Yellow("v")},
 		{"error", severity.Error, s.Red("v")},
 		{"none", severity.None, "v"},
+		{"unknown", severity.Level(255), "v"},
 	}
 	for _, tt := range tests {
 		if got := s.Severity(tt.sev, "v"); got != tt.want {
@@ -115,6 +116,7 @@ func TestStylerColor(t *testing.T) {
 		{"cyan", ColorCyan, s.Cyan("v")},
 		{"muted", ColorMuted, s.Muted("v")},
 		{"none", ColorNone, "v"},
+		{"unknown", Color(999), "v"},
 	}
 	for _, tt := range tests {
 		if got := s.Color(tt.color, "v"); got != tt.want {
