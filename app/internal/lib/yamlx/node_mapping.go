@@ -1,6 +1,7 @@
 package yamlx
 
 import (
+	"errors"
 	"slices"
 	"strings"
 
@@ -38,6 +39,95 @@ func NewMappingNode() *yaml.Node {
 		Kind: yaml.MappingNode,
 		Tag:  "!!map",
 	}
+}
+
+// Lookup finds the value node associated with key in mapping.
+// It returns (nil, false) if mapping is nil, not a mapping node,
+// or does not contain key.
+func Lookup(mapping *yaml.Node, key string) (*yaml.Node, bool) {
+	if mapping == nil {
+		return nil, false
+	}
+	if mapping.Kind == yaml.DocumentNode && len(mapping.Content) > 0 {
+		mapping = mapping.Content[0]
+	}
+	if mapping.Kind != yaml.MappingNode {
+		return nil, false
+	}
+	for i := 0; i+1 < len(mapping.Content); i += 2 {
+		if mapping.Content[i].Value == key {
+			return mapping.Content[i+1], true
+		}
+	}
+	return nil, false
+}
+
+// Set sets key to node in mapping, replacing an existing entry's value or appending
+// a new key-value pair. It returns an error if mapping is nil or not a mapping node,
+// or if node is nil.
+func Set(mapping *yaml.Node, key string, node *yaml.Node) error {
+	if mapping == nil {
+		return errors.New("yamlx: cannot set entry on nil node")
+	}
+	if mapping.Kind == 0 ||
+		(mapping.Kind == yaml.DocumentNode && len(mapping.Content) == 0) {
+		mapping.Kind = yaml.DocumentNode
+		mapping.Content = []*yaml.Node{NewMappingNode()}
+		mapping = mapping.Content[0]
+	} else if mapping.Kind == yaml.DocumentNode {
+		mapping = mapping.Content[0]
+	}
+	if mapping.Kind != yaml.MappingNode {
+		return errors.New("yamlx: cannot set entry on non-mapping node")
+	}
+	if node == nil {
+		return errors.New("yamlx: cannot set nil node value")
+	}
+	for i := 0; i+1 < len(mapping.Content); i += 2 {
+		if mapping.Content[i].Value == key {
+			old := mapping.Content[i+1]
+			if node.HeadComment == "" &&
+				node.LineComment == "" &&
+				node.FootComment == "" {
+				node.HeadComment = old.HeadComment
+				node.LineComment = old.LineComment
+				node.FootComment = old.FootComment
+			}
+			mapping.Content[i+1] = node
+			return nil
+		}
+	}
+	mapping.Content = append(mapping.Content,
+		&yaml.Node{
+			Kind:  yaml.ScalarNode,
+			Tag:   "!!str",
+			Value: key,
+		},
+		node,
+	)
+	return nil
+}
+
+// Delete removes the entry matching key from mapping, returning true if found
+// and removed. It returns false if mapping is nil, not a mapping node, or key
+// is not present.
+func Delete(mapping *yaml.Node, key string) bool {
+	if mapping == nil {
+		return false
+	}
+	if mapping.Kind == yaml.DocumentNode && len(mapping.Content) > 0 {
+		mapping = mapping.Content[0]
+	}
+	if mapping.Kind != yaml.MappingNode {
+		return false
+	}
+	for i := 0; i+1 < len(mapping.Content); i += 2 {
+		if mapping.Content[i].Value == key {
+			deleteMappingEntryAtIndex(mapping, i)
+			return true
+		}
+	}
+	return false
 }
 
 // AppendMappingEntry appends a string key and value node pair to a mapping node.

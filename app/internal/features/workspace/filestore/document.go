@@ -8,8 +8,8 @@ import (
 	"gopkg.in/yaml.v3"
 
 	"github.com/go-envx/envx/app/internal/features/workspace"
+	"github.com/go-envx/envx/app/internal/lib/yamlx"
 	"github.com/go-envx/envx/app/internal/utils/strictyaml"
-	"github.com/go-envx/envx/app/internal/utils/yamlx"
 )
 
 const (

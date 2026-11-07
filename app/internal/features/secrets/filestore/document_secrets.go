@@ -5,7 +5,7 @@ import (
 	"strings"
 
 	"github.com/go-envx/envx/app/internal/features/secrets"
-	"github.com/go-envx/envx/app/internal/utils/yamlx"
+	"github.com/go-envx/envx/app/internal/lib/yamlx"
 	"gopkg.in/yaml.v3"
 )
 

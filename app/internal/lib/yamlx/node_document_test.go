@@ -3,7 +3,7 @@ package yamlx_test
 import (
 	"testing"
 
-	"github.com/go-envx/envx/app/internal/utils/yamlx"
+	"github.com/go-envx/envx/app/internal/lib/yamlx"
 	"gopkg.in/yaml.v3"
 )
 

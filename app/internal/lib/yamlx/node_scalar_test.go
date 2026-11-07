@@ -3,7 +3,7 @@ package yamlx_test
 import (
 	"testing"
 
-	"github.com/go-envx/envx/app/internal/utils/yamlx"
+	"github.com/go-envx/envx/app/internal/lib/yamlx"
 	"gopkg.in/yaml.v3"
 )
 
@@ -280,10 +280,10 @@ func TestIsScalarNode(t *testing.T) {
 		},
 	}
 
-	for _, tc := range tests {
-		t.Run(tc.name, func(t *testing.T) {
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
-			tc.test(t, tc.node)
+			test.test(t, test.node)
 		})
 	}
 }

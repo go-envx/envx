@@ -9,8 +9,8 @@ import (
 	"gopkg.in/yaml.v3"
 
 	"github.com/go-envx/envx/app/internal/features/env"
+	"github.com/go-envx/envx/app/internal/lib/yamlx"
 	"github.com/go-envx/envx/app/internal/utils/filex"
-	"github.com/go-envx/envx/app/internal/utils/yamlx"
 )
 
 var _ env.NamespaceRepository = (*Repository)(nil)
