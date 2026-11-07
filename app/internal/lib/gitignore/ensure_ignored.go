@@ -1,15 +1,14 @@
-package git
+package gitignore
 
 import (
 	"context"
 	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
-
-	"github.com/go-envx/envx/app/internal/utils/filex"
 )
 
 // EnsureIgnored verifies targetPath is ignored by Git or adds a local .gitignore
@@ -38,7 +37,8 @@ func EnsureIgnored(targetPath string) error {
 	}
 
 	ignorePath := filepath.Join(dir, ".gitignore")
-	data, err := filex.Read(ignorePath)
+	//nolint:gosec // ignorePath is constructed from targetPath directory.
+	data, err := os.ReadFile(ignorePath)
 	if err != nil && !errors.Is(err, os.ErrNotExist) {
 		return fmt.Errorf("reading %s: %w", ignorePath, err)
 	}
@@ -51,7 +51,7 @@ func EnsureIgnored(targetPath string) error {
 		content += "\n"
 	}
 	content += name + "\n"
-	if err := filex.WriteAtomic(ignorePath, []byte(content)); err != nil {
+	if err := writeDurable(ignorePath, []byte(content)); err != nil {
 		return fmt.Errorf("protecting file with %s: %w", ignorePath, err)
 	}
 	return nil
@@ -91,4 +91,54 @@ func hasIgnoreRule(content, name string) bool {
 		}
 	}
 	return false
+}
+
+// writeDurable writes data to path durably, preserving existing permissions
+// or defaulting to 0644. It uses temporary file creation, byte synchronization,
+// and atomic rename.
+func writeDurable(path string, data []byte) error {
+	perm, err := fileMode(path)
+	if err != nil {
+		return err
+	}
+	dir := filepath.Dir(path)
+	tmp, err := os.CreateTemp(dir, ".gitignore-*.tmp")
+	if err != nil {
+		return fmt.Errorf("creating temp file in %s: %w", dir, err)
+	}
+	tmpName := tmp.Name()
+	defer func() { _ = os.Remove(tmpName) }()
+
+	if _, err := tmp.Write(data); err != nil {
+		_ = tmp.Close()
+		return fmt.Errorf("writing temp file %s: %w", tmpName, err)
+	}
+	if err := tmp.Sync(); err != nil {
+		_ = tmp.Close()
+		return fmt.Errorf("syncing temp file %s: %w", tmpName, err)
+	}
+	if err := tmp.Chmod(perm); err != nil {
+		_ = tmp.Close()
+		return fmt.Errorf("setting permissions on %s: %w", tmpName, err)
+	}
+	if err := tmp.Close(); err != nil {
+		return fmt.Errorf("closing temp file %s: %w", tmpName, err)
+	}
+	if err := os.Rename(tmpName, path); err != nil {
+		return fmt.Errorf("renaming %s to %s: %w", tmpName, path, err)
+	}
+	return nil
+}
+
+// fileMode returns the existing permission bits for path, or 0644 default.
+func fileMode(path string) (os.FileMode, error) {
+	info, err := os.Stat(path)
+	switch {
+	case err == nil:
+		return info.Mode().Perm(), nil
+	case errors.Is(err, fs.ErrNotExist):
+		return 0o644, nil
+	default:
+		return 0, fmt.Errorf("checking permissions on %s: %w", path, err)
+	}
 }

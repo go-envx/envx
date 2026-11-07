@@ -1,4 +1,4 @@
-package git
+package gitignore
 
 import (
 	"bytes"
@@ -51,6 +51,63 @@ func TestEnsureIgnoredCreatesLocalRule(t *testing.T) {
 	}
 }
 
+func TestEnsureIgnoredAppendsToExistingWithoutTrailingNewline(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+	ignoreFile := filepath.Join(dir, ".gitignore")
+	if err := os.WriteFile(ignoreFile, []byte("existing.dat"), 0o600); err != nil {
+		t.Fatalf("WriteFile(.gitignore): %v", err)
+	}
+
+	targetPath := filepath.Join(dir, "cache.dat")
+	if err := EnsureIgnored(targetPath); err != nil {
+		t.Fatalf("EnsureIgnored(): %v", err)
+	}
+
+	data, err := os.ReadFile(ignoreFile) //nolint:gosec // path is test-local.
+	if err != nil {
+		t.Fatalf("ReadFile(.gitignore): %v", err)
+	}
+	expected := "existing.dat\ncache.dat\n"
+	if string(data) != expected {
+		t.Errorf(".gitignore = %q, want %q", string(data), expected)
+	}
+
+	// Verify permissions were preserved (0600).
+	info, err := os.Stat(ignoreFile)
+	if err != nil {
+		t.Fatalf("Stat(.gitignore): %v", err)
+	}
+	if perm := info.Mode().Perm(); perm != 0o600 {
+		t.Errorf(".gitignore perm = %o, want %o", perm, 0o600)
+	}
+}
+
+func TestEnsureIgnoredSkipsWhenAlreadyIgnoredWithSlash(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+	ignoreFile := filepath.Join(dir, ".gitignore")
+	initial := "/cache.dat\n"
+	if err := os.WriteFile(ignoreFile, []byte(initial), 0o600); err != nil {
+		t.Fatalf("WriteFile(.gitignore): %v", err)
+	}
+
+	targetPath := filepath.Join(dir, "cache.dat")
+	if err := EnsureIgnored(targetPath); err != nil {
+		t.Fatalf("EnsureIgnored(): %v", err)
+	}
+
+	data, err := os.ReadFile(ignoreFile) //nolint:gosec // path is test-local.
+	if err != nil {
+		t.Fatalf("ReadFile(.gitignore): %v", err)
+	}
+	if string(data) != initial {
+		t.Errorf(".gitignore modified: %q vs %q", string(data), initial)
+	}
+}
+
 func TestEnsureIgnoredSkipsWhenGitUnavailable(t *testing.T) {
 	gitlessPath := t.TempDir()
 	t.Setenv("PATH", gitlessPath)
@@ -99,6 +156,18 @@ func TestHasIgnoreRule(t *testing.T) {
 			content: "my-cache.dat\n",
 			target:  "cache.dat",
 			want:    false,
+		},
+		{
+			name:    "empty content",
+			content: "",
+			target:  "cache.dat",
+			want:    false,
+		},
+		{
+			name:    "match with whitespace padding",
+			content: "  cache.dat  \n",
+			target:  "cache.dat",
+			want:    true,
 		},
 	}
 
