@@ -1,6 +1,6 @@
 package style
 
-import "github.com/go-envx/envx/app/internal/utils/severity"
+import "github.com/go-envx/envx/app/internal/lib/severity"
 
 // ANSI control sequences used to open and close styling.
 const (

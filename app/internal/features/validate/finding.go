@@ -2,8 +2,8 @@ package validate
 
 import (
 	"github.com/go-envx/envx/app/internal/features/env"
+	"github.com/go-envx/envx/app/internal/lib/severity"
 	"github.com/go-envx/envx/app/internal/shared/status"
-	"github.com/go-envx/envx/app/internal/utils/severity"
 )
 
 // Severity ranks a finding.

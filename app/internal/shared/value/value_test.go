@@ -5,8 +5,8 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/go-envx/envx/app/internal/lib/severity"
 	"github.com/go-envx/envx/app/internal/shared/value"
-	"github.com/go-envx/envx/app/internal/utils/severity"
 )
 
 func TestKindString(t *testing.T) {

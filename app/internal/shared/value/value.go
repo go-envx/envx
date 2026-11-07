@@ -12,7 +12,7 @@ import (
 	"encoding/json"
 	"errors"
 
-	"github.com/go-envx/envx/app/internal/utils/severity"
+	"github.com/go-envx/envx/app/internal/lib/severity"
 )
 
 // Kind classifies the syntactic structure of an environment value.

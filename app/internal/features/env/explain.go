@@ -6,9 +6,9 @@ import (
 	"strings"
 
 	"github.com/go-envx/envx/app/internal/features/env/syntax"
+	"github.com/go-envx/envx/app/internal/lib/severity"
 	"github.com/go-envx/envx/app/internal/shared/status"
 	"github.com/go-envx/envx/app/internal/shared/value"
-	"github.com/go-envx/envx/app/internal/utils/severity"
 )
 
 // ExplainParams selects all keys or one case-insensitive key from an environment

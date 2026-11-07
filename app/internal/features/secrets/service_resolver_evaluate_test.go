@@ -3,9 +3,9 @@ package secrets
 import (
 	"testing"
 
+	"github.com/go-envx/envx/app/internal/lib/severity"
 	"github.com/go-envx/envx/app/internal/resources/cipher/naclbox"
 	"github.com/go-envx/envx/app/internal/shared/status"
-	"github.com/go-envx/envx/app/internal/utils/severity"
 )
 
 // diagnoseResolver builds a resolver over a manager that has one stored secret,

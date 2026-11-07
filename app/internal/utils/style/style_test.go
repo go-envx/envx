@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/go-envx/envx/app/internal/utils/severity"
+	"github.com/go-envx/envx/app/internal/lib/severity"
 )
 
 // TestStylerDisabled verifies a disabled Styler returns text unchanged for every
