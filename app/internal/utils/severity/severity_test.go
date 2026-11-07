@@ -51,12 +51,24 @@ func TestLevelRank(t *testing.T) {
 	t.Parallel()
 
 	if severity.None.Rank() >= severity.OK.Rank() {
-		t.Errorf("Rank None (%d) should be < OK (%d)", severity.None.Rank(), severity.OK.Rank())
+		t.Errorf(
+			"Rank None (%d) should be < OK (%d)",
+			severity.None.Rank(),
+			severity.OK.Rank(),
+		)
 	}
 	if severity.OK.Rank() >= severity.Warn.Rank() {
-		t.Errorf("Rank OK (%d) should be < Warn (%d)", severity.OK.Rank(), severity.Warn.Rank())
+		t.Errorf(
+			"Rank OK (%d) should be < Warn (%d)",
+			severity.OK.Rank(),
+			severity.Warn.Rank(),
+		)
 	}
 	if severity.Warn.Rank() >= severity.Error.Rank() {
-		t.Errorf("Rank Warn (%d) should be < Error (%d)", severity.Warn.Rank(), severity.Error.Rank())
+		t.Errorf(
+			"Rank Warn (%d) should be < Error (%d)",
+			severity.Warn.Rank(),
+			severity.Error.Rank(),
+		)
 	}
 }
