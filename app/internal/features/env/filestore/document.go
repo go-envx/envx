@@ -8,8 +8,8 @@ import (
 
 	"gopkg.in/yaml.v3"
 
+	"github.com/go-envx/envx/app/internal/lib/filex"
 	"github.com/go-envx/envx/app/internal/lib/yamlx"
-	"github.com/go-envx/envx/app/internal/utils/filex"
 )
 
 // defaultIndent is the indentation width used when a document has no nested

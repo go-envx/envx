@@ -5,6 +5,8 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/go-envx/envx/app/internal/lib/filex"
 )
 
 // TestWriteAtomicCreates verifies a new file is created with 0644 permissions
@@ -20,7 +22,7 @@ func TestWriteAtomicCreates(t *testing.T) {
 		t.Fatalf("WriteAtomic: %v", err)
 	}
 
-	got, err := Read(target)
+	got, err := filex.Read(target)
 	if err != nil {
 		t.Fatalf("reading back: %v", err)
 	}
@@ -55,7 +57,7 @@ func TestWriteAtomicOverwrites(t *testing.T) {
 		t.Fatalf("WriteAtomic: %v", err)
 	}
 
-	got, err := Read(target)
+	got, err := filex.Read(target)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -119,7 +121,7 @@ func TestWriteAtomicPrivateOverwrites(t *testing.T) {
 		t.Fatalf("WriteAtomicPrivate: %v", err)
 	}
 
-	got, err := Read(target)
+	got, err := filex.Read(target)
 	if err != nil {
 		t.Fatal(err)
 	}

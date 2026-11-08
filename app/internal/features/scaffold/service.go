@@ -9,7 +9,8 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/go-envx/envx/app/internal/utils/filex"
+	"github.com/go-envx/envx/app/internal/lib/filex"
+	atomicfile "github.com/go-envx/envx/app/internal/utils/filex"
 )
 
 // TemplatesFS embeds the create templates. Each subdirectory of templates/ is one
@@ -91,7 +92,7 @@ func (s *Service) Create(params CreateParams) (CreateResult, error) {
 				err,
 			)
 		}
-		if err := filex.WriteAtomic(dest, data); err != nil {
+		if err := atomicfile.WriteAtomic(dest, data); err != nil {
 			return CreateResult{}, err
 		}
 		written = append(written, dest)

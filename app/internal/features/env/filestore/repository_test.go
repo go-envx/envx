@@ -7,7 +7,7 @@ import (
 	"testing"
 
 	"github.com/go-envx/envx/app/internal/features/env/filestore"
-	"github.com/go-envx/envx/app/internal/utils/filex"
+	"github.com/go-envx/envx/app/internal/lib/filex"
 )
 
 func TestNew(t *testing.T) {

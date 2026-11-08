@@ -2,7 +2,7 @@ package cli
 
 import (
 	"github.com/go-envx/envx/app/internal/features/env"
-	"github.com/go-envx/envx/app/internal/utils/filex"
+	"github.com/go-envx/envx/app/internal/lib/filex"
 )
 
 // explainResultJSON is the machine-readable envelope for JSON output.

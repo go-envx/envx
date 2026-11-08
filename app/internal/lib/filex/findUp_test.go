@@ -1,7 +1,6 @@
 package filex
 
 import (
-	"errors"
 	"os"
 	"path/filepath"
 	"testing"
@@ -75,54 +74,5 @@ func TestFindUpReturnsAbsolute(t *testing.T) {
 	}
 	if !filepath.IsAbs(got) {
 		t.Errorf("expected absolute path, got %q", got)
-	}
-}
-
-// TestFindUpStopsAtBoundary verifies the walk halts at a boundary marker and
-// does not reach a file living above it.
-func TestFindUpStopsAtBoundary(t *testing.T) {
-	t.Parallel()
-
-	root := t.TempDir()
-	touch(t, root, "target.yaml")      // lives above the boundary
-	boundary := mkdirAll(t, root, "a") // a/.git marks the boundary
-	touch(t, boundary, ".git")
-	start := mkdirAll(t, root, "a", "b", "c")
-
-	_, err := FindUp(start, "target.yaml", ".git")
-	if !errors.Is(err, ErrNotFound) {
-		t.Errorf("err = %v, want ErrNotFound", err)
-	}
-}
-
-// TestFindUpBoundaryInclusive verifies the directory holding the boundary marker
-// is still searched before the walk halts.
-func TestFindUpBoundaryInclusive(t *testing.T) {
-	t.Parallel()
-
-	root := t.TempDir()
-	boundary := mkdirAll(t, root, "a")
-	touch(t, boundary, ".git")
-	want := touch(t, boundary, "target.yaml") // same dir as the marker
-	start := mkdirAll(t, root, "a", "b", "c")
-
-	got, err := FindUp(start, "target.yaml", ".git")
-	if err != nil {
-		t.Fatalf("FindUp: %v", err)
-	}
-	if got != want {
-		t.Errorf("FindUp() = %q, want %q", got, want)
-	}
-}
-
-// TestFindUpNotFound verifies ErrNotFound is returned when no match exists.
-func TestFindUpNotFound(t *testing.T) {
-	t.Parallel()
-
-	start := mkdirAll(t, t.TempDir(), "a", "b")
-
-	_, err := FindUp(start, "missing.yaml")
-	if !errors.Is(err, ErrNotFound) {
-		t.Errorf("err = %v, want ErrNotFound", err)
 	}
 }

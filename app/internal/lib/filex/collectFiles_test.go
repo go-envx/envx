@@ -5,7 +5,7 @@ import (
 	"testing"
 	"testing/fstest"
 
-	"github.com/go-envx/envx/app/internal/utils/filex"
+	"github.com/go-envx/envx/app/internal/lib/filex"
 )
 
 // TestCollectFiles verifies recursive collection of files in sorted order.

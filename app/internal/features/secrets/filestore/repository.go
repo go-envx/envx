@@ -7,7 +7,8 @@ import (
 	"strings"
 
 	"github.com/go-envx/envx/app/internal/features/secrets"
-	"github.com/go-envx/envx/app/internal/utils/filex"
+	"github.com/go-envx/envx/app/internal/lib/filex"
+	atomicfile "github.com/go-envx/envx/app/internal/utils/filex"
 )
 
 var _ secrets.Repository = (*Repository)(nil)
@@ -69,7 +70,7 @@ func (r *Repository) save(doc *document) error {
 	if err != nil {
 		return err
 	}
-	if err := filex.WriteAtomic(r.path, data); err != nil {
+	if err := atomicfile.WriteAtomic(r.path, data); err != nil {
 		return fmt.Errorf("writing secrets %s: %w", r.path, err)
 	}
 	return nil
