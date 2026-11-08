@@ -7,12 +7,7 @@
 
 ## Agent Workflow
 
-
-### Code Quality
-- **Always use the code-review agent after making changes** to review quality and correctness
-
 ### Skills Usage
 Skills are defined in `./.agents/skills`. Unless specifically asked to ignore them, skills should be heavily utilized and selected based on relevancy to the current task. Below is a list of key skills and when they should be used. Other skills may exist and should also be used, as appropriate.
 - **git-commit**: generates commit messages and opens pull request
-- **code-review**: use this skill after making changes to review code quality
 - **markdown-editor**: use this skill when writing, or editing Markdown files
