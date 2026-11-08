@@ -7,8 +7,8 @@ import (
 	"strings"
 
 	"github.com/go-envx/envx/app/internal/features/secrets"
+	"github.com/go-envx/envx/app/internal/lib/atomicfile"
 	"github.com/go-envx/envx/app/internal/lib/filex"
-	atomicfile "github.com/go-envx/envx/app/internal/utils/filex"
 )
 
 var _ secrets.Repository = (*Repository)(nil)
@@ -22,7 +22,7 @@ type Params struct {
 // Repository implements secrets.Repository against a YAML document.
 //
 // Thread/Process Safety: Writes use atomic temporary file renaming via
-// filex.WriteAtomic to prevent file corruption. In-process concurrent access
+// atomicfile.Write to prevent file corruption. In-process concurrent access
 // and multi-process concurrent updates follow last-write-wins semantics.
 // TODO: Implement advisory file locking (flock) to coordinate concurrent
 // cross-process updates.
@@ -70,7 +70,7 @@ func (r *Repository) save(doc *document) error {
 	if err != nil {
 		return err
 	}
-	if err := atomicfile.WriteAtomic(r.path, data); err != nil {
+	if err := atomicfile.Write(r.path, data); err != nil {
 		return fmt.Errorf("writing secrets %s: %w", r.path, err)
 	}
 	return nil

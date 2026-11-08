@@ -7,8 +7,8 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/go-envx/envx/app/internal/lib/atomicfile"
 	"github.com/go-envx/envx/app/internal/lib/filex"
-	atomicfile "github.com/go-envx/envx/app/internal/utils/filex"
 )
 
 // planProjects discovers each selected project's namespaces and assigns their
@@ -234,7 +234,7 @@ func writeFile(target string, data []byte) error {
 	if err := os.MkdirAll(filepath.Dir(target), 0o750); err != nil {
 		return fmt.Errorf("creating bundle directory for %s: %w", target, err)
 	}
-	return atomicfile.WriteAtomic(target, data)
+	return atomicfile.Write(target, data)
 }
 
 // exists reports whether path names an existing regular file, treating any stat

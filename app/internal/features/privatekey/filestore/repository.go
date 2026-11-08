@@ -7,9 +7,9 @@ import (
 	"strings"
 
 	"github.com/go-envx/envx/app/internal/features/privatekey"
+	"github.com/go-envx/envx/app/internal/lib/atomicfile"
 	"github.com/go-envx/envx/app/internal/lib/filex"
 	"github.com/go-envx/envx/app/internal/lib/gitignore"
-	atomicfile "github.com/go-envx/envx/app/internal/utils/filex"
 )
 
 var _ privatekey.Repository = (*Repository)(nil)
@@ -100,7 +100,7 @@ func (r *Repository) SetPrivateKey(group, privateKey string) error {
 	}
 	updated := parsed.upsert(group, privateKey)
 
-	if err := atomicfile.WriteAtomicPrivate(r.path, []byte(updated)); err != nil {
+	if err := atomicfile.WritePrivate(r.path, []byte(updated)); err != nil {
 		return err
 	}
 	return nil

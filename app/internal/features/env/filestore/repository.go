@@ -9,9 +9,9 @@ import (
 	"gopkg.in/yaml.v3"
 
 	"github.com/go-envx/envx/app/internal/features/env"
+	"github.com/go-envx/envx/app/internal/lib/atomicfile"
 	"github.com/go-envx/envx/app/internal/lib/filex"
 	"github.com/go-envx/envx/app/internal/lib/yamlx"
-	atomicfile "github.com/go-envx/envx/app/internal/utils/filex"
 )
 
 var _ env.NamespaceRepository = (*Repository)(nil)
@@ -90,7 +90,7 @@ func (r *Repository) SetOverlay(
 		return "", fmt.Errorf("marshaling %s: %w", target, err)
 	}
 	out = yamlx.PreserveBlankLines(source, out)
-	if err := atomicfile.WriteAtomic(target, out); err != nil {
+	if err := atomicfile.Write(target, out); err != nil {
 		return "", err
 	}
 	return target, nil

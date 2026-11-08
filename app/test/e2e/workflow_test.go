@@ -9,8 +9,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/go-envx/envx/app/internal/lib/atomicfile"
 	"github.com/go-envx/envx/app/internal/lib/filex"
-	atomicfile "github.com/go-envx/envx/app/internal/utils/filex"
 	"github.com/go-envx/envx/app/test/fixtures"
 )
 
@@ -35,7 +35,7 @@ func copyTree(t *testing.T, src, dst string) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if err := atomicfile.WriteAtomic(d, data); err != nil {
+		if err := atomicfile.Write(d, data); err != nil {
 			t.Fatal(err)
 		}
 	}

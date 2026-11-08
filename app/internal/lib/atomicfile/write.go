@@ -1,4 +1,4 @@
-package filex
+package atomicfile
 
 import (
 	"errors"
@@ -8,23 +8,32 @@ import (
 	"path/filepath"
 )
 
-// WriteAtomic writes data to path durably, preserving an existing file's
+// Write writes data to path durably, preserving an existing file's
 // permission bits or using 0644 for a new file. It writes to a temporary file in
-// the same directory, then renames it over the target. The temp+rename dance
-// guarantees a crash never leaves a half-written file in place; readers see
-// either the old contents or the complete new contents.
-func WriteAtomic(path string, data []byte) error {
+// the same directory, flushes data to disk with Sync, and atomically renames it
+// over the target.
+func Write(path string, data []byte) error {
 	perm, err := fileMode(path)
 	if err != nil {
 		return err
 	}
-	return writeAtomic(path, data, perm)
+	return write(path, data, perm)
 }
 
-// WriteAtomicPrivate writes data to path durably with 0600 permission bits. It
-// always applies the private mode, including when replacing an existing file.
+// WritePrivate writes data to path durably with 0600 permission bits. It always
+// applies the private mode, including when replacing an existing file.
+func WritePrivate(path string, data []byte) error {
+	return write(path, data, 0o600)
+}
+
+// WriteAtomic is an alias for Write to ease transition from utils/filex.
+func WriteAtomic(path string, data []byte) error {
+	return Write(path, data)
+}
+
+// WriteAtomicPrivate is an alias for WritePrivate to ease transition from utils/filex.
 func WriteAtomicPrivate(path string, data []byte) error {
-	return writeAtomic(path, data, 0o600)
+	return WritePrivate(path, data)
 }
 
 // fileMode returns the existing permission bits for path, or the deterministic
@@ -41,9 +50,9 @@ func fileMode(path string) (os.FileMode, error) {
 	}
 }
 
-// writeAtomic writes data to a temporary file with perm and renames it over
+// write writes data to a temporary file with perm, fsyncs it, and renames it over
 // path after the write is complete.
-func writeAtomic(path string, data []byte, perm os.FileMode) error {
+func write(path string, data []byte, perm os.FileMode) error {
 	dir := filepath.Dir(path)
 
 	tmp, err := os.CreateTemp(dir, ".envx-*.tmp")
@@ -62,6 +71,10 @@ func writeAtomic(path string, data []byte, perm os.FileMode) error {
 	if err := tmp.Chmod(perm); err != nil {
 		_ = tmp.Close()
 		return fmt.Errorf("setting permissions on %s: %w", tmpName, err)
+	}
+	if err := tmp.Sync(); err != nil {
+		_ = tmp.Close()
+		return fmt.Errorf("syncing temp file %s: %w", tmpName, err)
 	}
 	if err := tmp.Close(); err != nil {
 		return fmt.Errorf("closing temp file %s: %w", tmpName, err)

@@ -11,10 +11,10 @@ import (
 
 	"github.com/go-envx/envx/app/internal/features/emit"
 	"github.com/go-envx/envx/app/internal/features/env"
+	"github.com/go-envx/envx/app/internal/lib/atomicfile"
 	"github.com/go-envx/envx/app/internal/lib/printer"
 	"github.com/go-envx/envx/app/internal/lib/str"
 	"github.com/go-envx/envx/app/internal/shared/flags"
-	"github.com/go-envx/envx/app/internal/utils/filex"
 	"github.com/spf13/cobra"
 )
 
@@ -229,7 +229,7 @@ func outputEmit(
 
 	// The render may carry plaintext secrets, so persist it with private
 	// permissions rather than the world-readable default.
-	if err := filex.WriteAtomicPrivate(outputPath, rendered); err != nil {
+	if err := atomicfile.WritePrivate(outputPath, rendered); err != nil {
 		return err
 	}
 
