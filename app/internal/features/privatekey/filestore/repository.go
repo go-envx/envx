@@ -9,7 +9,7 @@ import (
 	"github.com/go-envx/envx/app/internal/features/privatekey"
 	"github.com/go-envx/envx/app/internal/lib/atomicfile"
 	"github.com/go-envx/envx/app/internal/lib/filex"
-	"github.com/go-envx/envx/app/internal/lib/gitignore"
+	"github.com/go-envx/envx/app/internal/lib/git"
 )
 
 var _ privatekey.Repository = (*Repository)(nil)
@@ -82,7 +82,7 @@ func (r *Repository) SetPrivateKey(group, privateKey string) error {
 		return err
 	}
 
-	if err := gitignore.EnsureIgnored(r.path); err != nil {
+	if err := git.EnsureIgnored(r.path); err != nil {
 		return err
 	}
 
