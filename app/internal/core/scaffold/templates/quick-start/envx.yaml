@@ -1,0 +1,14 @@
+environments:
+  - development
+  - production
+
+projects:
+  api-service:
+    includes:
+      - env/database
+      - env/gateway
+      - api-service/env/values
+  web-server:
+    includes:
+      - env/gateway
+      - web-server/env/values
