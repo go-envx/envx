@@ -60,7 +60,7 @@ func TestReadModifyWriteConcurrent(t *testing.T) {
 		if _, err := fmt.Sscanf(string(data), "%d", &count); err != nil {
 			return nil, err
 		}
-		return []byte(fmt.Sprintf("%d", count+1)), nil
+		return fmt.Appendf(nil, "%d", count+1), nil
 	}
 	for i := 0; i < concurrency; i++ {
 		go func() {
