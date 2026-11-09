@@ -13,6 +13,10 @@ import (
 // internal Go types.
 const SchemaDocsURL = "https://go-envx.github.io/envx/configuration/schema/"
 
+// LockFilename names the per-directory lock file that coordinates envx writes
+// to files in that directory. Adapters keep it Git-ignored.
+const LockFilename = ".envx.lock"
+
 // Workspace represents the validated workspace domain entity.
 type Workspace struct {
 	Path string
