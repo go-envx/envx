@@ -23,6 +23,8 @@ type evaluator struct {
 	engine *substituter
 	// leaves memoizes per-leaf evaluations.
 	leaves map[string]value.Evaluation
+	// leafFindings memoizes every distinct per-item finding of a leaf.
+	leafFindings map[string][]diagnostic.Finding
 	// secrets memoizes secret derivation.
 	secrets map[string]bool
 }
@@ -32,13 +34,14 @@ func newEvaluator(
 	merged *mergedEnv, resolver ValueResolver, op operation, reveal bool,
 ) *evaluator {
 	return &evaluator{
-		merged:   merged,
-		resolver: resolver,
-		op:       op,
-		reveal:   reveal,
-		engine:   newSubstituter(op, merged.symbols(resolver, op)),
-		leaves:   make(map[string]value.Evaluation),
-		secrets:  make(map[string]bool),
+		merged:       merged,
+		resolver:     resolver,
+		op:           op,
+		reveal:       reveal,
+		engine:       newSubstituter(op, merged.symbols(resolver, op)),
+		leaves:       make(map[string]value.Evaluation),
+		leafFindings: make(map[string][]diagnostic.Finding),
+		secrets:      make(map[string]bool),
 	}
 }
 
@@ -54,17 +57,21 @@ func (e *evaluator) entries(keys []string) []Entry {
 // entry evaluates one winning key.
 func (e *evaluator) entry(key string) Entry {
 	leaf := e.merged.values[key]
-	eval := e.evaluate(key, leaf)
+	eval, findings := e.evaluate(key, leaf)
+	findings = slices.Clone(findings)
+	for i := range findings {
+		findings[i] = e.locate(findings[i], key)
+	}
 	if !eval.Diagnostic.IsZero() {
-		eval.Diagnostic.Project = e.op.project
-		eval.Diagnostic.Environment = e.op.environment
-		eval.Diagnostic.Key = key
+		eval.Diagnostic = e.locate(eval.Diagnostic, key)
 	}
 	var items []string
 	raw := ""
 	if !leaf.opaque {
 		items = slices.Clone(leaf.items)
 		raw = literalOf(leaf, e.op.settings.delimiter)
+	} else if replaced, ok := e.merged.overridden[key]; ok {
+		items = slices.Clone(replaced.items)
 	}
 	origin := e.merged.origins[key]
 	origin.Shadowed = slices.Clone(origin.Shadowed)
@@ -73,29 +80,45 @@ func (e *evaluator) entry(key string) Entry {
 		Raw:            raw,
 		Items:          items,
 		Evaluation:     eval,
+		Findings:       findings,
 		Origin:         origin,
 		Secret:         e.secret(key),
 		DeclaredInBase: e.merged.declaredInBase[key],
 	}
 }
 
-// evaluate classifies one winner. Host values are opaque, values touched by
-// substitution go through the engine, and others are evaluated per item.
-func (e *evaluator) evaluate(key string, leaf leafValue) value.Evaluation {
+// locate stamps a finding with the operation's project and environment and key.
+func (e *evaluator) locate(found diagnostic.Finding, key string) diagnostic.Finding {
+	found.Project = e.op.project
+	found.Environment = e.op.environment
+	found.Key = key
+	return found
+}
+
+// evaluate classifies one winner and returns its distinct findings. Host values
+// are opaque, values touched by substitution go through the engine, and others
+// are evaluated per item.
+func (e *evaluator) evaluate(
+	key string, leaf leafValue,
+) (value.Evaluation, []diagnostic.Finding) {
 	if leaf.opaque {
 		eval := value.Evaluation{Kind: value.Config}
 		if e.reveal {
 			eval.Value = leaf.items[0]
 			eval.Resolved = true
 		}
-		return eval
+		return eval, nil
 	}
 	literal := literalOf(leaf, e.op.settings.delimiter)
 	refs := len(e.op.grammar.References(literal)) > 0
 	if refs || e.op.grammar.HasEscape(literal) {
-		return e.substitution(key, refs)
+		eval := e.substitution(key, refs)
+		if eval.Diagnostic.IsZero() {
+			return eval, nil
+		}
+		return eval, []diagnostic.Finding{eval.Diagnostic}
 	}
-	return e.leaf(key)
+	return e.leaf(key), e.leafFindings[key]
 }
 
 // substitution evaluates a value through the engine. Only a live reference
@@ -130,6 +153,7 @@ func (e *evaluator) leaf(key string) value.Evaluation {
 	}
 	leaf := e.merged.values[key]
 	eval := value.Evaluation{Kind: value.Config, Resolved: true}
+	var findings []diagnostic.Finding
 	items := make([]string, len(leaf.items))
 	for i, item := range leaf.items {
 		out := value.Evaluation{Kind: value.Config, Value: item, Resolved: true}
@@ -141,6 +165,9 @@ func (e *evaluator) leaf(key string) value.Evaluation {
 		}
 		if out.Diagnostic.Outranks(eval.Diagnostic) {
 			eval.Diagnostic = out.Diagnostic
+		}
+		if !out.Diagnostic.IsZero() && !slices.Contains(findings, out.Diagnostic) {
+			findings = append(findings, out.Diagnostic)
 		}
 		items[i] = out.Value
 		eval.Resolved = eval.Resolved && out.Resolved
@@ -155,6 +182,7 @@ func (e *evaluator) leaf(key string) value.Evaluation {
 		}
 	}
 	e.leaves[key] = eval
+	e.leafFindings[key] = findings
 	return eval
 }
 

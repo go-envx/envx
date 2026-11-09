@@ -103,6 +103,10 @@ func (s *Service) inspect(group, publicKey string) (KeypairMetadata, error) {
 	if errors.Is(err, ErrKeyNotAvailable) {
 		return metadata, nil
 	}
+	if errors.Is(err, ErrInvalidKey) {
+		metadata.PrivateKeyStatus = PrivateKeyInvalid
+		return metadata, nil
+	}
 	if err != nil {
 		return KeypairMetadata{}, fmt.Errorf(
 			"resolving private key for group %q: %w", group, err,

@@ -35,6 +35,8 @@ type memKeys struct {
 	resolves int
 	// retainErr, when set, fails every Retain.
 	retainErr error
+	// resolveErr, when set, fails every Resolve.
+	resolveErr error
 }
 
 // newMemStore returns a store seeded with groups.
@@ -116,6 +118,9 @@ func (k *memKeys) Location() string { return "mem://keys" }
 // Resolve implements secrets.KeySource, preferring overrides.
 func (k *memKeys) Resolve(group, publicKey string) (secrets.PrivateKey, error) {
 	k.resolves++
+	if k.resolveErr != nil {
+		return secrets.PrivateKey{}, k.resolveErr
+	}
 	if key, ok := k.overrides[group]; ok {
 		return key, nil
 	}

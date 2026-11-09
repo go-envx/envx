@@ -2,6 +2,7 @@ package secrets_test
 
 import (
 	"errors"
+	"fmt"
 	"testing"
 
 	"github.com/go-envx/envx/app/internal/core/secrets"
@@ -71,6 +72,18 @@ func TestInspectKeypair(t *testing.T) {
 	if err != nil || meta.PrivateKeyStatus != secrets.PrivateKeyNotAvailable {
 		t.Errorf("missing key: %+v, %v", meta, err)
 	}
+
+	f.keys.resolveErr = fmt.Errorf("%w: empty override", secrets.ErrInvalidKey)
+	meta, err = f.service.InspectKeypair("api")
+	if err != nil || meta.PrivateKeyStatus != secrets.PrivateKeyInvalid {
+		t.Errorf("malformed key: %+v, %v", meta, err)
+	}
+
+	f.keys.resolveErr = errors.New("keyring unreadable")
+	if _, err = f.service.InspectKeypair("api"); err == nil {
+		t.Error("unreadable keyring: InspectKeypair succeeded, want error")
+	}
+	f.keys.resolveErr = nil
 
 	_, err = f.service.InspectKeypair("missing")
 	mustErrorIs(t, err, secrets.ErrGroupNotFound)

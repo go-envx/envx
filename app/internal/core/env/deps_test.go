@@ -47,12 +47,16 @@ type fakeResolver struct {
 	reveal bool
 	// plaintext maps references to their plaintext.
 	plaintext map[string]string
+	// codes maps references to the finding code they report.
+	codes map[string]diagnostic.Code
 }
 
 // fakeOpener opens fakeResolvers and records each call.
 type fakeOpener struct {
 	// plaintext is handed to every opened resolver.
 	plaintext map[string]string
+	// codes is handed to every opened resolver.
+	codes map[string]diagnostic.Code
 	// calls counts opened resolvers.
 	calls int
 	// reveal records the last reveal policy.
@@ -146,6 +150,11 @@ func (r fakeResolver) Evaluate(raw, _ string) value.Evaluation {
 		return value.Evaluation{Kind: value.Config, Value: raw, Resolved: true}
 	}
 	eval := value.Evaluation{Kind: value.Secret, Value: raw}
+	if code, ok := r.codes[raw]; ok {
+		def, _ := diagnostic.Lookup(code)
+		eval.Diagnostic = diagnostic.Finding{Code: code, Level: def.Level, Message: "m"}
+		return eval
+	}
 	plaintext, ok := r.plaintext[raw]
 	if !ok {
 		eval.Diagnostic = diagnostic.Finding{
@@ -165,7 +174,7 @@ func (r fakeResolver) Evaluate(raw, _ string) value.Evaluation {
 func (o *fakeOpener) open(reveal bool, host hostenv.Snapshot) (ValueResolver, error) {
 	o.calls++
 	o.reveal, o.host = reveal, host
-	return fakeResolver{reveal: reveal, plaintext: o.plaintext}, nil
+	return fakeResolver{reveal: reveal, plaintext: o.plaintext, codes: o.codes}, nil
 }
 
 // run implements Executor.

@@ -4,6 +4,7 @@ import (
 	"maps"
 	"slices"
 
+	"github.com/go-envx/envx/app/internal/core/diagnostic"
 	"github.com/go-envx/envx/app/internal/core/value"
 	"github.com/go-envx/envx/app/internal/core/workspace"
 )
@@ -41,10 +42,14 @@ type Entry struct {
 	// Raw is the winning value as declared, with list items joined; empty for a
 	// host value.
 	Raw string
-	// Items are the raw scalar items before joining; nil for a host value.
+	// Items are the raw namespace items before joining. For a host winner they
+	// are the replaced namespace value's items, or nil for a host-only key.
 	Items []string
 	// Evaluation is the value's classification and diagnosis.
 	Evaluation value.Evaluation
+	// Findings lists every distinct finding in item order; Evaluation holds the
+	// most severe.
+	Findings []diagnostic.Finding
 	// Origin records the winning and shadowed sources.
 	Origin Origin
 	// Secret reports whether the value derives from a secret, directly or

@@ -150,9 +150,12 @@ func TestExplainHostValues(t *testing.T) {
 	s := explainFixture(t, "PASSWORD=from-host", "HOST=h", "HOST_ONLY=x")
 	entries := explainEntries(t, s, ExplainParams{})
 	password := entries["PASSWORD"]
-	if password.Raw != "" || password.Items != nil || password.Evaluation.Value != "" ||
+	if password.Raw != "" || password.Evaluation.Value != "" ||
 		password.Evaluation.Resolved || !password.Secret {
 		t.Errorf("masked host entry = %+v", password)
+	}
+	if !slices.Equal(password.Items, []string{"secret://db/password"}) {
+		t.Errorf("PASSWORD items = %v, want the replaced namespace items", password.Items)
 	}
 	if entries["HOST"].Secret || entries["HOST"].Raw != "" {
 		t.Errorf("host override of config = %+v", entries["HOST"])
@@ -174,6 +177,53 @@ func TestExplainHostValues(t *testing.T) {
 	})
 	if !overloaded["URL"].Secret {
 		t.Error("URL should derive from the namespace secret under overload")
+	}
+}
+
+// TestExplainFindings verifies an entry lists every distinct item finding,
+// located, while its evaluation keeps the most severe.
+func TestExplainFindings(t *testing.T) {
+	t.Parallel()
+
+	namespaces := newFakeNamespaces().base(t, appInclude, `
+		mixed: [secret://db/plain, secret://db/missing, secret://db/missing]
+		loop: "{{LOOP}}"
+		host: db.local
+	`)
+	opener := &fakeOpener{codes: map[string]diagnostic.Code{
+		"secret://db/plain": diagnostic.SecretIsNotEncrypted,
+	}}
+	s := newService(t, testWorkspace(), Dependencies{
+		Namespaces:   namespaces,
+		OpenResolver: opener.open,
+	})
+
+	entries := explainEntries(t, s, ExplainParams{})
+
+	mixed := entries["MIXED"]
+	var got []diagnostic.Code
+	for _, found := range mixed.Findings {
+		got = append(got, found.Code)
+		if found.Project != "app" || found.Environment != "development" ||
+			found.Key != "MIXED" {
+			t.Errorf("finding not located: %+v", found)
+		}
+	}
+	want := []diagnostic.Code{
+		diagnostic.SecretIsNotEncrypted, diagnostic.SecretReferenceNotFound,
+	}
+	if !slices.Equal(got, want) {
+		t.Errorf("MIXED findings = %v, want %v", got, want)
+	}
+	if mixed.Evaluation.Diagnostic != mixed.Findings[0] {
+		t.Errorf("MIXED evaluation = %+v, want the first finding", mixed.Evaluation)
+	}
+	if loop := entries["LOOP"].Findings; len(loop) != 1 ||
+		loop[0].Code != diagnostic.CircularVariableReference {
+		t.Errorf("LOOP findings = %+v", loop)
+	}
+	if host := entries["HOST"].Findings; host != nil {
+		t.Errorf("HOST findings = %+v, want none", host)
 	}
 }
 
