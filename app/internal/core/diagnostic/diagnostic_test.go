@@ -7,6 +7,30 @@ import (
 	"github.com/go-envx/envx/app/internal/lib/severity"
 )
 
+func TestDefinitions_ReturnsCopy(t *testing.T) {
+	t.Parallel()
+
+	defs := diagnostic.Definitions()
+	defs[0].Summary = "mutated"
+	if diagnostic.Definitions()[0].Summary == "mutated" {
+		t.Error("Definitions() exposed internal registry")
+	}
+}
+
+func TestLookup(t *testing.T) {
+	t.Parallel()
+
+	def, ok := diagnostic.Lookup(diagnostic.PrivateKeyIsUnavailable)
+	if !ok || def.Level != severity.Warn {
+		t.Errorf("Lookup(PrivateKeyIsUnavailable) = %+v, %v", def, ok)
+	}
+	for _, code := range []diagnostic.Code{diagnostic.OK, "NOPE", ""} {
+		if _, ok := diagnostic.Lookup(code); ok {
+			t.Errorf("Lookup(%q) ok = true, want false", code)
+		}
+	}
+}
+
 func TestFinding_IsZero(t *testing.T) {
 	t.Parallel()
 
