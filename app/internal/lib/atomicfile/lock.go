@@ -37,29 +37,30 @@ func getPathMutex(canonicalPath string) *sync.Mutex {
 	return mu
 }
 
-// Lock acquires an exclusive lock on path (using an adjacent lockfile at
-// path + ".lock"). It blocks until the lock is acquired or an error occurs.
-func Lock(path string) (*FileLock, error) {
-	absPath, err := filepath.Abs(path)
+// Lock acquires an exclusive lock on the lock file at lockPath, creating it if
+// needed. Callers choose the lock path so one lock may guard several files.
+// Locks are not reentrant. It blocks until the lock is acquired or an error
+// occurs.
+func Lock(lockPath string) (*FileLock, error) {
+	absPath, err := filepath.Abs(lockPath)
 	if err != nil {
-		return nil, fmt.Errorf("resolving absolute path %s: %w", path, err)
+		return nil, fmt.Errorf("resolving absolute path %s: %w", lockPath, err)
 	}
 
 	mu := getPathMutex(absPath)
 	mu.Lock()
 
-	lockFilePath := filepath.Clean(absPath + ".lock")
-	//nolint:gosec // G304: lock file path is constructed from validated target path
-	f, err := os.OpenFile(lockFilePath, os.O_CREATE|os.O_RDWR, 0o600)
+	//nolint:gosec // G304: lock path is chosen by the calling adapter
+	f, err := os.OpenFile(absPath, os.O_CREATE|os.O_RDWR, 0o600)
 	if err != nil {
 		mu.Unlock()
-		return nil, fmt.Errorf("opening lock file %s: %w", lockFilePath, err)
+		return nil, fmt.Errorf("opening lock file %s: %w", absPath, err)
 	}
 
 	if err := lockFile(f); err != nil {
 		_ = f.Close()
 		mu.Unlock()
-		return nil, fmt.Errorf("locking %s: %w", lockFilePath, err)
+		return nil, fmt.Errorf("locking %s: %w", absPath, err)
 	}
 
 	return &FileLock{
@@ -90,12 +91,14 @@ func (fl *FileLock) Unlock() error {
 	return unlockErr
 }
 
-// ReadModifyWrite executes fn under an exclusive lock on path.
+// ReadModifyWrite executes fn while holding the lock at lockPath.
 // It reads the current contents of path (or an empty byte slice if not found),
 // executes fn with the read data, and if fn returns without error, atomically
 // writes the updated data back to path.
-func ReadModifyWrite(path string, fn func(data []byte) ([]byte, error)) error {
-	fl, err := Lock(path)
+func ReadModifyWrite(
+	lockPath, path string, fn func(data []byte) ([]byte, error),
+) error {
+	fl, err := Lock(lockPath)
 	if err != nil {
 		return fmt.Errorf("locking for read-modify-write on %s: %w", path, err)
 	}

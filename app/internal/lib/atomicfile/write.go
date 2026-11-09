@@ -6,6 +6,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"runtime"
 )
 
 // Write writes data to path durably, preserving an existing file's
@@ -81,6 +82,24 @@ func write(path string, data []byte, perm os.FileMode) error {
 	}
 	if err := os.Rename(tmpName, path); err != nil {
 		return fmt.Errorf("renaming %s to %s: %w", tmpName, path, err)
+	}
+	return syncDir(dir)
+}
+
+// syncDir flushes a directory entry so a completed rename survives a crash.
+// Windows cannot sync directory handles, and NTFS journals renames.
+func syncDir(dir string) error {
+	if runtime.GOOS == "windows" {
+		return nil
+	}
+	//nolint:gosec // G304: dir is the parent of a caller-provided target path
+	handle, err := os.Open(dir)
+	if err != nil {
+		return fmt.Errorf("opening directory %s: %w", dir, err)
+	}
+	defer func() { _ = handle.Close() }()
+	if err := handle.Sync(); err != nil {
+		return fmt.Errorf("syncing directory %s: %w", dir, err)
 	}
 	return nil
 }

@@ -15,16 +15,18 @@ func TestLockUnlock(t *testing.T) {
 
 	dir := t.TempDir()
 	target := filepath.Join(dir, "lock_test.txt")
+	lockFilePath := filepath.Join(dir, ".test.lock")
 
-	fl, err := atomicfile.Lock(target)
+	fl, err := atomicfile.Lock(lockFilePath)
 	if err != nil {
 		t.Fatalf("Lock: %v", err)
 	}
 
-	// Verify lockfile exists
-	lockFilePath := target + ".lock"
 	if _, err := os.Stat(lockFilePath); err != nil {
 		t.Errorf("lock file missing: %v", err)
+	}
+	if _, err := os.Stat(target); err == nil {
+		t.Error("Lock created an unrelated target file")
 	}
 
 	if err := fl.Unlock(); err != nil {
@@ -42,6 +44,7 @@ func TestReadModifyWriteConcurrent(t *testing.T) {
 
 	dir := t.TempDir()
 	target := filepath.Join(dir, "counter.txt")
+	lockPath := filepath.Join(dir, ".test.lock")
 
 	// Initialize file with 0
 	if err := atomicfile.Write(target, []byte("0")); err != nil {
@@ -52,18 +55,17 @@ func TestReadModifyWriteConcurrent(t *testing.T) {
 	var wg sync.WaitGroup
 	wg.Add(concurrency)
 
+	increment := func(data []byte) ([]byte, error) {
+		var count int
+		if _, err := fmt.Sscanf(string(data), "%d", &count); err != nil {
+			return nil, err
+		}
+		return []byte(fmt.Sprintf("%d", count+1)), nil
+	}
 	for i := 0; i < concurrency; i++ {
 		go func() {
 			defer wg.Done()
-			err := atomicfile.ReadModifyWrite(target, func(data []byte) ([]byte, error) {
-				var count int
-				_, err := fmt.Sscanf(string(data), "%d", &count)
-				if err != nil {
-					return nil, err
-				}
-				count++
-				return []byte(fmt.Sprintf("%d", count)), nil
-			})
+			err := atomicfile.ReadModifyWrite(lockPath, target, increment)
 			if err != nil {
 				t.Errorf("ReadModifyWrite error: %v", err)
 			}
@@ -93,8 +95,9 @@ func TestReadModifyWriteNewFile(t *testing.T) {
 
 	dir := t.TempDir()
 	target := filepath.Join(dir, "new_file.txt")
+	lockPath := filepath.Join(dir, ".test.lock")
 
-	err := atomicfile.ReadModifyWrite(target, func(data []byte) ([]byte, error) {
+	err := atomicfile.ReadModifyWrite(lockPath, target, func(data []byte) ([]byte, error) {
 		if len(data) != 0 {
 			return nil, fmt.Errorf("expected empty data, got %q", string(data))
 		}
