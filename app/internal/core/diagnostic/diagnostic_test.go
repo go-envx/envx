@@ -31,6 +31,32 @@ func TestLookup(t *testing.T) {
 	}
 }
 
+func TestFinding_Outranks(t *testing.T) {
+	t.Parallel()
+
+	var zero diagnostic.Finding
+	warn := diagnostic.Finding{Code: "W", Level: severity.Warn}
+	errFinding := diagnostic.Finding{Code: "E", Level: severity.Error}
+
+	cases := []struct {
+		name  string
+		f     diagnostic.Finding
+		other diagnostic.Finding
+		want  bool
+	}{
+		{name: "zero never outranks", f: zero, other: zero, want: false},
+		{name: "any finding outranks zero", f: warn, other: zero, want: true},
+		{name: "higher level outranks", f: errFinding, other: warn, want: true},
+		{name: "lower level does not", f: warn, other: errFinding, want: false},
+		{name: "equal level does not", f: warn, other: warn, want: false},
+	}
+	for _, tc := range cases {
+		if got := tc.f.Outranks(tc.other); got != tc.want {
+			t.Errorf("%s: Outranks = %v, want %v", tc.name, got, tc.want)
+		}
+	}
+}
+
 func TestFinding_IsZero(t *testing.T) {
 	t.Parallel()
 

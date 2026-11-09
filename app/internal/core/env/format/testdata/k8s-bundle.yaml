@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: Secret
+metadata:
+  name: api-config-secrets
+type: Opaque
+data:
+  config.json: ewogICJBUElfS0VZIjogImFiYzEyMyIsCiAgIkFQUF9OQU1FIjogImFwaSIsCiAgIkRCX1BBU1NXT1JEIjogInMzY3IzdCIsCiAgIlBPUlQiOiAiNTQzMiIKfQo=

@@ -49,3 +49,12 @@ type Finding struct {
 func (f Finding) IsZero() bool {
 	return f == Finding{}
 }
+
+// Outranks reports whether f is more severe than other. A zero finding
+// outranks nothing, and any other finding outranks a zero one.
+func (f Finding) Outranks(other Finding) bool {
+	if f.IsZero() {
+		return false
+	}
+	return other.IsZero() || f.Level.Rank() > other.Level.Rank()
+}
