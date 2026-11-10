@@ -61,7 +61,7 @@ func (f *fixture) service(t *testing.T) *Service {
 }
 
 // validate runs Validate and fails the test on error.
-func (f *fixture) validate(t *testing.T, params Params) Report {
+func (f *fixture) validate(t *testing.T, params ValidateParams) Report {
 	t.Helper()
 	report, err := f.service(t).Validate(params)
 	if err != nil {

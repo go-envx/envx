@@ -1,68 +1,75 @@
 // Package cli implements "envx validate", the workspace-wide gate that resolves
 // every project against every declared environment and checks the secrets store.
 // It selects which checks run, delegates the diagnosis to
-// internal/features/validate, renders the findings, and returns a non-zero exit
+// internal/core/validate, renders the findings, and returns a non-zero exit
 // when the graded report fails.
 package cli
 
 import (
-	"github.com/go-envx/envx/app/internal/features/validate"
-	"github.com/go-envx/envx/app/internal/shared/flags"
+	"strings"
+
+	"github.com/go-envx/envx/app/internal/core/diagnostic"
+	"github.com/go-envx/envx/app/internal/core/validate"
+	"github.com/go-envx/envx/app/internal/lib/cliflags"
+	"github.com/spf13/cobra"
 )
 
 // Flags local to the validate command.
 var (
 	// strictFlag fails validation on warnings as well as errors.
-	strictFlag = flags.Spec[bool]{
+	strictFlag = cliflags.Spec[bool]{
 		Name:  "strict",
 		Usage: "fail on warnings as well as errors",
 	}
 
-	// requireOverlaysFlag requires every environment overlay file in the namespace to
-	// exist.
-	requireOverlaysFlag = flags.Spec[bool]{
-		Name:  "require-overlays",
-		Env:   "ENVX_REQUIRE_OVERLAYS",
-		Usage: "require all environment overlay files to exist",
-	}
-
-	// prefixFlag is prepended to every resolved env-var key.
-	prefixFlag = flags.Spec[string]{
-		Name:  "prefix",
-		Env:   "ENVX_PREFIX",
-		Usage: "prefix prepended to every key",
-	}
-
-	// suffixFlag is appended to every resolved env-var key.
-	suffixFlag = flags.Spec[string]{
-		Name:  "suffix",
-		Env:   "ENVX_SUFFIX",
-		Usage: "suffix appended to every key",
-	}
-
-	// delimiterFlag joins a list-valued leaf into a single env var.
-	delimiterFlag = flags.Spec[string]{
-		Name:  "delimiter",
-		Env:   "ENVX_DELIMITER",
-		Usage: `string used to join list values (default ",")`,
-	}
-
-	// overloadFlag lets file values override existing OS env vars.
-	overloadFlag = flags.Spec[bool]{
-		Name:  "overload",
-		Env:   "ENVX_OVERLOAD",
-		Usage: "file values override OS env vars",
-	}
-
-	// referencePatternFlag overrides the {{VAR}} reference syntax with a regex.
-	referencePatternFlag = flags.Spec[string]{
-		Name:  "reference-pattern",
-		Env:   "ENVX_REFERENCE_PATTERN",
-		Usage: "regex overriding the {{VAR}} reference syntax (group 1 is the name)",
+	// outputFlag selects the rendering format.
+	outputFlag = cliflags.Spec[string]{
+		Name:  "output",
+		Short: "o",
+		Usage: "output format: table|json",
 	}
 )
 
+// bindSelectionFlags registers one boolean selection flag per check.
+func bindSelectionFlags(cmd *cobra.Command) {
+	for _, check := range validate.Checks() {
+		selectionFlag(check).Bind(cmd)
+	}
+}
+
+// selectedChecks returns the codes whose selection flags were set, in catalog
+// order. An empty result means no selection was made, which the service reads
+// as "run every check".
+func selectedChecks(cmd *cobra.Command) []diagnostic.Code {
+	var selected []diagnostic.Code
+	for _, check := range validate.Checks() {
+		if selectionFlag(check).Value(cmd) {
+			selected = append(selected, check.Code)
+		}
+	}
+	return selected
+}
+
+// selectionFlag describes the flag that selects check. Its name is the check
+// code's kebab-case form, matching its envx.yaml severity key so the flag and
+// the config property can never drift apart.
+func selectionFlag(check validate.Check) cliflags.Spec[bool] {
+	return cliflags.Spec[bool]{
+		Name:  flagName(check.Code),
+		Usage: "run only this check: " + check.Summary + " [" + string(check.Group) + "]",
+	}
+}
+
+// flagName returns a check's selection flag name: the lowercased code with
+// underscores turned into dashes, e.g. SECRET_IS_NOT_ENCRYPTED ->
+// "secret-is-not-encrypted". It is the kebab-case twin of the code's config
+// severity key, so `validate --secret-is-not-encrypted` selects exactly the check
+// whose severity is set by `validate.secret_is_not_encrypted` in envx.yaml.
+func flagName(code diagnostic.Code) string {
+	return strings.ReplaceAll(strings.ToLower(string(code)), "_", "-")
+}
+
 // Factory defines the capabilities required for the validate command.
 type Factory interface {
-	ValidateService(configPath string) (*validate.Service, error)
+	NewValidateService(configPath string) (*validate.Service, error)
 }

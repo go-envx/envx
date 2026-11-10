@@ -4,12 +4,11 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/go-envx/envx/app/internal/features/validate"
+	"github.com/go-envx/envx/app/internal/core/validate"
+	workspacecli "github.com/go-envx/envx/app/internal/core/workspace/cli"
 	"github.com/go-envx/envx/app/internal/lib/printer"
 	"github.com/go-envx/envx/app/internal/lib/str"
-	"github.com/go-envx/envx/app/internal/shared/flags"
 	"github.com/spf13/cobra"
-	"github.com/spf13/pflag"
 )
 
 // errValidationFailed is returned when the graded report fails, so the process
@@ -60,12 +59,6 @@ const (
 
 // NewValidateCommand builds the "validate" command.
 func NewValidateCommand(f Factory) *cobra.Command {
-	// Register one boolean selection flag per check, named identically to the
-	// check's envx.yaml severity key (kebab-case), so --secret-is-not-encrypted
-	// selects the check configured by validate.secret_is_not_encrypted. The value
-	// pointers are read back into the selected-check set inside RunE.
-	selections := make(map[string]*bool)
-
 	cmd := &cobra.Command{
 		Use:     validateUsage,
 		Short:   validateShort,
@@ -74,14 +67,13 @@ func NewValidateCommand(f Factory) *cobra.Command {
 		Args:    cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			// Extract command-line flag values.
-			fs := cmd.Flags()
-			configPath := flags.Config.Get(fs)
-			strict := strictFlag.Get(fs)
-			output := flags.Output.Get(fs)
-			envOptions := getEnvOptions(fs)
+			configPath := workspacecli.ConfigPath(cmd)
+			strict := strictFlag.Value(cmd)
+			output := outputFlag.Value(cmd)
+			settings := workspacecli.Settings(cmd)
 
 			// Obtain the validate service using the configuration path.
-			validateService, err := f.ValidateService(configPath)
+			validateService, err := f.NewValidateService(configPath)
 			if err != nil {
 				return err
 			}
@@ -90,13 +82,12 @@ func NewValidateCommand(f Factory) *cobra.Command {
 			// flags were set.
 			report, err := validateService.Validate(validate.ValidateParams{
 				Strict:   strict,
-				Selected: selectedChecks(selections),
-				Options:  envOptions,
+				Selected: selectedChecks(cmd),
+				Options:  settings,
 			})
 			if err != nil {
 				return err
 			}
-			report.Sort()
 
 			// Initialize the console printer for output.
 			console := printer.New(printer.Options{
@@ -118,14 +109,12 @@ func NewValidateCommand(f Factory) *cobra.Command {
 		},
 	}
 
-	// Bind the command-line flags.
-	{
-		fs := cmd.Flags()
-		flags.Bind(fs, &flags.Output)
-		flags.Bind(fs, &strictFlag)
-		bindEnvOptionsFlags(fs)
-		bindSelectionFlags(fs, selections)
-	}
+	// Bind the command-line flags. The environment is not among the settings:
+	// validate diagnoses every declared environment rather than selecting one.
+	outputFlag.Bind(cmd)
+	strictFlag.Bind(cmd)
+	workspacecli.BindSettings(cmd, "env")
+	bindSelectionFlags(cmd)
 
 	return cmd
 }
@@ -154,28 +143,4 @@ func outputValidate(
 	default:
 		return fmt.Errorf("invalid output format %q (want table or json)", format)
 	}
-}
-
-// bindSelectionFlags adds one boolean selection flag per check, binding each
-// into selections keyed by the check's canonical code so RunE can read which were
-// set. The flag name is the check code's kebab-case form, matching its envx.yaml
-// severity key so the flag and the config property can never drift apart.
-func bindSelectionFlags(fs *pflag.FlagSet, selections map[string]*bool) {
-	for _, check := range validate.Checks() {
-		usage := "run only this check: " + check.Summary + " [" + string(check.Group) + "]"
-		selections[check.Code] = fs.Bool(validate.FlagName(check.Code), false, usage)
-	}
-}
-
-// selectedChecks collapses the bound selection-flag pointers into a set of the
-// codes whose flags were set. An empty result means no selection was made, which
-// the service reads as "run every check".
-func selectedChecks(selections map[string]*bool) map[string]bool {
-	selected := make(map[string]bool)
-	for code, value := range selections {
-		if *value {
-			selected[code] = true
-		}
-	}
-	return selected
 }

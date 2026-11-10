@@ -59,7 +59,7 @@ func NewRootCmd(info BuildInfo) (*cobra.Command, error) {
 		envcli.NewEmitCommand(appFactory),
 		envcli.NewDiffCommand(appFactory),
 		secretscli.NewSecretsCommand(appFactory),
-		validatecli.NewValidateCommand(appFactory),
+		validatecli.NewValidateCommand(app.Factory{}),
 	)
 	return root, nil
 }

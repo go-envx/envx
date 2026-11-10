@@ -3,7 +3,8 @@ package cli
 import (
 	"fmt"
 
-	"github.com/go-envx/envx/app/internal/features/validate"
+	"github.com/go-envx/envx/app/internal/core/diagnostic"
+	"github.com/go-envx/envx/app/internal/core/validate"
 	"github.com/go-envx/envx/app/internal/lib/printer"
 )
 
@@ -24,7 +25,7 @@ func (r validateRenderer) table(report validate.Report) error {
 		rows = append(rows, []printer.Cell{
 			{Text: r.scope(f)},
 			{Text: f.Key},
-			{Text: f.Code, Severity: f.Severity},
+			{Text: string(f.Code), Severity: f.Level},
 			{Text: f.Message},
 		})
 	}
@@ -47,7 +48,7 @@ func (r validateRenderer) table(report validate.Report) error {
 // for a reference finding, or "secrets" for a store-level finding. "store" is an
 // internal term; users know the secrets store as secrets.yaml, so the scope reads
 // "secrets" rather than exposing the implementation concept.
-func (r validateRenderer) scope(f validate.Finding) string {
+func (r validateRenderer) scope(f diagnostic.Finding) string {
 	if f.Project == "" && f.Environment == "" {
 		return "secrets"
 	}

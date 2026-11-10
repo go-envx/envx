@@ -22,7 +22,7 @@ func TestValidateDiagnosesEveryProjectEnvironment(t *testing.T) {
 	}
 	prefix := "APP_"
 
-	report := f.validate(t, Params{Options: workspace.Settings{Prefix: &prefix}})
+	report := f.validate(t, ValidateParams{Options: workspace.Settings{Prefix: &prefix}})
 
 	type call struct {
 		project     string
@@ -100,7 +100,7 @@ func TestValidateGradesBySeverity(t *testing.T) {
 			overlayOnly.DeclaredInBase = false
 			f.explainer.entries["api"] = []env.Entry{overlayOnly}
 
-			report := f.validate(t, Params{Strict: tt.strict})
+			report := f.validate(t, ValidateParams{Strict: tt.strict})
 
 			if report.Errors != tt.errors || report.Warnings != tt.warnings ||
 				report.Failed != tt.failed {
@@ -134,7 +134,7 @@ func TestValidateReportsStoreFindings(t *testing.T) {
 		GroupsMissingPublicKey: []string{"orphaned"},
 	}
 
-	report := f.validate(t, Params{})
+	report := f.validate(t, ValidateParams{})
 
 	type found struct {
 		code diagnostic.Code
@@ -211,7 +211,7 @@ func TestValidateReportsStoreProblemsOnce(t *testing.T) {
 			}
 			f.inspector.audit = tt.audit
 
-			report := f.validate(t, Params{})
+			report := f.validate(t, ValidateParams{})
 
 			if n := count(report.Findings, tt.code); n != 1 {
 				t.Errorf("%s reported %d times, want once: %v",
@@ -238,7 +238,7 @@ func TestValidateDeduplicatesFindings(t *testing.T) {
 			Secrets:                []secrets.StoredSecret{leaked, leaked},
 			GroupsMissingPublicKey: []string{"bare", "bare"},
 		}
-		report := f.validate(t, Params{})
+		report := f.validate(t, ValidateParams{})
 		for _, code := range []diagnostic.Code{
 			diagnostic.SecretIsNotEncrypted,
 			diagnostic.SecretIsNotReferenced,
@@ -255,7 +255,7 @@ func TestValidateDeduplicatesFindings(t *testing.T) {
 		f.explainer.entries["api"] = []env.Entry{
 			failing("PASSWORD", diagnostic.SecretIsNotEncrypted, "secret://shared/pw"),
 		}
-		report := f.validate(t, Params{
+		report := f.validate(t, ValidateParams{
 			Selected: []diagnostic.Code{diagnostic.SecretReferenceNotFound},
 		})
 		if len(report.Findings) != 0 {
@@ -278,7 +278,7 @@ func TestValidateReportsMaskedResolutionFindings(t *testing.T) {
 	})
 	f.explainer.entries["api"] = []env.Entry{mixed}
 
-	report := f.validate(t, Params{
+	report := f.validate(t, ValidateParams{
 		Selected: []diagnostic.Code{diagnostic.SecretReferenceNotFound},
 	})
 
@@ -299,7 +299,7 @@ func TestValidateCountsOverriddenReferences(t *testing.T) {
 		stored("shared", "pw", true, false),
 	}}
 
-	report := f.validate(t, Params{})
+	report := f.validate(t, ValidateParams{})
 
 	if len(report.Findings) != 0 {
 		t.Errorf("findings = %v, want none", codes(report.Findings))
@@ -365,7 +365,7 @@ func TestValidateSelectsChecks(t *testing.T) {
 				GroupsMissingPublicKey: []string{"bare"},
 			}
 
-			report := f.validate(t, Params{Selected: tt.selected})
+			report := f.validate(t, ValidateParams{Selected: tt.selected})
 
 			if f.envOpens != tt.envOpens {
 				t.Errorf("explainer opened %d times, want %d", f.envOpens, tt.envOpens)
@@ -404,7 +404,7 @@ func TestValidateSortsFindings(t *testing.T) {
 	}
 	f.ws.ValidateSeverities = map[string]string{"secret_is_not_referenced": "off"}
 
-	report := f.validate(t, Params{})
+	report := f.validate(t, ValidateParams{})
 
 	var got []string
 	for _, found := range report.Findings {
@@ -427,13 +427,13 @@ func TestValidateFails(t *testing.T) {
 	boom := errors.New("boom")
 	tests := []struct {
 		name   string
-		params Params
+		params ValidateParams
 		setup  func(f *fixture)
 		want   error
 	}{
 		{
 			name:   "unknown check",
-			params: Params{Selected: []diagnostic.Code{"NOPE"}},
+			params: ValidateParams{Selected: []diagnostic.Code{"NOPE"}},
 			setup:  func(*fixture) {},
 			want:   ErrUnknownCheck,
 		},
@@ -485,7 +485,7 @@ func TestValidateOpenerFailures(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			if _, err := service.Validate(Params{}); !errors.Is(err, boom) {
+			if _, err := service.Validate(ValidateParams{}); !errors.Is(err, boom) {
 				t.Errorf("err = %v, want %v", err, boom)
 			}
 		})

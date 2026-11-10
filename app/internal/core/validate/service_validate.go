@@ -12,8 +12,8 @@ import (
 	"github.com/go-envx/envx/app/internal/lib/severity"
 )
 
-// Params selects checks and the verdict policy for one run.
-type Params struct {
+// ValidateParams selects checks and the verdict policy for one run.
+type ValidateParams struct {
 	// Strict fails the run on warnings as well as errors.
 	Strict bool
 	// Selected lists the checks to run; empty runs every check.
@@ -37,7 +37,7 @@ type Report struct {
 // run is the state of one Validate call.
 type run struct {
 	// params are the normalized parameters.
-	params Params
+	params ValidateParams
 	// report accumulates graded findings.
 	report Report
 	// seen records reported findings, ignoring messages.
@@ -49,7 +49,7 @@ type run struct {
 // Validate diagnoses every project in every declared environment, then audits
 // the store, and grades the findings. Only the inspectors a selected check
 // needs are opened, and the store audit reads only the selected sections.
-func (s *Service) Validate(params Params) (Report, error) {
+func (s *Service) Validate(params ValidateParams) (Report, error) {
 	params, err := params.normalized()
 	if err != nil {
 		return Report{}, err
@@ -93,10 +93,10 @@ func (s *Service) Validate(params Params) (Report, error) {
 }
 
 // normalized rejects codes outside the catalog.
-func (p Params) normalized() (Params, error) {
+func (p ValidateParams) normalized() (ValidateParams, error) {
 	for _, code := range p.Selected {
 		if owner(code) == "" {
-			return Params{}, fmt.Errorf("%w %q", ErrUnknownCheck, code)
+			return ValidateParams{}, fmt.Errorf("%w %q", ErrUnknownCheck, code)
 		}
 	}
 	p.Selected = slices.Clone(p.Selected)
@@ -104,7 +104,7 @@ func (p Params) normalized() (Params, error) {
 }
 
 // runs reports whether the check for code is selected.
-func (p Params) runs(code diagnostic.Code) bool {
+func (p ValidateParams) runs(code diagnostic.Code) bool {
 	return len(p.Selected) == 0 || slices.Contains(p.Selected, code)
 }
 

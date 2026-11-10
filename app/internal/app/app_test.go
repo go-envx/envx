@@ -136,13 +136,13 @@ func TestNewValidateServiceOpensEnvOnlyForMergeChecks(t *testing.T) {
 		t.Fatalf("NewValidateService: %v", err)
 	}
 
-	report, err := service.Validate(validate.Params{
+	report, err := service.Validate(validate.ValidateParams{
 		Selected: []diagnostic.Code{diagnostic.PublicKeyIsMissing},
 	})
 	if err != nil || report.Failed {
 		t.Errorf("store-only Validate = %+v, %v; want pass", report, err)
 	}
-	if _, err := service.Validate(validate.Params{}); err == nil {
+	if _, err := service.Validate(validate.ValidateParams{}); err == nil {
 		t.Error("Validate of all checks succeeded over a malformed namespace")
 	}
 }
@@ -177,7 +177,7 @@ func TestCipherIsRequiredOnlyByConsumers(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewValidateService: %v", err)
 	}
-	if _, err := service.Validate(validate.Params{}); err == nil {
+	if _, err := service.Validate(validate.ValidateParams{}); err == nil {
 		t.Error("Validate succeeded with an unsupported cipher")
 	}
 }

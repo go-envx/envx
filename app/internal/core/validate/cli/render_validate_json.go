@@ -1,7 +1,8 @@
 package cli
 
 import (
-	"github.com/go-envx/envx/app/internal/features/validate"
+	"github.com/go-envx/envx/app/internal/core/diagnostic"
+	"github.com/go-envx/envx/app/internal/core/validate"
 )
 
 // validateFindingJSON is the exported, tagged view of a finding for JSON output
@@ -43,15 +44,17 @@ func (r validateRenderer) json(report validate.Report) error {
 }
 
 // toFindingsJSON converts findings to their tagged JSON view.
-func (r validateRenderer) toFindingsJSON(in []validate.Finding) []validateFindingJSON {
+func (r validateRenderer) toFindingsJSON(
+	in []diagnostic.Finding,
+) []validateFindingJSON {
 	out := make([]validateFindingJSON, 0, len(in))
 	for _, f := range in {
 		out = append(out, validateFindingJSON{
-			Severity:    f.Severity.DisplayString(),
+			Severity:    f.Level.DisplayString(),
 			Project:     f.Project,
 			Environment: f.Environment,
 			Key:         f.Key,
-			Code:        f.Code,
+			Code:        string(f.Code),
 			Message:     f.Message,
 		})
 	}

@@ -9,11 +9,12 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/go-envx/envx/app/internal/core"
-	"github.com/go-envx/envx/app/internal/features/validate"
+	"github.com/go-envx/envx/app/internal/app"
+	"github.com/go-envx/envx/app/internal/core/diagnostic"
+	"github.com/go-envx/envx/app/internal/core/validate"
+	workspacecli "github.com/go-envx/envx/app/internal/core/workspace/cli"
 	"github.com/go-envx/envx/app/internal/lib/printer"
-	"github.com/go-envx/envx/app/internal/shared/flags"
-	"github.com/go-envx/envx/app/internal/shared/status"
+	"github.com/go-envx/envx/app/internal/lib/severity"
 	"github.com/go-envx/envx/app/test/fixtures"
 )
 
@@ -22,17 +23,13 @@ type mockValidateFactory struct {
 	err error
 }
 
-func (m *mockValidateFactory) ValidateService(
+func (m *mockValidateFactory) NewValidateService(
 	configPath string,
 ) (*validate.Service, error) {
 	if m.err != nil {
 		return nil, m.err
 	}
-	app, err := core.NewAppFactory()
-	if err != nil {
-		return nil, err
-	}
-	return app.ValidateService(configPath)
+	return app.Factory{}.NewValidateService(configPath)
 }
 
 // executeValidate builds the validate command, executes it with args, and returns
@@ -43,7 +40,7 @@ func executeValidate(
 	t.Helper()
 
 	cmd := NewValidateCommand(factory)
-	flags.Bind(cmd.PersistentFlags(), &flags.Config)
+	workspacecli.BindConfig(cmd)
 	cmd.SilenceUsage = true
 	cmd.SetArgs(append([]string{"--config", configPath}, args...))
 
@@ -56,51 +53,49 @@ func executeValidate(
 }
 
 // validateManifest runs the validate service over the manifest at path and
-// returns the sorted report.
+// returns the report.
 func validateManifest(
 	t *testing.T, path string, params validate.ValidateParams,
 ) validate.Report {
 	t.Helper()
 
-	app, err := core.NewAppFactory()
+	service, err := app.Factory{}.NewValidateService(path)
 	if err != nil {
-		t.Fatalf("NewAppFactory(): %v", err)
-	}
-	service, err := app.ValidateService(path)
-	if err != nil {
-		t.Fatalf("ValidateService(): %v", err)
+		t.Fatalf("NewValidateService(): %v", err)
 	}
 	report, err := service.Validate(params)
 	if err != nil {
 		t.Fatalf("Validate(): %v", err)
 	}
-	report.Sort()
 	return report
 }
 
 // findFinding returns the first finding carrying the given status code, and
 // whether one was present.
-func findFinding(report validate.Report, code string) (validate.Finding, bool) {
+func findFinding(
+	report validate.Report, code diagnostic.Code,
+) (diagnostic.Finding, bool) {
 	for _, f := range report.Findings {
 		if f.Code == code {
 			return f, true
 		}
 	}
-	return validate.Finding{}, false
+	return diagnostic.Finding{}, false
 }
 
 // sampleReport is a mixed error/warning report used by the output tests.
 func sampleReport() validate.Report {
 	return validate.Report{
-		Findings: []validate.Finding{
+		Findings: []diagnostic.Finding{
 			{
-				Severity: validate.SeverityError,
-				Project:  "api", Environment: "production", Key: "PASSWORD",
-				Code: status.SecretReferenceNotFound, Message: "no stored value for this reference",
+				Level:   severity.Error,
+				Project: "api", Environment: "production", Key: "PASSWORD",
+				Code:    diagnostic.SecretReferenceNotFound,
+				Message: "no stored value for this reference",
 			},
 			{
-				Severity: validate.SeverityWarning,
-				Key:      "shared/unused", Code: status.SecretIsNotReferenced,
+				Level: severity.Warn,
+				Key:   "shared/unused", Code: diagnostic.SecretIsNotReferenced,
 				Message: "stored value is never referenced by any environment",
 			},
 		},
@@ -135,22 +130,22 @@ func TestValidateDanglingReferenceFails(t *testing.T) {
 		t.Fatal("dangling reference must fail the run")
 	}
 
-	ref, ok := findFinding(report, status.SecretReferenceNotFound)
+	ref, ok := findFinding(report, diagnostic.SecretReferenceNotFound)
 	if !ok {
 		t.Fatalf("no reference finding: %+v", report.Findings)
 	}
-	if ref.Severity != validate.SeverityError || ref.Key != "PASSWORD" {
+	if ref.Level != severity.Error || ref.Key != "PASSWORD" {
 		t.Errorf("reference finding = %+v, want error on PASSWORD", ref)
 	}
 
 	// The store holds a plaintext value no environment references, so both a
 	// plaintext error and an orphan error surface without a per-environment view.
-	plaintext, ok := findFinding(report, status.SecretIsNotEncrypted)
-	if !ok || plaintext.Severity != validate.SeverityError {
+	plaintext, ok := findFinding(report, diagnostic.SecretIsNotEncrypted)
+	if !ok || plaintext.Level != severity.Error {
 		t.Errorf("plaintext finding = %+v (present=%v), want an error", plaintext, ok)
 	}
-	orphan, ok := findFinding(report, status.SecretIsNotReferenced)
-	if !ok || orphan.Severity != validate.SeverityError {
+	orphan, ok := findFinding(report, diagnostic.SecretIsNotReferenced)
+	if !ok || orphan.Level != severity.Error {
 		t.Errorf("orphan finding = %+v (present=%v), want an error", orphan, ok)
 	}
 }
@@ -230,7 +225,7 @@ func TestValidateBaseDeclaration(t *testing.T) {
 	writeFile(t, filepath.Join(dir, "env", "app.production.yaml"), "only_in_overlay: x\n")
 
 	off := validateManifest(t, filepath.Join(dir, "envx.yaml"), validate.ValidateParams{})
-	if _, ok := findFinding(off, status.PropertyNotDeclaredInBase); ok {
+	if _, ok := findFinding(off, diagnostic.PropertyNotDeclaredInBase); ok {
 		t.Errorf("base-declaration check must be off by default: %+v", off.Findings)
 	}
 	if off.Failed {
@@ -253,11 +248,11 @@ func TestValidateBaseDeclaration(t *testing.T) {
 	report := validateManifest(
 		t, filepath.Join(optedIn, "envx.yaml"), validate.ValidateParams{},
 	)
-	finding, ok := findFinding(report, status.PropertyNotDeclaredInBase)
+	finding, ok := findFinding(report, diagnostic.PropertyNotDeclaredInBase)
 	if !ok {
 		t.Fatalf("no base-declaration finding after opt-in: %+v", report.Findings)
 	}
-	if finding.Code != status.PropertyNotDeclaredInBase ||
+	if finding.Code != diagnostic.PropertyNotDeclaredInBase ||
 		finding.Key != "ONLY_IN_OVERLAY" {
 		t.Errorf("finding = %+v, want base-declaration on ONLY_IN_OVERLAY", finding)
 	}
@@ -282,16 +277,16 @@ func TestValidateMissingPublicKey(t *testing.T) {
 		"secrets:\n  db:\n    password: encrypted-age:YWJj\n")
 
 	report := validateManifest(t, filepath.Join(dir, "envx.yaml"), validate.ValidateParams{
-		Selected: map[string]bool{status.PublicKeyIsMissing: true},
+		Selected: []diagnostic.Code{diagnostic.PublicKeyIsMissing},
 	})
 
-	finding, ok := findFinding(report, status.PublicKeyIsMissing)
-	if !ok || finding.Code != status.PublicKeyIsMissing || finding.Key != "db" {
+	finding, ok := findFinding(report, diagnostic.PublicKeyIsMissing)
+	if !ok || finding.Code != diagnostic.PublicKeyIsMissing || finding.Key != "db" {
 		t.Fatalf("missing-public-key finding = %+v (present=%v), want %s on db",
-			finding, ok, status.PublicKeyIsMissing)
+			finding, ok, diagnostic.PublicKeyIsMissing)
 	}
 	// Only the selected check ran, so the orphaned encrypted value is not reported.
-	if _, ok := findFinding(report, status.SecretIsNotReferenced); ok {
+	if _, ok := findFinding(report, diagnostic.SecretIsNotReferenced); ok {
 		t.Error("selecting only the missing-public-key check must not report orphans")
 	}
 }
@@ -313,13 +308,14 @@ func TestValidateAlgorithmMismatchFromStore(t *testing.T) {
 		"secrets:\n  db:\n    token: encrypted-nacl-box:YWJj\n")
 
 	report := validateManifest(t, filepath.Join(dir, "envx.yaml"), validate.ValidateParams{
-		Selected: map[string]bool{status.SecretAlgorithmMismatch: true},
+		Selected: []diagnostic.Code{diagnostic.SecretAlgorithmMismatch},
 	})
 
-	finding, ok := findFinding(report, status.SecretAlgorithmMismatch)
-	if !ok || finding.Code != status.SecretAlgorithmMismatch || finding.Key != "db/token" {
+	finding, ok := findFinding(report, diagnostic.SecretAlgorithmMismatch)
+	if !ok || finding.Code != diagnostic.SecretAlgorithmMismatch ||
+		finding.Key != "db/token" {
 		t.Fatalf("algorithm finding = %+v (present=%v), want %s on db/token",
-			finding, ok, status.SecretAlgorithmMismatch)
+			finding, ok, diagnostic.SecretAlgorithmMismatch)
 	}
 }
 
@@ -343,13 +339,9 @@ func TestValidateStoreOnlySelectionSkipsMerge(t *testing.T) {
 		"secrets:\n  db:\n    leaked: just-plaintext\n")
 
 	// A full run reaches the merge and aborts on the malformed base file.
-	app, err := core.NewAppFactory()
+	service, err := app.Factory{}.NewValidateService(manifestPath)
 	if err != nil {
-		t.Fatalf("NewAppFactory(): %v", err)
-	}
-	service, err := app.ValidateService(manifestPath)
-	if err != nil {
-		t.Fatalf("ValidateService(): %v", err)
+		t.Fatalf("NewValidateService(): %v", err)
 	}
 	if _, err := service.Validate(validate.ValidateParams{}); err == nil {
 		t.Fatal("a full run must fail on the malformed base file")
@@ -358,9 +350,9 @@ func TestValidateStoreOnlySelectionSkipsMerge(t *testing.T) {
 	// Selecting only the offline plaintext check skips the merge entirely and still
 	// reports the plaintext store value.
 	report := validateManifest(t, manifestPath, validate.ValidateParams{
-		Selected: map[string]bool{status.SecretIsNotEncrypted: true},
+		Selected: []diagnostic.Code{diagnostic.SecretIsNotEncrypted},
 	})
-	finding, ok := findFinding(report, status.SecretIsNotEncrypted)
+	finding, ok := findFinding(report, diagnostic.SecretIsNotEncrypted)
 	if !ok || finding.Key != "db/leaked" {
 		t.Fatalf("plaintext finding = %+v (present=%v), want db/leaked", finding, ok)
 	}
@@ -412,10 +404,10 @@ func TestNewValidateCommandSelectionFlag(t *testing.T) {
 	if !errors.Is(err, errValidationFailed) {
 		t.Fatalf("err = %v, want errValidationFailed", err)
 	}
-	if !strings.Contains(stdout, status.SecretIsNotEncrypted) {
+	if !strings.Contains(stdout, string(diagnostic.SecretIsNotEncrypted)) {
 		t.Errorf("stdout = %q, want the plaintext finding", stdout)
 	}
-	if strings.Contains(stdout, status.SecretReferenceNotFound) {
+	if strings.Contains(stdout, string(diagnostic.SecretReferenceNotFound)) {
 		t.Errorf("stdout = %q, must not run the unselected reference check", stdout)
 	}
 }
@@ -498,21 +490,21 @@ func TestOutputValidateTable(t *testing.T) {
 func TestOutputValidateTableSeparatesVerdict(t *testing.T) {
 	t.Parallel()
 
-	orphan := validate.Finding{
-		Severity: validate.SeverityWarning,
-		Key:      "shared/unused", Code: status.SecretIsNotReferenced,
+	orphan := diagnostic.Finding{
+		Level: severity.Warn,
+		Key:   "shared/unused", Code: diagnostic.SecretIsNotReferenced,
 		Message: "stored value is never referenced by any environment",
 	}
 
 	// A failing report ends with the table's final newline plus a separating
 	// blank; a passing report ends with just the table's final newline.
 	if got := outputCombined(t, validate.Report{
-		Findings: []validate.Finding{orphan}, Errors: 1, Failed: true,
+		Findings: []diagnostic.Finding{orphan}, Errors: 1, Failed: true,
 	}); !strings.HasSuffix(got, "\n\n") {
 		t.Errorf("failing table must be followed by a blank line:\n%q", got)
 	}
 	if got := outputCombined(t, validate.Report{
-		Findings: []validate.Finding{orphan}, Warnings: 1, Failed: false,
+		Findings: []diagnostic.Finding{orphan}, Warnings: 1, Failed: false,
 	}); strings.HasSuffix(got, "\n\n") {
 		t.Errorf("passing table must not add a trailing blank line:\n%q", got)
 	}
@@ -612,13 +604,9 @@ func writeWarningOnlyWorkspace(t *testing.T) string {
 
 	// A valid keypair keeps the store readable; "shared" is available and produces
 	// no finding.
-	app, err := core.NewAppFactory()
+	manager, err := app.Factory{}.NewSecretsService(manifestPath)
 	if err != nil {
-		t.Fatalf("NewAppFactory(): %v", err)
-	}
-	manager, err := app.SecretsService(manifestPath)
-	if err != nil {
-		t.Fatalf("SecretsService(): %v", err)
+		t.Fatalf("NewSecretsService(): %v", err)
 	}
 	if _, err := manager.GenerateKeypair("shared"); err != nil {
 		t.Fatalf("GenerateKeypair(): %v", err)
