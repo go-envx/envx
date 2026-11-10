@@ -2,46 +2,87 @@ package cli
 
 import (
 	"bytes"
-	"encoding/base64"
 	"errors"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 
-	"github.com/go-envx/envx/app/internal/app"
 	"github.com/go-envx/envx/app/internal/core/emit"
 	"github.com/go-envx/envx/app/internal/core/emit/format"
+	"github.com/go-envx/envx/app/internal/core/env"
+	"github.com/go-envx/envx/app/internal/core/value"
 	workspacecli "github.com/go-envx/envx/app/internal/core/workspace/cli"
-	"github.com/go-envx/envx/app/internal/lib/crypt/age"
-	"github.com/go-envx/envx/app/test/fixtures"
+	"github.com/go-envx/envx/app/internal/lib/filex"
+	"github.com/go-envx/envx/app/internal/testutil"
 )
 
-// mockEmitFactory implements Factory for unit testing.
-type mockEmitFactory struct {
+// testConfig is the manifest path every command test passes with --config.
+const testConfig = "/ws/envx.yaml"
+
+// fakeFactory builds an emit service whose explainer is the factory itself,
+// returning entries for project "api".
+type fakeFactory struct {
+	// configPath records the manifest path the command requested.
+	configPath string
+	// err, when set, is returned instead of a service.
 	err error
+	// entries are returned by every explain request.
+	entries []env.ExplainEntry
+	// explains records every explain request.
+	explains []env.ExplainParams
 }
 
-func (m *mockEmitFactory) NewEmitService(configPath string) (*emit.Service, error) {
-	if m.err != nil {
-		return nil, m.err
+// NewEmitService implements Factory.
+func (f *fakeFactory) NewEmitService(configPath string) (*emit.Service, error) {
+	f.configPath = configPath
+	if f.err != nil {
+		return nil, f.err
 	}
-	return app.Factory{}.NewEmitService(configPath)
+	return emit.New(emit.Dependencies{
+		Env:      f,
+		Renderer: format.Renderer{},
+	})
+}
+
+// Explain implements emit.Explainer.
+func (f *fakeFactory) Explain(params env.ExplainParams) (env.ExplainResult, error) {
+	f.explains = append(f.explains, params)
+	return env.ExplainResult{Project: "api", Entries: f.entries}, nil
+}
+
+// TestMain keeps ambient ENVX_* settings out of the command's flags.
+func TestMain(m *testing.M) {
+	testutil.UnsetEnvPrefix("ENVX_")
+	os.Exit(m.Run())
+}
+
+// resolvedEntries is one plain and one secret-derived resolved value.
+func resolvedEntries() []env.ExplainEntry {
+	return []env.ExplainEntry{
+		{
+			Key:        "APP_NAME",
+			Evaluation: value.Evaluation{Value: "myapp", Resolved: true},
+		},
+		{
+			Key:        "DB_PASSWORD",
+			Evaluation: value.Evaluation{Value: "top-secret", Resolved: true},
+			Secret:     true,
+		},
+	}
 }
 
 // executeEmit builds the emit command, executes it with args, and returns its
 // captured stdout and stderr.
 func executeEmit(
-	t *testing.T, factory Factory, configPath string, args ...string,
+	t *testing.T, factory Factory, args ...string,
 ) (stdout, stderr string, err error) {
 	t.Helper()
 
 	cmd := NewEmitCommand(factory)
 	workspacecli.BindConfig(cmd)
-	// The root command silences usage for runtime errors; mirror it here so a
-	// failed emit leaves stdout to the rendered output alone.
 	cmd.SilenceUsage = true
-	cmd.SetArgs(append([]string{"--config", configPath}, args...))
+	cmd.SetArgs(append([]string{"--config", testConfig}, args...))
 
 	var out, errBuf bytes.Buffer
 	cmd.SetOut(&out)
@@ -51,378 +92,244 @@ func executeEmit(
 	return out.String(), errBuf.String(), err
 }
 
-// writeWorkspaceFile writes body to a workspace-relative path under dir, creating
-// parent directories as needed.
-func writeWorkspaceFile(t *testing.T, dir, name, body string) {
-	t.Helper()
-	path := filepath.Join(dir, name)
-	if err := os.MkdirAll(filepath.Dir(path), 0o750); err != nil {
-		t.Fatalf("MkdirAll(%q): %v", filepath.Dir(path), err)
-	}
-	if err := os.WriteFile(path, []byte(body), 0o600); err != nil {
-		t.Fatalf("WriteFile(%q): %v", path, err)
-	}
-}
-
-// encryptedWorkspace writes a workspace that references one encrypted secret and
-// one plain value, returning the config path and the private key that decrypts
-// the secret. The store ships the public key so the workspace is complete; the
-// private key is returned to the caller to supply via the environment.
-func encryptedWorkspace(t *testing.T) (cfgPath, privateKey string) {
-	t.Helper()
-	dir := t.TempDir()
-
-	selected := age.Cipher{}
-	pair, err := selected.Keypair()
-	if err != nil {
-		t.Fatalf("Keypair(): %v", err)
-	}
-	raw, err := selected.Encrypt("top-secret", pair.PublicKey)
-	if err != nil {
-		t.Fatalf("Encrypt(): %v", err)
-	}
-	ciphertext := "encrypted-age:" + base64.RawURLEncoding.EncodeToString(raw)
-
-	writeWorkspaceFile(t, dir, "envx.yaml",
-		"environments: [production]\nprojects:\n  api:\n    includes: [env/app]\n")
-	writeWorkspaceFile(t, dir, filepath.Join("env", "app.yaml"),
-		"app_name: myapp\ndb_password: secret://production/db\n")
-	writeWorkspaceFile(t, dir, "secrets.yaml",
-		"public-keys:\n  production: "+pair.PublicKey+
-			"\nsecrets:\n  production:\n    db: "+ciphertext+"\n")
-
-	return filepath.Join(dir, "envx.yaml"), pair.PrivateKey
-}
-
-// TestNewEmitCommandDotenv verifies emit resolves a project and renders its
-// environment as dotenv to stdout.
-func TestNewEmitCommandDotenv(t *testing.T) {
+// TestEmitCommandWritesStdout verifies --config, the project, and settings
+// reach the service and the render goes to stdout with nothing on stderr.
+func TestEmitCommandWritesStdout(t *testing.T) {
 	t.Parallel()
 
-	stdout, _, err := executeEmit(
-		t, &mockEmitFactory{}, fixtures.Manifest("basic"),
-		"api-core", "--target", "dotenv",
+	factory := &fakeFactory{entries: resolvedEntries()}
+	stdout, stderr, err := executeEmit(
+		t, factory, "api", "--target", "dotenv", "--env", "production",
 	)
 	if err != nil {
 		t.Fatalf("Execute(): %v", err)
 	}
-	if !strings.Contains(stdout, "APP_NAME=api-core\n") {
-		t.Errorf("dotenv output missing APP_NAME:\n%s", stdout)
+	if factory.configPath != testConfig {
+		t.Errorf("factory configPath = %q, want %q", factory.configPath, testConfig)
+	}
+	if len(factory.explains) != 1 {
+		t.Fatalf("explains = %d, want 1", len(factory.explains))
+	}
+	params := factory.explains[0]
+	if params.Project != "api" {
+		t.Errorf("Project = %q, want api", params.Project)
+	}
+	if params.Options.Env == nil || *params.Options.Env != "production" {
+		t.Errorf("Options.Env = %v, want production", params.Options.Env)
+	}
+	if !strings.Contains(stdout, "APP_NAME=myapp\n") {
+		t.Errorf("stdout missing APP_NAME:\n%s", stdout)
+	}
+	if stderr != "" {
+		t.Errorf("stderr = %q, want nothing when emitting to stdout", stderr)
 	}
 }
 
-// TestNewEmitCommandJSON verifies the json target renders a resolved environment
-// as a JSON object.
-func TestNewEmitCommandJSON(t *testing.T) {
+// TestEmitCommandRenderFlags verifies --target, --only, --name, and --key reach
+// the renderer.
+func TestEmitCommandRenderFlags(t *testing.T) {
 	t.Parallel()
 
-	stdout, _, err := executeEmit(
-		t, &mockEmitFactory{}, fixtures.Manifest("basic"),
-		"api-core", "--target", "json",
-	)
-	if err != nil {
-		t.Fatalf("Execute(): %v", err)
+	tests := []struct {
+		// name labels the case.
+		name string
+		// args are the flags after the project.
+		args []string
+		// want lists substrings of the expected output.
+		want []string
+		// reject lists substrings the output must not contain.
+		reject []string
+	}{
+		{
+			name:   "only config",
+			args:   []string{"--target", "json", "--only", "config"},
+			want:   []string{`"APP_NAME": "myapp"`},
+			reject: []string{"DB_PASSWORD"},
+		},
+		{
+			name: "name",
+			args: []string{"--target", "k8s", "--only", "config", "--name", "web"},
+			want: []string{"kind: ConfigMap", "name: web\n"},
+		},
+		{
+			name: "key",
+			args: []string{
+				"--target", "k8s-bundle", "--only", "config", "--key", "app.env",
+			},
+			want: []string{"app.env: |"},
+		},
 	}
-	if !strings.Contains(stdout, "\"APP_NAME\": \"api-core\"") {
-		t.Errorf("json output missing APP_NAME:\n%s", stdout)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			factory := &fakeFactory{entries: resolvedEntries()}
+			args := append([]string{"api"}, tt.args...)
+			stdout, _, err := executeEmit(t, factory, args...)
+			if err != nil {
+				t.Fatalf("Execute(): %v", err)
+			}
+			for _, want := range tt.want {
+				if !strings.Contains(stdout, want) {
+					t.Errorf("output missing %q:\n%s", want, stdout)
+				}
+			}
+			for _, reject := range tt.reject {
+				if strings.Contains(stdout, reject) {
+					t.Errorf("output unexpectedly contains %q:\n%s", reject, stdout)
+				}
+			}
+		})
 	}
 }
 
-// TestNewEmitCommandRequiresTarget verifies emit rejects an invocation with no
-// --target.
-func TestNewEmitCommandRequiresTarget(t *testing.T) {
+// TestEmitCommandRequiresTarget verifies emit rejects an invocation with no
+// --target before calling the factory.
+func TestEmitCommandRequiresTarget(t *testing.T) {
 	t.Parallel()
 
-	_, _, err := executeEmit(t, &mockEmitFactory{}, fixtures.Manifest("basic"), "api-core")
-	if err == nil {
-		t.Fatal("expected emit to require --target")
+	factory := &fakeFactory{}
+	_, _, err := executeEmit(t, factory, "api")
+	if err == nil || !strings.Contains(err.Error(), `required flag(s) "target"`) {
+		t.Fatalf("err = %v, want a required --target error", err)
+	}
+	if factory.configPath != "" {
+		t.Error("factory was called despite the missing --target")
 	}
 }
 
-// TestNewEmitCommandUnknownTarget verifies an unknown --target fails with the
-// format sentinel before any output is written.
-func TestNewEmitCommandUnknownTarget(t *testing.T) {
+// TestEmitCommandUnknownTarget verifies an unknown --target fails before any
+// value is explained or output written.
+func TestEmitCommandUnknownTarget(t *testing.T) {
 	t.Parallel()
 
-	stdout, _, err := executeEmit(
-		t, &mockEmitFactory{},
-		fixtures.Manifest("basic"), "api-core", "--target", "toml",
-	)
+	factory := &fakeFactory{entries: resolvedEntries()}
+	stdout, _, err := executeEmit(t, factory, "api", "--target", "toml")
 	if !errors.Is(err, format.ErrUnknownTarget) {
-		t.Fatalf("got err = %v, want ErrUnknownTarget", err)
+		t.Fatalf("err = %v, want ErrUnknownTarget", err)
+	}
+	if len(factory.explains) != 0 || stdout != "" {
+		t.Errorf(
+			"explains = %d, stdout = %q; want neither", len(factory.explains), stdout,
+		)
+	}
+}
+
+// TestEmitCommandFailsClosedOnUnresolved verifies an unresolved value aborts
+// emit with no output.
+func TestEmitCommandFailsClosedOnUnresolved(t *testing.T) {
+	t.Parallel()
+
+	entries := append(resolvedEntries(), env.ExplainEntry{Key: "BROKEN"})
+	stdout, _, err := executeEmit(
+		t, &fakeFactory{entries: entries}, "api", "--target", "dotenv",
+	)
+	if !errors.Is(err, env.ErrUnresolved) {
+		t.Fatalf("err = %v, want ErrUnresolved", err)
 	}
 	if stdout != "" {
 		t.Errorf("emit wrote output despite the failure: %q", stdout)
 	}
 }
 
-// TestNewEmitCommandFactoryError verifies an emit service failure aborts
-// emit before any output is written.
-func TestNewEmitCommandFactoryError(t *testing.T) {
+// TestEmitCommandFactoryError verifies a factory failure aborts emit before any
+// output is written.
+func TestEmitCommandFactoryError(t *testing.T) {
 	t.Parallel()
 
-	expectedErr := errors.New("factory failure")
+	want := errors.New("factory failure")
 	stdout, _, err := executeEmit(
-		t, &mockEmitFactory{err: expectedErr}, "envx.yaml",
-		"api-core", "--target", "dotenv",
+		t, &fakeFactory{err: want}, "api", "--target", "dotenv",
 	)
-	if !errors.Is(err, expectedErr) {
-		t.Fatalf("got err = %v, want %v", err, expectedErr)
+	if !errors.Is(err, want) {
+		t.Fatalf("err = %v, want %v", err, want)
 	}
 	if stdout != "" {
 		t.Errorf("emit wrote output despite the factory failure: %q", stdout)
 	}
 }
 
-// TestNewEmitCommandRejectsMisusedName verifies --name is rejected on a target
-// that has no resource name.
-func TestNewEmitCommandRejectsMisusedName(t *testing.T) {
-	t.Parallel()
-
-	_, _, err := executeEmit(
-		t, &mockEmitFactory{}, fixtures.Manifest("basic"),
-		"api-core", "--target", "dotenv", "--name", "oops",
-	)
-	if err == nil {
-		t.Fatal("expected --name on dotenv to be rejected")
-	}
-}
-
-// TestNewEmitCommandK8sDefaultsNameToProject verifies the k8s target renders
-// without --name, deriving the resource name from the project.
-func TestNewEmitCommandK8sDefaultsNameToProject(t *testing.T) {
-	t.Parallel()
-
-	stdout, _, err := executeEmit(
-		t, &mockEmitFactory{}, fixtures.Manifest("basic"),
-		"api-core", "--target", "k8s", "--only", "config",
-	)
-	if err != nil {
-		t.Fatalf("Execute(): %v", err)
-	}
-	if !strings.Contains(stdout, "name: api-core-config") {
-		t.Errorf("ConfigMap should be named after the project:\n%s", stdout)
-	}
-}
-
-// TestNewEmitCommandFailsClosedOnUnresolved verifies an unresolved value aborts
-// emit before any output is written, so no partial render escapes.
-func TestNewEmitCommandFailsClosedOnUnresolved(t *testing.T) {
+// TestEmitCommandWritesFile verifies --output writes a private file, confirms
+// on stdout, and warns on stderr only when the file carries secrets.
+func TestEmitCommandWritesFile(t *testing.T) {
 	t.Parallel()
 
 	dir := t.TempDir()
-	writeWorkspaceFile(t, dir, "envx.yaml",
-		"environments: [development]\nprojects:\n  api:\n    includes: [env/app]\n")
-	writeWorkspaceFile(t, dir, filepath.Join("env", "app.yaml"),
-		"good: value\nbroken: \"{{NOPE}}\"\n")
-
-	stdout, _, err := executeEmit(
-		t, &mockEmitFactory{}, filepath.Join(dir, "envx.yaml"),
-		"api", "--target", "dotenv",
-	)
-	if err == nil {
-		t.Fatal("expected an unresolved value to abort emit")
-	}
-	if !strings.Contains(err.Error(), "BROKEN") {
-		t.Errorf("error %q should name the unresolved key", err)
-	}
-	if stdout != "" {
-		t.Errorf("emit wrote output despite the failure: %q", stdout)
-	}
-}
-
-// TestNewEmitCommandK8sSecretRevealsOnlySecrets verifies the k8s target with only
-// the secret slice selected renders a Secret carrying the decrypted
-// secret-derived value (base64-encoded) and not the plain one.
-func TestNewEmitCommandK8sSecretRevealsOnlySecrets(t *testing.T) {
-	cfgPath, privateKey := encryptedWorkspace(t)
-	t.Setenv("ENVX_PRIVATE_KEY_PRODUCTION", privateKey)
-
-	stdout, _, err := executeEmit(
-		t, &mockEmitFactory{}, cfgPath,
-		"api", "--target", "k8s", "--name", "api-secrets", "--only", "secrets",
-	)
-	if err != nil {
-		t.Fatalf("Execute(): %v", err)
-	}
-
-	if !strings.Contains(stdout, "kind: Secret") ||
-		!strings.Contains(stdout, "name: api-secrets") {
-		t.Errorf("output is not the expected Secret:\n%s", stdout)
-	}
-	wantData := "DB_PASSWORD: " + base64.StdEncoding.EncodeToString([]byte("top-secret"))
-	if !strings.Contains(stdout, wantData) {
-		t.Errorf("Secret missing the decrypted secret %q:\n%s", wantData, stdout)
-	}
-	if strings.Contains(stdout, "APP_NAME") {
-		t.Errorf("Secret unexpectedly carries the plain value APP_NAME:\n%s", stdout)
-	}
-	// The plaintext secret must never appear unencoded in the manifest.
-	if strings.Contains(stdout, "top-secret") {
-		t.Errorf("Secret leaked plaintext secret material:\n%s", stdout)
-	}
-}
-
-// TestNewEmitCommandK8sConfigMapExcludesSecrets verifies the k8s target with only
-// the config slice selected renders a ConfigMap carrying the plain value and not
-// the secret-derived one.
-func TestNewEmitCommandK8sConfigMapExcludesSecrets(t *testing.T) {
-	cfgPath, privateKey := encryptedWorkspace(t)
-	t.Setenv("ENVX_PRIVATE_KEY_PRODUCTION", privateKey)
-
-	stdout, _, err := executeEmit(
-		t, &mockEmitFactory{}, cfgPath,
-		"api", "--target", "k8s", "--name", "api-config", "--only", "config",
-	)
-	if err != nil {
-		t.Fatalf("Execute(): %v", err)
-	}
-
-	if !strings.Contains(stdout, "kind: ConfigMap") ||
-		!strings.Contains(stdout, "name: api-config") {
-		t.Errorf("output is not the expected ConfigMap:\n%s", stdout)
-	}
-	if !strings.Contains(stdout, "APP_NAME: myapp") {
-		t.Errorf("ConfigMap missing the plain value APP_NAME:\n%s", stdout)
-	}
-	for _, secret := range []string{"DB_PASSWORD", "top-secret"} {
-		if strings.Contains(stdout, secret) {
-			t.Errorf("ConfigMap unexpectedly carries secret material %q:\n%s", secret, stdout)
-		}
-	}
-}
-
-// TestNewEmitCommandMissingKeyAborts verifies that when the private key is
-// unavailable the secret cannot be revealed, so emit fails closed with no output.
-func TestNewEmitCommandMissingKeyAborts(t *testing.T) {
-	cfgPath, _ := encryptedWorkspace(t)
-	// Deliberately do not export ENVX_PRIVATE_KEY_PRODUCTION.
-
-	stdout, _, err := executeEmit(
-		t, &mockEmitFactory{}, cfgPath,
-		"api", "--target", "k8s", "--name", "api-secrets", "--only", "secrets",
-	)
-	if err == nil {
-		t.Fatal("expected emit to fail when the private key is unavailable")
-	}
-	if stdout != "" {
-		t.Errorf("emit wrote output despite the reveal failure: %q", stdout)
-	}
-}
-
-// TestNewEmitCommandWritesFile verifies emit writes to a file with private
-// permissions instead of stdout when an output path is given.
-func TestNewEmitCommandWritesFile(t *testing.T) {
-	t.Parallel()
-
-	outPath := filepath.Join(t.TempDir(), "out.env")
-	stdout, _, err := executeEmit(
-		t, &mockEmitFactory{}, fixtures.Manifest("basic"),
-		"api-core", "--target", "dotenv", "--output", outPath,
-	)
-	if err != nil {
-		t.Fatalf("Execute(): %v", err)
-	}
-	if strings.Contains(stdout, "APP_NAME=") {
-		t.Errorf("emit wrote the render to stdout despite an output path: %q", stdout)
-	}
-
-	//nolint:gosec // test-local path.
-	data, err := os.ReadFile(outPath)
-	if err != nil {
-		t.Fatalf("ReadFile(%q): %v", outPath, err)
-	}
-	if !strings.Contains(string(data), "APP_NAME=api-core\n") {
-		t.Errorf("output file missing APP_NAME:\n%s", data)
-	}
-	info, err := os.Stat(outPath)
-	if err != nil {
-		t.Fatalf("Stat(%q): %v", outPath, err)
-	}
-	if perm := info.Mode().Perm(); perm != 0o600 {
-		t.Errorf("output file mode = %o, want 600 (secrets may be present)", perm)
-	}
-}
-
-// TestNewEmitCommandWarnsOnSecretFile verifies a file target whose output carries
-// secret material warns on stderr — preceded by a blank line — that the file must
-// not be committed, while a ConfigMap file (which excludes secrets) does not warn.
-func TestNewEmitCommandWarnsOnSecretFile(t *testing.T) {
-	cfgPath, privateKey := encryptedWorkspace(t)
-	t.Setenv("ENVX_PRIVATE_KEY_PRODUCTION", privateKey)
-
-	// A dotenv file carries the decrypted secret, so it must warn. Color is off
-	// (a buffer is not a terminal), so the WARNING label appears without glyph or
-	// escape codes.
-	outPath := filepath.Join(t.TempDir(), "out.env")
+	outPath := filepath.Join(dir, "out.env")
 	stdout, stderr, err := executeEmit(
-		t, &mockEmitFactory{}, cfgPath,
+		t, &fakeFactory{entries: resolvedEntries()},
 		"api", "--target", "dotenv", "--output", outPath,
 	)
 	if err != nil {
 		t.Fatalf("Execute(): %v", err)
 	}
-	// The confirmation is normal output (stdout); the caution is a stderr warning.
-	if !strings.Contains(stdout, "Wrote api ") || !strings.Contains(stdout, outPath) {
-		t.Errorf("expected a wrote-confirmation on stdout naming %q, got %q", outPath, stdout)
+	if strings.Contains(stdout, "APP_NAME=") {
+		t.Errorf("render went to stdout despite --output: %q", stdout)
+	}
+	if !strings.Contains(stdout, "Wrote api config and secrets to "+outPath) {
+		t.Errorf("stdout = %q, want the write confirmation", stdout)
 	}
 	if !strings.Contains(stderr, "WARNING:") ||
 		!strings.Contains(stderr, "do not commit") {
-		t.Errorf("expected a do-not-commit warning on stderr, got %q", stderr)
+		t.Errorf("stderr = %q, want a do-not-commit warning", stderr)
+	}
+	data, err := filex.Read(outPath)
+	if err != nil {
+		t.Fatalf("Read(%q): %v", outPath, err)
+	}
+	if !strings.Contains(string(data), "APP_NAME=myapp\n") {
+		t.Errorf("output file missing APP_NAME:\n%s", data)
+	}
+	info, err := os.Stat(outPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if perm := info.Mode().Perm(); perm != 0o600 {
+		t.Errorf("output file mode = %o, want 600", perm)
 	}
 
-	// A config-only file excludes secrets, so it confirms the write but does not
-	// warn.
-	cfgOut := filepath.Join(t.TempDir(), "config.yaml")
+	configPath := filepath.Join(dir, "config.json")
 	stdout, stderr, err = executeEmit(
-		t, &mockEmitFactory{}, cfgPath,
-		"api", "--target", "k8s", "--name", "api-config", "--only", "config",
-		"--output", cfgOut,
+		t, &fakeFactory{entries: resolvedEntries()},
+		"api", "--target", "json", "--only", "config", "--output", configPath,
 	)
 	if err != nil {
-		t.Fatalf("Execute(): %v", err)
+		t.Fatalf("Execute() config only: %v", err)
 	}
 	if !strings.Contains(stdout, "Wrote api config to") {
-		t.Errorf("config-only file should confirm the write on stdout, got %q", stdout)
-	}
-	if strings.Contains(stderr, "WARNING:") {
-		t.Errorf("config-only file should not warn, got %q", stderr)
-	}
-}
-
-// TestNewEmitCommandStdoutStaysQuiet verifies emitting to stdout prints nothing on
-// stderr, so a piped manifest is clean.
-func TestNewEmitCommandStdoutStaysQuiet(t *testing.T) {
-	cfgPath, privateKey := encryptedWorkspace(t)
-	t.Setenv("ENVX_PRIVATE_KEY_PRODUCTION", privateKey)
-
-	_, stderr, err := executeEmit(
-		t, &mockEmitFactory{}, cfgPath,
-		"api", "--target", "k8s-bundle", "--only", "config",
-	)
-	if err != nil {
-		t.Fatalf("Execute(): %v", err)
+		t.Errorf("stdout = %q, want the config write confirmation", stdout)
 	}
 	if stderr != "" {
-		t.Errorf("emit to stdout should print nothing on stderr, got %q", stderr)
+		t.Errorf("config-only file should not warn, got %q", stderr)
+	}
+
+	bundlePath := filepath.Join(dir, "secrets.yaml")
+	stdout, _, err = executeEmit(
+		t, &fakeFactory{entries: resolvedEntries()},
+		"api", "--target", "k8s-bundle", "--only", "secrets", "--output", bundlePath,
+	)
+	if err != nil {
+		t.Fatalf("Execute() secrets bundle: %v", err)
+	}
+	if !strings.Contains(stdout, "Wrote api secrets to "+bundlePath+". Read the docs") {
+		t.Errorf("stdout = %q, want the bundle confirmation", stdout)
 	}
 }
 
-// TestNewEmitCommandMissingOutputDir verifies emit refuses to write into a
-// directory that does not exist, failing before any output rather than creating
-// it.
-func TestNewEmitCommandMissingOutputDir(t *testing.T) {
+// TestEmitCommandMissingOutputDir verifies emit refuses a missing output
+// directory before calling the factory.
+func TestEmitCommandMissingOutputDir(t *testing.T) {
 	t.Parallel()
 
+	factory := &fakeFactory{entries: resolvedEntries()}
 	missing := filepath.Join(t.TempDir(), "nope", "out.env")
 	_, _, err := executeEmit(
-		t, &mockEmitFactory{}, fixtures.Manifest("basic"),
-		"api-core", "--target", "dotenv", "--output", missing,
+		t, factory, "api", "--target", "dotenv", "--output", missing,
 	)
-	if err == nil {
-		t.Fatal("expected an error for a missing output directory")
+	if err == nil || !strings.Contains(err.Error(), "does not exist") {
+		t.Fatalf("err = %v, want a missing-directory error", err)
 	}
-	if !strings.Contains(err.Error(), "does not exist") {
-		t.Errorf("error %q should explain the directory is missing", err)
+	if factory.configPath != "" {
+		t.Error("factory was called despite the missing output directory")
 	}
 }

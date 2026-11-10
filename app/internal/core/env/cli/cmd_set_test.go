@@ -1,91 +1,36 @@
 package cli
 
 import (
-	"bytes"
-	"os"
-	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
-
-	"github.com/go-envx/envx/app/internal/core/env"
-	"github.com/go-envx/envx/app/internal/lib/filex"
-	"github.com/go-envx/envx/app/internal/lib/printer"
 )
 
-func writeSetManifest(t *testing.T) (manifestPath, dir string) {
-	t.Helper()
-	dir = t.TempDir()
-	manifestPath = filepath.Join(dir, "envx.yaml")
-	manifestBody := "environments: [development, production]\n" +
-		"projects:\n  app:\n    includes: [env/postgres]\n"
-	if err := os.WriteFile(manifestPath, []byte(manifestBody), 0o600); err != nil {
-		t.Fatal(err)
-	}
-
-	envDir := filepath.Join(dir, "env")
-	if err := os.MkdirAll(envDir, 0o750); err != nil {
-		t.Fatal(err)
-	}
-	writeYAML(t, envDir, "postgres.yaml", "host: localhost\nport: 5432\n")
-
-	return manifestPath, dir
-}
-
-func TestOutputSet(t *testing.T) {
+// TestSetCommandWritesOverlay verifies the arguments and --env reach the
+// overlay writer and the written overlay is confirmed.
+func TestSetCommandWritesOverlay(t *testing.T) {
 	t.Parallel()
 
-	var buf bytes.Buffer
-	disabled := false
-	console := printer.New(printer.Options{
-		Out:   &buf,
-		Err:   &buf,
-		Color: &disabled,
-	})
-
-	err := outputSet(console, env.SetResult{
-		Key:         "database.password",
-		OverlayPath: "/workspace/env/postgres.yaml",
-	})
+	factory := newFakeFactory()
+	stdout, _, err := execute(
+		t, NewSetCommand(factory),
+		"env/postgres", "host", "prod-db.local", "--env", "production",
+	)
 	if err != nil {
-		t.Fatalf("outputSet: %v", err)
+		t.Fatalf("Execute(): %v", err)
 	}
 
-	got := buf.String()
-	if !strings.Contains(got, `Set "database.password" in:`) {
-		t.Errorf("output = %q, want set confirmation", got)
+	want := []overlayWrite{{
+		include:     appInclude,
+		environment: "production",
+		key:         "host",
+		text:        "prod-db.local",
+	}}
+	if !slices.Equal(factory.overlays, want) {
+		t.Errorf("overlays = %+v, want %+v", factory.overlays, want)
 	}
-}
-
-func TestNewSetCommand(t *testing.T) {
-	t.Parallel()
-
-	manifest, dir := writeSetManifest(t)
-	svc := newEnvService(t, manifest)
-
-	factory := &mockEnvFactory{svc: svc}
-	cmd := NewSetCommand(factory)
-	cmd.PersistentFlags().String("config", manifest, "")
-	cmd.SetArgs([]string{
-		filepath.Join(dir, "env", "postgres"),
-		"host",
-		"prod-db.local",
-		"--config", manifest,
-		"--env", "production",
-	})
-
-	var out bytes.Buffer
-	cmd.SetOut(&out)
-
-	if err := cmd.Execute(); err != nil {
-		t.Fatalf("cmd.Execute(): %v", err)
-	}
-
-	targetOverlay := filepath.Join(dir, "env", "postgres.production.yaml")
-	content, err := filex.Read(targetOverlay)
-	if err != nil {
-		t.Fatalf("Read(%s): %v", targetOverlay, err)
-	}
-	if !strings.Contains(string(content), "host: prod-db.local") {
-		t.Errorf("overlay content = %q, want host: prod-db.local", string(content))
+	if !strings.Contains(stdout, `Set "host" in:`) ||
+		!strings.Contains(stdout, appInclude+".production.yaml") {
+		t.Errorf("stdout = %q, want the set confirmation", stdout)
 	}
 }

@@ -1,175 +1,51 @@
 package cli
 
 import (
-	"bytes"
-	"os"
-	"path/filepath"
 	"strings"
 	"testing"
-
-	"github.com/go-envx/envx/app/internal/core/secrets"
-	"github.com/go-envx/envx/app/internal/lib/filex"
-	"github.com/go-envx/envx/app/internal/lib/printer"
 )
 
-// writeDecryptManifest creates a valid workspace manifest for decrypt action tests.
-func writeDecryptManifest(t *testing.T) string {
-	t.Helper()
-	path := filepath.Join(t.TempDir(), "envx.yaml")
-	body := "environments: [production]\n" +
-		"projects:\n  app:\n    includes: [env/app]\n"
-	if err := os.WriteFile(path, []byte(body), 0o600); err != nil {
-		t.Fatal(err)
-	}
-	return path
-}
-
-// TestExecuteDecryptsCiphertextInPlace verifies decrypt rewrites ciphertext with
-// plaintext in place.
-func TestExecuteDecryptsCiphertextInPlace(t *testing.T) {
+// TestSecretsDecryptCommand verifies --group and --key select the secret,
+// which is rewritten as plaintext and listed under --verbose.
+func TestSecretsDecryptCommand(t *testing.T) {
 	t.Parallel()
 
-	manifest := writeDecryptManifest(t)
-	manager := managerFor(t, manifest)
-	if _, err := manager.GenerateKeypair("production"); err != nil {
-		t.Fatalf("GenerateKeypair(): %v", err)
-	}
-
-	const plaintext = "database-password"
-	_, err := manager.SetSecret(
-		"production", "database_password", func() (string, error) {
-			return plaintext, nil
-		},
+	factory := seededFactory(t)
+	stdout, _, err := execute(
+		t, factory, "",
+		"secrets", "decrypt", "--group", "production", "--key", "api_key", "-v",
 	)
 	if err != nil {
-		t.Fatalf("SetSecret(): %v", err)
+		t.Fatalf("Execute(): %v", err)
 	}
-
-	result, err := manager.DecryptSecrets("Production", "database_password")
-	if err != nil {
-		t.Fatalf("DecryptSecrets(): %v", err)
+	if got := factory.stored("production", "api_key"); got != "s3cret" {
+		t.Errorf("api_key = %q, want the plaintext", got)
 	}
-	if len(result.Secrets) != 1 {
-		t.Fatalf("len(Secrets) = %d, want 1", len(result.Secrets))
-	}
-
-	data, err := filex.Read(secretsPathFor(manifest))
-	if err != nil {
-		t.Fatalf("Read(): %v", err)
-	}
-	if !strings.Contains(string(data), plaintext) {
-		t.Fatalf("store does not contain plaintext after decrypt: %q", data)
-	}
-}
-
-// TestExecuteDecryptUnavailableGroupReportsSkipped verifies missing key reports
-// in unavailable.
-func TestExecuteDecryptUnavailableGroupReportsSkipped(t *testing.T) {
-	t.Parallel()
-
-	manifest := writeDecryptManifest(t)
-	manager := managerFor(t, manifest)
-	if _, err := manager.GenerateKeypair("production"); err != nil {
-		t.Fatalf("GenerateKeypair(): %v", err)
-	}
-	_, err := manager.SetSecret(
-		"production", "database_password", func() (string, error) {
-			return "secret-val", nil
-		},
-	)
-	if err != nil {
-		t.Fatalf("SetSecret(): %v", err)
-	}
-
-	// Remove keys file so group is unavailable
-	if err := os.Remove(keysPathFor(manifest)); err != nil {
-		t.Fatalf("Remove keys file: %v", err)
-	}
-
-	result, err := manager.DecryptSecrets("", "")
-	if err != nil {
-		t.Fatalf("DecryptSecrets(): %v", err)
-	}
-	if len(result.UnavailableGroups) != 1 || result.UnavailableGroups[0] != "production" {
-		t.Errorf("result.UnavailableGroups = %v, want [production]", result.UnavailableGroups)
-	}
-}
-
-// TestOutputDecryptReportsDecryptedCount verifies the summary output.
-func TestOutputDecryptReportsDecryptedCount(t *testing.T) {
-	t.Parallel()
-
-	var out, errOut bytes.Buffer
-	err := outputSecretsDecrypt(
-		printer.NewPlain(&out, &errOut),
-		secrets.DecryptSecretsResult{
-			Secrets: []secrets.Reference{
-				{Group: "production", Key: "database_password"},
-			},
-			Location: "/workspace/secrets.yaml",
-		},
-		true,
-	)
-	if err != nil {
-		t.Fatalf("outputDecrypt(): %v", err)
-	}
-
-	got := out.String()
-	wants := []string{
-		"Decrypted 1 secret",
-		"/workspace/secrets.yaml",
-		"production/database_password",
-	}
-	for _, want := range wants {
-		if !strings.Contains(got, want) {
-			t.Errorf("outputDecrypt() = %q, want it to contain %q", got, want)
+	for _, want := range []string{"Decrypted 1 secret in:", "  production/api_key"} {
+		if !strings.Contains(stdout, want) {
+			t.Errorf("stdout = %q, want %q", stdout, want)
 		}
 	}
 }
 
-// mockSecretsFactory implements SecretsFactory for unit testing.
-type mockSecretsFactory struct {
-	svc *secrets.Service
-	err error
-}
+// TestSecretsDecryptCommandUnavailableGroup verifies a group without a private
+// key is skipped with a warning on stderr.
+func TestSecretsDecryptCommandUnavailableGroup(t *testing.T) {
+	t.Parallel()
 
-func (m *mockSecretsFactory) NewSecretsService(
-	_ string,
-) (*secrets.Service, error) {
-	return m.svc, m.err
-}
-
-// TestNewDecryptCommand verifies the command builds and dispatches through the factory.
-func TestNewDecryptCommand(t *testing.T) {
-	manifest := writeDecryptManifest(t)
-	manager := managerFor(t, manifest)
-	if _, err := manager.GenerateKeypair("production"); err != nil {
-		t.Fatalf("GenerateKeypair(): %v", err)
-	}
-	_, err := manager.SetSecret(
-		"production", "database_password", func() (string, error) {
-			return "secret-value", nil
-		},
-	)
+	factory := seededFactory(t)
+	clear(factory.keys.byPublic)
+	stdout, stderr, err := execute(t, factory, "", "secrets", "decrypt")
 	if err != nil {
-		t.Fatalf("SetSecret(): %v", err)
+		t.Fatalf("Execute(): %v", err)
 	}
-
-	factory := &mockSecretsFactory{svc: manager}
-
-	parent := NewSecretsCommand(factory)
-	parent.PersistentFlags().String("config", manifest, "")
-	parent.SetArgs([]string{
-		"decrypt",
-		"--group", "production",
-		"--key", "database_password",
-		"--config", manifest,
-	})
-
-	var out bytes.Buffer
-	parent.SetOut(&out)
-
-	if err := parent.Execute(); err != nil {
-		t.Fatalf("parent.Execute(): %v", err)
+	if !strings.Contains(stderr, `no private key available for group "production"`) {
+		t.Errorf("stderr = %q, want the unavailable-group warning", stderr)
+	}
+	if stdout != "" {
+		t.Errorf("stdout = %q, want nothing when no secret was decrypted", stdout)
+	}
+	if got := factory.stored("production", "api_key"); got == "s3cret" {
+		t.Error("api_key was decrypted without a private key")
 	}
 }

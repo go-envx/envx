@@ -1,108 +1,68 @@
 package cli
 
 import (
-	"bytes"
-	"os"
-	"path/filepath"
 	"strings"
 	"testing"
-
-	"github.com/go-envx/envx/app/internal/core/env"
-	"github.com/go-envx/envx/app/internal/lib/printer"
 )
 
-func writeExplainManifest(t *testing.T) (manifestPath, dir string) {
-	t.Helper()
-	dir = t.TempDir()
-	manifestPath = filepath.Join(dir, "envx.yaml")
-	manifestBody := "environments: [development, production]\n" +
-		"projects:\n  app:\n    includes: [env/postgres]\n"
-	if err := os.WriteFile(manifestPath, []byte(manifestBody), 0o600); err != nil {
-		t.Fatal(err)
-	}
-
-	envDir := filepath.Join(dir, "env")
-	if err := os.MkdirAll(envDir, 0o750); err != nil {
-		t.Fatal(err)
-	}
-	writeYAML(t, envDir, "postgres.yaml", "host: localhost\nport: 5432\n")
-	writeYAML(t, envDir, "postgres.development.yaml", "host: dev-db.local\n")
-
-	return manifestPath, dir
-}
-
-func TestNewExplainCommandTable(t *testing.T) {
+// TestExplainCommandOutput verifies the table and JSON renders against their
+// goldens.
+func TestExplainCommandOutput(t *testing.T) {
 	t.Parallel()
 
-	manifest, _ := writeExplainManifest(t)
-	svc := newEnvService(t, manifest)
-
-	factory := &mockEnvFactory{svc: svc}
-	cmd := NewExplainCommand(factory)
-	cmd.PersistentFlags().String("config", manifest, "")
-	cmd.SetArgs([]string{
-		"app",
-		"--config", manifest,
-		"--env", "development",
-	})
-
-	var out bytes.Buffer
-	cmd.SetOut(&out)
-
-	if err := cmd.Execute(); err != nil {
-		t.Fatalf("cmd.Execute(): %v", err)
+	tests := []struct {
+		// golden names the expected output file.
+		golden string
+		// args are the flags after the project.
+		args []string
+	}{
+		{golden: "explain.txt"},
+		{golden: "explain.json", args: []string{"--output", "json"}},
 	}
+	for _, tt := range tests {
+		t.Run(tt.golden, func(t *testing.T) {
+			t.Parallel()
 
-	output := out.String()
-	if !strings.Contains(output, "HOST") || !strings.Contains(output, "dev-db.local") {
-		t.Errorf("output = %q, want HOST and dev-db.local", output)
+			args := append([]string{"app", "--env", "development"}, tt.args...)
+			stdout, _, err := execute(t, NewExplainCommand(newFakeFactory()), args...)
+			if err != nil {
+				t.Fatalf("Execute(): %v", err)
+			}
+			assertGolden(t, tt.golden, stdout)
+		})
 	}
 }
 
-func TestNewExplainCommandJSON(t *testing.T) {
+// TestExplainCommandFlags verifies the key argument narrows the output and
+// --reveal and --absolute change the rendered columns.
+func TestExplainCommandFlags(t *testing.T) {
 	t.Parallel()
 
-	manifest, _ := writeExplainManifest(t)
-	svc := newEnvService(t, manifest)
-
-	factory := &mockEnvFactory{svc: svc}
-	cmd := NewExplainCommand(factory)
-	cmd.PersistentFlags().String("config", manifest, "")
-	cmd.SetArgs([]string{
-		"app",
-		"--config", manifest,
-		"--env", "development",
-		"--output", "json",
-	})
-
-	var out bytes.Buffer
-	cmd.SetOut(&out)
-
-	if err := cmd.Execute(); err != nil {
-		t.Fatalf("cmd.Execute(): %v", err)
-	}
-
-	output := out.String()
-	if !strings.Contains(output, `"key": "HOST"`) {
-		t.Errorf("output = %q, want JSON containing key HOST", output)
-	}
-}
-
-func TestOutputExplainInvalidFormatFails(t *testing.T) {
-	t.Parallel()
-
-	var buf bytes.Buffer
-	disabled := false
-	console := printer.New(printer.Options{
-		Out:   &buf,
-		Err:   &buf,
-		Color: &disabled,
-	})
-
-	err := outputExplain(
-		console, &env.ExplainResult{}, "invalid_format", false, false,
+	stdout, _, err := execute(
+		t, NewExplainCommand(newFakeFactory()),
+		"app", "host", "--env", "development", "--reveal", "--absolute",
 	)
-	if err == nil {
-		t.Fatal("expected error for invalid output format")
+	if err != nil {
+		t.Fatalf("Execute(): %v", err)
+	}
+	for _, want := range []string{"RESOLVED", appInclude + ".development.yaml"} {
+		if !strings.Contains(stdout, want) {
+			t.Errorf("stdout missing %q:\n%s", want, stdout)
+		}
+	}
+	if strings.Contains(stdout, "PORT") {
+		t.Errorf("stdout lists an unrequested key:\n%s", stdout)
+	}
+}
+
+// TestExplainCommandInvalidOutput verifies an unknown --output is rejected.
+func TestExplainCommandInvalidOutput(t *testing.T) {
+	t.Parallel()
+
+	_, _, err := execute(
+		t, NewExplainCommand(newFakeFactory()), "app", "--output", "yaml",
+	)
+	if err == nil || !strings.Contains(err.Error(), "invalid output format") {
+		t.Fatalf("err = %v, want an invalid output format error", err)
 	}
 }

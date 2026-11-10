@@ -1,0 +1,3 @@
+SCOPE           KEY            STATUS                      MESSAGE
+api/production  PASSWORD       SECRET_REFERENCE_NOT_FOUND  no stored value for this reference
+secrets         shared/unused  SECRET_IS_NOT_REFERENCED    stored value is never referenced by any environment

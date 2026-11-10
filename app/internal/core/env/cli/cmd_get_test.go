@@ -1,128 +1,36 @@
 package cli
 
 import (
-	"bytes"
-	"os"
-	"path/filepath"
 	"testing"
-
-	"github.com/go-envx/envx/app/internal/app"
-	"github.com/go-envx/envx/app/internal/core/env"
 )
 
-// mockEnvFactory implements Factory for unit testing.
-type mockEnvFactory struct {
-	svc *env.Service
-	err error
-}
+// TestGetCommandPrintsValue verifies the project, key, and --env reach the
+// service and the value is printed with a trailing newline.
+func TestGetCommandPrintsValue(t *testing.T) {
+	t.Parallel()
 
-func (m *mockEnvFactory) NewEnvService(
-	configPath string,
-) (*env.Service, error) {
-	if m.err != nil {
-		return nil, m.err
-	}
-	if m.svc != nil {
-		return m.svc, nil
-	}
-	return app.Factory{}.NewEnvService(configPath)
-}
-
-// newEnvService assembles the environment service for manifest.
-func newEnvService(t *testing.T, manifest string) *env.Service {
-	t.Helper()
-	svc, err := app.Factory{}.NewEnvService(manifest)
+	stdout, _, err := execute(
+		t, NewGetCommand(newFakeFactory()), "app", "host", "--env", "production",
+	)
 	if err != nil {
-		t.Fatalf("NewEnvService(): %v", err)
+		t.Fatalf("Execute(): %v", err)
 	}
-	return svc
-}
-
-func writeGetManifest(t *testing.T) (manifestPath, dir string) {
-	t.Helper()
-	dir = t.TempDir()
-	manifestPath = filepath.Join(dir, "envx.yaml")
-	manifestBody := "environments: [development, production]\n" +
-		"projects:\n  app:\n    includes: [env/postgres]\n"
-	if err := os.WriteFile(manifestPath, []byte(manifestBody), 0o600); err != nil {
-		t.Fatal(err)
-	}
-
-	envDir := filepath.Join(dir, "env")
-	if err := os.MkdirAll(envDir, 0o750); err != nil {
-		t.Fatal(err)
-	}
-	writeYAML(t, envDir, "postgres.yaml", "host: localhost\nport: 5432\n")
-	writeYAML(t, envDir, "postgres.development.yaml", "host: dev-db.local\n")
-
-	return manifestPath, dir
-}
-
-func writeYAML(t *testing.T, dir, name, body string) {
-	t.Helper()
-	if err := os.WriteFile(filepath.Join(dir, name), []byte(body), 0o600); err != nil {
-		t.Fatal(err)
+	if stdout != "prod-db.internal\n" {
+		t.Errorf("stdout = %q, want prod-db.internal", stdout)
 	}
 }
 
-func TestOutputGetPrintsPlaintextWithNewline(t *testing.T) {
+// TestGetCommandSettings verifies setting flags reach the service.
+func TestGetCommandSettings(t *testing.T) {
 	t.Parallel()
 
-	var buf bytes.Buffer
-	err := outputGet(&buf, "dev-db.local")
+	stdout, _, err := execute(
+		t, NewGetCommand(newFakeFactory()), "app", "APP_PORT", "--prefix", "app",
+	)
 	if err != nil {
-		t.Fatalf("outputGet(): %v", err)
+		t.Fatalf("Execute(): %v", err)
 	}
-
-	if got, want := buf.String(), "dev-db.local\n"; got != want {
-		t.Errorf("outputGet() = %q, want %q", got, want)
-	}
-}
-
-func TestNewGetCommand(t *testing.T) {
-	t.Parallel()
-
-	manifest, _ := writeGetManifest(t)
-	svc := newEnvService(t, manifest)
-
-	factory := &mockEnvFactory{svc: svc}
-	cmd := NewGetCommand(factory)
-	cmd.PersistentFlags().String("config", manifest, "")
-	cmd.SetArgs([]string{
-		"app",
-		"host",
-		"--config", manifest,
-		"--env", "development",
-	})
-
-	var out bytes.Buffer
-	cmd.SetOut(&out)
-
-	if err := cmd.Execute(); err != nil {
-		t.Fatalf("cmd.Execute(): %v", err)
-	}
-
-	if got, want := out.String(), "dev-db.local\n"; got != want {
-		t.Errorf("output = %q, want %q", got, want)
-	}
-}
-
-func TestNewGetCommandMissingKey(t *testing.T) {
-	t.Parallel()
-
-	manifest, _ := writeGetManifest(t)
-	svc := newEnvService(t, manifest)
-
-	factory := &mockEnvFactory{svc: svc}
-	cmd := NewGetCommand(factory)
-	cmd.PersistentFlags().String("config", manifest, "")
-	cmd.SetArgs([]string{
-		"app",
-		"missing_key",
-		"--config", manifest,
-	})
-
-	if err := cmd.Execute(); err == nil {
-		t.Fatal("expected error for missing key")
+	if stdout != "5432\n" {
+		t.Errorf("stdout = %q, want 5432", stdout)
 	}
 }

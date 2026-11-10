@@ -1,0 +1,45 @@
+{
+  "summary": {
+    "severity": "ok",
+    "errors": 0,
+    "warnings": 0
+  },
+  "entries": [
+    {
+      "key": "DEBUG",
+      "type": "config",
+      "value": "true",
+      "source": "env/postgres.development.yaml",
+      "sourceKey": "debug",
+      "status": {
+        "severity": "ok",
+        "code": "OK"
+      }
+    },
+    {
+      "key": "HOST",
+      "type": "config",
+      "value": "dev-db.local",
+      "source": "env/postgres.development.yaml",
+      "sourceKey": "host",
+      "shadowed": [
+        "env/postgres.yaml"
+      ],
+      "status": {
+        "severity": "ok",
+        "code": "OK"
+      }
+    },
+    {
+      "key": "PORT",
+      "type": "config",
+      "value": "5432",
+      "source": "env/postgres.yaml",
+      "sourceKey": "port",
+      "status": {
+        "severity": "ok",
+        "code": "OK"
+      }
+    }
+  ]
+}

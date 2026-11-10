@@ -1,170 +1,67 @@
 package cli
 
 import (
-	"bytes"
-	"os"
-	"path/filepath"
 	"strings"
 	"testing"
-
-	"github.com/go-envx/envx/app/internal/core/secrets"
-	"github.com/go-envx/envx/app/internal/lib/filex"
-	"github.com/go-envx/envx/app/internal/lib/printer"
 )
 
-// writeEncryptManifest creates a valid workspace manifest for encrypt action tests.
-func writeEncryptManifest(t *testing.T) string {
+// plaintextFactory returns seededFactory with two plaintext values, a and b,
+// added to the "production" group.
+func plaintextFactory(t *testing.T) *fakeFactory {
 	t.Helper()
-	path := filepath.Join(t.TempDir(), "envx.yaml")
-	body := "environments: [production]\n" +
-		"projects:\n  app:\n    includes: [env/app]\n"
-	if err := os.WriteFile(path, []byte(body), 0o600); err != nil {
-		t.Fatal(err)
-	}
-	return path
+	f := seededFactory(t)
+	values := f.store.groups["production"].Values
+	values["a"] = "plain-a"
+	values["b"] = "plain-b"
+	return f
 }
 
-// TestExecuteEncryptsPlaintextInPlace verifies encrypt replaces plaintext with
-// ciphertext envelopes without altering untouched groups.
-func TestExecuteEncryptsPlaintextInPlace(t *testing.T) {
+// TestSecretsEncryptCommand verifies --group and --key narrow the operation and
+// --verbose lists each encrypted secret.
+func TestSecretsEncryptCommand(t *testing.T) {
 	t.Parallel()
 
-	manifest := writeEncryptManifest(t)
-	manager := managerFor(t, manifest)
-	if _, err := manager.GenerateKeypair("production"); err != nil {
-		t.Fatalf("GenerateKeypair(): %v", err)
-	}
-	if _, err := manager.SetSecret("production", "api_key", func() (string, error) {
-		return "plain-secret", nil
-	}); err != nil {
-		t.Fatalf("SetSecret(): %v", err)
-	}
-
-	// First decrypt it so we have a plaintext store value
-	if _, err := manager.DecryptSecrets("production", "api_key"); err != nil {
-		t.Fatalf("DecryptSecrets(): %v", err)
-	}
-
-	result, err := manager.EncryptSecrets("Production", "api_key")
-	if err != nil {
-		t.Fatalf("EncryptSecrets(): %v", err)
-	}
-	if len(result.Secrets) != 1 {
-		t.Fatalf("len(Secrets) = %d, want 1", len(result.Secrets))
-	}
-	if result.Secrets[0].Group != "production" || result.Secrets[0].Key != "api_key" {
-		t.Errorf("Secrets = %+v", result.Secrets)
-	}
-
-	data, err := filex.Read(secretsPathFor(manifest))
-	if err != nil {
-		t.Fatalf("Read(): %v", err)
-	}
-	if !strings.Contains(string(data), "encrypted-age:") {
-		t.Errorf("store = %q, want age envelope", data)
-	}
-}
-
-// TestExecuteEncryptNoMatchesFails verifies narrowing to an unknown group fails.
-func TestExecuteEncryptNoMatchesFails(t *testing.T) {
-	t.Parallel()
-
-	manifest := writeEncryptManifest(t)
-	manager := managerFor(t, manifest)
-
-	if _, err := manager.EncryptSecrets("missing", ""); err == nil {
-		t.Fatal("EncryptSecrets() succeeded for missing group")
-	}
-}
-
-// TestOutputEncryptReportsEncryptedCount verifies the summary output.
-func TestOutputEncryptReportsEncryptedCount(t *testing.T) {
-	t.Parallel()
-
-	var out, errOut bytes.Buffer
-	err := outputSecretsEncrypt(
-		printer.NewPlain(&out, &errOut),
-		secrets.EncryptSecretsResult{
-			Secrets: []secrets.Reference{
-				{Group: "production", Key: "api_key"},
-			},
-			Location: "/workspace/secrets.yaml",
-		},
-		true,
+	factory := plaintextFactory(t)
+	stdout, _, err := execute(
+		t, factory, "",
+		"secrets", "encrypt", "--group", "production", "--key", "a", "--verbose",
 	)
 	if err != nil {
-		t.Fatalf("outputEncrypt(): %v", err)
+		t.Fatalf("Execute(): %v", err)
 	}
-
-	got := out.String()
-	wants := []string{
-		"Encrypted 1 secret",
-		"/workspace/secrets.yaml",
-		"production/api_key",
+	got := factory.stored("production", "a")
+	if !strings.HasPrefix(got, "encrypted-age:") {
+		t.Errorf("a = %q, want an age envelope", got)
 	}
-	for _, want := range wants {
-		if !strings.Contains(got, want) {
-			t.Errorf("outputEncrypt() = %q, want it to contain %q", got, want)
+	if got := factory.stored("production", "b"); got != "plain-b" {
+		t.Errorf("b = %q, want it left as plaintext", got)
+	}
+	for _, want := range []string{"Encrypted 1 secret in:", "  production/a"} {
+		if !strings.Contains(stdout, want) {
+			t.Errorf("stdout = %q, want %q", stdout, want)
 		}
 	}
 }
 
-// TestOutputEncryptReportsNothingToEncrypt verifies message when no changes.
-func TestOutputEncryptReportsNothingToEncrypt(t *testing.T) {
+// TestSecretsEncryptCommandSummary verifies the summary omits identities
+// without --verbose and reports when nothing needed encrypting.
+func TestSecretsEncryptCommandSummary(t *testing.T) {
 	t.Parallel()
 
-	var out, errOut bytes.Buffer
-	err := outputSecretsEncrypt(
-		printer.NewPlain(&out, &errOut),
-		secrets.EncryptSecretsResult{
-			Secrets:  nil,
-			Location: "/workspace/secrets.yaml",
-		},
-		false,
-	)
+	stdout, _, err := execute(t, plaintextFactory(t), "", "secrets", "encrypt")
 	if err != nil {
-		t.Fatalf("outputEncrypt(): %v", err)
+		t.Fatalf("Execute(): %v", err)
+	}
+	if !strings.Contains(stdout, "Encrypted 2 secrets in:") ||
+		strings.Contains(stdout, "production/a") {
+		t.Errorf("stdout = %q, want a count without identities", stdout)
 	}
 
-	if !strings.Contains(out.String(), "No plaintext values to encrypt.") {
-		t.Errorf("outputEncrypt() = %q, want no plaintext message", out.String())
+	stdout, _, err = execute(t, seededFactory(t), "", "secrets", "encrypt")
+	if err != nil {
+		t.Fatalf("Execute() with nothing to encrypt: %v", err)
 	}
-}
-
-// TestNewSecretsEncryptCommand verifies the command builds and dispatches
-// through the factory.
-func TestNewSecretsEncryptCommand(t *testing.T) {
-	manifest := writeEncryptManifest(t)
-	manager := managerFor(t, manifest)
-	if _, err := manager.GenerateKeypair("production"); err != nil {
-		t.Fatalf("GenerateKeypair(): %v", err)
-	}
-	if _, err := manager.SetSecret("production", "api_key", func() (string, error) {
-		return "plain-secret", nil
-	}); err != nil {
-		t.Fatalf("SetSecret(): %v", err)
-	}
-
-	// Decrypt so we have a plaintext secret to encrypt
-	if _, err := manager.DecryptSecrets("production", "api_key"); err != nil {
-		t.Fatalf("DecryptSecrets(): %v", err)
-	}
-
-	factory := &mockSecretsFactory{svc: manager}
-
-	parent := NewSecretsCommand(factory)
-	parent.PersistentFlags().String("config", manifest, "")
-	parent.SetArgs([]string{
-		"encrypt",
-		"--group", "production",
-		"--key", "api_key",
-		"--config", manifest,
-	})
-
-	var out bytes.Buffer
-	parent.SetOut(&out)
-
-	if err := parent.Execute(); err != nil {
-		t.Fatalf("parent.Execute(): %v", err)
+	if !strings.Contains(stdout, "No plaintext values to encrypt.") {
+		t.Errorf("stdout = %q, want the nothing-to-encrypt message", stdout)
 	}
 }

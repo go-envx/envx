@@ -1,0 +1,4 @@
+KEY    TYPE    VALUE         SOURCE                         STATUS
+DEBUG  config  true          env/postgres.development.yaml  OK
+HOST   config  dev-db.local  env/postgres.development.yaml  OK
+PORT   config  5432          env/postgres.yaml              OK

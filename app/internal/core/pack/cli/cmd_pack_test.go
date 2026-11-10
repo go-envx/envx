@@ -3,27 +3,56 @@ package cli
 import (
 	"bytes"
 	"errors"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 
-	"github.com/go-envx/envx/app/internal/app"
 	"github.com/go-envx/envx/app/internal/core/pack"
+	"github.com/go-envx/envx/app/internal/core/secrets"
 	workspacecli "github.com/go-envx/envx/app/internal/core/workspace/cli"
+	workspaceStore "github.com/go-envx/envx/app/internal/core/workspace/filestore"
 	"github.com/go-envx/envx/app/internal/lib/printer"
 )
 
-// mockPackFactory implements Factory for unit testing.
-type mockPackFactory struct {
+// fakeFactory builds a pack service from the workspace at the requested path
+// over an empty secrets store.
+type fakeFactory struct {
+	// configPath records the manifest path the command requested.
+	configPath string
+	// err, when set, is returned instead of a service.
 	err error
 }
 
-func (m *mockPackFactory) NewPackService(configPath string) (*pack.Service, error) {
-	if m.err != nil {
-		return nil, m.err
+// emptySecrets is a pack.SecretStore holding no groups.
+type emptySecrets struct{}
+
+// NewPackService implements Factory.
+func (f *fakeFactory) NewPackService(configPath string) (*pack.Service, error) {
+	f.configPath = configPath
+	if f.err != nil {
+		return nil, f.err
 	}
-	return app.Factory{}.NewPackService(configPath)
+	repository, err := workspaceStore.New(workspaceStore.Params{Path: configPath})
+	if err != nil {
+		return nil, err
+	}
+	ws, err := repository.Load()
+	if err != nil {
+		return nil, err
+	}
+	return pack.New(*ws, pack.Dependencies{Secrets: emptySecrets{}})
+}
+
+// Read implements pack.SecretStore.
+func (emptySecrets) Read(string) (secrets.Snapshot, error) {
+	return secrets.Snapshot{}, nil
+}
+
+// Export implements pack.SecretStore.
+func (emptySecrets) Export(io.Writer, []secrets.Group) error {
+	return nil
 }
 
 // executePack builds the pack command, executes it with args, and returns its
@@ -46,17 +75,20 @@ func executePack(
 	return out.String(), err
 }
 
-// writePackWorkspace scaffolds a minimal single-project workspace in a fresh temp
-// dir and returns the manifest path.
+// writePackWorkspace scaffolds a two-project workspace in a fresh temp dir and
+// returns the manifest path.
 func writePackWorkspace(t *testing.T) string {
 	t.Helper()
 	root := t.TempDir()
 	files := map[string]string{
 		"envx.yaml": "environments: [development, production]\n" +
-			"projects:\n  app:\n    includes: [env/app]\n",
+			"projects:\n" +
+			"  app:\n    includes: [env/app]\n" +
+			"  web:\n    includes: [env/web]\n",
 		"env/app.yaml":             "A: base\n",
 		"env/app.development.yaml": "A: dev\n",
 		"env/app.production.yaml":  "A: prod\n",
+		"env/web.yaml":             "W: base\n",
 	}
 	for path, body := range files {
 		full := filepath.Join(root, path)
@@ -84,25 +116,28 @@ func seedPackDir(t *testing.T, dir string) string {
 	return stale
 }
 
-// TestPackCommandWritesBundle verifies the command copies the selected
-// environment's files and reports them.
+// TestPackCommandWritesBundle verifies the command passes --config to the
+// factory, copies only the selected environment's files, and reports them.
 func TestPackCommandWritesBundle(t *testing.T) {
 	t.Parallel()
 
 	cfg := writePackWorkspace(t)
 	out := filepath.Join(t.TempDir(), "dist")
+	factory := &fakeFactory{}
 
-	stdout, err := executePack(
-		t, &mockPackFactory{}, cfg, "-e", "production", "--out", out,
-	)
+	stdout, err := executePack(t, factory, cfg, "-e", "production", "--out", out)
 	if err != nil {
 		t.Fatalf("pack: %v", err)
+	}
+	if factory.configPath != cfg {
+		t.Errorf("factory configPath = %q, want %q", factory.configPath, cfg)
 	}
 	if !strings.Contains(stdout, "app.production.yaml") {
 		t.Errorf("summary missing packed file, got %q", stdout)
 	}
-	if _, err := os.Stat(filepath.Join(out, "envx.yaml")); err != nil {
-		t.Errorf("manifest not written: %v", err)
+	kept := filepath.Join(out, "app", "app.production.yaml")
+	if _, err := os.Stat(kept); err != nil {
+		t.Errorf("selected production overlay was not copied: %v", err)
 	}
 	dropped := filepath.Join(out, "app", "app.development.yaml")
 	if _, err := os.Stat(dropped); !os.IsNotExist(err) {
@@ -110,53 +145,74 @@ func TestPackCommandWritesBundle(t *testing.T) {
 	}
 }
 
-// TestPackCommandRefusesNonEmptyOut verifies the command refuses a non-empty
-// output directory by default.
-func TestPackCommandRefusesNonEmptyOut(t *testing.T) {
+// TestPackCommandProjectFlag verifies -p narrows the bundle to the named
+// project.
+func TestPackCommandProjectFlag(t *testing.T) {
 	t.Parallel()
 
 	cfg := writePackWorkspace(t)
 	out := filepath.Join(t.TempDir(), "dist")
-	seedPackDir(t, out)
 
-	_, err := executePack(t, &mockPackFactory{}, cfg, "-e", "production", "--out", out)
-	if !errors.Is(err, pack.ErrOutputNotEmpty) {
-		t.Fatalf("err = %v, want ErrOutputNotEmpty", err)
+	stdout, err := executePack(t, &fakeFactory{}, cfg, "-p", "web", "--out", out)
+	if err != nil {
+		t.Fatalf("pack: %v", err)
+	}
+	if !strings.Contains(stdout, "web.yaml") || strings.Contains(stdout, "app.yaml") {
+		t.Errorf("summary = %q, want only the web project's files", stdout)
 	}
 }
 
-// TestPackCommandForceReplacesOut verifies --force lets the command replace a
-// non-empty output directory.
-func TestPackCommandForceReplacesOut(t *testing.T) {
+// TestPackCommandRepeatedEnv verifies -e is repeatable.
+func TestPackCommandRepeatedEnv(t *testing.T) {
+	t.Parallel()
+
+	out := filepath.Join(t.TempDir(), "dist")
+	stdout, err := executePack(
+		t, &fakeFactory{}, writePackWorkspace(t),
+		"-e", "development", "-e", "production", "--out", out,
+	)
+	if err != nil {
+		t.Fatalf("pack: %v", err)
+	}
+	if !strings.Contains(stdout, "for environments [development, production]") {
+		t.Errorf("summary = %q, want both environments", stdout)
+	}
+}
+
+// TestPackCommandForce verifies a non-empty --out is refused unless --force is
+// set, which replaces it.
+func TestPackCommandForce(t *testing.T) {
 	t.Parallel()
 
 	cfg := writePackWorkspace(t)
 	out := filepath.Join(t.TempDir(), "dist")
 	stale := seedPackDir(t, out)
 
-	_, err := executePack(
-		t, &mockPackFactory{}, cfg, "-e", "production", "--out", out, "--force",
-	)
-	if err != nil {
-		t.Fatalf("pack --force: %v", err)
+	_, err := executePack(t, &fakeFactory{}, cfg, "--out", out)
+	if !errors.Is(err, pack.ErrOutputNotEmpty) {
+		t.Fatalf("without --force: err = %v, want ErrOutputNotEmpty", err)
+	}
+
+	if _, err := executePack(t, &fakeFactory{}, cfg, "--out", out, "--force"); err != nil {
+		t.Fatalf("with --force: %v", err)
 	}
 	if _, err := os.Stat(stale); !os.IsNotExist(err) {
 		t.Error("--force did not clear the stale file")
 	}
-	if _, err := os.Stat(filepath.Join(out, "envx.yaml")); err != nil {
-		t.Errorf("manifest not written: %v", err)
-	}
 }
 
-// TestPackCommandRequiresOut verifies --out is a required flag.
+// TestPackCommandRequiresOut verifies --out is a required flag checked before
+// the factory is called.
 func TestPackCommandRequiresOut(t *testing.T) {
 	t.Parallel()
 
-	cfg := writePackWorkspace(t)
-
-	_, err := executePack(t, &mockPackFactory{}, cfg, "-e", "production")
-	if err == nil || !strings.Contains(err.Error(), "out") {
+	factory := &fakeFactory{}
+	_, err := executePack(t, factory, writePackWorkspace(t), "-e", "production")
+	if err == nil || !strings.Contains(err.Error(), `required flag(s) "out"`) {
 		t.Fatalf("err = %v, want a required --out error", err)
+	}
+	if factory.configPath != "" {
+		t.Error("factory was called despite the missing --out")
 	}
 }
 
@@ -164,11 +220,10 @@ func TestPackCommandRequiresOut(t *testing.T) {
 func TestPackCommandFactoryError(t *testing.T) {
 	t.Parallel()
 
-	cfg := writePackWorkspace(t)
-	out := filepath.Join(t.TempDir(), "dist")
 	want := errors.New("factory failed")
+	out := filepath.Join(t.TempDir(), "dist")
 
-	_, err := executePack(t, &mockPackFactory{err: want}, cfg, "--out", out)
+	_, err := executePack(t, &fakeFactory{err: want}, "envx.yaml", "--out", out)
 	if !errors.Is(err, want) {
 		t.Fatalf("err = %v, want %v", err, want)
 	}

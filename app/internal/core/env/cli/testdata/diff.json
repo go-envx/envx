@@ -1,0 +1,21 @@
+{
+  "added": [
+    {
+      "key": "POOL",
+      "env_b": "20"
+    }
+  ],
+  "removed": [
+    {
+      "key": "DEBUG",
+      "env_a": "true"
+    }
+  ],
+  "changed": [
+    {
+      "key": "HOST",
+      "env_a": "dev-db.local",
+      "env_b": "prod-db.internal"
+    }
+  ]
+}

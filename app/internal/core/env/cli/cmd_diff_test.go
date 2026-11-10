@@ -1,110 +1,61 @@
 package cli
 
 import (
-	"bytes"
-	"os"
-	"path/filepath"
 	"strings"
 	"testing"
-
-	"github.com/go-envx/envx/app/internal/core/env"
-	"github.com/go-envx/envx/app/internal/lib/printer"
 )
 
-func writeDiffManifest(t *testing.T) (manifestPath, dir string) {
-	t.Helper()
-	dir = t.TempDir()
-	manifestPath = filepath.Join(dir, "envx.yaml")
-	manifestBody := "environments: [development, production]\n" +
-		"projects:\n  app:\n    includes: [env/postgres]\n"
-	if err := os.WriteFile(manifestPath, []byte(manifestBody), 0o600); err != nil {
-		t.Fatal(err)
-	}
-
-	envDir := filepath.Join(dir, "env")
-	if err := os.MkdirAll(envDir, 0o750); err != nil {
-		t.Fatal(err)
-	}
-	writeYAML(t, envDir, "postgres.yaml", "host: localhost\nport: 5432\n")
-	writeYAML(t, envDir, "postgres.development.yaml", "host: dev-db.local\n")
-	writeYAML(t, envDir, "postgres.production.yaml", "host: prod-db.internal\n")
-
-	return manifestPath, dir
-}
-
-func TestNewDiffCommandTable(t *testing.T) {
+// TestDiffCommandOutput verifies the table and JSON renders against their
+// goldens.
+func TestDiffCommandOutput(t *testing.T) {
 	t.Parallel()
 
-	manifest, _ := writeDiffManifest(t)
-	svc := newEnvService(t, manifest)
-
-	factory := &mockEnvFactory{svc: svc}
-	cmd := NewDiffCommand(factory)
-	cmd.PersistentFlags().String("config", manifest, "")
-	cmd.SetArgs([]string{
-		"app",
-		"development",
-		"production",
-		"--config", manifest,
-	})
-
-	var out bytes.Buffer
-	cmd.SetOut(&out)
-
-	if err := cmd.Execute(); err != nil {
-		t.Fatalf("cmd.Execute(): %v", err)
+	tests := []struct {
+		// golden names the expected output file.
+		golden string
+		// args are the flags after the environments.
+		args []string
+	}{
+		{golden: "diff.txt"},
+		{golden: "diff.json", args: []string{"--output", "json"}},
 	}
+	for _, tt := range tests {
+		t.Run(tt.golden, func(t *testing.T) {
+			t.Parallel()
 
-	output := out.String()
-	if !strings.Contains(output, "HOST") ||
-		!strings.Contains(output, "dev-db.local -> prod-db.internal") {
-		t.Errorf("output = %q, want HOST diff", output)
+			args := append([]string{"app", "development", "production"}, tt.args...)
+			stdout, _, err := execute(t, NewDiffCommand(newFakeFactory()), args...)
+			if err != nil {
+				t.Fatalf("Execute(): %v", err)
+			}
+			assertGolden(t, tt.golden, stdout)
+		})
 	}
 }
 
-func TestNewDiffCommandJSON(t *testing.T) {
+// TestDiffCommandRejectsEnvFlag verifies --env is not accepted, since both
+// environments are positional.
+func TestDiffCommandRejectsEnvFlag(t *testing.T) {
 	t.Parallel()
 
-	manifest, _ := writeDiffManifest(t)
-	svc := newEnvService(t, manifest)
-
-	factory := &mockEnvFactory{svc: svc}
-	cmd := NewDiffCommand(factory)
-	cmd.PersistentFlags().String("config", manifest, "")
-	cmd.SetArgs([]string{
-		"app",
-		"development",
-		"production",
-		"--config", manifest,
-		"--output", "json",
-	})
-
-	var out bytes.Buffer
-	cmd.SetOut(&out)
-
-	if err := cmd.Execute(); err != nil {
-		t.Fatalf("cmd.Execute(): %v", err)
-	}
-
-	output := out.String()
-	if !strings.Contains(output, `"key": "HOST"`) {
-		t.Errorf("output = %q, want JSON containing key HOST", output)
+	_, _, err := execute(
+		t, NewDiffCommand(newFakeFactory()),
+		"app", "development", "production", "--env", "production",
+	)
+	if err == nil || !strings.Contains(err.Error(), "unknown flag: --env") {
+		t.Fatalf("err = %v, want an unknown --env flag error", err)
 	}
 }
 
-func TestOutputDiffInvalidFormatFails(t *testing.T) {
+// TestDiffCommandInvalidOutput verifies an unknown --output is rejected.
+func TestDiffCommandInvalidOutput(t *testing.T) {
 	t.Parallel()
 
-	var buf bytes.Buffer
-	disabled := false
-	console := printer.New(printer.Options{
-		Out:   &buf,
-		Err:   &buf,
-		Color: &disabled,
-	})
-
-	err := outputDiff(console, &env.DiffResult{}, "invalid_format")
-	if err == nil {
-		t.Fatal("expected error for invalid output format")
+	_, _, err := execute(
+		t, NewDiffCommand(newFakeFactory()),
+		"app", "development", "production", "--output", "yaml",
+	)
+	if err == nil || !strings.Contains(err.Error(), "invalid output format") {
+		t.Fatalf("err = %v, want an invalid output format error", err)
 	}
 }

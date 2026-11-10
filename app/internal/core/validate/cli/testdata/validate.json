@@ -1,0 +1,23 @@
+{
+  "summary": {
+    "failed": true,
+    "errors": 1,
+    "warnings": 1
+  },
+  "findings": [
+    {
+      "severity": "error",
+      "project": "api",
+      "environment": "production",
+      "key": "PASSWORD",
+      "code": "SECRET_REFERENCE_NOT_FOUND",
+      "message": "no stored value for this reference"
+    },
+    {
+      "severity": "warning",
+      "key": "shared/unused",
+      "code": "SECRET_IS_NOT_REFERENCED",
+      "message": "stored value is never referenced by any environment"
+    }
+  ]
+}

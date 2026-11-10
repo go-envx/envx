@@ -1,128 +1,21 @@
 package cli
 
 import (
-	"bytes"
-	"os"
-	"path/filepath"
 	"testing"
 )
 
-// writeGetManifest creates a valid workspace manifest for get action tests.
-func writeGetManifest(t *testing.T) string {
-	t.Helper()
-	path := filepath.Join(t.TempDir(), "envx.yaml")
-	body := "environments: [production]\n" +
-		"projects:\n  app:\n    includes: [env/app]\n"
-	if err := os.WriteFile(path, []byte(body), 0o600); err != nil {
-		t.Fatal(err)
-	}
-	return path
-}
-
-// seedGetSecret generates a group keypair and stores one secret for get tests.
-func seedGetSecret(
-	t *testing.T,
-	manifest, group, key, plaintext string,
-) {
-	t.Helper()
-	manager := managerFor(t, manifest)
-	if _, err := manager.GenerateKeypair(group); err != nil {
-		t.Fatalf("GenerateKeypair(): %v", err)
-	}
-	if _, err := manager.SetSecret(group, key, func() (string, error) {
-		return plaintext, nil
-	}); err != nil {
-		t.Fatalf("SetSecret(): %v", err)
-	}
-}
-
-// TestServiceGetDecryptsStoredSecret verifies service get returns the
-// decrypted plaintext.
-func TestServiceGetDecryptsStoredSecret(t *testing.T) {
+// TestSecretsGetCommandPrintsPlaintext verifies the decrypted value is printed
+// with a trailing newline.
+func TestSecretsGetCommandPrintsPlaintext(t *testing.T) {
 	t.Parallel()
 
-	manifest := writeGetManifest(t)
-	const plaintext = "database-password"
-	seedGetSecret(t, manifest, "production", "database_password", plaintext)
-
-	manager := managerFor(t, manifest)
-
-	result, err := manager.GetSecret("Production", "database_password")
+	stdout, _, err := execute(
+		t, seededFactory(t), "", "secrets", "get", "Production", "api_key",
+	)
 	if err != nil {
-		t.Fatalf("GetSecret(): %v", err)
+		t.Fatalf("Execute(): %v", err)
 	}
-	if result.Value != plaintext {
-		t.Errorf("GetSecret() value = %q, want %q", result.Value, plaintext)
-	}
-	if result.Location != secretsPathFor(manifest) {
-		t.Errorf(
-			"GetSecret() location = %q, want %q",
-			result.Location,
-			secretsPathFor(manifest),
-		)
-	}
-}
-
-// TestServiceGetMissingSecretFails verifies reading a missing secret is an error.
-func TestServiceGetMissingSecretFails(t *testing.T) {
-	t.Parallel()
-
-	manifest := writeGetManifest(t)
-	seedGetSecret(t, manifest, "production", "database_password", "database-password")
-
-	manager := managerFor(t, manifest)
-
-	if _, err := manager.GetSecret("production", "missing"); err == nil {
-		t.Fatal("GetSecret() succeeded for a missing secret")
-	}
-}
-
-// TestOutputGetPrintsPlaintextWithNewline verifies the decrypted value is printed
-// directly to the writer followed by a trailing newline.
-func TestOutputGetPrintsPlaintextWithNewline(t *testing.T) {
-	t.Parallel()
-
-	var buf bytes.Buffer
-	err := outputSecretsGet(&buf, "super-secret-password")
-	if err != nil {
-		t.Fatalf("outputGet(): %v", err)
-	}
-
-	got := buf.String()
-	want := "super-secret-password\n"
-	if got != want {
-		t.Errorf("outputGet() = %q, want %q", got, want)
-	}
-}
-
-// TestNewSecretsGetCommand verifies the command builds and dispatches through
-// the factory.
-func TestNewSecretsGetCommand(t *testing.T) {
-	manifest := writeGetManifest(t)
-	const plaintext = "database-password"
-	seedGetSecret(t, manifest, "production", "database_password", plaintext)
-
-	manager := managerFor(t, manifest)
-
-	factory := &mockSecretsFactory{svc: manager}
-
-	parent := NewSecretsCommand(factory)
-	parent.PersistentFlags().String("config", manifest, "")
-	parent.SetArgs([]string{
-		"get",
-		"production",
-		"database_password",
-		"--config", manifest,
-	})
-
-	var out bytes.Buffer
-	parent.SetOut(&out)
-
-	if err := parent.Execute(); err != nil {
-		t.Fatalf("parent.Execute(): %v", err)
-	}
-
-	if out.String() != plaintext+"\n" {
-		t.Errorf("parent.Execute() output = %q, want %q", out.String(), plaintext+"\n")
+	if stdout != "s3cret\n" {
+		t.Errorf("stdout = %q, want s3cret", stdout)
 	}
 }

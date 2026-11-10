@@ -1,189 +1,71 @@
 package cli
 
 import (
-	"bytes"
-	"fmt"
-	"io"
-	"os"
-	"path/filepath"
 	"strings"
 	"testing"
-
-	"github.com/go-envx/envx/app/internal/core/secrets"
-	"github.com/go-envx/envx/app/internal/lib/filex"
-	"github.com/go-envx/envx/app/internal/lib/printer"
 )
 
-// writeSetManifest creates a valid workspace manifest for set action tests.
-func writeSetManifest(t *testing.T) string {
-	t.Helper()
-	path := filepath.Join(t.TempDir(), "envx.yaml")
-	body := "environments: [production]\n" +
-		"projects:\n  app:\n    includes: [env/app]\n"
-	if err := os.WriteFile(path, []byte(body), 0o600); err != nil {
-		t.Fatal(err)
-	}
-	return path
-}
-
-// TestExecuteSetEncryptsAndStoresSafeMetadata verifies the action stores an
-// encrypted envelope without persisting the supplied plaintext.
-func TestExecuteSetEncryptsAndStoresSafeMetadata(t *testing.T) {
+// TestSecretsSetCommand verifies the plaintext comes from the argument, or from
+// stdin when omitted, and the summary names the secret without its value.
+func TestSecretsSetCommand(t *testing.T) {
 	t.Parallel()
 
-	manifest := writeSetManifest(t)
-	manager := managerFor(t, manifest)
-	if _, err := manager.GenerateKeypair("production"); err != nil {
-		t.Fatalf("GenerateKeypair(): %v", err)
-	}
-
-	const plaintext = "database-password"
-	readSecret := func() (string, error) {
-		return newSecretPrompt(secretPromptParams{
-			Stdin:  strings.NewReader(plaintext + "\n"),
-			Stderr: new(bytes.Buffer),
-		}).readSecret()
-	}
-	result, err := manager.SetSecret(
-		"Production", "database_password", readSecret,
-	)
-	if err != nil {
-		t.Fatalf("SetSecret(): %v", err)
-	}
-	if result.Secret.Group != "production" || result.Secret.Key != "database_password" {
-		t.Errorf("result = %+v", result)
-	}
-	if result.Location != secretsPathFor(manifest) {
-		t.Errorf(
-			"result.Location = %q, want %q",
-			result.Location,
-			secretsPathFor(manifest),
-		)
-	}
-
-	data, err := filex.Read(secretsPathFor(manifest))
-	if err != nil {
-		t.Fatalf("Read(): %v", err)
-	}
-	if !strings.Contains(string(data), "encrypted-age:") {
-		t.Errorf("store = %q, want an age ciphertext envelope", data)
-	}
-	if strings.Contains(string(data), plaintext) {
-		t.Fatalf("store contains plaintext: %q", data)
-	}
-}
-
-// TestExecuteSetRejectsUnconfirmedTerminalInputWithoutMutation verifies a failed
-// confirmation cannot encrypt or write the secrets store.
-func TestExecuteSetRejectsUnconfirmedTerminalInputWithoutMutation(t *testing.T) {
-	t.Parallel()
-
-	manifest := writeSetManifest(t)
-	manager := managerFor(t, manifest)
-	if _, err := manager.GenerateKeypair("production"); err != nil {
-		t.Fatalf("GenerateKeypair(): %v", err)
-	}
-	before, err := filex.Read(secretsPathFor(manifest))
-	if err != nil {
-		t.Fatalf("Read() before execute: %v", err)
-	}
-
-	terminal, err := os.Open(os.DevNull)
-	if err != nil {
-		t.Fatalf("Open(%q): %v", os.DevNull, err)
-	}
-	defer func() { _ = terminal.Close() }()
-	var stderr bytes.Buffer
-	readSecret := func() (string, error) {
-		return newSecretPrompt(secretPromptParams{
-			Stdin:  terminal,
-			Stderr: &stderr,
-			IsTerminal: func(int) bool {
-				return true
-			},
-			readSecret: func(in io.Reader, out io.Writer, prompt string) (string, error) {
-				_, _ = fmt.Fprint(out, prompt)
-				_, _ = fmt.Fprintln(out)
-				return "secret", nil
-			},
-			ReadConfirmation: func(*os.File) (bool, error) {
-				return false, nil
-			},
-		}).readSecret()
-	}
-	_, err = manager.SetSecret("production", "database_password", readSecret)
-	if err == nil || err.Error() != "secret was not confirmed" {
-		t.Fatalf("SetSecret() error = %v, want mismatch error", err)
-	}
-	after, err := filex.Read(secretsPathFor(manifest))
-	if err != nil {
-		t.Fatalf("Read() after execute: %v", err)
-	}
-	if !bytes.Equal(after, before) {
-		t.Errorf(
-			"secrets store changed after mismatch:\nbefore: %s\nafter: %s",
-			before,
-			after,
-		)
-	}
-	if stderr.String() != "Secret value: \nConfirm secret of length 6? [Y/n] " {
-		t.Errorf("stderr = %q", stderr.String())
-	}
-}
-
-// TestOutputSetReportsKeyGroupAndStorePath verifies the safe mutation summary
-// logs the stored identity and store path without leaking plaintext.
-func TestOutputSetReportsKeyGroupAndStorePath(t *testing.T) {
-	t.Parallel()
-
-	var out, errOut bytes.Buffer
-	err := outputSecretsSet(
-		printer.NewPlain(&out, &errOut),
-		secrets.SetSecretResult{
-			Location: "/workspace/secrets.yaml",
-			Secret: secrets.Reference{
-				Group: "production",
-				Key:   "api_key",
-			},
+	tests := []struct {
+		// name labels the case.
+		name string
+		// stdin is the command's standard input.
+		stdin string
+		// args are the arguments after "secrets set".
+		args []string
+		// want is the stored plaintext.
+		want string
+	}{
+		{
+			name: "argument",
+			args: []string{"production", "token", "from-arg"},
+			want: "from-arg",
 		},
-	)
-	if err != nil {
-		t.Fatalf("outputSet(): %v", err)
+		{
+			name:  "stdin",
+			stdin: "from-stdin\n",
+			args:  []string{"production", "token"},
+			want:  "from-stdin",
+		},
 	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 
-	got := out.String()
-	for _, want := range []string{`"api_key"`, `"production"`, "/workspace/secrets.yaml"} {
-		if !strings.Contains(got, want) {
-			t.Errorf("outputSet() = %q, want it to contain %q", got, want)
-		}
+			factory := seededFactory(t)
+			args := append([]string{"secrets", "set"}, tt.args...)
+			stdout, _, err := execute(t, factory, tt.stdin, args...)
+			if err != nil {
+				t.Fatalf("Execute(): %v", err)
+			}
+			got, err := factory.service(t).GetSecret("production", "token")
+			if err != nil || got.Value != tt.want {
+				t.Errorf("stored = %q, %v; want %q", got.Value, err, tt.want)
+			}
+			summary := `Stored secret "token" in group "production"`
+			if !strings.Contains(stdout, summary) ||
+				strings.Contains(stdout, tt.want) {
+				t.Errorf("stdout = %q, want a summary without the value", stdout)
+			}
+		})
 	}
 }
 
-// TestNewSecretsSetCommand verifies the command builds and dispatches through
-// the factory.
-func TestNewSecretsSetCommand(t *testing.T) {
-	manifest := writeSetManifest(t)
-	manager := managerFor(t, manifest)
-	if _, err := manager.GenerateKeypair("production"); err != nil {
-		t.Fatalf("GenerateKeypair(): %v", err)
+// TestSecretsSetCommandEmptyStdin verifies a missing plaintext fails without
+// storing anything.
+func TestSecretsSetCommandEmptyStdin(t *testing.T) {
+	t.Parallel()
+
+	factory := seededFactory(t)
+	_, _, err := execute(t, factory, "", "secrets", "set", "production", "token")
+	if err == nil {
+		t.Fatal("expected an error for empty stdin")
 	}
-
-	factory := &mockSecretsFactory{svc: manager}
-
-	parent := NewSecretsCommand(factory)
-	parent.PersistentFlags().String("config", manifest, "")
-	parent.SetArgs([]string{
-		"set",
-		"production",
-		"database_password",
-		"my-secret-value",
-		"--config", manifest,
-	})
-
-	var out bytes.Buffer
-	parent.SetOut(&out)
-
-	if err := parent.Execute(); err != nil {
-		t.Fatalf("parent.Execute(): %v", err)
+	if factory.stored("production", "token") != "" {
+		t.Error("a value was stored despite the missing plaintext")
 	}
 }

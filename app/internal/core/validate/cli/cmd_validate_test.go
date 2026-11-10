@@ -6,81 +6,119 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
-	"github.com/go-envx/envx/app/internal/app"
 	"github.com/go-envx/envx/app/internal/core/diagnostic"
+	"github.com/go-envx/envx/app/internal/core/env"
+	"github.com/go-envx/envx/app/internal/core/secrets"
 	"github.com/go-envx/envx/app/internal/core/validate"
+	"github.com/go-envx/envx/app/internal/core/workspace"
 	workspacecli "github.com/go-envx/envx/app/internal/core/workspace/cli"
+	"github.com/go-envx/envx/app/internal/lib/filex"
 	"github.com/go-envx/envx/app/internal/lib/printer"
 	"github.com/go-envx/envx/app/internal/lib/severity"
-	"github.com/go-envx/envx/app/test/fixtures"
+	"github.com/go-envx/envx/app/internal/testutil"
 )
 
-// mockValidateFactory implements Factory for unit testing.
-type mockValidateFactory struct {
+// testConfig is the manifest path every command test passes with --config.
+const testConfig = "/ws/envx.yaml"
+
+// fakeFactory builds a validate service for a one-project workspace whose
+// explainer and inspector are the factory itself.
+type fakeFactory struct {
+	// configPath records the manifest path the command requested.
+	configPath string
+	// err, when set, is returned instead of a service.
 	err error
+	// audit is returned by every store audit.
+	audit secrets.Audit
+	// explains records every explain request.
+	explains []env.ExplainParams
+	// scopes records every audit scope.
+	scopes []secrets.AuditScope
 }
 
-func (m *mockValidateFactory) NewValidateService(
-	configPath string,
-) (*validate.Service, error) {
-	if m.err != nil {
-		return nil, m.err
+// TestMain keeps ambient ENVX_* settings out of the command's flags.
+func TestMain(m *testing.M) {
+	testutil.UnsetEnvPrefix("ENVX_")
+	os.Exit(m.Run())
+}
+
+// NewValidateService implements Factory.
+func (f *fakeFactory) NewValidateService(configPath string) (*validate.Service, error) {
+	f.configPath = configPath
+	if f.err != nil {
+		return nil, f.err
 	}
-	return app.Factory{}.NewValidateService(configPath)
+	ws := workspace.Workspace{
+		Environments: []string{"production"},
+		Projects: map[string]workspace.Project{
+			"api": {Includes: []string{"env/app"}},
+		},
+	}
+	return validate.New(ws, validate.Dependencies{
+		OpenEnv: func() (validate.Explainer, error) {
+			return f, nil
+		},
+		OpenSecrets: func() (validate.Inspector, error) {
+			return f, nil
+		},
+	})
+}
+
+// Explain implements validate.Explainer with no entries.
+func (f *fakeFactory) Explain(params env.ExplainParams) (env.ExplainResult, error) {
+	f.explains = append(f.explains, params)
+	return env.ExplainResult{Project: params.Project}, nil
+}
+
+// Audit implements validate.Inspector.
+func (f *fakeFactory) Audit(scope secrets.AuditScope) (secrets.Audit, error) {
+	f.scopes = append(f.scopes, scope)
+	return f.audit, nil
+}
+
+// plaintextAudit holds one unencrypted, unreferenced stored value.
+func plaintextAudit() secrets.Audit {
+	return secrets.Audit{
+		Secrets: []secrets.StoredSecret{{
+			Reference: secrets.Reference{Group: "db", Key: "leaked"},
+		}},
+	}
 }
 
 // executeValidate builds the validate command, executes it with args, and returns
-// its captured stdout and stderr.
+// its captured stdout.
 func executeValidate(
-	t *testing.T, factory Factory, configPath string, args ...string,
-) (stdout, stderr string, err error) {
+	t *testing.T, factory Factory, args ...string,
+) (stdout string, err error) {
 	t.Helper()
 
 	cmd := NewValidateCommand(factory)
 	workspacecli.BindConfig(cmd)
 	cmd.SilenceUsage = true
-	cmd.SetArgs(append([]string{"--config", configPath}, args...))
+	cmd.SetArgs(append([]string{"--config", testConfig}, args...))
 
 	var out, errBuf bytes.Buffer
 	cmd.SetOut(&out)
 	cmd.SetErr(&errBuf)
 
 	err = cmd.Execute()
-	return out.String(), errBuf.String(), err
+	return out.String(), err
 }
 
-// validateManifest runs the validate service over the manifest at path and
-// returns the report.
-func validateManifest(
-	t *testing.T, path string, params validate.ValidateParams,
-) validate.Report {
+// assertGolden compares got with the named file under testdata.
+func assertGolden(t *testing.T, name string, got []byte) {
 	t.Helper()
-
-	service, err := app.Factory{}.NewValidateService(path)
+	want, err := filex.Read(filepath.Join("testdata", name))
 	if err != nil {
-		t.Fatalf("NewValidateService(): %v", err)
+		t.Fatalf("reading golden: %v", err)
 	}
-	report, err := service.Validate(params)
-	if err != nil {
-		t.Fatalf("Validate(): %v", err)
+	if !bytes.Equal(got, want) {
+		t.Errorf("%s mismatch\ngot:\n%s\nwant:\n%s", name, got, want)
 	}
-	return report
-}
-
-// findFinding returns the first finding carrying the given status code, and
-// whether one was present.
-func findFinding(
-	report validate.Report, code diagnostic.Code,
-) (diagnostic.Finding, bool) {
-	for _, f := range report.Findings {
-		if f.Code == code {
-			return f, true
-		}
-	}
-	return diagnostic.Finding{}, false
 }
 
 // sampleReport is a mixed error/warning report used by the output tests.
@@ -103,323 +141,108 @@ func sampleReport() validate.Report {
 	}
 }
 
-// TestValidateCleanWorkspacePasses verifies a workspace with no store and no
-// references produces no findings and does not fail.
-func TestValidateCleanWorkspacePasses(t *testing.T) {
+// TestValidateCommandCleanWorkspace verifies --config reaches the factory and a
+// clean workspace is confirmed without error.
+func TestValidateCommandCleanWorkspace(t *testing.T) {
 	t.Parallel()
 
-	report := validateManifest(t, fixtures.Manifest("basic"), validate.ValidateParams{})
-	if len(report.Findings) != 0 {
-		t.Errorf("Findings = %d, want 0: %+v", len(report.Findings), report.Findings)
-	}
-	if report.Failed {
-		t.Error("clean workspace must not fail")
-	}
-}
-
-// TestValidateDanglingReferenceFails verifies a dangling reference fails the run
-// and is listed alongside the store-level findings the per-environment view
-// cannot produce.
-func TestValidateDanglingReferenceFails(t *testing.T) {
-	t.Parallel()
-
-	path := fixtures.Testdata("resolve", "dangling-reference", "envx.yaml")
-	report := validateManifest(t, path, validate.ValidateParams{})
-
-	if !report.Failed {
-		t.Fatal("dangling reference must fail the run")
-	}
-
-	ref, ok := findFinding(report, diagnostic.SecretReferenceNotFound)
-	if !ok {
-		t.Fatalf("no reference finding: %+v", report.Findings)
-	}
-	if ref.Level != severity.Error || ref.Key != "PASSWORD" {
-		t.Errorf("reference finding = %+v, want error on PASSWORD", ref)
-	}
-
-	// The store holds a plaintext value no environment references, so both a
-	// plaintext error and an orphan error surface without a per-environment view.
-	plaintext, ok := findFinding(report, diagnostic.SecretIsNotEncrypted)
-	if !ok || plaintext.Level != severity.Error {
-		t.Errorf("plaintext finding = %+v (present=%v), want an error", plaintext, ok)
-	}
-	orphan, ok := findFinding(report, diagnostic.SecretIsNotReferenced)
-	if !ok || orphan.Level != severity.Error {
-		t.Errorf("orphan finding = %+v (present=%v), want an error", orphan, ok)
-	}
-}
-
-// TestValidateStrictFailsOnWarningsOnly verifies a workspace whose only finding is
-// a warning passes by default but fails under --strict.
-func TestValidateStrictFailsOnWarningsOnly(t *testing.T) {
-	t.Parallel()
-
-	manifestPath := writeWarningOnlyWorkspace(t)
-
-	relaxed := validateManifest(t, manifestPath, validate.ValidateParams{Strict: false})
-	if relaxed.Failed {
-		t.Errorf("warning-only workspace must pass by default: %+v", relaxed.Findings)
-	}
-	if relaxed.Warnings == 0 || relaxed.Errors != 0 {
-		t.Fatalf("want warnings only, got %d errors %d warnings: %+v",
-			relaxed.Errors, relaxed.Warnings, relaxed.Findings)
-	}
-
-	strict := validateManifest(t, manifestPath, validate.ValidateParams{Strict: true})
-	if !strict.Failed {
-		t.Error("warning-only workspace must fail under --strict")
-	}
-}
-
-// TestValidateSeverityConfigOverrides verifies the manifest's validate block
-// changes a check's severity: promoting the unavailable-key warning to an error
-// fails the run, while a second workspace confirms turning a check off drops it.
-func TestValidateSeverityConfigOverrides(t *testing.T) {
-	t.Parallel()
-
-	// Promote the unavailable-key warning to an error via the validate block.
-	promoted := writeWarningOnlyWorkspace(t)
-	writeFile(t, promoted,
-		"environments: [development, production]\n"+
-			"validate:\n"+
-			"  private_key_is_unavailable: error\n"+
-			"projects:\n"+
-			"  api:\n"+
-			"    includes: [env/app]\n")
-	report := validateManifest(t, promoted, validate.ValidateParams{})
-	if !report.Failed || report.Errors == 0 {
-		t.Errorf("promoting the unavailable key to error must fail: %+v", report)
-	}
-
-	// Turn the same check off: the workspace then has no findings and passes.
-	silenced := writeWarningOnlyWorkspace(t)
-	writeFile(t, silenced,
-		"environments: [development, production]\n"+
-			"validate:\n"+
-			"  private_key_is_unavailable: off\n"+
-			"projects:\n"+
-			"  api:\n"+
-			"    includes: [env/app]\n")
-	off := validateManifest(t, silenced, validate.ValidateParams{Strict: true})
-	if off.Failed || len(off.Findings) != 0 {
-		t.Errorf("turning the check off must drop it even under --strict: %+v", off)
-	}
-}
-
-// TestValidateBaseDeclaration verifies the base-declaration check is off by
-// default — an environment overlay key its namespace base file never declares is
-// tolerated — and surfaces PROPERTY_NOT_DECLARED_IN_BASE only once a workspace
-// opts in through the validate block.
-func TestValidateBaseDeclaration(t *testing.T) {
-	t.Parallel()
-
-	// By default the check is off: the overlay-only key produces no finding.
-	dir := t.TempDir()
-	writeFile(t, filepath.Join(dir, "envx.yaml"),
-		"environments: [production]\n"+
-			"projects:\n"+
-			"  api:\n"+
-			"    includes: [env/app]\n")
-	writeFile(t, filepath.Join(dir, "env", "app.yaml"), "shared: base-value\n")
-	writeFile(t, filepath.Join(dir, "env", "app.production.yaml"), "only_in_overlay: x\n")
-
-	off := validateManifest(t, filepath.Join(dir, "envx.yaml"), validate.ValidateParams{})
-	if _, ok := findFinding(off, diagnostic.PropertyNotDeclaredInBase); ok {
-		t.Errorf("base-declaration check must be off by default: %+v", off.Findings)
-	}
-	if off.Failed {
-		t.Errorf("an overlay-only key must not fail by default: %+v", off.Findings)
-	}
-
-	// Opting in through the validate block surfaces the finding and fails the run.
-	optedIn := t.TempDir()
-	writeFile(t, filepath.Join(optedIn, "envx.yaml"),
-		"environments: [production]\n"+
-			"validate:\n"+
-			"  property_not_declared_in_base: error\n"+
-			"projects:\n"+
-			"  api:\n"+
-			"    includes: [env/app]\n")
-	writeFile(t, filepath.Join(optedIn, "env", "app.yaml"), "shared: base-value\n")
-	writeFile(t,
-		filepath.Join(optedIn, "env", "app.production.yaml"), "only_in_overlay: x\n")
-
-	report := validateManifest(
-		t, filepath.Join(optedIn, "envx.yaml"), validate.ValidateParams{},
-	)
-	finding, ok := findFinding(report, diagnostic.PropertyNotDeclaredInBase)
-	if !ok {
-		t.Fatalf("no base-declaration finding after opt-in: %+v", report.Findings)
-	}
-	if finding.Code != diagnostic.PropertyNotDeclaredInBase ||
-		finding.Key != "ONLY_IN_OVERLAY" {
-		t.Errorf("finding = %+v, want base-declaration on ONLY_IN_OVERLAY", finding)
-	}
-	if !report.Failed {
-		t.Error("an undeclared overlay key must fail once configured to error")
-	}
-}
-
-// TestValidateMissingPublicKey verifies a group with stored secrets but no public
-// key surfaces PUBLIC_KEY_IS_MISSING, isolated by selecting only that check.
-func TestValidateMissingPublicKey(t *testing.T) {
-	t.Parallel()
-
-	dir := t.TempDir()
-	writeFile(t, filepath.Join(dir, "envx.yaml"),
-		"environments: [production]\n"+
-			"projects:\n"+
-			"  api:\n"+
-			"    includes: [env/app]\n")
-	writeFile(t, filepath.Join(dir, "env", "app.yaml"), "name: app-value\n")
-	writeFile(t, filepath.Join(dir, "secrets.yaml"),
-		"secrets:\n  db:\n    password: encrypted-age:YWJj\n")
-
-	report := validateManifest(t, filepath.Join(dir, "envx.yaml"), validate.ValidateParams{
-		Selected: []diagnostic.Code{diagnostic.PublicKeyIsMissing},
-	})
-
-	finding, ok := findFinding(report, diagnostic.PublicKeyIsMissing)
-	if !ok || finding.Code != diagnostic.PublicKeyIsMissing || finding.Key != "db" {
-		t.Fatalf("missing-public-key finding = %+v (present=%v), want %s on db",
-			finding, ok, diagnostic.PublicKeyIsMissing)
-	}
-	// Only the selected check ran, so the orphaned encrypted value is not reported.
-	if _, ok := findFinding(report, diagnostic.SecretIsNotReferenced); ok {
-		t.Error("selecting only the missing-public-key check must not report orphans")
-	}
-}
-
-// TestValidateAlgorithmMismatchFromStore verifies a value stored under a
-// non-configured algorithm surfaces SECRET_ALGORITHM_MISMATCH from the store scan.
-func TestValidateAlgorithmMismatchFromStore(t *testing.T) {
-	t.Parallel()
-
-	dir := t.TempDir()
-	writeFile(t, filepath.Join(dir, "envx.yaml"),
-		"environments: [production]\n"+
-			"projects:\n"+
-			"  api:\n"+
-			"    includes: [env/app]\n")
-	writeFile(t, filepath.Join(dir, "env", "app.yaml"), "name: app-value\n")
-	// The default cipher is age; a nacl-box envelope is a mismatch.
-	writeFile(t, filepath.Join(dir, "secrets.yaml"),
-		"secrets:\n  db:\n    token: encrypted-nacl-box:YWJj\n")
-
-	report := validateManifest(t, filepath.Join(dir, "envx.yaml"), validate.ValidateParams{
-		Selected: []diagnostic.Code{diagnostic.SecretAlgorithmMismatch},
-	})
-
-	finding, ok := findFinding(report, diagnostic.SecretAlgorithmMismatch)
-	if !ok || finding.Code != diagnostic.SecretAlgorithmMismatch ||
-		finding.Key != "db/token" {
-		t.Fatalf("algorithm finding = %+v (present=%v), want %s on db/token",
-			finding, ok, diagnostic.SecretAlgorithmMismatch)
-	}
-}
-
-// TestValidateStoreOnlySelectionSkipsMerge verifies that selecting only a store
-// check performs no environment merge: a workspace whose merge would fail still
-// validates its plaintext store value, while a full run aborts on the broken
-// merge.
-func TestValidateStoreOnlySelectionSkipsMerge(t *testing.T) {
-	t.Parallel()
-
-	dir := t.TempDir()
-	manifestPath := filepath.Join(dir, "envx.yaml")
-	writeFile(t, manifestPath,
-		"environments: [production]\n"+
-			"projects:\n"+
-			"  api:\n"+
-			"    includes: [env/app]\n")
-	// A base file whose YAML cannot parse makes the environment merge fatal.
-	writeFile(t, filepath.Join(dir, "env", "app.yaml"), "name: : : [unbalanced\n")
-	writeFile(t, filepath.Join(dir, "secrets.yaml"),
-		"secrets:\n  db:\n    leaked: just-plaintext\n")
-
-	// A full run reaches the merge and aborts on the malformed base file.
-	service, err := app.Factory{}.NewValidateService(manifestPath)
-	if err != nil {
-		t.Fatalf("NewValidateService(): %v", err)
-	}
-	if _, err := service.Validate(validate.ValidateParams{}); err == nil {
-		t.Fatal("a full run must fail on the malformed base file")
-	}
-
-	// Selecting only the offline plaintext check skips the merge entirely and still
-	// reports the plaintext store value.
-	report := validateManifest(t, manifestPath, validate.ValidateParams{
-		Selected: []diagnostic.Code{diagnostic.SecretIsNotEncrypted},
-	})
-	finding, ok := findFinding(report, diagnostic.SecretIsNotEncrypted)
-	if !ok || finding.Key != "db/leaked" {
-		t.Fatalf("plaintext finding = %+v (present=%v), want db/leaked", finding, ok)
-	}
-	if !report.Failed {
-		t.Error("a plaintext store value must fail the run")
-	}
-}
-
-// TestNewValidateCommandFailsOnErrors verifies the command renders the findings
-// and returns the validation verdict when the graded report fails.
-func TestNewValidateCommandFailsOnErrors(t *testing.T) {
-	t.Parallel()
-
-	path := fixtures.Testdata("resolve", "dangling-reference", "envx.yaml")
-	stdout, _, err := executeValidate(t, &mockValidateFactory{}, path)
-	if !errors.Is(err, errValidationFailed) {
-		t.Fatalf("err = %v, want errValidationFailed", err)
-	}
-	if !strings.Contains(stdout, "SECRET_REFERENCE_NOT_FOUND") {
-		t.Errorf("stdout = %q, want the reference finding", stdout)
-	}
-}
-
-// TestNewValidateCommandCleanWorkspace verifies the command confirms a clean
-// workspace and exits without error.
-func TestNewValidateCommandCleanWorkspace(t *testing.T) {
-	t.Parallel()
-
-	stdout, _, err := executeValidate(
-		t, &mockValidateFactory{}, fixtures.Manifest("basic"),
-	)
+	factory := &fakeFactory{}
+	stdout, err := executeValidate(t, factory)
 	if err != nil {
 		t.Fatalf("validate: %v", err)
+	}
+	if factory.configPath != testConfig {
+		t.Errorf("factory configPath = %q, want %q", factory.configPath, testConfig)
 	}
 	if got := strings.TrimSpace(stdout); got != "no validation problems found" {
 		t.Errorf("stdout = %q, want the clean confirmation line", got)
 	}
 }
 
-// TestNewValidateCommandSelectionFlag verifies a per-check flag runs only the
-// named check.
-func TestNewValidateCommandSelectionFlag(t *testing.T) {
+// TestValidateCommandFailsOnErrors verifies the command renders the findings
+// and returns the verdict when the report fails.
+func TestValidateCommandFailsOnErrors(t *testing.T) {
 	t.Parallel()
 
-	path := fixtures.Testdata("resolve", "dangling-reference", "envx.yaml")
-	stdout, _, err := executeValidate(
-		t, &mockValidateFactory{}, path, "--secret-is-not-encrypted",
-	)
+	stdout, err := executeValidate(t, &fakeFactory{audit: plaintextAudit()})
 	if !errors.Is(err, errValidationFailed) {
 		t.Fatalf("err = %v, want errValidationFailed", err)
 	}
 	if !strings.Contains(stdout, string(diagnostic.SecretIsNotEncrypted)) {
 		t.Errorf("stdout = %q, want the plaintext finding", stdout)
 	}
-	if strings.Contains(stdout, string(diagnostic.SecretReferenceNotFound)) {
-		t.Errorf("stdout = %q, must not run the unselected reference check", stdout)
+}
+
+// TestValidateCommandStrict verifies --strict fails a warning-only report.
+func TestValidateCommandStrict(t *testing.T) {
+	t.Parallel()
+
+	warnOnly := secrets.Audit{
+		Keypairs: []secrets.KeypairMetadata{{
+			Group:            "legacy",
+			PrivateKeyStatus: secrets.PrivateKeyNotAvailable,
+		}},
+	}
+	if _, err := executeValidate(t, &fakeFactory{audit: warnOnly}); err != nil {
+		t.Errorf("without --strict: err = %v, want nil", err)
+	}
+	_, err := executeValidate(t, &fakeFactory{audit: warnOnly}, "--strict")
+	if !errors.Is(err, errValidationFailed) {
+		t.Errorf("with --strict: err = %v, want errValidationFailed", err)
 	}
 }
 
-// TestNewValidateCommandJSON verifies --output=json renders the machine-readable
-// envelope.
-func TestNewValidateCommandJSON(t *testing.T) {
+// TestValidateCommandSelectionFlag verifies a per-check flag runs only that
+// check: no environment is explained and only its store section is audited.
+func TestValidateCommandSelectionFlag(t *testing.T) {
 	t.Parallel()
 
-	path := fixtures.Testdata("resolve", "dangling-reference", "envx.yaml")
-	stdout, _, err := executeValidate(
-		t, &mockValidateFactory{}, path, "--output", "json",
+	factory := &fakeFactory{audit: plaintextAudit()}
+	stdout, err := executeValidate(t, factory, "--secret-is-not-encrypted")
+	if !errors.Is(err, errValidationFailed) {
+		t.Fatalf("err = %v, want errValidationFailed", err)
+	}
+	if len(factory.explains) != 0 {
+		t.Errorf("explained %d environments, want none", len(factory.explains))
+	}
+	want := []secrets.AuditScope{{Secrets: true}}
+	if !slices.Equal(factory.scopes, want) {
+		t.Errorf("audit scopes = %+v, want %+v", factory.scopes, want)
+	}
+	if strings.Contains(stdout, string(diagnostic.SecretIsNotReferenced)) {
+		t.Errorf("stdout = %q, must not report the unselected orphan check", stdout)
+	}
+}
+
+// TestValidateCommandSettings verifies setting flags reach every explain
+// request and that --env is not accepted.
+func TestValidateCommandSettings(t *testing.T) {
+	t.Parallel()
+
+	factory := &fakeFactory{}
+	if _, err := executeValidate(t, factory, "--prefix", "app"); err != nil {
+		t.Fatalf("validate: %v", err)
+	}
+	if len(factory.explains) == 0 {
+		t.Fatal("no environment was explained")
+	}
+	if got := factory.explains[0].Options.Prefix; got == nil || *got != "app" {
+		t.Errorf("Options.Prefix = %v, want app", got)
+	}
+
+	_, err := executeValidate(t, &fakeFactory{}, "--env", "production")
+	if err == nil || !strings.Contains(err.Error(), "unknown flag: --env") {
+		t.Errorf("err = %v, want an unknown --env flag error", err)
+	}
+}
+
+// TestValidateCommandJSON verifies --output=json renders the machine-readable
+// envelope.
+func TestValidateCommandJSON(t *testing.T) {
+	t.Parallel()
+
+	stdout, err := executeValidate(
+		t, &fakeFactory{audit: plaintextAudit()}, "--output", "json",
 	)
 	if !errors.Is(err, errValidationFailed) {
 		t.Fatalf("err = %v, want errValidationFailed", err)
@@ -434,22 +257,20 @@ func TestNewValidateCommandJSON(t *testing.T) {
 	}
 }
 
-// TestNewValidateCommandFactoryError verifies a factory failure is returned
+// TestValidateCommandFactoryError verifies a factory failure is returned
 // unchanged.
-func TestNewValidateCommandFactoryError(t *testing.T) {
+func TestValidateCommandFactoryError(t *testing.T) {
 	t.Parallel()
 
 	want := errors.New("factory failed")
-	_, _, err := executeValidate(
-		t, &mockValidateFactory{err: want}, fixtures.Manifest("basic"),
-	)
+	_, err := executeValidate(t, &fakeFactory{err: want})
 	if !errors.Is(err, want) {
 		t.Fatalf("err = %v, want %v", err, want)
 	}
 }
 
-// TestOutputValidateTable verifies the table lists each finding with its scope
-// and a severity banner precedes it.
+// TestOutputValidateTable verifies the table against its golden and that a
+// severity banner is written to stderr.
 func TestOutputValidateTable(t *testing.T) {
 	t.Parallel()
 
@@ -458,27 +279,13 @@ func TestOutputValidateTable(t *testing.T) {
 	if err != nil {
 		t.Fatalf("outputValidate(): %v", err)
 	}
-
-	body := out.String()
-	for _, want := range []string{
-		"SCOPE", "KEY", "STATUS", "MESSAGE",
-		"api/production", "PASSWORD", "SECRET_REFERENCE_NOT_FOUND",
-		"secrets", "shared/unused", "SECRET_IS_NOT_REFERENCED",
-	} {
-		if !strings.Contains(body, want) {
-			t.Errorf("table missing %q\n%s", want, body)
-		}
-	}
-	if strings.Contains(body, "KIND") {
-		t.Errorf("table must not include the removed KIND column:\n%s", body)
-	}
+	assertGolden(t, "validate.txt", out.Bytes())
 
 	banner := errOut.String()
-	if !strings.Contains(banner, "1 error(s) found") {
-		t.Errorf("banner missing error count:\n%s", banner)
-	}
-	if !strings.Contains(banner, "1 warning(s) found") {
-		t.Errorf("banner missing warning count:\n%s", banner)
+	for _, want := range []string{"1 error(s) found", "1 warning(s) found"} {
+		if !strings.Contains(banner, want) {
+			t.Errorf("banner missing %q:\n%s", want, banner)
+		}
 	}
 }
 
@@ -535,16 +342,12 @@ func TestOutputValidateTableClean(t *testing.T) {
 	if err != nil {
 		t.Fatalf("outputValidate(): %v", err)
 	}
-	if got := strings.TrimSpace(out.String()); got != "no validation problems found" {
-		t.Errorf("output = %q, want the clean confirmation line", got)
-	}
-	if strings.Contains(out.String(), "SCOPE") {
-		t.Error("clean report must not print a table header")
+	if got := out.String(); got != "no validation problems found\n" {
+		t.Errorf("output = %q, want only the clean confirmation line", got)
 	}
 }
 
-// TestOutputValidateJSON verifies the JSON envelope carries the summary and a
-// tagged findings array, omitting empty scope fields for a store-level finding.
+// TestOutputValidateJSON verifies the JSON envelope against its golden.
 func TestOutputValidateJSON(t *testing.T) {
 	t.Parallel()
 
@@ -553,23 +356,7 @@ func TestOutputValidateJSON(t *testing.T) {
 	if err != nil {
 		t.Fatalf("outputValidate(): %v", err)
 	}
-
-	var decoded validateReportJSON
-	if err := json.Unmarshal(out.Bytes(), &decoded); err != nil {
-		t.Fatalf("decode JSON: %v\n%s", err, out.String())
-	}
-	summary := decoded.Summary
-	if !summary.Failed || summary.Errors != 1 || summary.Warnings != 1 {
-		t.Errorf("summary = %+v, want failed 1 error 1 warning", summary)
-	}
-	if len(decoded.Findings) != 2 {
-		t.Fatalf("findings = %d, want 2", len(decoded.Findings))
-	}
-
-	// The store-level orphan finding omits project and environment.
-	if strings.Contains(out.String(), `"project": ""`) {
-		t.Errorf("empty project should be omitted:\n%s", out.String())
-	}
+	assertGolden(t, "validate.json", out.Bytes())
 }
 
 // TestOutputValidateInvalidFormatFails verifies an unrecognized format is
@@ -581,77 +368,5 @@ func TestOutputValidateInvalidFormatFails(t *testing.T) {
 	err := outputValidate(printer.NewPlain(&out, &errOut), sampleReport(), "jsonn")
 	if err == nil {
 		t.Fatal("expected an error for an invalid format")
-	}
-}
-
-// writeWarningOnlyWorkspace builds a temp workspace whose only finding is a
-// warning: a group whose public key is present but whose private key is not
-// available in this context (PRIVATE_KEY_IS_UNAVAILABLE, the one check that
-// defaults to warn). It stores no secrets, so nothing is orphaned or plaintext,
-// and its env file has no references. It returns the manifest path.
-func writeWarningOnlyWorkspace(t *testing.T) string {
-	t.Helper()
-	dir := t.TempDir()
-	secretsPath := filepath.Join(dir, "secrets.yaml")
-	manifestPath := filepath.Join(dir, "envx.yaml")
-
-	writeFile(t, manifestPath,
-		"environments: [development, production]\n"+
-			"projects:\n"+
-			"  api:\n"+
-			"    includes: [env/app]\n")
-	writeFile(t, filepath.Join(dir, "env", "app.yaml"), "name: app-value\n")
-
-	// A valid keypair keeps the store readable; "shared" is available and produces
-	// no finding.
-	manager, err := app.Factory{}.NewSecretsService(manifestPath)
-	if err != nil {
-		t.Fatalf("NewSecretsService(): %v", err)
-	}
-	if _, err := manager.GenerateKeypair("shared"); err != nil {
-		t.Fatalf("GenerateKeypair(): %v", err)
-	}
-
-	// Add a second group that declares a public key but has no private key in the
-	// keys file, so validate reports it as an unavailable-key warning.
-	addUnavailableGroup(t, secretsPath, "legacy")
-
-	return manifestPath
-}
-
-// addUnavailableGroup appends a public-key entry for group to the store at path,
-// reusing an existing group's public key value so the entry is well-formed. The
-// keys file holds no private key for it, so validate reports it as unavailable.
-func addUnavailableGroup(t *testing.T, path, group string) {
-	t.Helper()
-	data, err := os.ReadFile(path) //nolint:gosec // path is test-local.
-	if err != nil {
-		t.Fatalf("ReadFile(%s): %v", path, err)
-	}
-	lines := strings.Split(string(data), "\n")
-	for i, line := range lines {
-		trimmed := strings.TrimSpace(line)
-		// Duplicate the first public-key entry under the new group name.
-		if strings.HasPrefix(trimmed, "shared:") {
-			value := strings.TrimSpace(strings.TrimPrefix(trimmed, "shared:"))
-			lines = append(lines[:i+1], append([]string{"  " + group + ": " + value},
-				lines[i+1:]...)...)
-			break
-		}
-	}
-	//nolint:gosec // G703: path is created inside this test's temporary directory.
-	if err := os.WriteFile(path, []byte(strings.Join(lines, "\n")), 0o600); err != nil {
-		t.Fatalf("WriteFile(%s): %v", path, err)
-	}
-}
-
-// writeFile writes content to path, creating parent directories.
-func writeFile(t *testing.T, path, content string) {
-	t.Helper()
-	if err := os.MkdirAll(filepath.Dir(path), 0o750); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
-		t.Fatal(err)
 	}
 }

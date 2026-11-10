@@ -1,315 +1,157 @@
 package cli
 
 import (
-	"bytes"
-	"encoding/base64"
 	"errors"
-	"os"
-	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
-
-	"github.com/go-envx/envx/app/internal/core/diagnostic"
-	workspacecli "github.com/go-envx/envx/app/internal/core/workspace/cli"
-	"github.com/go-envx/envx/app/internal/lib/crypt/age"
-	"github.com/go-envx/envx/app/internal/lib/printer"
-	"github.com/go-envx/envx/app/test/fixtures"
 )
 
-// executeRun builds the run command, executes it with args, and returns its
-// captured stdout and stderr.
-func executeRun(
-	t *testing.T, factory Factory, configPath string, args ...string,
-) (stdout, stderr string, err error) {
-	t.Helper()
+// TestRunCommandStartsChild verifies the child receives the command after
+// "--", the selected environment, and the command's streams.
+func TestRunCommandStartsChild(t *testing.T) {
+	t.Parallel()
 
+	factory := newFakeFactory()
 	cmd := NewRunCommand(factory)
-	workspacecli.BindConfig(cmd)
-	// The root command silences usage for runtime errors; mirror it here so a
-	// failed run leaves stdout to the child alone.
-	cmd.SilenceUsage = true
-	cmd.SetArgs(append([]string{"--config", configPath}, args...))
-
-	var out, errBuf bytes.Buffer
-	cmd.SetOut(&out)
-	cmd.SetErr(&errBuf)
-	cmd.SetIn(strings.NewReader(""))
-
-	err = cmd.Execute()
-	return out.String(), errBuf.String(), err
-}
-
-// writeWorkspaceFile writes body to a workspace-relative path under dir, creating
-// parent directories as needed.
-func writeWorkspaceFile(t *testing.T, dir, name, body string) {
-	t.Helper()
-	path := filepath.Join(dir, name)
-	if err := os.MkdirAll(filepath.Dir(path), 0o750); err != nil {
-		t.Fatalf("MkdirAll(%q): %v", filepath.Dir(path), err)
+	if _, _, err := execute(
+		t, cmd, "app", "--env", "production", "--", "printenv", "HOST",
+	); err != nil {
+		t.Fatalf("Execute(): %v", err)
 	}
-	if err := os.WriteFile(path, []byte(body), 0o600); err != nil {
-		t.Fatalf("WriteFile(%q): %v", path, err)
+	if len(factory.runs) != 1 {
+		t.Fatalf("runs = %d, want 1", len(factory.runs))
+	}
+
+	run := factory.runs[0]
+	if want := []string{"printenv", "HOST"}; !slices.Equal(run.Args, want) {
+		t.Errorf("Args = %q, want %q", run.Args, want)
+	}
+	if got := run.Env["HOST"]; got != "prod-db.internal" {
+		t.Errorf("HOST = %q, want prod-db.internal", got)
+	}
+	if run.Streams.In != cmd.InOrStdin() ||
+		run.Streams.Out != cmd.OutOrStdout() ||
+		run.Streams.ErrOut != cmd.ErrOrStderr() {
+		t.Error("child streams are not the command's streams")
 	}
 }
 
-// TestNewRunCommandInjectsEnv verifies the resolved environment reaches the child
-// process under the default (no-overload) settings.
-func TestNewRunCommandInjectsEnv(t *testing.T) {
+// TestRunCommandOverload verifies host values win by default and --overload
+// lets file values win.
+func TestRunCommandOverload(t *testing.T) {
 	t.Parallel()
 
-	path := fixtures.Manifest("basic")
-	stdout, _, err := executeRun(
-		t, &mockEnvFactory{}, path, "api-core", "--", "printenv", "APP_NAME",
-	)
-	if err != nil {
-		t.Fatalf("Execute(): %v", err)
+	tests := []struct {
+		// name labels the case.
+		name string
+		// args are the flags before "--".
+		args []string
+		// want is the child's HOST.
+		want string
+	}{
+		{name: "host wins by default", want: "from-host"},
+		{name: "overload", args: []string{"--overload"}, want: "dev-db.local"},
 	}
-	if stdout != "api-core\n" {
-		t.Errorf("child APP_NAME = %q, want api-core", stdout)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			factory := newFakeFactory()
+			factory.host = []string{"HOST=from-host"}
+			args := append(append([]string{"app"}, tt.args...), "--", "true")
+			if _, _, err := execute(t, NewRunCommand(factory), args...); err != nil {
+				t.Fatalf("Execute(): %v", err)
+			}
+			if got := factory.runs[0].Env["HOST"]; got != tt.want {
+				t.Errorf("HOST = %q, want %q", got, tt.want)
+			}
+		})
 	}
 }
 
-// TestNewRunCommandOverloadFromEnv verifies ENVX_OVERLOAD lets file values win
-// over an OS env var even without the --overload flag.
-func TestNewRunCommandOverloadFromEnv(t *testing.T) {
-	t.Setenv("APP_NAME", "from-os")
-	t.Setenv("ENVX_OVERLOAD", "true")
-
-	path := fixtures.Manifest("basic")
-	stdout, _, err := executeRun(
-		t, &mockEnvFactory{}, path, "api-core", "--", "printenv", "APP_NAME",
-	)
-	if err != nil {
-		t.Fatalf("Execute(): %v", err)
-	}
-	if stdout != "api-core\n" {
-		t.Errorf("APP_NAME = %q, want api-core (file wins via ENVX_OVERLOAD)", stdout)
-	}
-}
-
-// TestNewRunCommandOverloadFlag verifies --overload lets file values win over an
-// OS env var.
-func TestNewRunCommandOverloadFlag(t *testing.T) {
-	t.Setenv("APP_NAME", "from-os")
-
-	path := fixtures.Manifest("basic")
-	stdout, _, err := executeRun(
-		t, &mockEnvFactory{}, path,
-		"api-core", "--overload", "--", "printenv", "APP_NAME",
-	)
-	if err != nil {
-		t.Fatalf("Execute(): %v", err)
-	}
-	if stdout != "api-core\n" {
-		t.Errorf("APP_NAME = %q, want api-core (file wins via --overload)", stdout)
-	}
-}
-
-// TestNewRunCommandUnionsOSKeys verifies the child receives OS-only environment
-// variables too, so the effective environment stays complete now that
-// Materialize (not the runner) composes it.
-func TestNewRunCommandUnionsOSKeys(t *testing.T) {
-	t.Setenv("OS_ONLY_VAR", "present")
-
-	path := fixtures.Manifest("basic")
-	stdout, _, err := executeRun(
-		t, &mockEnvFactory{}, path, "api-core", "--", "printenv", "OS_ONLY_VAR",
-	)
-	if err != nil {
-		t.Fatalf("Execute(): %v", err)
-	}
-	if stdout != "present\n" {
-		t.Errorf("child OS_ONLY_VAR = %q, want present", stdout)
-	}
-}
-
-// TestNewRunCommandFactoryError verifies an environment service failure aborts the
-// run before any child starts.
-func TestNewRunCommandFactoryError(t *testing.T) {
+// TestRunCommandIgnoreErrors verifies an unresolved value aborts before the
+// child starts unless --ignore-errors, which warns and omits the key.
+func TestRunCommandIgnoreErrors(t *testing.T) {
 	t.Parallel()
 
-	expectedErr := errors.New("factory failure")
-	stdout, _, err := executeRun(
-		t, &mockEnvFactory{err: expectedErr}, "envx.yaml",
-		"api-core", "--", "printenv", "APP_NAME",
-	)
-	if !errors.Is(err, expectedErr) {
-		t.Fatalf("got err = %v, want %v", err, expectedErr)
+	broken := func() *fakeFactory {
+		factory := newFakeFactory()
+		factory.namespaces[appInclude]["broken"] = "{{NOPE}}"
+		return factory
 	}
-	if stdout != "" {
-		t.Errorf("child produced output %q despite the factory failure", stdout)
-	}
-}
 
-// TestNewRunCommandRevealFailurePreventsChildStartup verifies run reveals secrets
-// before starting the child, so a reference it cannot decrypt fails during
-// resolution and the child process never runs. The workspace stores real
-// ciphertext but ships no private key, so the required key is unavailable.
-func TestNewRunCommandRevealFailurePreventsChildStartup(t *testing.T) {
-	dir := t.TempDir()
-
-	// Encrypt a value to a fresh keypair whose private key is never written, so
-	// revealing the reference must fail for want of a key.
-	selected := age.Cipher{}
-	pair, err := selected.Keypair()
-	if err != nil {
-		t.Fatalf("Keypair(): %v", err)
-	}
-	raw, err := selected.Encrypt("top-secret", pair.PublicKey)
-	if err != nil {
-		t.Fatalf("Encrypt(): %v", err)
-	}
-	ciphertext := "encrypted-age:" + base64.RawURLEncoding.EncodeToString(raw)
-
-	writeWorkspaceFile(t, dir, "envx.yaml",
-		"environments: [development]\nprojects:\n  api:\n    includes: [env/app]\n")
-	writeWorkspaceFile(t, dir, filepath.Join("env", "app.yaml"),
-		"password: secret://production/db\n")
-	writeWorkspaceFile(t, dir, "secrets.yaml",
-		"public-keys:\n  production: "+pair.PublicKey+
-			"\nsecrets:\n  production:\n    db: "+ciphertext+"\n")
-
-	stdout, _, err := executeRun(
-		t, &mockEnvFactory{}, filepath.Join(dir, "envx.yaml"),
-		"api", "--", "printenv", "PASSWORD",
-	)
+	strict := broken()
+	_, _, err := execute(t, NewRunCommand(strict), "app", "--", "true")
 	if err == nil {
-		t.Fatal("expected the reveal failure to prevent child-process startup")
+		t.Error("an unresolved value did not abort the run")
 	}
-	if stdout != "" {
-		t.Errorf("child produced output %q despite the reveal failure", stdout)
+	if len(strict.runs) != 0 {
+		t.Error("the child started despite the unresolved value")
 	}
-}
 
-// TestNewRunCommandIgnoreErrorsFailsClosedByDefault verifies that without
-// --ignore-errors an unresolved reference aborts the run before the child starts.
-func TestNewRunCommandIgnoreErrorsFailsClosedByDefault(t *testing.T) {
-	t.Parallel()
-
-	dir := t.TempDir()
-	writeWorkspaceFile(t, dir, "envx.yaml",
-		"environments: [development]\nprojects:\n  api:\n    includes: [env/app]\n")
-	writeWorkspaceFile(t, dir, filepath.Join("env", "app.yaml"),
-		"good: value\nbroken: \"{{NOPE}}\"\n")
-
-	stdout, _, err := executeRun(
-		t, &mockEnvFactory{}, filepath.Join(dir, "envx.yaml"),
-		"api", "--", "printenv", "GOOD",
-	)
-	if err == nil {
-		t.Fatal("expected the missing reference to abort the run")
-	}
-	if stdout != "" {
-		t.Errorf("child produced output %q despite the failure", stdout)
-	}
-}
-
-// TestNewRunCommandIgnoreErrorsStartsChild verifies --ignore-errors downgrades an
-// unresolved reference to a stderr warning, omits its key (leaving it unset, not
-// empty), and still starts the child with the keys that did resolve.
-func TestNewRunCommandIgnoreErrorsStartsChild(t *testing.T) {
-	t.Parallel()
-
-	dir := t.TempDir()
-	writeWorkspaceFile(t, dir, "envx.yaml",
-		"environments: [development]\nprojects:\n  api:\n    includes: [env/app]\n")
-	writeWorkspaceFile(t, dir, filepath.Join("env", "app.yaml"),
-		"good: value\nbroken: \"{{NOPE}}\"\n")
-
-	stdout, stderr, err := executeRun(
-		t, &mockEnvFactory{}, filepath.Join(dir, "envx.yaml"),
-		"api", "--ignore-errors", "--",
-		"sh", "-c", "echo GOOD=$GOOD; echo BROKEN=${BROKEN-<unset>}",
+	tolerant := broken()
+	_, stderr, err := execute(
+		t, NewRunCommand(tolerant), "app", "--ignore-errors", "--", "true",
 	)
 	if err != nil {
-		t.Fatalf("Execute(): %v", err)
+		t.Fatalf("Execute(--ignore-errors): %v", err)
 	}
-	// GOOD resolves; BROKEN is omitted entirely, so the child sees it as unset
-	// rather than an empty string.
-	if stdout != "GOOD=value\nBROKEN=<unset>\n" {
-		t.Errorf("child output = %q, want GOOD=value + BROKEN unset", stdout)
+	if len(tolerant.runs) != 1 {
+		t.Fatalf("runs = %d, want 1", len(tolerant.runs))
+	}
+	if _, ok := tolerant.runs[0].Env["BROKEN"]; ok {
+		t.Error("the unresolved key reached the child")
 	}
 	if !strings.Contains(stderr, "WARNING") || !strings.Contains(stderr, "BROKEN") {
 		t.Errorf("stderr = %q, want a warning naming BROKEN", stderr)
 	}
 }
 
-// TestNewRunCommandIgnoreErrorsKeepsAmbientValue verifies that under --overload a
-// broken file value which the shell already defines is not omitted: the ambient
-// value survives so the file value never clobbers it.
-func TestNewRunCommandIgnoreErrorsKeepsAmbientValue(t *testing.T) {
-	t.Setenv("BROKEN", "from-shell")
-	t.Setenv("ENVX_OVERLOAD", "true")
+// TestRunCommandReturnsChildError verifies the child's error is returned
+// unchanged so the exit status can propagate.
+func TestRunCommandReturnsChildError(t *testing.T) {
+	t.Parallel()
 
-	dir := t.TempDir()
-	writeWorkspaceFile(t, dir, "envx.yaml",
-		"environments: [development]\nprojects:\n  api:\n    includes: [env/app]\n")
-	writeWorkspaceFile(t, dir, filepath.Join("env", "app.yaml"),
-		"broken: \"{{MISSING}}\"\n")
-
-	stdout, stderr, err := executeRun(
-		t, &mockEnvFactory{}, filepath.Join(dir, "envx.yaml"),
-		"api", "--ignore-errors", "--", "sh", "-c", "echo BROKEN=$BROKEN",
-	)
-	if err != nil {
-		t.Fatalf("Execute(): %v", err)
-	}
-	if stdout != "BROKEN=from-shell\n" {
-		t.Errorf("child BROKEN = %q, want the ambient from-shell", stdout)
-	}
-	if !strings.Contains(stderr, "keeping the value") {
-		t.Errorf("stderr = %q, want a fallback warning", stderr)
+	want := errors.New("exit status 3")
+	factory := newFakeFactory()
+	factory.runErr = want
+	_, _, err := execute(t, NewRunCommand(factory), "app", "--", "false")
+	if !errors.Is(err, want) {
+		t.Fatalf("err = %v, want %v", err, want)
 	}
 }
 
-// TestNewRunCommandArgsValidation verifies run's positional layout is enforced
-// as a usage error.
-func TestNewRunCommandArgsValidation(t *testing.T) {
+// TestRunCommandArgsValidation verifies run's positional layout is enforced
+// before the factory is called.
+func TestRunCommandArgsValidation(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
+		// name labels the case.
 		name string
+		// args are the command-line arguments.
 		args []string
+		// want is a substring of the expected error.
 		want string
 	}{
-		{"missing separator", []string{"api"}, "missing '--' separator"},
+		{"missing separator", []string{"app"}, "missing '--' separator"},
 		{"no project", []string{"--", "ls"}, "exactly one project"},
 		{"two projects", []string{"a", "b", "--", "ls"}, "exactly one project"},
-		{"no command", []string{"api", "--"}, "no command specified"},
+		{"no command", []string{"app", "--"}, "no command specified"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			cmd := NewRunCommand(&mockEnvFactory{})
-			cmd.SetArgs(tt.args)
-			cmd.SetOut(&bytes.Buffer{})
-			cmd.SetErr(&bytes.Buffer{})
-
-			err := cmd.Execute()
+			factory := newFakeFactory()
+			_, _, err := execute(t, NewRunCommand(factory), tt.args...)
 			if err == nil || !strings.Contains(err.Error(), tt.want) {
-				t.Errorf("Execute() error = %v, want it to contain %q", err, tt.want)
+				t.Errorf("err = %v, want it to contain %q", err, tt.want)
+			}
+			if factory.configPath != "" {
+				t.Error("factory was called despite invalid arguments")
 			}
 		})
-	}
-}
-
-// TestOutputRunWarning verifies a downgraded failure is printed as a warning.
-func TestOutputRunWarning(t *testing.T) {
-	t.Parallel()
-
-	var stderr bytes.Buffer
-	console := printer.New(printer.Options{
-		Out: &bytes.Buffer{},
-		Err: &stderr,
-	})
-
-	err := outputRunWarning(console, diagnostic.Finding{Message: "first problem"})
-	if err != nil {
-		t.Fatalf("outputRunWarning(): %v", err)
-	}
-
-	if got := stderr.String(); !strings.Contains(got, "first problem") {
-		t.Errorf("stderr missing the warning:\n%s", got)
 	}
 }
