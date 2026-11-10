@@ -183,7 +183,8 @@ Which flags each verb registers (from each `command.go`):
 ## Testing
 
 - Tests run through `task envx:test` (race detector + coverage over all packages).
-- Sample workspaces live under [testdata/](testdata); resolve their paths with the helpers in [internal/fixtures](internal/fixtures) (for example `fixtures.Manifest("basic")`) rather than fragile `../..` offsets.
+- Tests read package-local fixtures from their own `testdata/` directory; tests that mutate a workspace copy it first with `testutil.CopyDir`.
+- The end-to-end suite in [test/e2e](test/e2e) (`task envx:test:e2e`, `e2e` build tag) builds the binary once and runs it as a subprocess against isolated copies of its `testdata` workspaces.
 - `envmerge` tests build `envmerge.Params` directly, so they need no manifest on disk.
 - Pure kernels (merge, flatten, precedence, exit-code mapping) are table-tested; keep new logic pure where possible so it stays easy to test.
 

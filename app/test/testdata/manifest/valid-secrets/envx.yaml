@@ -1,9 +1,0 @@
-environments: [development, production]
-secrets:
-  path: ./private/secrets.yaml
-  keys-path: ./private/envx.keys
-  cipher: age
-projects:
-  api:
-    includes:
-      - env/postgres

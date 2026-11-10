@@ -3,43 +3,19 @@
 package e2e_test
 
 import (
-	"bytes"
 	"encoding/json"
 	"strings"
 	"testing"
-
-	"github.com/go-envx/envx/app/internal/app"
-	"github.com/go-envx/envx/app/internal/cli"
-	"github.com/go-envx/envx/app/internal/lib/stdio"
-	"github.com/go-envx/envx/app/test/fixtures"
 )
-
-// execCmd builds a root command wired to fresh stdout/stderr buffers, sets the
-// given args, and executes it. It returns the captured buffers and any error.
-func execCmd(args ...string) (stdout, stderr *bytes.Buffer, err error) {
-	stdout = new(bytes.Buffer)
-	stderr = new(bytes.Buffer)
-	cmd := cli.NewRootCommand(
-		cli.BuildInfo{Version: "test"},
-		app.Factory{},
-		stdio.Streams{Out: stdout, ErrOut: stderr},
-	)
-	cmd.SetArgs(args)
-	err = cmd.Execute()
-	return stdout, stderr, err
-}
 
 // TestRootShowsHelp verifies bare invocation prints help and does not require a
 // manifest.
 func TestRootShowsHelp(t *testing.T) {
 	t.Parallel()
 
-	stdout, _, err := execCmd()
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if !strings.Contains(stdout.String(), "envx") {
-		t.Errorf("expected help output, got %q", stdout.String())
+	res := mustEnvx(t, nil)
+	if !strings.Contains(res.stdout, "envx") {
+		t.Errorf("expected help output, got %q", res.stdout)
 	}
 }
 
@@ -48,9 +24,13 @@ func TestRootShowsHelp(t *testing.T) {
 func TestKeypairGenerateRequiresGroup(t *testing.T) {
 	t.Parallel()
 
-	_, _, err := execCmd("keypair", "generate")
-	if err == nil || !strings.Contains(err.Error(), "accepts 1 arg") {
-		t.Fatalf("error = %v, want missing-group validation error", err)
+	res := envx(t, nil, "keypair", "generate")
+	if res.code != 2 || !strings.Contains(res.stderr, "accepts 1 arg") {
+		t.Fatalf(
+			"exit %d, stderr %q; want usage exit 2 with missing-group error",
+			res.code,
+			res.stderr,
+		)
 	}
 }
 
@@ -58,34 +38,32 @@ func TestKeypairGenerateRequiresGroup(t *testing.T) {
 func TestVersionFlag(t *testing.T) {
 	t.Parallel()
 
-	stdout, _, err := execCmd("--version")
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	out := stdout.String()
-	if !strings.HasPrefix(out, "envx version test\n") {
+	res := mustEnvx(t, nil, "--version")
+	if !strings.HasPrefix(res.stdout, "envx version test\n") {
 		t.Errorf(
 			"version output = %q, want it to start with %q",
-			out,
+			res.stdout,
 			"envx version test\n",
 		)
 	}
-	if !strings.Contains(out, "commit:") {
-		t.Errorf("version output %q missing commit metadata", out)
+	if !strings.Contains(res.stdout, "commit:") {
+		t.Errorf("version output %q missing commit metadata", res.stdout)
 	}
 }
 
-// TestGet verifies get prints a resolved value and reports missing keys.
+// TestGet verifies get prints a resolved value and reports failures with the
+// matching exit code on stderr.
 func TestGet(t *testing.T) {
 	t.Parallel()
 
-	cfg := fixtures.Manifest("basic")
+	cfg := basicWorkspace(t)
 
 	tests := []struct {
-		name    string
-		args    []string
-		want    string
-		wantErr string
+		name     string
+		args     []string
+		want     string
+		wantCode int
+		wantErr  string
 	}{
 		{
 			name: "overlay value",
@@ -106,36 +84,44 @@ func TestGet(t *testing.T) {
 			args: []string{
 				"get", "--config", cfg, "--env", "development", "api-core", "NOPE",
 			},
-			wantErr: "not found",
+			wantCode: 1,
+			wantErr:  "not found",
 		},
 		{
 			name: "unknown project",
 			args: []string{
 				"get", "--config", cfg, "--env", "development", "ghost", "HOST",
 			},
-			wantErr: "not found in manifest",
+			wantCode: 1,
+			wantErr:  "not found in manifest",
 		},
 		{
-			name:    "bad arg count",
-			args:    []string{"get", "--config", cfg, "api-core"},
-			wantErr: "accepts 2 arg",
+			name:     "bad arg count",
+			args:     []string{"get", "--config", cfg, "api-core"},
+			wantCode: 2,
+			wantErr:  "accepts 2 arg",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			stdout, _, err := execCmd(tt.args...)
+			res := envx(t, nil, tt.args...)
+			if res.code != tt.wantCode {
+				t.Fatalf(
+					"exit %d, want %d\nstderr:\n%s",
+					res.code,
+					tt.wantCode,
+					res.stderr,
+				)
+			}
 			if tt.wantErr != "" {
-				if err == nil || !strings.Contains(err.Error(), tt.wantErr) {
-					t.Fatalf("error = %v, want containing %q", err, tt.wantErr)
+				if !strings.Contains(res.stderr, tt.wantErr) {
+					t.Errorf("stderr = %q, want containing %q", res.stderr, tt.wantErr)
 				}
 				return
 			}
-			if err != nil {
-				t.Fatalf("unexpected error: %v", err)
-			}
-			if got := strings.TrimSpace(stdout.String()); got != tt.want {
+			if got := strings.TrimSpace(res.stdout); got != tt.want {
 				t.Errorf("got %q, want %q", got, tt.want)
 			}
 		})
@@ -146,15 +132,12 @@ func TestGet(t *testing.T) {
 func TestRun(t *testing.T) {
 	t.Parallel()
 
-	cfg := fixtures.Manifest("basic")
-	stdout, _, err := execCmd(
+	cfg := basicWorkspace(t)
+	res := mustEnvx(t, nil,
 		"run", "--config", cfg, "--env", "development", "--overload",
 		"api-core", "--", "printenv", "APP_NAME",
 	)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if got := strings.TrimSpace(stdout.String()); got != "api-core" {
+	if got := strings.TrimSpace(res.stdout); got != "api-core" {
 		t.Errorf("child APP_NAME = %q, want api-core", got)
 	}
 }
@@ -163,9 +146,9 @@ func TestRun(t *testing.T) {
 func TestRunRequiresCommand(t *testing.T) {
 	t.Parallel()
 
-	cfg := fixtures.Manifest("basic")
-	if _, _, err := execCmd("run", "--config", cfg, "api-core"); err == nil {
-		t.Fatal("expected error when no command follows --")
+	cfg := basicWorkspace(t)
+	if res := envx(t, nil, "run", "--config", cfg, "api-core"); res.code == 0 {
+		t.Fatal("expected failure when no command follows --")
 	}
 }
 
@@ -174,16 +157,13 @@ func TestRunRequiresCommand(t *testing.T) {
 func TestEmitDotenv(t *testing.T) {
 	t.Parallel()
 
-	cfg := fixtures.Manifest("basic")
-	stdout, _, err := execCmd(
+	cfg := basicWorkspace(t)
+	res := mustEnvx(t, nil,
 		"emit", "--config", cfg, "--env", "development", "api-core",
 		"--target", "dotenv",
 	)
-	if err != nil {
-		t.Fatalf("emit: %v", err)
-	}
-	if got := stdout.String(); !strings.Contains(got, "APP_NAME=api-core\n") {
-		t.Errorf("emit dotenv missing APP_NAME:\n%s", got)
+	if !strings.Contains(res.stdout, "APP_NAME=api-core\n") {
+		t.Errorf("emit dotenv missing APP_NAME:\n%s", res.stdout)
 	}
 }
 
@@ -191,8 +171,8 @@ func TestEmitDotenv(t *testing.T) {
 func TestEmitRequiresTarget(t *testing.T) {
 	t.Parallel()
 
-	cfg := fixtures.Manifest("basic")
-	if _, _, err := execCmd("emit", "--config", cfg, "api-core"); err == nil {
+	cfg := basicWorkspace(t)
+	if res := envx(t, nil, "emit", "--config", cfg, "api-core"); res.code == 0 {
 		t.Fatal("expected emit to require --target")
 	}
 }
@@ -202,10 +182,11 @@ func TestEmitRequiresTarget(t *testing.T) {
 func TestEmitRejectsNameForPlainTarget(t *testing.T) {
 	t.Parallel()
 
-	cfg := fixtures.Manifest("basic")
-	if _, _, err := execCmd(
+	cfg := basicWorkspace(t)
+	res := envx(t, nil,
 		"emit", "--config", cfg, "api-core", "--target", "dotenv", "--name", "oops",
-	); err == nil {
+	)
+	if res.code == 0 {
 		t.Fatal("expected --name to be rejected for the dotenv target")
 	}
 }
@@ -215,18 +196,12 @@ func TestEmitRejectsNameForPlainTarget(t *testing.T) {
 func TestEmitK8sAutoNamesFromProject(t *testing.T) {
 	t.Parallel()
 
-	cfg := fixtures.Manifest("basic")
-	stdout, _, err := execCmd(
+	cfg := basicWorkspace(t)
+	res := mustEnvx(t, nil,
 		"emit", "--config", cfg, "api-core", "--target", "k8s", "--only", "config",
 	)
-	if err != nil {
-		t.Fatalf("emit k8s without --name: %v", err)
-	}
-	if !strings.Contains(stdout.String(), "name: api-core-config") {
-		t.Errorf(
-			"expected auto-named ConfigMap api-core-config:\n%s",
-			stdout.String(),
-		)
+	if !strings.Contains(res.stdout, "name: api-core-config") {
+		t.Errorf("expected auto-named ConfigMap api-core-config:\n%s", res.stdout)
 	}
 }
 
@@ -234,39 +209,32 @@ func TestEmitK8sAutoNamesFromProject(t *testing.T) {
 func TestExplain(t *testing.T) {
 	t.Parallel()
 
-	cfg := fixtures.Manifest("basic")
+	cfg := basicWorkspace(t)
 
 	t.Run("shows value", func(t *testing.T) {
 		t.Parallel()
-		stdout, _, err := execCmd(
+		res := mustEnvx(t, nil,
 			"explain", "--config", cfg, "--env", "development", "api-core", "HOST",
 		)
-		if err != nil {
-			t.Fatalf("explain: %v", err)
+		if !strings.Contains(res.stdout, "HOST") {
+			t.Errorf("expected HOST in output, got %q", res.stdout)
 		}
-		out := stdout.String()
-		if !strings.Contains(out, "HOST") {
-			t.Errorf("expected HOST in output, got %q", out)
-		}
-		if !strings.Contains(out, "dev-db.local") {
-			t.Errorf("expected value in output, got %q", out)
+		if !strings.Contains(res.stdout, "dev-db.local") {
+			t.Errorf("expected value in output, got %q", res.stdout)
 		}
 	})
 
 	t.Run("json output", func(t *testing.T) {
 		t.Parallel()
-		stdout, _, err := execCmd(
+		res := mustEnvx(t, nil,
 			"explain", "--config", cfg, "--env", "development",
 			"--output", "json", "api-core", "HOST",
 		)
-		if err != nil {
-			t.Fatalf("explain --output json: %v", err)
-		}
 		var result struct {
 			Entries []map[string]any `json:"entries"`
 		}
-		if err := json.Unmarshal(stdout.Bytes(), &result); err != nil {
-			t.Fatalf("invalid json: %v\n%s", err, stdout.String())
+		if err := json.Unmarshal([]byte(res.stdout), &result); err != nil {
+			t.Fatalf("invalid json: %v\n%s", err, res.stdout)
 		}
 		if len(result.Entries) != 1 || result.Entries[0]["key"] != "HOST" {
 			t.Errorf("unexpected json entries: %v", result.Entries)
@@ -280,37 +248,24 @@ func TestExplain(t *testing.T) {
 func TestDiff(t *testing.T) {
 	t.Parallel()
 
-	cfg := fixtures.Manifest("basic")
-
-	// changedHost runs diff for api-core development->production and returns the
-	// env_a value of the HOST change, which differs between the two environments.
-	changedHost := func(t *testing.T, args ...string) string {
-		t.Helper()
-		full := append([]string{"diff", "--config", cfg, "--output", "json"}, args...)
-		full = append(full, "api-core", "development", "production")
-		stdout, _, err := execCmd(full...)
-		if err != nil {
-			t.Fatalf("diff: %v", err)
-		}
-		var result struct {
-			Changed []map[string]string `json:"changed"`
-		}
-		if err := json.Unmarshal(stdout.Bytes(), &result); err != nil {
-			t.Fatalf("invalid json: %v\n%s", err, stdout.String())
-		}
-		for _, c := range result.Changed {
-			if c["key"] == "HOST" {
-				return c["env_a"]
-			}
-		}
-		t.Fatalf("expected HOST among changed keys, got %v", result.Changed)
-		return ""
+	cfg := basicWorkspace(t)
+	res := mustEnvx(t, nil,
+		"diff", "--config", cfg, "--output", "json",
+		"api-core", "development", "production",
+	)
+	var result struct {
+		Changed []map[string]string `json:"changed"`
 	}
-
-	t.Run("shows values", func(t *testing.T) {
-		t.Parallel()
-		if got := changedHost(t); got != "dev-db.local" {
-			t.Errorf("env_a = %q, want dev-db.local", got)
+	if err := json.Unmarshal([]byte(res.stdout), &result); err != nil {
+		t.Fatalf("invalid json: %v\n%s", err, res.stdout)
+	}
+	for _, c := range result.Changed {
+		if c["key"] == "HOST" {
+			if c["env_a"] != "dev-db.local" {
+				t.Errorf("env_a = %q, want dev-db.local", c["env_a"])
+			}
+			return
 		}
-	})
+	}
+	t.Fatalf("expected HOST among changed keys, got %v", result.Changed)
 }

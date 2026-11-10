@@ -3,43 +3,14 @@
 package e2e_test
 
 import (
+	"bufio"
 	"encoding/base64"
 	"os"
 	"path/filepath"
 	"strings"
+	"syscall"
 	"testing"
-
-	"github.com/go-envx/envx/app/internal/lib/atomicfile"
-	"github.com/go-envx/envx/app/internal/lib/filex"
-	"github.com/go-envx/envx/app/test/fixtures"
 )
-
-// copyTree recursively copies the directory tree at src into dst.
-func copyTree(t *testing.T, src, dst string) {
-	t.Helper()
-	entries, err := os.ReadDir(src)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := os.MkdirAll(dst, 0o750); err != nil {
-		t.Fatal(err)
-	}
-	for _, e := range entries {
-		s := filepath.Join(src, e.Name())
-		d := filepath.Join(dst, e.Name())
-		if e.IsDir() {
-			copyTree(t, s, d)
-			continue
-		}
-		data, err := filex.Read(s)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if err := atomicfile.Write(d, data); err != nil {
-			t.Fatal(err)
-		}
-	}
-}
 
 // dataValue extracts the scalar value of one data key from a rendered k8s
 // manifest, so a test can decode a Secret's single bundle body.
@@ -62,16 +33,9 @@ func dataValue(t *testing.T, manifest, key string) string {
 func TestPackThenRun(t *testing.T) {
 	t.Parallel()
 
-	work := t.TempDir()
-	copyTree(t, fixtures.Testdata("basic"), work)
-	cfg := filepath.Join(work, "envx.yaml")
+	cfg := basicWorkspace(t)
 	dist := filepath.Join(t.TempDir(), "dist")
-
-	if _, _, err := execCmd(
-		"pack", "--config", cfg, "-e", "development", "--out", dist,
-	); err != nil {
-		t.Fatalf("pack: %v", err)
-	}
+	mustEnvx(t, nil, "pack", "--config", cfg, "-e", "development", "--out", dist)
 
 	// The bundle nests each namespace under its project directory, keeps the
 	// selected environment's overlays, and drops the rest.
@@ -85,64 +49,26 @@ func TestPackThenRun(t *testing.T) {
 	}
 
 	// The copied workspace runs through the ordinary pipeline under --config.
-	stdout, _, err := execCmd(
+	res := mustEnvx(t, nil,
 		"run", "--config", filepath.Join(dist, "envx.yaml"),
 		"--env", "development", "--overload",
 		"api-core", "--", "printenv", "APP_NAME",
 	)
-	if err != nil {
-		t.Fatalf("run from bundle: %v", err)
-	}
-	if got := strings.TrimSpace(stdout.String()); got != "api-core" {
+	if got := strings.TrimSpace(res.stdout); got != "api-core" {
 		t.Errorf("child APP_NAME from bundle = %q, want api-core", got)
 	}
 }
 
-// TestPackFiltersAndDecryptsSecrets is the end-to-end secret path: it builds a
-// workspace with a real keypair and one encrypted, referenced secret, packs it,
-// and confirms the bundle store keeps only that secret (no public keys), fails
-// closed without the private key, and decrypts at runtime with ENVX_PRIVATE_KEY.
+// TestPackFiltersAndDecryptsSecrets is the end-to-end secret path: it packs a
+// workspace with one encrypted, referenced secret and confirms the bundle store
+// keeps only that secret (no public keys), fails closed without the private
+// key, and decrypts at runtime with ENVX_PRIVATE_KEY.
 func TestPackFiltersAndDecryptsSecrets(t *testing.T) {
-	// Not parallel: t.Setenv drives the private-key lookup through the process env.
-	work := t.TempDir()
-	cfg := filepath.Join(work, "envx.yaml")
-	body := "environments: [production]\n" +
-		"secrets:\n  cipher: age\n" +
-		"projects:\n  app:\n    includes: [env/app]\n"
-	if err := os.WriteFile(cfg, []byte(body), 0o600); err != nil {
-		t.Fatal(err)
-	}
-	appPath := filepath.Join(work, "env", "app.yaml")
-	if err := os.MkdirAll(filepath.Dir(appPath), 0o750); err != nil {
-		t.Fatal(err)
-	}
-	appYAML := "GREETING: hello\nAPI_KEY: secret://app/api_key\n"
-	if err := os.WriteFile(appPath, []byte(appYAML), 0o600); err != nil {
-		t.Fatal(err)
-	}
+	t.Parallel()
 
-	// Generate a keypair and store one encrypted secret.
-	if _, _, err := execCmd("keypair", "generate", "app", "--config", cfg); err != nil {
-		t.Fatalf("keypair generate: %v", err)
-	}
-	if _, _, err := execCmd(
-		"secrets", "set", "app", "api_key", "s3cr3t", "--config", cfg,
-	); err != nil {
-		t.Fatalf("secrets set: %v", err)
-	}
-	//nolint:gosec // test-local path.
-	privateKey, err := os.ReadFile(filepath.Join(work, "envx.keys"))
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	// Pack the production environment.
+	cfg, privateKey := secretWorkspace(t)
 	dist := filepath.Join(t.TempDir(), "dist")
-	if _, _, err := execCmd(
-		"pack", "--config", cfg, "-e", "production", "--out", dist,
-	); err != nil {
-		t.Fatalf("pack: %v", err)
-	}
+	mustEnvx(t, nil, "pack", "--config", cfg, "-e", "production", "--out", dist)
 
 	// The bundle store keeps only the referenced value and no public keys.
 	//nolint:gosec // test-local path.
@@ -159,161 +85,76 @@ func TestPackFiltersAndDecryptsSecrets(t *testing.T) {
 
 	// Without the private key, the reference fails closed.
 	bundleCfg := filepath.Join(dist, "envx.yaml")
-	if _, _, err := execCmd(
+	runArgs := []string{
 		"run", "--config", bundleCfg, "--env", "production",
 		"app", "--", "printenv", "API_KEY",
-	); err == nil {
+	}
+	if res := envx(t, nil, runArgs...); res.code == 0 {
 		t.Error("run from bundle succeeded without a private key")
 	}
 
 	// With ENVX_PRIVATE_KEY, the bundle decrypts at runtime.
-	t.Setenv("ENVX_PRIVATE_KEY", string(privateKey))
-	stdout, _, err := execCmd(
-		"run", "--config", bundleCfg, "--env", "production",
-		"app", "--", "printenv", "API_KEY",
-	)
-	if err != nil {
-		t.Fatalf("run from bundle with key: %v", err)
-	}
-	if got := strings.TrimSpace(stdout.String()); got != "s3cr3t" {
+	res := mustEnvx(t, []string{privateKey}, runArgs...)
+	if got := strings.TrimSpace(res.stdout); got != "s3cr3t" {
 		t.Errorf("decrypted API_KEY = %q, want s3cr3t", got)
 	}
 }
 
-// TestEmitK8sSplitDecrypts is the end-to-end Kubernetes path: it builds a
-// workspace with a real keypair and one encrypted, referenced secret, then emits
-// the k8s target with each slice and confirms the split — "--only secrets" emits
-// a Secret carrying the decrypted secret value (base64-encoded) while "--only
+// TestEmitK8sSplitDecrypts is the end-to-end Kubernetes path: it emits the k8s
+// target with each slice and confirms the split — "--only secrets" emits a
+// Secret carrying the decrypted secret value (base64-encoded) while "--only
 // config" emits a ConfigMap carrying only the plain value.
 func TestEmitK8sSplitDecrypts(t *testing.T) {
-	// Not parallel: t.Setenv drives the private-key lookup through the process env.
-	work := t.TempDir()
-	cfg := filepath.Join(work, "envx.yaml")
-	body := "environments: [production]\n" +
-		"secrets:\n  cipher: age\n" +
-		"projects:\n  app:\n    includes: [env/app]\n"
-	if err := os.WriteFile(cfg, []byte(body), 0o600); err != nil {
-		t.Fatal(err)
-	}
-	appPath := filepath.Join(work, "env", "app.yaml")
-	if err := os.MkdirAll(filepath.Dir(appPath), 0o750); err != nil {
-		t.Fatal(err)
-	}
-	appYAML := "GREETING: hello\nAPI_KEY: secret://app/api_key\n"
-	if err := os.WriteFile(appPath, []byte(appYAML), 0o600); err != nil {
-		t.Fatal(err)
-	}
+	t.Parallel()
 
-	// Generate a keypair and store one encrypted secret.
-	if _, _, err := execCmd("keypair", "generate", "app", "--config", cfg); err != nil {
-		t.Fatalf("keypair generate: %v", err)
-	}
-	if _, _, err := execCmd(
-		"secrets", "set", "app", "api_key", "s3cr3t", "--config", cfg,
-	); err != nil {
-		t.Fatalf("secrets set: %v", err)
-	}
-	//nolint:gosec // test-local path.
-	privateKey, err := os.ReadFile(filepath.Join(work, "envx.keys"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	t.Setenv("ENVX_PRIVATE_KEY", string(privateKey))
+	cfg, privateKey := secretWorkspace(t)
+	env := []string{privateKey}
 
 	// The Secret carries the decrypted, base64-encoded secret and not the plain
 	// value.
-	secretOut, _, err := execCmd(
+	secretOut := mustEnvx(t, env,
 		"emit", "--config", cfg, "--env", "production", "app",
 		"--target", "k8s", "--only", "secrets", "--name", "app-secrets",
-	)
-	if err != nil {
-		t.Fatalf("emit k8s --only secrets: %v", err)
-	}
+	).stdout
 	wantData := "API_KEY: " + base64.StdEncoding.EncodeToString([]byte("s3cr3t"))
-	if !strings.Contains(secretOut.String(), wantData) {
-		t.Errorf(
-			"Secret missing decrypted secret %q:\n%s",
-			wantData,
-			secretOut.String(),
-		)
+	if !strings.Contains(secretOut, wantData) {
+		t.Errorf("Secret missing decrypted secret %q:\n%s", wantData, secretOut)
 	}
-	if strings.Contains(secretOut.String(), "GREETING") {
-		t.Errorf("Secret unexpectedly carries the plain value:\n%s", secretOut.String())
+	if strings.Contains(secretOut, "GREETING") {
+		t.Errorf("Secret unexpectedly carries the plain value:\n%s", secretOut)
 	}
 
 	// The ConfigMap carries the plain value and not the secret.
-	configOut, _, err := execCmd(
+	configOut := mustEnvx(t, env,
 		"emit", "--config", cfg, "--env", "production", "app",
 		"--target", "k8s", "--only", "config", "--name", "app-config",
-	)
-	if err != nil {
-		t.Fatalf("emit k8s --only config: %v", err)
-	}
-	if !strings.Contains(configOut.String(), "GREETING: hello") {
-		t.Errorf("ConfigMap missing the plain value:\n%s", configOut.String())
+	).stdout
+	if !strings.Contains(configOut, "GREETING: hello") {
+		t.Errorf("ConfigMap missing the plain value:\n%s", configOut)
 	}
 	for _, secret := range []string{"API_KEY", "s3cr3t"} {
-		if strings.Contains(configOut.String(), secret) {
-			t.Errorf(
-				"ConfigMap leaked secret material %q:\n%s",
-				secret,
-				configOut.String(),
-			)
+		if strings.Contains(configOut, secret) {
+			t.Errorf("ConfigMap leaked secret material %q:\n%s", secret, configOut)
 		}
 	}
 }
 
-// TestEmitK8sBundleDecrypts is the end-to-end bundle path: it reuses the
-// encrypted workspace and emits a merged --bundle, then confirms the single
-// Secret data key holds a base64 JSON body carrying both the decrypted secret and
-// the plain value — the shape an app volume-mounts and parses as one file.
+// TestEmitK8sBundleDecrypts is the end-to-end bundle path: it emits a merged
+// --bundle and confirms the single Secret data key holds a base64 JSON body
+// carrying both the decrypted secret and the plain value — the shape an app
+// volume-mounts and parses as one file.
 func TestEmitK8sBundleDecrypts(t *testing.T) {
-	// Not parallel: t.Setenv drives the private-key lookup through the process env.
-	work := t.TempDir()
-	cfg := filepath.Join(work, "envx.yaml")
-	body := "environments: [production]\n" +
-		"secrets:\n  cipher: age\n" +
-		"projects:\n  app:\n    includes: [env/app]\n"
-	if err := os.WriteFile(cfg, []byte(body), 0o600); err != nil {
-		t.Fatal(err)
-	}
-	appPath := filepath.Join(work, "env", "app.yaml")
-	if err := os.MkdirAll(filepath.Dir(appPath), 0o750); err != nil {
-		t.Fatal(err)
-	}
-	appYAML := "GREETING: hello\nAPI_KEY: secret://app/api_key\n"
-	if err := os.WriteFile(appPath, []byte(appYAML), 0o600); err != nil {
-		t.Fatal(err)
-	}
-	if _, _, err := execCmd("keypair", "generate", "app", "--config", cfg); err != nil {
-		t.Fatalf("keypair generate: %v", err)
-	}
-	if _, _, err := execCmd(
-		"secrets", "set", "app", "api_key", "s3cr3t", "--config", cfg,
-	); err != nil {
-		t.Fatalf("secrets set: %v", err)
-	}
-	//nolint:gosec // test-local path.
-	privateKey, err := os.ReadFile(filepath.Join(work, "envx.keys"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	t.Setenv("ENVX_PRIVATE_KEY", string(privateKey))
+	t.Parallel()
 
-	out, _, err := execCmd(
+	cfg, privateKey := secretWorkspace(t)
+	out := mustEnvx(t, []string{privateKey},
 		"emit", "--config", cfg, "--env", "production", "app",
 		"--target", "k8s-bundle", "--name", "app", "--key", "app.json",
-	)
-	if err != nil {
-		t.Fatalf("emit k8s-bundle: %v", err)
+	).stdout
+	if !strings.Contains(out, "kind: Secret") {
+		t.Fatalf("bundle should be a Secret:\n%s", out)
 	}
-	// The merged bundle is a single Secret data key; decode its base64 body and
-	// confirm it is JSON carrying both the decrypted secret and the plain value.
-	if !strings.Contains(out.String(), "kind: Secret") {
-		t.Fatalf("bundle should be a Secret:\n%s", out.String())
-	}
-	encoded := dataValue(t, out.String(), "app.json")
-	decoded, err := base64.StdEncoding.DecodeString(encoded)
+	decoded, err := base64.StdEncoding.DecodeString(dataValue(t, out, "app.json"))
 	if err != nil {
 		t.Fatalf("bundle body is not valid base64: %v", err)
 	}
@@ -328,25 +169,76 @@ func TestEmitK8sBundleDecrypts(t *testing.T) {
 func TestSetRoundTrip(t *testing.T) {
 	t.Parallel()
 
-	work := t.TempDir()
-	copyTree(t, fixtures.Testdata("basic"), work)
-	cfg := filepath.Join(work, "envx.yaml")
-
-	if _, _, err := execCmd(
+	cfg := basicWorkspace(t)
+	mustEnvx(t, nil,
 		"set", "--config", cfg, "--env", "development",
 		"env/postgres", "feature.enabled", "true",
-	); err != nil {
-		t.Fatalf("set: %v", err)
-	}
-
-	stdout, _, err := execCmd(
+	)
+	res := mustEnvx(t, nil,
 		"get", "--config", cfg, "--env", "development",
 		"api-core", "FEATURE_ENABLED",
 	)
-	if err != nil {
-		t.Fatalf("get after set: %v", err)
-	}
-	if got := strings.TrimSpace(stdout.String()); got != "true" {
+	if got := strings.TrimSpace(res.stdout); got != "true" {
 		t.Errorf("FEATURE_ENABLED = %q, want true", got)
+	}
+}
+
+// TestRunExitStatus verifies the child's exit status becomes envx's own, and a
+// command that cannot start reports its cause on stderr with exit 127.
+func TestRunExitStatus(t *testing.T) {
+	t.Parallel()
+
+	cfg := basicWorkspace(t)
+
+	t.Run("child status", func(t *testing.T) {
+		t.Parallel()
+		res := envx(t, nil, "run", "--config", cfg, "api-core", "--", "sh", "-c", "exit 7")
+		if res.code != 7 {
+			t.Errorf("exit %d, want 7\nstderr:\n%s", res.code, res.stderr)
+		}
+	})
+
+	t.Run("command not found", func(t *testing.T) {
+		t.Parallel()
+		res := envx(t, nil, "run", "--config", cfg, "api-core", "--", "envx-no-such-cmd")
+		if res.code != 127 {
+			t.Errorf("exit %d, want 127", res.code)
+		}
+		if !strings.HasPrefix(res.stderr, "envx: ") ||
+			!strings.Contains(res.stderr, "envx-no-such-cmd") {
+			t.Errorf("stderr = %q, want envx-prefixed start failure", res.stderr)
+		}
+	})
+}
+
+// TestRunForwardsSignal verifies SIGTERM sent to envx reaches the child, whose
+// resulting exit status envx mirrors.
+func TestRunForwardsSignal(t *testing.T) {
+	t.Parallel()
+
+	cfg := basicWorkspace(t)
+	cmd, _ := command(t, nil,
+		"run", "--config", cfg, "api-core", "--",
+		"sh", "-c", `trap 'exit 42' TERM; echo ready; while :; do sleep 1 & wait $!; done`,
+	)
+	stdout, err := cmd.StdoutPipe()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := cmd.Start(); err != nil {
+		t.Fatal(err)
+	}
+
+	// The child installs its trap before announcing readiness.
+	line, err := bufio.NewReader(stdout).ReadString('\n')
+	if err != nil || line != "ready\n" {
+		t.Fatalf("readiness line = %q, %v", line, err)
+	}
+	if err := cmd.Process.Signal(syscall.SIGTERM); err != nil {
+		t.Fatal(err)
+	}
+	_ = cmd.Wait()
+	if code := cmd.ProcessState.ExitCode(); code != 42 {
+		t.Errorf("exit %d, want the child's trapped status 42", code)
 	}
 }

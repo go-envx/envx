@@ -1,4 +1,0 @@
-environments: [development, production]
-projects:
-  api:
-    includes: [env/app]

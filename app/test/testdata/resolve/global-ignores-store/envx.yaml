@@ -1,4 +1,0 @@
-environments: [development]
-projects:
-  api:
-    includes: [env/app]

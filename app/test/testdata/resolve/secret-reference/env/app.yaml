@@ -1,2 +1,0 @@
-password: secret://development/api_key
-token: secret://shared/token

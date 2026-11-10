@@ -1,3 +1,0 @@
-gateway:
-  url: # set per environment
-  timeout: 30
