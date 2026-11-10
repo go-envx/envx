@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/base64"
 	"errors"
-	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -18,7 +17,7 @@ import (
 	"github.com/go-envx/envx/app/test/fixtures"
 )
 
-// mockRunFactory implements Factory for unit testing.
+// mockRunFactory implements RunFactory for unit testing.
 type mockRunFactory struct {
 	err       error
 	runnerErr error
@@ -49,7 +48,7 @@ func (m *mockRunFactory) RunnerService() (*runner.Service, error) {
 // executeRun builds the run command, executes it with args, and returns its
 // captured stdout and stderr.
 func executeRun(
-	t *testing.T, factory Factory, configPath string, args ...string,
+	t *testing.T, factory RunFactory, configPath string, args ...string,
 ) (stdout, stderr string, err error) {
 	t.Helper()
 
@@ -355,18 +354,5 @@ func TestOutputRunWarnings(t *testing.T) {
 		if !strings.Contains(got, want) {
 			t.Errorf("stderr missing %q:\n%s", want, got)
 		}
-	}
-}
-
-// writeWorkspaceFile writes body to a workspace-relative path under dir, creating
-// parent directories as needed.
-func writeWorkspaceFile(t *testing.T, dir, name, body string) {
-	t.Helper()
-	path := filepath.Join(dir, name)
-	if err := os.MkdirAll(filepath.Dir(path), 0o750); err != nil {
-		t.Fatalf("MkdirAll(%q): %v", filepath.Dir(path), err)
-	}
-	if err := os.WriteFile(path, []byte(body), 0o600); err != nil {
-		t.Fatalf("WriteFile(%q): %v", path, err)
 	}
 }

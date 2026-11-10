@@ -4,14 +4,12 @@ import (
 	"fmt"
 
 	"github.com/go-envx/envx/app/internal/core"
+	envcli "github.com/go-envx/envx/app/internal/core/env/cli"
+	packcli "github.com/go-envx/envx/app/internal/core/pack/cli"
+	scaffoldcli "github.com/go-envx/envx/app/internal/core/scaffold/cli"
+	secretscli "github.com/go-envx/envx/app/internal/core/secrets/cli"
+	validatecli "github.com/go-envx/envx/app/internal/core/validate/cli"
 	workspacecli "github.com/go-envx/envx/app/internal/core/workspace/cli"
-	emitcli "github.com/go-envx/envx/app/internal/features/emit/cli"
-	envcli "github.com/go-envx/envx/app/internal/features/env/cli"
-	packcli "github.com/go-envx/envx/app/internal/features/pack/cli"
-	runnercli "github.com/go-envx/envx/app/internal/features/runner/cli"
-	scaffoldcli "github.com/go-envx/envx/app/internal/features/scaffold/cli"
-	secretscli "github.com/go-envx/envx/app/internal/features/secrets/cli"
-	validatecli "github.com/go-envx/envx/app/internal/features/validate/cli"
 	"github.com/spf13/cobra"
 )
 
@@ -54,10 +52,10 @@ func NewRootCmd(info BuildInfo) (*cobra.Command, error) {
 		envcli.NewGetCommand(appFactory),
 		secretscli.NewKeypairCmd(appFactory),
 		packcli.NewPackCommand(appFactory),
-		runnercli.NewRunCommand(appFactory),
+		envcli.NewRunCommand(appFactory),
 		envcli.NewSetCommand(appFactory),
 		envcli.NewExplainCommand(appFactory),
-		emitcli.NewEmitCommand(appFactory),
+		envcli.NewEmitCommand(appFactory),
 		envcli.NewDiffCommand(appFactory),
 		secretscli.NewSecretsCommand(appFactory),
 		validatecli.NewValidateCommand(appFactory),

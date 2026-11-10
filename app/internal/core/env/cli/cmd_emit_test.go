@@ -17,7 +17,7 @@ import (
 	"github.com/go-envx/envx/app/test/fixtures"
 )
 
-// mockEmitFactory implements Factory for unit testing.
+// mockEmitFactory implements EmitFactory for unit testing.
 type mockEmitFactory struct {
 	err     error
 	emitErr error
@@ -48,7 +48,7 @@ func (m *mockEmitFactory) EmitService() (*emit.Service, error) {
 // executeEmit builds the emit command, executes it with args, and returns its
 // captured stdout and stderr.
 func executeEmit(
-	t *testing.T, factory Factory, configPath string, args ...string,
+	t *testing.T, factory EmitFactory, configPath string, args ...string,
 ) (stdout, stderr string, err error) {
 	t.Helper()
 

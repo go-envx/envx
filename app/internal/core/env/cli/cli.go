@@ -1,17 +1,15 @@
-// Package cli implements "envx emit", which fully resolves and decrypts a
-// single project environment and renders it to a delivery target — dotenv, JSON,
-// or split Kubernetes Secret/ConfigMap manifests. It reveals every value through
-// the diagnostic reveal path, fails closed when any value is unresolved so no
-// partial output escapes, and delegates formatting to internal/features/emit.
+// Package cli provides CLI commands for environment resolution,
+// inspection, and modification.
 package cli
 
 import (
 	"github.com/go-envx/envx/app/internal/features/emit"
 	"github.com/go-envx/envx/app/internal/features/env"
+	"github.com/go-envx/envx/app/internal/features/runner"
 	"github.com/go-envx/envx/app/internal/shared/flags"
 )
 
-// Flags local to the emit command.
+// Flags local to environment commands.
 var (
 	// envFlag selects the target environment.
 	envFlag = flags.Spec[string]{
@@ -64,6 +62,18 @@ var (
 		Usage: "regex overriding the {{VAR}} reference syntax (group 1 is the name)",
 	}
 
+	// revealFlag decrypts referenced secret values instead of masking them.
+	revealFlag = flags.Spec[bool]{
+		Name:  "reveal",
+		Usage: "decrypt secret references instead of masking them",
+	}
+
+	// absoluteFlag renders source paths absolutely instead of relative to envx.yaml.
+	absoluteFlag = flags.Spec[bool]{
+		Name:  "absolute",
+		Usage: "show absolute source paths instead of paths relative to envx.yaml",
+	}
+
 	// targetFlag selects the output shape the emit command renders to.
 	targetFlag = flags.Spec[string]{
 		Name:  "target",
@@ -97,10 +107,27 @@ var (
 		Short: "o",
 		Usage: "write output to this file instead of stdout",
 	}
+
+	// ignoreErrorsFlag downgrades resolution failures to warnings.
+	ignoreErrorsFlag = flags.Spec[bool]{
+		Name:  "ignore-errors",
+		Usage: "warn on unresolved values and omit them instead of aborting",
+	}
 )
 
-// Factory defines the capabilities required for the emit command.
+// Factory defines the capabilities required for the environment commands.
 type Factory interface {
 	EnvService(configPath string) (*env.Service, error)
+}
+
+// EmitFactory defines the capabilities required for the emit command.
+type EmitFactory interface {
+	EnvService(configPath string) (*env.Service, error)
 	EmitService() (*emit.Service, error)
+}
+
+// RunFactory defines the capabilities required for the run command.
+type RunFactory interface {
+	EnvService(configPath string) (*env.Service, error)
+	RunnerService() (*runner.Service, error)
 }

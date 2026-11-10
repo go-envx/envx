@@ -40,7 +40,7 @@ const (
 )
 
 // NewRunCommand builds the "run" command.
-func NewRunCommand(f Factory) *cobra.Command {
+func NewRunCommand(f RunFactory) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     runUsage,
 		Short:   runShort,

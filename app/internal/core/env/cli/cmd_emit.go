@@ -67,7 +67,7 @@ const (
 )
 
 // NewEmitCommand builds the "emit" command.
-func NewEmitCommand(f Factory) *cobra.Command {
+func NewEmitCommand(f EmitFactory) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     emitUsage,
 		Short:   emitShort,
