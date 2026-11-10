@@ -48,7 +48,7 @@ func TestSet(t *testing.T) {
 
 			overlays := &fakeOverlays{}
 			s := newService(t, testWorkspace(), Dependencies{
-				Namespaces: newFakeNamespaces(), Overlays: overlays,
+				EnvNamespaces: newFakeNamespaces(), EnvOverlays: overlays,
 			})
 			got, err := s.Set(SetParams{
 				Include: tt.include, Key: "db.host", Value: "x",
@@ -85,7 +85,7 @@ func TestSetAmbiguousInclude(t *testing.T) {
 	ws.Projects["web"] = workspace.Project{IncludePaths: []string{"/ws/web/app"}}
 	overlays := &fakeOverlays{}
 	s := newService(t, ws, Dependencies{
-		Namespaces: newFakeNamespaces(), Overlays: overlays,
+		EnvNamespaces: newFakeNamespaces(), EnvOverlays: overlays,
 	})
 	if _, err := s.Set(SetParams{Include: "app", Key: "k"}); err == nil {
 		t.Error("Set with ambiguous include succeeded")
@@ -101,13 +101,13 @@ func TestSetRequirements(t *testing.T) {
 	t.Parallel()
 
 	noWriter := newService(
-		t, testWorkspace(), Dependencies{Namespaces: newFakeNamespaces()},
+		t, testWorkspace(), Dependencies{EnvNamespaces: newFakeNamespaces()},
 	)
 	if _, err := noWriter.Set(SetParams{Include: "env/app", Key: "k"}); err == nil {
 		t.Error("Set without Overlays succeeded")
 	}
 	s := newService(t, testWorkspace(), Dependencies{
-		Namespaces: newFakeNamespaces(), Overlays: &fakeOverlays{},
+		EnvNamespaces: newFakeNamespaces(), EnvOverlays: &fakeOverlays{},
 	})
 	if _, err := s.Set(SetParams{Include: "env/app", Key: " "}); err == nil {
 		t.Error("Set with empty key succeeded")

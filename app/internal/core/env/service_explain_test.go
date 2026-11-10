@@ -27,9 +27,9 @@ func explainFixture(t *testing.T, host ...string) *Service {
 		overlay(t, appInclude, "development", "extra: overlay-only")
 	opener := &fakeOpener{plaintext: map[string]string{"secret://db/password": "s3cr3t"}}
 	return newService(t, testWorkspace(), Dependencies{
-		Namespaces:   namespaces,
-		HostEnv:      hostOf(host...),
-		OpenResolver: opener.open,
+		EnvNamespaces:    namespaces,
+		HostEnv:          hostOf(host...),
+		NewValueResolver: opener.open,
 	})
 }
 
@@ -194,8 +194,8 @@ func TestExplainFindings(t *testing.T) {
 		"secret://db/plain": diagnostic.SecretIsNotEncrypted,
 	}}
 	s := newService(t, testWorkspace(), Dependencies{
-		Namespaces:   namespaces,
-		OpenResolver: opener.open,
+		EnvNamespaces:    namespaces,
+		NewValueResolver: opener.open,
 	})
 
 	entries := explainEntries(t, s, ExplainParams{})

@@ -32,7 +32,7 @@ type SetResult struct {
 
 // Set writes a value to the overlay of a declared include.
 func (s *Service) Set(params SetParams) (SetResult, error) {
-	if s.deps.Overlays == nil {
+	if s.deps.EnvOverlays == nil {
 		return SetResult{}, errors.New("overlay writer is required")
 	}
 	if strings.TrimSpace(params.Key) == "" {
@@ -49,7 +49,7 @@ func (s *Service) Set(params SetParams) (SetResult, error) {
 	if err != nil {
 		return SetResult{}, err
 	}
-	overlayPath, err := s.deps.Overlays.SetOverlay(
+	overlayPath, err := s.deps.EnvOverlays.SetOverlay(
 		include, environment, params.Key, params.Value,
 	)
 	if err != nil {

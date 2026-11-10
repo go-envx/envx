@@ -1,0 +1,6 @@
+environments: [dev]
+
+projects:
+  app:
+    includes:
+      - env/app

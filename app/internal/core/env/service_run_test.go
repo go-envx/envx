@@ -17,10 +17,10 @@ func runFixture(t *testing.T, yaml string) (*Service, *fakeExecutor) {
 	executor := &fakeExecutor{}
 	opener := &fakeOpener{plaintext: map[string]string{"secret://db/password": "s3cr3t"}}
 	return newService(t, testWorkspace(), Dependencies{
-		Namespaces:   newFakeNamespaces().base(t, appInclude, yaml),
-		HostEnv:      hostOf("HOST_ONLY=x"),
-		OpenResolver: opener.open,
-		Executor:     executor.run,
+		EnvNamespaces:    newFakeNamespaces().base(t, appInclude, yaml),
+		HostEnv:          hostOf("HOST_ONLY=x"),
+		NewValueResolver: opener.open,
+		ProcessRunner:    executor.run,
 	}), executor
 }
 
@@ -118,7 +118,7 @@ func TestRunFailures(t *testing.T) {
 	}
 
 	noExecutor := newService(
-		t, testWorkspace(), Dependencies{Namespaces: newFakeNamespaces()},
+		t, testWorkspace(), Dependencies{EnvNamespaces: newFakeNamespaces()},
 	)
 	if err := noExecutor.Run(RunParams{Args: []string{"x"}}); err == nil {
 		t.Error("Run without Executor succeeded")

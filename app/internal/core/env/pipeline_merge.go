@@ -37,7 +37,7 @@ type mergedEnv struct {
 func (s *Service) loadNamespaces(includes []string) ([]namespace, error) {
 	loaded := make([]namespace, 0, len(includes))
 	for _, include := range includes {
-		data, err := s.deps.Namespaces.LoadBase(include)
+		data, err := s.deps.EnvNamespaces.LoadBase(include)
 		if err != nil {
 			return nil, err
 		}
@@ -80,7 +80,7 @@ func (s *Service) merge(namespaces []namespace, op operation) (*mergedEnv, error
 // loadOverlay reads ns's overlay for op's environment. A missing overlay has
 // nil data unless overlays are required.
 func (s *Service) loadOverlay(ns namespace, op operation) (NamespaceData, error) {
-	overlay, found, err := s.deps.Namespaces.LoadOverlay(ns.include, op.environment)
+	overlay, found, err := s.deps.EnvNamespaces.LoadOverlay(ns.include, op.environment)
 	if err != nil {
 		return NamespaceData{}, err
 	}

@@ -16,9 +16,9 @@ func materializeFixture(t *testing.T, yaml string, host ...string) *Service {
 	t.Helper()
 	opener := &fakeOpener{plaintext: map[string]string{"secret://db/password": "s3cr3t"}}
 	return newService(t, testWorkspace(), Dependencies{
-		Namespaces:   newFakeNamespaces().base(t, appInclude, yaml),
-		HostEnv:      hostOf(host...),
-		OpenResolver: opener.open,
+		EnvNamespaces:    newFakeNamespaces().base(t, appInclude, yaml),
+		HostEnv:          hostOf(host...),
+		NewValueResolver: opener.open,
 	})
 }
 
@@ -149,12 +149,12 @@ func TestMaterializeCapturesHostOnce(t *testing.T) {
 	captures := 0
 	opener := &fakeOpener{}
 	s := newService(t, testWorkspace(), Dependencies{
-		Namespaces: newFakeNamespaces().base(t, appInclude, "a: b"),
+		EnvNamespaces: newFakeNamespaces().base(t, appInclude, "a: b"),
 		HostEnv: func() hostenv.Snapshot {
 			captures++
 			return hostenv.From([]string{"X=1"})
 		},
-		OpenResolver: opener.open,
+		NewValueResolver: opener.open,
 	})
 	if _, err := s.Materialize(MaterializeParams{}); err != nil {
 		t.Fatalf("Materialize: %v", err)

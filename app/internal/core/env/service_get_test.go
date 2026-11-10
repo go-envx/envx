@@ -20,9 +20,9 @@ func getFixture(t *testing.T, host ...string) (*Service, *fakeOpener) {
 	`)
 	opener := &fakeOpener{plaintext: map[string]string{"secret://db/password": "s3cr3t"}}
 	s := newService(t, testWorkspace(), Dependencies{
-		Namespaces:   namespaces,
-		HostEnv:      hostOf(host...),
-		OpenResolver: opener.open,
+		EnvNamespaces:    namespaces,
+		HostEnv:          hostOf(host...),
+		NewValueResolver: opener.open,
 	})
 	return s, opener
 }
@@ -83,7 +83,7 @@ func TestGetFailures(t *testing.T) {
 	`)
 	opener := &fakeOpener{}
 	failing := newService(t, testWorkspace(), Dependencies{
-		Namespaces: namespaces, OpenResolver: opener.open,
+		EnvNamespaces: namespaces, NewValueResolver: opener.open,
 	})
 	_, err := failing.Get(GetParams{Key: "url", Reveal: true})
 	if err == nil || strings.Contains(err.Error(), "s3cr3t") {
@@ -126,7 +126,7 @@ func TestGetWithoutResolver(t *testing.T) {
 	t.Parallel()
 
 	s := newService(t, testWorkspace(), Dependencies{
-		Namespaces: newFakeNamespaces().base(t, appInclude, "password: secret://db/x"),
+		EnvNamespaces: newFakeNamespaces().base(t, appInclude, "password: secret://db/x"),
 	})
 	got, err := s.Get(GetParams{Key: "password", Reveal: true})
 	if err != nil || got.Value != "secret://db/x" {

@@ -26,9 +26,9 @@ func diffFixture(t *testing.T, host ...string) *Service {
 		"secret://prod/token": "same",
 	}}
 	return newService(t, testWorkspace(), Dependencies{
-		Namespaces:   namespaces,
-		HostEnv:      hostOf(host...),
-		OpenResolver: opener.open,
+		EnvNamespaces:    namespaces,
+		HostEnv:          hostOf(host...),
+		NewValueResolver: opener.open,
 	})
 }
 
@@ -126,8 +126,8 @@ func TestDiffFailures(t *testing.T) {
 	}
 
 	broken := newService(t, testWorkspace(), Dependencies{
-		Namespaces:   newFakeNamespaces().base(t, appInclude, "token: secret://x/y"),
-		OpenResolver: (&fakeOpener{}).open,
+		EnvNamespaces:    newFakeNamespaces().base(t, appInclude, "token: secret://x/y"),
+		NewValueResolver: (&fakeOpener{}).open,
 	})
 	if _, err := broken.Diff(DiffParams{To: "production"}); err != nil {
 		t.Errorf("masked diff with dangling secret: %v", err)

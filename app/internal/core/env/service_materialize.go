@@ -50,7 +50,7 @@ func (s *Service) Materialize(params MaterializeParams) (MaterializeResult, erro
 	if err != nil {
 		return MaterializeResult{}, err
 	}
-	resolver, err := s.openResolver(true, op.host)
+	resolver, err := s.newValueResolver(true, op.host)
 	if err != nil {
 		return MaterializeResult{}, err
 	}

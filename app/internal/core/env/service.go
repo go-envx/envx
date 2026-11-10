@@ -66,9 +66,9 @@ type resolvedSettings struct {
 }
 
 // New validates structural settings and privately copies the workspace
-// configuration without performing I/O. Only Namespaces is required.
+// configuration without performing I/O. Only EnvNamespaces is required.
 func New(ws workspace.Workspace, deps Dependencies) (*Service, error) {
-	if deps.Namespaces == nil {
+	if deps.EnvNamespaces == nil {
 		return nil, errors.New("namespace reader is required")
 	}
 	grammar, err := syntax.Compile(deref(ws.Settings.ReferencePattern))
@@ -183,15 +183,15 @@ func (s *Service) host() hostenv.Snapshot {
 	return s.deps.HostEnv()
 }
 
-// openResolver opens an operation-scoped resolver bound to host. A nil opener
-// yields a nil resolver, which resolution treats as identity.
-func (s *Service) openResolver(
+// newValueResolver creates an operation-scoped resolver bound to host. A nil
+// factory yields a nil resolver, which resolution treats as identity.
+func (s *Service) newValueResolver(
 	reveal bool, host hostenv.Snapshot,
 ) (ValueResolver, error) {
-	if s.deps.OpenResolver == nil {
+	if s.deps.NewValueResolver == nil {
 		return nil, nil
 	}
-	return s.deps.OpenResolver(reveal, host)
+	return s.deps.NewValueResolver(reveal, host)
 }
 
 // resolveSettings applies precedence: overrides, project, then workspace.

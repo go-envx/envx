@@ -27,7 +27,7 @@ type RunParams struct {
 // Run materializes the environment and executes the command with exactly that
 // environment. The child's exit status is returned by the executor.
 func (s *Service) Run(params RunParams) error {
-	if s.deps.Executor == nil {
+	if s.deps.ProcessRunner == nil {
 		return errors.New("executor is required")
 	}
 	if len(params.Args) == 0 {
@@ -47,7 +47,7 @@ func (s *Service) Run(params RunParams) error {
 			}
 		}
 	}
-	return s.deps.Executor(process.Command{
+	return s.deps.ProcessRunner(process.Command{
 		Args:    slices.Clone(params.Args),
 		Env:     result.Environment.All(),
 		Streams: params.Streams.Normalized(),

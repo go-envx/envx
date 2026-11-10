@@ -40,10 +40,10 @@ func emitFixture(
 	namespaces := newFakeNamespaces().base(t, appInclude, yaml)
 	opener := &fakeOpener{plaintext: map[string]string{"secret://db/password": "s3cr3t"}}
 	return newService(t, testWorkspace(), Dependencies{
-		Namespaces:   namespaces,
-		HostEnv:      hostOf("HOST_ONLY=x"),
-		OpenResolver: opener.open,
-		Renderer:     renderer,
+		EnvNamespaces:    namespaces,
+		HostEnv:          hostOf("HOST_ONLY=x"),
+		NewValueResolver: opener.open,
+		FormatRenderer:   renderer,
 	}), renderer, namespaces
 }
 
@@ -54,10 +54,10 @@ func TestEmitHostOverridesSecret(t *testing.T) {
 
 	renderer := &fakeRenderer{}
 	s := newService(t, testWorkspace(), Dependencies{
-		Namespaces:   newFakeNamespaces().base(t, appInclude, "password: secret://db/x"),
-		HostEnv:      hostOf("PASSWORD=from-host"),
-		OpenResolver: (&fakeOpener{}).open,
-		Renderer:     renderer,
+		EnvNamespaces:    newFakeNamespaces().base(t, appInclude, "password: secret://db/x"),
+		HostEnv:          hostOf("PASSWORD=from-host"),
+		NewValueResolver: (&fakeOpener{}).open,
+		FormatRenderer:   renderer,
 	})
 	artifact, err := s.Emit(EmitParams{})
 	if err != nil {
@@ -77,14 +77,14 @@ func TestEmitSecretThroughCycle(t *testing.T) {
 	renderer := &fakeRenderer{}
 	opener := &fakeOpener{plaintext: map[string]string{"secret://db/password": "s3cr3t"}}
 	s := newService(t, testWorkspace(), Dependencies{
-		Namespaces: newFakeNamespaces().base(t, appInclude, `
+		EnvNamespaces: newFakeNamespaces().base(t, appInclude, `
 			a: "{{B}}{{C}}"
 			b: "{{A}}"
 			c: secret://db/password
 		`),
-		HostEnv:      hostOf("A=from-host"),
-		OpenResolver: opener.open,
-		Renderer:     renderer,
+		HostEnv:          hostOf("A=from-host"),
+		NewValueResolver: opener.open,
+		FormatRenderer:   renderer,
 	})
 	if _, err := s.Emit(EmitParams{}); err != nil {
 		t.Fatalf("Emit: %v", err)
@@ -103,8 +103,8 @@ func TestEmitIdentityValidatesLists(t *testing.T) {
 
 	renderer := &fakeRenderer{}
 	s := newService(t, testWorkspace(), Dependencies{
-		Namespaces: newFakeNamespaces().base(t, appInclude, `items: ["a,b", c]`),
-		Renderer:   renderer,
+		EnvNamespaces:  newFakeNamespaces().base(t, appInclude, `items: ["a,b", c]`),
+		FormatRenderer: renderer,
 	})
 	if _, err := s.Emit(EmitParams{}); !errors.Is(err, ErrUnresolved) {
 		t.Errorf("Emit error = %v, want ErrUnresolved", err)
@@ -179,7 +179,7 @@ func TestEmitFailsClosed(t *testing.T) {
 	}
 
 	noRenderer := newService(
-		t, testWorkspace(), Dependencies{Namespaces: newFakeNamespaces()},
+		t, testWorkspace(), Dependencies{EnvNamespaces: newFakeNamespaces()},
 	)
 	if _, err := noRenderer.Emit(EmitParams{}); err == nil {
 		t.Error("Emit without Renderer succeeded")

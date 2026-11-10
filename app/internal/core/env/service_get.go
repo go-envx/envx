@@ -46,7 +46,7 @@ func (s *Service) Get(params GetParams) (GetResult, error) {
 	}
 	origin := merged.origins[key]
 
-	resolver, err := s.openResolver(params.Reveal, op.host)
+	resolver, err := s.newValueResolver(params.Reveal, op.host)
 	if err != nil {
 		return GetResult{}, err
 	}

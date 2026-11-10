@@ -15,7 +15,7 @@ type SecretStore interface {
 	Export(out io.Writer, groups []secrets.Group) error
 }
 
-// Dependencies are the adapters a Service uses; Secrets is required.
+// Dependencies are the adapters a Service calls; Secrets is required.
 type Dependencies struct {
 	// Secrets reads the workspace store and exports the bundle store.
 	Secrets SecretStore

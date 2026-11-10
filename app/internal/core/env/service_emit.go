@@ -68,10 +68,10 @@ type Artifact struct {
 // output to memory. Any value that does not resolve fails the operation before
 // rendering, so no partial artifact is produced. Host-only keys are excluded.
 func (s *Service) Emit(params EmitParams) (Artifact, error) {
-	if s.deps.Renderer == nil {
+	if s.deps.FormatRenderer == nil {
 		return Artifact{}, errors.New("renderer is required")
 	}
-	if err := s.deps.Renderer.Validate(params.Options); err != nil {
+	if err := s.deps.FormatRenderer.Validate(params.Options); err != nil {
 		return Artifact{}, err
 	}
 	op, err := s.begin(params.Query)
@@ -82,7 +82,7 @@ func (s *Service) Emit(params EmitParams) (Artifact, error) {
 	if err != nil {
 		return Artifact{}, err
 	}
-	resolver, err := s.openResolver(true, op.host)
+	resolver, err := s.newValueResolver(true, op.host)
 	if err != nil {
 		return Artifact{}, err
 	}
@@ -105,7 +105,7 @@ func (s *Service) Emit(params EmitParams) (Artifact, error) {
 	}
 
 	var buffer bytes.Buffer
-	if err := s.deps.Renderer.Render(
+	if err := s.deps.FormatRenderer.Render(
 		&buffer, op.project, entries, params.Options,
 	); err != nil {
 		return Artifact{}, err

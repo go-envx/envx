@@ -70,7 +70,7 @@ func (s *Service) Diff(params DiffParams) (DiffResult, error) {
 	if err != nil {
 		return DiffResult{}, err
 	}
-	resolver, err := s.openResolver(params.Reveal, op.host)
+	resolver, err := s.newValueResolver(params.Reveal, op.host)
 	if err != nil {
 		return DiffResult{}, err
 	}

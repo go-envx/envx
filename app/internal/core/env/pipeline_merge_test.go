@@ -15,7 +15,7 @@ func mergeFixture(
 	includes []string, set resolvedSettings,
 ) (*mergedEnv, error) {
 	t.Helper()
-	s := newService(t, testWorkspace(), Dependencies{Namespaces: namespaces})
+	s := newService(t, testWorkspace(), Dependencies{EnvNamespaces: namespaces})
 	loaded, err := s.loadNamespaces(includes)
 	if err != nil {
 		return nil, err
@@ -244,7 +244,7 @@ func TestLoadNamespacesOncePerDiff(t *testing.T) {
 	t.Parallel()
 
 	namespaces := newFakeNamespaces().base(t, appInclude, "host: a")
-	s := newService(t, testWorkspace(), Dependencies{Namespaces: namespaces})
+	s := newService(t, testWorkspace(), Dependencies{EnvNamespaces: namespaces})
 	if _, err := s.Diff(DiffParams{From: "development", To: "production"}); err != nil {
 		t.Fatalf("Diff: %v", err)
 	}

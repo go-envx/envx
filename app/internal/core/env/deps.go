@@ -50,20 +50,20 @@ type Renderer interface {
 	Render(out io.Writer, project string, entries []Entry, options EmitOptions) error
 }
 
-// Dependencies are the adapters a Service uses. Only Namespaces is required;
+// Dependencies are the adapters a Service uses. Only EnvNamespaces is required;
 // the others are required only by the operations that use them.
 type Dependencies struct {
-	// Namespaces loads namespace files.
-	Namespaces NamespaceReader
-	// Overlays writes overlay values; required by Set.
-	Overlays OverlayWriter
+	// EnvNamespaces loads namespace files.
+	EnvNamespaces NamespaceReader
+	// EnvOverlays writes overlay values; required by Set.
+	EnvOverlays OverlayWriter
 	// HostEnv captures the host environment once per operation; nil is empty.
 	HostEnv func() hostenv.Snapshot
-	// OpenResolver opens an operation-scoped resolver bound to the captured host
-	// snapshot; nil is identity resolution.
-	OpenResolver func(reveal bool, host hostenv.Snapshot) (ValueResolver, error)
-	// Executor runs child processes; required by Run.
-	Executor Executor
-	// Renderer serializes emit output; required by Emit.
-	Renderer Renderer
+	// NewValueResolver creates an operation-scoped resolver bound to the
+	// captured host snapshot; nil is identity resolution.
+	NewValueResolver func(reveal bool, host hostenv.Snapshot) (ValueResolver, error)
+	// ProcessRunner runs child processes; required by Run.
+	ProcessRunner Executor
+	// FormatRenderer serializes emit output; required by Emit.
+	FormatRenderer Renderer
 }

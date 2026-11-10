@@ -44,18 +44,18 @@ func TestNewValidation(t *testing.T) {
 	t.Parallel()
 
 	if _, err := New(testWorkspace(), Dependencies{}); err == nil {
-		t.Error("New without Namespaces succeeded")
+		t.Error("New without EnvNamespaces succeeded")
 	}
 	ws := testWorkspace()
 	ws.Settings.ReferencePattern = ptr("(unterminated")
-	if _, err := New(ws, Dependencies{Namespaces: newFakeNamespaces()}); err == nil {
+	if _, err := New(ws, Dependencies{EnvNamespaces: newFakeNamespaces()}); err == nil {
 		t.Error("New with an invalid reference pattern succeeded")
 	}
 	ws = testWorkspace()
 	ws.Projects["app"] = workspace.Project{
 		Settings: workspace.Settings{ReferencePattern: ptr("(")},
 	}
-	if _, err := New(ws, Dependencies{Namespaces: newFakeNamespaces()}); err == nil {
+	if _, err := New(ws, Dependencies{EnvNamespaces: newFakeNamespaces()}); err == nil {
 		t.Error("New with an invalid project reference pattern succeeded")
 	}
 }
@@ -68,8 +68,8 @@ func TestNewPerformsNoIO(t *testing.T) {
 	namespaces := newFakeNamespaces()
 	opener := &fakeOpener{}
 	newService(t, testWorkspace(), Dependencies{
-		Namespaces:   namespaces,
-		OpenResolver: opener.open,
+		EnvNamespaces:    namespaces,
+		NewValueResolver: opener.open,
 	})
 	if namespaces.baseReads != 0 || opener.calls != 0 {
 		t.Errorf("reads = %d, opens = %d; want none", namespaces.baseReads, opener.calls)
@@ -86,7 +86,7 @@ func TestNewCopiesWorkspace(t *testing.T) {
 		overlay(t, appInclude, "development", "host: dev")
 	ws := testWorkspace()
 	ws.Settings.Prefix = ptr("app")
-	s := newService(t, ws, Dependencies{Namespaces: namespaces})
+	s := newService(t, ws, Dependencies{EnvNamespaces: namespaces})
 
 	ws.Environments[0] = "production"
 	*ws.Settings.Prefix = "other"
@@ -109,7 +109,7 @@ func TestProjectSelection(t *testing.T) {
 	namespaces := newFakeNamespaces().
 		base(t, appInclude, "host: app").
 		base(t, "/ws/env/web", "host: web")
-	single := newService(t, testWorkspace(), Dependencies{Namespaces: namespaces})
+	single := newService(t, testWorkspace(), Dependencies{EnvNamespaces: namespaces})
 	if got, err := single.Get(GetParams{Key: "host"}); err != nil || got.Value != "app" {
 		t.Errorf("Get(only project) = %q, %v; want app", got.Value, err)
 	}
@@ -120,7 +120,7 @@ func TestProjectSelection(t *testing.T) {
 
 	ws := testWorkspace()
 	ws.Projects["web"] = workspace.Project{IncludePaths: []string{"/ws/env/web"}}
-	multi := newService(t, ws, Dependencies{Namespaces: namespaces})
+	multi := newService(t, ws, Dependencies{EnvNamespaces: namespaces})
 	if _, err := multi.Get(GetParams{Key: "host"}); !errors.Is(err, ErrProjectNotFound) {
 		t.Errorf("ambiguous project error = %v, want ErrProjectNotFound", err)
 	}
@@ -180,7 +180,7 @@ func TestEnvironmentPrecedence(t *testing.T) {
 				IncludePaths: []string{appInclude},
 				Settings:     workspace.Settings{Env: tt.project},
 			}
-			s := newService(t, ws, Dependencies{Namespaces: namespaces})
+			s := newService(t, ws, Dependencies{EnvNamespaces: namespaces})
 
 			got, err := s.Get(GetParams{
 				Query: Query{Options: workspace.Settings{Env: tt.override}},
@@ -231,7 +231,7 @@ func TestSettingsPrecedence(t *testing.T) {
 				Settings:     workspace.Settings{Prefix: tt.project},
 			}
 			s := newService(t, ws, Dependencies{
-				Namespaces: newFakeNamespaces().base(t, appInclude, "host: x"),
+				EnvNamespaces: newFakeNamespaces().base(t, appInclude, "host: x"),
 			})
 			result, err := s.Explain(ExplainParams{
 				Query: Query{Options: workspace.Settings{Prefix: tt.override}},
@@ -257,7 +257,7 @@ func TestProjectReferencePattern(t *testing.T) {
 		Settings:     workspace.Settings{ReferencePattern: ptr(`\$\{([^}]*)\}`)},
 	}
 	s := newService(t, ws, Dependencies{
-		Namespaces: newFakeNamespaces().base(t, appInclude, `
+		EnvNamespaces: newFakeNamespaces().base(t, appInclude, `
 			host: db
 			url: ${HOST}/{{HOST}}
 		`),
