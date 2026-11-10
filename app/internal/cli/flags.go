@@ -1,31 +1,36 @@
 package cli
 
+import "github.com/go-envx/envx/app/internal/lib/flagspec"
+
 // Flags shared across commands.
 var (
 	// configFlag selects the manifest path (auto-discovered when unset).
-	configFlag = flagSpec[string]{
-		name:   "config",
-		envVar: "ENVX_CONFIG",
-		usage:  "path to envx.yaml, or a directory containing it",
+	configFlag = flagspec.Spec[string]{
+		Name:  "config",
+		Env:   "ENVX_CONFIG",
+		Usage: "path to envx.yaml, or a directory containing it",
 	}
 
 	// outputFlag selects the rendering format for tabular commands.
-	outputFlag = flagSpec[string]{
-		name:  "output",
-		short: "o",
-		usage: "output format: table|json",
+	//nolint:unused // Relocated to core/env/cli in Phase 6.3.
+	outputFlag = flagspec.Spec[string]{
+		Name:  "output",
+		Short: "o",
+		Usage: "output format: table|json",
 	}
 
 	// verboseFlag prints additional detail in command output.
-	verboseFlag = flagSpec[bool]{
-		name:  "verbose",
-		short: "v",
-		usage: "print detailed output",
+	//nolint:unused // Relocated to command packages in Phase 6.3.
+	verboseFlag = flagspec.Spec[bool]{
+		Name:  "verbose",
+		Short: "v",
+		Usage: "print detailed output",
 	}
 
 	// revealFlag decrypts referenced secret values instead of masking them.
-	revealFlag = flagSpec[bool]{
-		name:  "reveal",
-		usage: "decrypt secret references instead of masking them",
+	//nolint:unused // Relocated to command packages in Phase 6.3.
+	revealFlag = flagspec.Spec[bool]{
+		Name:  "reveal",
+		Usage: "decrypt secret references instead of masking them",
 	}
 )

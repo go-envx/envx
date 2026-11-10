@@ -46,7 +46,7 @@ func NewRootCmd(info BuildInfo) (*cobra.Command, error) {
 		},
 	}
 
-	configFlag.bind(root.PersistentFlags())
+	configFlag.Bind(root.PersistentFlags())
 
 	root.AddCommand(
 		scaffoldcli.NewCreateCommand(appFactory),
