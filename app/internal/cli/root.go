@@ -11,7 +11,6 @@ import (
 	scaffoldcli "github.com/go-envx/envx/app/internal/features/scaffold/cli"
 	secretscli "github.com/go-envx/envx/app/internal/features/secrets/cli"
 	validatecli "github.com/go-envx/envx/app/internal/features/validate/cli"
-	"github.com/go-envx/envx/app/internal/shared/flags"
 	"github.com/spf13/cobra"
 )
 
@@ -21,7 +20,7 @@ const (
 )
 
 // NewRootCmd builds the command tree. It registers the persistent --config flag,
-// which every action reads back through flags.Config to locate the manifest.
+// which every action reads back by name to locate the manifest.
 // The build metadata in info is rendered by the --version flag.
 func NewRootCmd(info BuildInfo) (*cobra.Command, error) {
 	appFactory, err := core.NewAppFactory()
@@ -47,7 +46,7 @@ func NewRootCmd(info BuildInfo) (*cobra.Command, error) {
 		},
 	}
 
-	flags.Bind(root.PersistentFlags(), &flags.Config)
+	configFlag.bind(root.PersistentFlags())
 
 	root.AddCommand(
 		scaffoldcli.NewCreateCommand(appFactory),
