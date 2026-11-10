@@ -30,7 +30,7 @@ type validateFactory interface {
 
 // scaffoldFactory returns the workspace-independent scaffold service.
 type scaffoldFactory interface {
-	NewScaffoldService() *scaffold.Service
+	NewScaffoldService() (*scaffold.Service, error)
 }
 
 // appFactory aggregates every feature factory for root command construction.

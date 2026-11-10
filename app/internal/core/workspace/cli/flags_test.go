@@ -5,20 +5,19 @@ import (
 	"testing"
 
 	"github.com/spf13/cobra"
-	"github.com/spf13/pflag"
 )
 
 // parseCommand returns a command whose flags are registered by bind and parsed
 // from args, with its error stream captured.
 func parseCommand(
-	t *testing.T, bind func(*pflag.FlagSet), args ...string,
+	t *testing.T, bind func(*cobra.Command), args ...string,
 ) (*cobra.Command, *bytes.Buffer) {
 	t.Helper()
 	cmd := &cobra.Command{Use: "test"}
 	stderr := new(bytes.Buffer)
 	cmd.SetErr(stderr)
 	if bind != nil {
-		bind(cmd.Flags())
+		bind(cmd)
 	}
 	if err := cmd.ParseFlags(args); err != nil {
 		t.Fatalf("parse %v: %v", args, err)
@@ -69,8 +68,9 @@ func TestBindConfig(t *testing.T) {
 func TestBindSettingsOmission(t *testing.T) {
 	t.Parallel()
 
-	fs := pflag.NewFlagSet("test", pflag.ContinueOnError)
-	BindSettings(fs, "env", "prefix")
+	cmd := &cobra.Command{Use: "test"}
+	BindSettings(cmd, "env", "prefix")
+	fs := cmd.Flags()
 
 	if fs.Lookup("env") != nil {
 		t.Error("omitted --env was registered")
@@ -92,7 +92,7 @@ func TestSettingsPrecedenceAndFallback(t *testing.T) {
 		t.Setenv("ENVX_OVERLOAD", "false")
 
 		cmd, _ := parseCommand(
-			t, func(fs *pflag.FlagSet) { BindSettings(fs) },
+			t, func(cmd *cobra.Command) { BindSettings(cmd) },
 			"--prefix", "FLAG_",
 			"--overload",
 		)
@@ -111,7 +111,7 @@ func TestSettingsPrecedenceAndFallback(t *testing.T) {
 		t.Setenv("ENVX_SUFFIX", "_SUF")
 		t.Setenv("ENVX_REQUIRE_OVERLAYS", "false")
 
-		cmd, _ := parseCommand(t, func(fs *pflag.FlagSet) { BindSettings(fs) })
+		cmd, _ := parseCommand(t, func(cmd *cobra.Command) { BindSettings(cmd) })
 		got := Settings(cmd)
 
 		if got.Env == nil || *got.Env != "staging" {
@@ -133,8 +133,8 @@ func TestSettingsPrecedenceAndFallback(t *testing.T) {
 		t.Setenv("ENVX_PREFIX", "PRE_")
 
 		// BindSettings with "env" and "prefix" omitted.
-		cmd, _ := parseCommand(t, func(fs *pflag.FlagSet) {
-			BindSettings(fs, "env", "prefix")
+		cmd, _ := parseCommand(t, func(cmd *cobra.Command) {
+			BindSettings(cmd, "env", "prefix")
 		})
 		got := Settings(cmd)
 
@@ -151,7 +151,7 @@ func TestSettingsAllFlags(t *testing.T) {
 	t.Parallel()
 
 	cmd, _ := parseCommand(
-		t, func(fs *pflag.FlagSet) { BindSettings(fs) },
+		t, func(cmd *cobra.Command) { BindSettings(cmd) },
 		"--env", "prod",
 		"--prefix", "PRE_",
 		"--suffix", "_SUF",

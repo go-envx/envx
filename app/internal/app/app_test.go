@@ -220,7 +220,11 @@ func TestNewScaffoldServiceNeedsNoWorkspace(t *testing.T) {
 	t.Parallel()
 
 	targetDir := t.TempDir()
-	result, err := Factory{}.NewScaffoldService().Create(scaffold.Params{
+	svc, err := Factory{}.NewScaffoldService()
+	if err != nil {
+		t.Fatalf("NewScaffoldService: %v", err)
+	}
+	result, err := svc.Create(scaffold.CreateParams{
 		Template:  scaffold.QuickStartTemplate,
 		TargetDir: targetDir,
 	})

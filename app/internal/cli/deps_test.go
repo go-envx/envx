@@ -22,7 +22,7 @@ type fakeFactory struct {
 	validate *validate.Service
 	// scaffold is returned by NewScaffoldService.
 	scaffold *scaffold.Service
-	// err is returned by every workspace-dependent constructor.
+	// err is returned by every constructor.
 	err error
 }
 
@@ -42,6 +42,6 @@ func (f fakeFactory) NewValidateService(string) (*validate.Service, error) {
 	return f.validate, f.err
 }
 
-func (f fakeFactory) NewScaffoldService() *scaffold.Service {
-	return f.scaffold
+func (f fakeFactory) NewScaffoldService() (*scaffold.Service, error) {
+	return f.scaffold, f.err
 }

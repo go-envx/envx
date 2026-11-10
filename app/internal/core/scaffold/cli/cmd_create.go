@@ -4,10 +4,9 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/go-envx/envx/app/internal/features/scaffold"
+	"github.com/go-envx/envx/app/internal/core/scaffold"
 	"github.com/go-envx/envx/app/internal/lib/printer"
 	"github.com/go-envx/envx/app/internal/lib/str"
-	"github.com/go-envx/envx/app/internal/shared/flags"
 	"github.com/spf13/cobra"
 )
 
@@ -59,11 +58,10 @@ func newTemplateCommand(f Factory, template templateSpec) *cobra.Command {
 		Long:  str.Dedent(template.Long),
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			fs := cmd.Flags()
-			targetDir := templateDirFlag.Get(fs)
+			targetDir := templateDirFlag.Value(cmd)
 
 			// Obtain the scaffold service from the factory.
-			scaffoldService, err := f.ScaffoldService()
+			scaffoldService, err := f.NewScaffoldService()
 			if err != nil {
 				return err
 			}
@@ -72,7 +70,7 @@ func newTemplateCommand(f Factory, template templateSpec) *cobra.Command {
 			result, err := scaffoldService.Create(scaffold.CreateParams{
 				Template:  template.Name,
 				TargetDir: targetDir,
-				Force:     forceFlag.Get(fs),
+				Force:     forceFlag.Value(cmd),
 			})
 			if err != nil {
 				return err
@@ -94,8 +92,8 @@ func newTemplateCommand(f Factory, template templateSpec) *cobra.Command {
 		},
 	}
 
-	flags.Bind(cmd.Flags(), &templateDirFlag)
-	flags.Bind(cmd.Flags(), &forceFlag)
+	templateDirFlag.Bind(cmd)
+	forceFlag.Bind(cmd)
 
 	return cmd
 }

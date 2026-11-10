@@ -21,15 +21,15 @@ const QuickStartTemplate = "quick-start"
 //go:embed all:templates
 var embedded embed.FS
 
-// Params defines input parameters for scaffolding a workspace template.
-type Params struct {
+// CreateParams defines input parameters for scaffolding a workspace template.
+type CreateParams struct {
 	Template  string
 	TargetDir string
 	Force     bool
 }
 
-// Result represents the outcome of scaffolding a workspace template.
-type Result struct {
+// CreateResult represents the outcome of scaffolding a workspace template.
+type CreateResult struct {
 	Written []string
 }
 
@@ -42,45 +42,45 @@ type Service struct {
 }
 
 // Create scaffolds a template into the target directory with conflict checks.
-func (s Service) Create(params Params) (Result, error) {
+func (s Service) Create(params CreateParams) (CreateResult, error) {
 	root, rels, err := s.template(params.Template)
 	if err != nil {
-		return Result{}, err
+		return CreateResult{}, err
 	}
 
 	dests := make([]string, len(rels))
 	for i, rel := range rels {
 		dest, err := destination(params.TargetDir, rel)
 		if err != nil {
-			return Result{}, err
+			return CreateResult{}, err
 		}
 		dests[i] = dest
 	}
 
 	if !params.Force {
 		if err := checkConflicts(dests); err != nil {
-			return Result{}, err
+			return CreateResult{}, err
 		}
 	}
 
 	for i, rel := range rels {
 		data, err := fs.ReadFile(root, rel)
 		if err != nil {
-			return Result{}, fmt.Errorf("reading template file %q: %w", rel, err)
+			return CreateResult{}, fmt.Errorf("reading template file %q: %w", rel, err)
 		}
 		if err := os.MkdirAll(filepath.Dir(dests[i]), 0o750); err != nil {
-			return Result{}, fmt.Errorf(
+			return CreateResult{}, fmt.Errorf(
 				"creating directory for %s: %w",
 				dests[i],
 				err,
 			)
 		}
 		if err := atomicfile.Write(dests[i], data); err != nil {
-			return Result{}, err
+			return CreateResult{}, err
 		}
 	}
 
-	return Result{Written: dests}, nil
+	return CreateResult{Written: dests}, nil
 }
 
 // template returns the named template's filesystem and its sorted file paths.

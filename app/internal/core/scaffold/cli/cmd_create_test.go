@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/go-envx/envx/app/internal/features/scaffold"
+	"github.com/go-envx/envx/app/internal/core/scaffold"
 	"github.com/go-envx/envx/app/internal/lib/printer"
 )
 
@@ -18,21 +18,8 @@ type mockScaffoldFactory struct {
 	err error
 }
 
-func (m *mockScaffoldFactory) ScaffoldService() (*scaffold.Service, error) {
+func (m *mockScaffoldFactory) NewScaffoldService() (*scaffold.Service, error) {
 	return m.svc, m.err
-}
-
-// newTestScaffoldService constructs a real scaffold service backed by embedded
-// templates.
-func newTestScaffoldService(t *testing.T) *scaffold.Service {
-	t.Helper()
-	svc, err := scaffold.NewService(scaffold.ServiceParams{
-		Source: scaffold.TemplatesFS,
-	})
-	if err != nil {
-		t.Fatalf("scaffold.NewService(): %v", err)
-	}
-	return svc
 }
 
 // TestNewCreateCommand verifies the command builds and dispatches through the factory.
@@ -42,8 +29,7 @@ func TestNewCreateCommand(t *testing.T) {
 	t.Run("with custom flags", func(t *testing.T) {
 		t.Parallel()
 
-		svc := newTestScaffoldService(t)
-		factory := &mockScaffoldFactory{svc: svc}
+		factory := &mockScaffoldFactory{svc: &scaffold.Service{}}
 		parent := NewCreateCommand(factory)
 
 		targetDir := filepath.Join(t.TempDir(), "custom-dir")
@@ -91,8 +77,7 @@ func TestNewCreateCommandDefaultFlags(t *testing.T) {
 	tmp := t.TempDir()
 	t.Chdir(tmp)
 
-	svc := newTestScaffoldService(t)
-	factory := &mockScaffoldFactory{svc: svc}
+	factory := &mockScaffoldFactory{svc: &scaffold.Service{}}
 	cmd := NewCreateCommand(factory)
 	cmd.SetArgs([]string{"quick-start"})
 

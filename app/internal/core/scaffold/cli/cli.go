@@ -2,20 +2,20 @@
 package cli
 
 import (
-	"github.com/go-envx/envx/app/internal/features/scaffold"
-	"github.com/go-envx/envx/app/internal/shared/flags"
+	"github.com/go-envx/envx/app/internal/core/scaffold"
+	"github.com/go-envx/envx/app/internal/lib/flagspec"
 )
 
 // Flags local to scaffold commands.
 var (
 	// forceFlag overwrites existing files instead of stopping on conflicts.
-	forceFlag = flags.Spec[bool]{
+	forceFlag = flagspec.Spec[bool]{
 		Name:  "force",
 		Usage: "overwrite existing files",
 	}
 
 	// targetDirFlag is the directory to scaffold into.
-	targetDirFlag = flags.Spec[string]{
+	targetDirFlag = flagspec.Spec[string]{
 		Name:  "target-dir",
 		Usage: "directory to scaffold into",
 	}
@@ -28,7 +28,7 @@ type templateSpec struct {
 	Long  string
 }
 
-func (t templateSpec) targetDirFlag() flags.Spec[string] {
+func (t templateSpec) targetDirFlag() flagspec.Spec[string] {
 	spec := targetDirFlag
 	spec.Default = t.Name
 	return spec
@@ -36,5 +36,5 @@ func (t templateSpec) targetDirFlag() flags.Spec[string] {
 
 // Factory defines the capabilities required for the scaffold commands.
 type Factory interface {
-	ScaffoldService() (*scaffold.Service, error)
+	NewScaffoldService() (*scaffold.Service, error)
 }

@@ -29,16 +29,15 @@ type Spec[T Value] struct {
 	Default T
 }
 
-// Bind registers the flag on fs.
-func (s Spec[T]) Bind(fs *pflag.FlagSet) {
-	switch fallback := any(s.Default).(type) {
-	case string:
-		fs.StringP(s.Name, s.Short, fallback, s.helpText())
-	case bool:
-		fs.BoolP(s.Name, s.Short, fallback, s.helpText())
-	case []string:
-		fs.StringSliceP(s.Name, s.Short, fallback, s.helpText())
-	}
+// Bind registers the flag on cmd's local flags.
+func (s Spec[T]) Bind(cmd *cobra.Command) {
+	s.bind(cmd.Flags())
+}
+
+// BindPersistent registers the flag on cmd's persistent flags, inherited by
+// its subcommands.
+func (s Spec[T]) BindPersistent(cmd *cobra.Command) {
+	s.bind(cmd.PersistentFlags())
 }
 
 // Value returns the flag or environment variable value, else the default.
@@ -82,6 +81,18 @@ func (s Spec[T]) Lookup(cmd *cobra.Command) *T {
 		return nil
 	}
 	return &v
+}
+
+// bind registers the flag on fs.
+func (s Spec[T]) bind(fs *pflag.FlagSet) {
+	switch fallback := any(s.Default).(type) {
+	case string:
+		fs.StringP(s.Name, s.Short, fallback, s.helpText())
+	case bool:
+		fs.BoolP(s.Name, s.Short, fallback, s.helpText())
+	case []string:
+		fs.StringSliceP(s.Name, s.Short, fallback, s.helpText())
+	}
 }
 
 // helpText appends the environment variable hint to the usage, if any.

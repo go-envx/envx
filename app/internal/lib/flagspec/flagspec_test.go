@@ -8,19 +8,18 @@ import (
 
 	"github.com/go-envx/envx/app/internal/lib/flagspec"
 	"github.com/spf13/cobra"
-	"github.com/spf13/pflag"
 )
 
 // parseCommand returns a command whose flags are registered by bind and parsed
 // from args, with its error stream captured.
 func parseCommand(
-	t *testing.T, bind func(*pflag.FlagSet), args ...string,
+	t *testing.T, bind func(*cobra.Command), args ...string,
 ) (*cobra.Command, *bytes.Buffer) {
 	t.Helper()
 	cmd := &cobra.Command{Use: "test"}
 	stderr := new(bytes.Buffer)
 	cmd.SetErr(stderr)
-	bind(cmd.Flags())
+	bind(cmd)
 	if err := cmd.ParseFlags(args); err != nil {
 		t.Fatalf("parse %v: %v", args, err)
 	}
@@ -48,10 +47,10 @@ func TestFlagSpecValue(t *testing.T) {
 		Default: []string{"default"},
 	}
 
-	bind := func(fs *pflag.FlagSet) {
-		outputSpec.Bind(fs)
-		verboseSpec.Bind(fs)
-		tagsSpec.Bind(fs)
+	bind := func(cmd *cobra.Command) {
+		outputSpec.Bind(cmd)
+		verboseSpec.Bind(cmd)
+		tagsSpec.Bind(cmd)
 	}
 
 	t.Run("unchanged returns default", func(t *testing.T) {
@@ -90,6 +89,31 @@ func TestFlagSpecValue(t *testing.T) {
 			t.Errorf("value = %q, want dflt", got)
 		}
 	})
+}
+
+func TestFlagSpecBindPersistent(t *testing.T) {
+	t.Parallel()
+
+	spec := flagspec.Spec[string]{Name: "file", Default: "dflt"}
+	root := &cobra.Command{Use: "root"}
+	spec.BindPersistent(root)
+
+	var got string
+	child := &cobra.Command{
+		Use: "child",
+		Run: func(cmd *cobra.Command, _ []string) {
+			got = spec.Value(cmd)
+		},
+	}
+	root.AddCommand(child)
+	root.SetArgs([]string{"child", "--file", "inherited.yaml"})
+
+	if err := root.Execute(); err != nil {
+		t.Fatalf("execute: %v", err)
+	}
+	if got != "inherited.yaml" {
+		t.Errorf("value = %q, want inherited.yaml", got)
+	}
 }
 
 func TestFlagSpecLookupEnvironment(t *testing.T) {
@@ -148,7 +172,7 @@ func TestFlagSpecLookupEnvironment(t *testing.T) {
 
 	t.Run("unregistered flag ignores variable", func(t *testing.T) {
 		t.Setenv("TEST_CONFIG_FILE", "from-env.yaml")
-		cmd, _ := parseCommand(t, func(*pflag.FlagSet) {})
+		cmd, _ := parseCommand(t, func(*cobra.Command) {})
 		if got := fileSpec.Lookup(cmd); got != nil {
 			t.Errorf("lookup = %q, want nil", *got)
 		}

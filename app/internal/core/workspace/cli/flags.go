@@ -68,9 +68,9 @@ var (
 	}
 )
 
-// BindConfig registers the persistent --config flag on fs.
-func BindConfig(fs *pflag.FlagSet) {
-	configFlag.Bind(fs)
+// BindConfig registers the persistent --config flag on cmd.
+func BindConfig(cmd *cobra.Command) {
+	configFlag.BindPersistent(cmd)
 }
 
 // ConfigPath returns the manifest path specified by the --config flag or
@@ -79,10 +79,10 @@ func ConfigPath(cmd *cobra.Command) string {
 	return configFlag.Value(cmd)
 }
 
-// BindSettings registers the workspace setting flags on fs, except those
+// BindSettings registers the workspace setting flags on cmd, except those
 // whose names are listed in omit.
-func BindSettings(fs *pflag.FlagSet, omit ...string) {
-	all := pflag.NewFlagSet("settings", pflag.ContinueOnError)
+func BindSettings(cmd *cobra.Command, omit ...string) {
+	all := &cobra.Command{}
 	delimiterFlag.Bind(all)
 	envFlag.Bind(all)
 	overloadFlag.Bind(all)
@@ -91,9 +91,9 @@ func BindSettings(fs *pflag.FlagSet, omit ...string) {
 	requireOverlaysFlag.Bind(all)
 	suffixFlag.Bind(all)
 
-	all.VisitAll(func(f *pflag.Flag) {
+	all.Flags().VisitAll(func(f *pflag.Flag) {
 		if !slices.Contains(omit, f.Name) {
-			fs.AddFlag(f)
+			cmd.Flags().AddFlag(f)
 		}
 	})
 }

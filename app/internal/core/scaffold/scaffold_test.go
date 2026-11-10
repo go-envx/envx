@@ -22,7 +22,7 @@ func TestCreateWritesTemplateFiles(t *testing.T) {
 	}}
 	dir := t.TempDir()
 
-	res, err := service.Create(scaffold.Params{Template: "demo", TargetDir: dir})
+	res, err := service.Create(scaffold.CreateParams{Template: "demo", TargetDir: dir})
 	if err != nil {
 		t.Fatalf("Create: %v", err)
 	}
@@ -64,7 +64,7 @@ func TestCreateConflictPolicy(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	params := scaffold.Params{Template: "demo", TargetDir: dir}
+	params := scaffold.CreateParams{Template: "demo", TargetDir: dir}
 	if _, err := service.Create(params); !errors.Is(err, scaffold.ErrConflict) {
 		t.Fatalf("Create without force: err = %v, want ErrConflict", err)
 	}
@@ -97,7 +97,7 @@ func TestCreateUnknownTemplate(t *testing.T) {
 			t.Parallel()
 
 			dir := t.TempDir()
-			_, err := service.Create(scaffold.Params{Template: name, TargetDir: dir})
+			_, err := service.Create(scaffold.CreateParams{Template: name, TargetDir: dir})
 			if !errors.Is(err, scaffold.ErrTemplateNotFound) {
 				t.Fatalf("err = %v, want ErrTemplateNotFound", err)
 			}
@@ -111,7 +111,7 @@ func TestQuickStartLoads(t *testing.T) {
 	t.Parallel()
 
 	dir := t.TempDir()
-	_, err := scaffold.Service{}.Create(scaffold.Params{
+	_, err := scaffold.Service{}.Create(scaffold.CreateParams{
 		Template:  scaffold.QuickStartTemplate,
 		TargetDir: dir,
 	})

@@ -3,6 +3,7 @@ package cli
 import (
 	"fmt"
 
+	"github.com/go-envx/envx/app/internal/app"
 	"github.com/go-envx/envx/app/internal/core"
 	envcli "github.com/go-envx/envx/app/internal/core/env/cli"
 	packcli "github.com/go-envx/envx/app/internal/core/pack/cli"
@@ -45,10 +46,10 @@ func NewRootCmd(info BuildInfo) (*cobra.Command, error) {
 		},
 	}
 
-	workspacecli.BindConfig(root.PersistentFlags())
+	workspacecli.BindConfig(root)
 
 	root.AddCommand(
-		scaffoldcli.NewCreateCommand(appFactory),
+		scaffoldcli.NewCreateCommand(app.Factory{}),
 		envcli.NewGetCommand(appFactory),
 		secretscli.NewKeypairCmd(appFactory),
 		packcli.NewPackCommand(appFactory),

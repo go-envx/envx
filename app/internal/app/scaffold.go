@@ -6,6 +6,6 @@ import (
 
 // NewScaffoldService returns the scaffold service over the embedded templates; it
 // needs no workspace.
-func (Factory) NewScaffoldService() *scaffold.Service {
-	return &scaffold.Service{}
+func (Factory) NewScaffoldService() (*scaffold.Service, error) {
+	return &scaffold.Service{}, nil
 }
