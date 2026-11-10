@@ -30,6 +30,18 @@ var (
 	}
 )
 
+// selectionFlag describes the flag that selects check. Its name is the check
+// code in kebab case (SECRET_IS_NOT_ENCRYPTED -> "secret-is-not-encrypted"),
+// the twin of its envx.yaml severity key (validate.secret_is_not_encrypted), so
+// the flag and the config property can never drift apart.
+func selectionFlag(check validate.Check) cliflags.Spec[bool] {
+	flagName := strings.ReplaceAll(strings.ToLower(string(check.Code)), "_", "-")
+	return cliflags.Spec[bool]{
+		Name:  flagName,
+		Usage: "run only this check: " + check.Summary + " [" + string(check.Group) + "]",
+	}
+}
+
 // bindSelectionFlags registers one boolean selection flag per check.
 func bindSelectionFlags(cmd *cobra.Command) {
 	for _, check := range validate.Checks() {
@@ -48,25 +60,6 @@ func selectedChecks(cmd *cobra.Command) []diagnostic.Code {
 		}
 	}
 	return selected
-}
-
-// selectionFlag describes the flag that selects check. Its name is the check
-// code's kebab-case form, matching its envx.yaml severity key so the flag and
-// the config property can never drift apart.
-func selectionFlag(check validate.Check) cliflags.Spec[bool] {
-	return cliflags.Spec[bool]{
-		Name:  flagName(check.Code),
-		Usage: "run only this check: " + check.Summary + " [" + string(check.Group) + "]",
-	}
-}
-
-// flagName returns a check's selection flag name: the lowercased code with
-// underscores turned into dashes, e.g. SECRET_IS_NOT_ENCRYPTED ->
-// "secret-is-not-encrypted". It is the kebab-case twin of the code's config
-// severity key, so `validate --secret-is-not-encrypted` selects exactly the check
-// whose severity is set by `validate.secret_is_not_encrypted` in envx.yaml.
-func flagName(code diagnostic.Code) string {
-	return strings.ReplaceAll(strings.ToLower(string(code)), "_", "-")
 }
 
 // Factory defines the capabilities required for the validate command.
