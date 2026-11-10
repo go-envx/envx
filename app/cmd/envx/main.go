@@ -7,8 +7,10 @@ import (
 	"io"
 	"os"
 
+	"github.com/go-envx/envx/app/internal/app"
 	"github.com/go-envx/envx/app/internal/cli"
 	"github.com/go-envx/envx/app/internal/lib/printer"
+	"github.com/go-envx/envx/app/internal/lib/stdio"
 	"github.com/go-envx/envx/app/internal/shared/exitcode"
 )
 
@@ -34,15 +36,15 @@ func main() {
 // any other failure maps to exitcode.Runtime. Child-process signal handling lives
 // in the runner, so no root-level signal trapping is required here.
 func run() int {
-	root, err := cli.NewRootCmd(cli.BuildInfo{
-		Version: version,
-		Commit:  commit,
-		Date:    date,
-	})
-	if err != nil {
-		_ = reportError(os.Stderr, err)
-		return exitcode.Runtime
-	}
+	root := cli.NewRootCommand(
+		cli.BuildInfo{
+			Version: version,
+			Commit:  commit,
+			Date:    date,
+		},
+		app.Factory{},
+		stdio.Streams{In: os.Stdin, Out: os.Stdout, ErrOut: os.Stderr},
+	)
 
 	cmd, err := root.ExecuteC()
 	if err == nil {

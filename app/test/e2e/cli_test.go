@@ -8,7 +8,9 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/go-envx/envx/app/internal/app"
 	"github.com/go-envx/envx/app/internal/cli"
+	"github.com/go-envx/envx/app/internal/lib/stdio"
 	"github.com/go-envx/envx/app/test/fixtures"
 )
 
@@ -17,12 +19,11 @@ import (
 func execCmd(args ...string) (stdout, stderr *bytes.Buffer, err error) {
 	stdout = new(bytes.Buffer)
 	stderr = new(bytes.Buffer)
-	cmd, err := cli.NewRootCmd(cli.BuildInfo{Version: "test"})
-	if err != nil {
-		return stdout, stderr, err
-	}
-	cmd.SetOut(stdout)
-	cmd.SetErr(stderr)
+	cmd := cli.NewRootCommand(
+		cli.BuildInfo{Version: "test"},
+		app.Factory{},
+		stdio.Streams{Out: stdout, ErrOut: stderr},
+	)
 	cmd.SetArgs(args)
 	err = cmd.Execute()
 	return stdout, stderr, err

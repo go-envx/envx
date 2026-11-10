@@ -1,7 +1,6 @@
 package cli
 
 import (
-	"github.com/go-envx/envx/app/internal/app"
 	emitcli "github.com/go-envx/envx/app/internal/core/emit/cli"
 	envcli "github.com/go-envx/envx/app/internal/core/env/cli"
 	packcli "github.com/go-envx/envx/app/internal/core/pack/cli"
@@ -9,6 +8,7 @@ import (
 	secretscli "github.com/go-envx/envx/app/internal/core/secrets/cli"
 	validatecli "github.com/go-envx/envx/app/internal/core/validate/cli"
 	workspacecli "github.com/go-envx/envx/app/internal/core/workspace/cli"
+	"github.com/go-envx/envx/app/internal/lib/stdio"
 	"github.com/spf13/cobra"
 )
 
@@ -17,12 +17,24 @@ const (
 	rootShort = "envx is a CLI tool for managing environment variables"
 )
 
-// NewRootCmd builds the command tree. It registers the persistent --config flag,
-// which every action reads back by name to locate the manifest.
-// The build metadata in info is rendered by the --version flag.
-func NewRootCmd(info BuildInfo) (*cobra.Command, error) {
-	factory := app.Factory{}
+// appFactory aggregates every command package's service factory.
+type appFactory interface {
+	emitcli.Factory
+	envcli.Factory
+	packcli.Factory
+	scaffoldcli.Factory
+	secretscli.Factory
+	validatecli.Factory
+}
 
+// NewRootCommand builds the command tree. It registers the persistent --config
+// flag, renders info for --version, and installs the normalized streams so
+// handlers can read them through Cobra's effective stream accessors.
+func NewRootCommand(
+	info BuildInfo,
+	factory appFactory,
+	streams stdio.Streams,
+) *cobra.Command {
 	root := &cobra.Command{
 		Use:           rootUsage,
 		Short:         rootShort,
@@ -41,6 +53,11 @@ func NewRootCmd(info BuildInfo) (*cobra.Command, error) {
 		},
 	}
 
+	streams = streams.Normalized()
+	root.SetIn(streams.In)
+	root.SetOut(streams.Out)
+	root.SetErr(streams.ErrOut)
+
 	workspacecli.BindConfig(root)
 
 	root.AddCommand(
@@ -56,5 +73,5 @@ func NewRootCmd(info BuildInfo) (*cobra.Command, error) {
 		secretscli.NewSecretsCommand(factory),
 		validatecli.NewValidateCommand(factory),
 	)
-	return root, nil
+	return root
 }
