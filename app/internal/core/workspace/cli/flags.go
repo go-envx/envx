@@ -4,21 +4,21 @@ import (
 	"slices"
 
 	"github.com/go-envx/envx/app/internal/core/workspace"
-	"github.com/go-envx/envx/app/internal/lib/flagspec"
+	"github.com/go-envx/envx/app/internal/lib/cliflags"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 )
 
 var (
 	// configFlag selects the manifest path (auto-discovered when unset).
-	configFlag = flagspec.Spec[string]{
+	configFlag = cliflags.Spec[string]{
 		Name:  "config",
 		Env:   "ENVX_CONFIG",
 		Usage: "path to envx.yaml, or a directory containing it",
 	}
 
 	// envFlag selects the target environment.
-	envFlag = flagspec.Spec[string]{
+	envFlag = cliflags.Spec[string]{
 		Name:  "env",
 		Short: "E",
 		Env:   "ENVX_ENV",
@@ -26,42 +26,42 @@ var (
 	}
 
 	// requireOverlaysFlag requires every environment overlay file to exist.
-	requireOverlaysFlag = flagspec.Spec[bool]{
+	requireOverlaysFlag = cliflags.Spec[bool]{
 		Name:  "require-overlays",
 		Env:   "ENVX_REQUIRE_OVERLAYS",
 		Usage: "require all environment overlay files to exist",
 	}
 
 	// prefixFlag is prepended to every resolved key.
-	prefixFlag = flagspec.Spec[string]{
+	prefixFlag = cliflags.Spec[string]{
 		Name:  "prefix",
 		Env:   "ENVX_PREFIX",
 		Usage: "prefix prepended to every key",
 	}
 
 	// suffixFlag is appended to every resolved key.
-	suffixFlag = flagspec.Spec[string]{
+	suffixFlag = cliflags.Spec[string]{
 		Name:  "suffix",
 		Env:   "ENVX_SUFFIX",
 		Usage: "suffix appended to every key",
 	}
 
 	// delimiterFlag joins a list-valued leaf into a single value.
-	delimiterFlag = flagspec.Spec[string]{
+	delimiterFlag = cliflags.Spec[string]{
 		Name:  "delimiter",
 		Env:   "ENVX_DELIMITER",
 		Usage: `string used to join list values (default ",")`,
 	}
 
 	// overloadFlag lets file values override existing host variables.
-	overloadFlag = flagspec.Spec[bool]{
+	overloadFlag = cliflags.Spec[bool]{
 		Name:  "overload",
 		Env:   "ENVX_OVERLOAD",
 		Usage: "file values override OS env vars",
 	}
 
 	// referencePatternFlag overrides the {{VAR}} reference syntax with a regex.
-	referencePatternFlag = flagspec.Spec[string]{
+	referencePatternFlag = cliflags.Spec[string]{
 		Name:  "reference-pattern",
 		Env:   "ENVX_REFERENCE_PATTERN",
 		Usage: "regex overriding the {{VAR}} reference syntax (group 1 is the name)",

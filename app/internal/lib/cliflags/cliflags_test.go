@@ -1,4 +1,4 @@
-package flagspec_test
+package cliflags_test
 
 import (
 	"bytes"
@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/go-envx/envx/app/internal/lib/flagspec"
+	"github.com/go-envx/envx/app/internal/lib/cliflags"
 	"github.com/spf13/cobra"
 )
 
@@ -29,19 +29,19 @@ func parseCommand(
 func TestFlagSpecValue(t *testing.T) {
 	t.Parallel()
 
-	outputSpec := flagspec.Spec[string]{
+	outputSpec := cliflags.Spec[string]{
 		Name:    "output",
 		Short:   "o",
 		Usage:   "output format",
 		Default: "text",
 	}
-	verboseSpec := flagspec.Spec[bool]{
+	verboseSpec := cliflags.Spec[bool]{
 		Name:    "verbose",
 		Short:   "v",
 		Usage:   "print verbose output",
 		Default: false,
 	}
-	tagsSpec := flagspec.Spec[[]string]{
+	tagsSpec := cliflags.Spec[[]string]{
 		Name:    "tags",
 		Usage:   "filter tags",
 		Default: []string{"default"},
@@ -83,7 +83,7 @@ func TestFlagSpecValue(t *testing.T) {
 
 	t.Run("unregistered returns default", func(t *testing.T) {
 		t.Parallel()
-		spec := flagspec.Spec[string]{Name: "missing", Default: "dflt"}
+		spec := cliflags.Spec[string]{Name: "missing", Default: "dflt"}
 		cmd, _ := parseCommand(t, bind)
 		if got := spec.Value(cmd); got != "dflt" {
 			t.Errorf("value = %q, want dflt", got)
@@ -94,7 +94,7 @@ func TestFlagSpecValue(t *testing.T) {
 func TestFlagSpecBindPersistent(t *testing.T) {
 	t.Parallel()
 
-	spec := flagspec.Spec[string]{Name: "file", Default: "dflt"}
+	spec := cliflags.Spec[string]{Name: "file", Default: "dflt"}
 	root := &cobra.Command{Use: "root"}
 	spec.BindPersistent(root)
 
@@ -117,7 +117,7 @@ func TestFlagSpecBindPersistent(t *testing.T) {
 }
 
 func TestFlagSpecLookupEnvironment(t *testing.T) {
-	fileSpec := flagspec.Spec[string]{
+	fileSpec := cliflags.Spec[string]{
 		Name:  "file",
 		Env:   "TEST_CONFIG_FILE",
 		Usage: "path to configuration file",
@@ -132,7 +132,7 @@ func TestFlagSpecLookupEnvironment(t *testing.T) {
 	})
 
 	t.Run("help without env has no suffix", func(t *testing.T) {
-		plainSpec := flagspec.Spec[string]{
+		plainSpec := cliflags.Spec[string]{
 			Name:  "plain",
 			Usage: "plain description",
 		}
@@ -180,7 +180,7 @@ func TestFlagSpecLookupEnvironment(t *testing.T) {
 
 	t.Run("invalid variable warns on command stream", func(t *testing.T) {
 		t.Setenv("TEST_FLAG_STRICT", "not-a-bool")
-		spec := flagspec.Spec[bool]{Name: "strict", Env: "TEST_FLAG_STRICT"}
+		spec := cliflags.Spec[bool]{Name: "strict", Env: "TEST_FLAG_STRICT"}
 		cmd, stderr := parseCommand(t, spec.Bind)
 		if got := spec.Lookup(cmd); got != nil {
 			t.Errorf("lookup = %v, want nil", *got)
@@ -192,7 +192,7 @@ func TestFlagSpecLookupEnvironment(t *testing.T) {
 
 	t.Run("list variable splits on commas", func(t *testing.T) {
 		t.Setenv("TEST_FLAG_TAGS", "a,b,c")
-		spec := flagspec.Spec[[]string]{Name: "tags", Env: "TEST_FLAG_TAGS"}
+		spec := cliflags.Spec[[]string]{Name: "tags", Env: "TEST_FLAG_TAGS"}
 		cmd, _ := parseCommand(t, spec.Bind)
 		if got := spec.Value(cmd); !slices.Equal(got, []string{"a", "b", "c"}) {
 			t.Errorf("value = %v, want [a b c]", got)
@@ -200,7 +200,7 @@ func TestFlagSpecLookupEnvironment(t *testing.T) {
 	})
 
 	t.Run("unset variable returns nil", func(t *testing.T) {
-		spec := flagspec.Spec[string]{Name: "file", Env: "TEST_NONEXISTENT_VAR"}
+		spec := cliflags.Spec[string]{Name: "file", Env: "TEST_NONEXISTENT_VAR"}
 		cmd, _ := parseCommand(t, spec.Bind)
 		if got := spec.Lookup(cmd); got != nil {
 			t.Errorf("lookup = %v, want nil", *got)
@@ -209,7 +209,7 @@ func TestFlagSpecLookupEnvironment(t *testing.T) {
 
 	t.Run("bool variable applies when valid", func(t *testing.T) {
 		t.Setenv("TEST_FLAG_BOOL", "true")
-		spec := flagspec.Spec[bool]{Name: "verbose", Env: "TEST_FLAG_BOOL"}
+		spec := cliflags.Spec[bool]{Name: "verbose", Env: "TEST_FLAG_BOOL"}
 		cmd, _ := parseCommand(t, spec.Bind)
 		if got := spec.Lookup(cmd); got == nil || !*got {
 			t.Errorf("lookup = %v, want true", got)
@@ -217,7 +217,7 @@ func TestFlagSpecLookupEnvironment(t *testing.T) {
 	})
 
 	t.Run("type mismatch on changed flag warns on error stream", func(t *testing.T) {
-		spec := flagspec.Spec[string]{Name: "count"}
+		spec := cliflags.Spec[string]{Name: "count"}
 		cmd := &cobra.Command{Use: "test"}
 		stderr := new(bytes.Buffer)
 		cmd.SetErr(stderr)

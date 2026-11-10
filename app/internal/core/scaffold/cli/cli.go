@@ -3,19 +3,19 @@ package cli
 
 import (
 	"github.com/go-envx/envx/app/internal/core/scaffold"
-	"github.com/go-envx/envx/app/internal/lib/flagspec"
+	"github.com/go-envx/envx/app/internal/lib/cliflags"
 )
 
 // Flags local to scaffold commands.
 var (
 	// forceFlag overwrites existing files instead of stopping on conflicts.
-	forceFlag = flagspec.Spec[bool]{
+	forceFlag = cliflags.Spec[bool]{
 		Name:  "force",
 		Usage: "overwrite existing files",
 	}
 
 	// targetDirFlag is the directory to scaffold into.
-	targetDirFlag = flagspec.Spec[string]{
+	targetDirFlag = cliflags.Spec[string]{
 		Name:  "target-dir",
 		Usage: "directory to scaffold into",
 	}
@@ -28,7 +28,7 @@ type templateSpec struct {
 	Long  string
 }
 
-func (t templateSpec) targetDirFlag() flagspec.Spec[string] {
+func (t templateSpec) targetDirFlag() cliflags.Spec[string] {
 	spec := targetDirFlag
 	spec.Default = t.Name
 	return spec

@@ -1,4 +1,4 @@
-package flagspec
+package cliflags
 
 import (
 	"fmt"
