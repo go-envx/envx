@@ -25,53 +25,55 @@ type KeypairMetadata struct {
 	PrivateKeyStatus string
 }
 
-// KeypairResult reports a generated or rotated keypair.
-type KeypairResult struct {
+// GenerateKeypairResult reports a newly generated keypair.
+type GenerateKeypairResult struct {
 	// Keypair describes the newly committed public key.
 	Keypair KeypairMetadata
 	// PublicKeyLocation identifies the store holding the public key.
 	PublicKeyLocation string
 	// PrivateKeyLocation identifies where the private key was retained.
 	PrivateKeyLocation string
-	// Reencrypted lists values re-encrypted by a rotation.
-	Reencrypted []Reference
 }
 
 // GenerateKeypair creates a group identity, retaining the private key before
 // committing the matching public key.
-func (s *Service) GenerateKeypair(group string) (KeypairResult, error) {
+func (s *Service) GenerateKeypair(group string) (GenerateKeypairResult, error) {
 	group, err := NormalizeGroup(group)
 	if err != nil {
-		return KeypairResult{}, err
+		return GenerateKeypairResult{}, err
 	}
 	snap, err := s.store.Read(group)
 	if err != nil {
-		return KeypairResult{}, err
+		return GenerateKeypairResult{}, err
 	}
 	if snap.Group.PublicKey != "" {
-		return KeypairResult{}, fmt.Errorf(
+		return GenerateKeypairResult{}, fmt.Errorf(
 			"group %q already has a public key: %w", group, ErrKeypairExists,
 		)
 	}
 	pair, err := s.newKeypair(group)
 	if err != nil {
-		return KeypairResult{}, err
+		return GenerateKeypairResult{}, err
 	}
 	if err := s.keys.Retain(group, pair); err != nil {
-		return KeypairResult{}, fmt.Errorf(
+		return GenerateKeypairResult{}, fmt.Errorf(
 			"writing private key for group %q: %w", group, err,
 		)
 	}
 	replacement := s.cloneGroup(snap, group)
 	replacement.PublicKey = pair.PublicKey
 	if err := s.store.Commit(snap, replacement); err != nil {
-		return KeypairResult{}, fmt.Errorf(
+		return GenerateKeypairResult{}, fmt.Errorf(
 			"private key for group %q was written, "+
 				"but public key could not be committed: %w",
 			group, err,
 		)
 	}
-	return s.keypairResult(group, pair.PublicKey, nil), nil
+	return GenerateKeypairResult{
+		Keypair:            s.committedKeypair(group, pair.PublicKey),
+		PublicKeyLocation:  s.store.Location(),
+		PrivateKeyLocation: s.keys.Location(),
+	}, nil
 }
 
 // InspectKeypair reports a group's key status without exposing key material.
@@ -137,18 +139,12 @@ func (s *Service) newKeypair(group string) (crypt.Keypair, error) {
 	return pair, nil
 }
 
-// keypairResult reports a newly committed public key with a valid private key.
-func (s *Service) keypairResult(
-	group, publicKey string, reencrypted []Reference,
-) KeypairResult {
-	return KeypairResult{
-		Keypair: KeypairMetadata{
-			Group:            group,
-			PublicKey:        publicKey,
-			PrivateKeyStatus: PrivateKeyValid,
-		},
-		PublicKeyLocation:  s.store.Location(),
-		PrivateKeyLocation: s.keys.Location(),
-		Reencrypted:        reencrypted,
+// committedKeypair describes a newly committed public key whose private key
+// was just retained, so it is valid.
+func (s *Service) committedKeypair(group, publicKey string) KeypairMetadata {
+	return KeypairMetadata{
+		Group:            group,
+		PublicKey:        publicKey,
+		PrivateKeyStatus: PrivateKeyValid,
 	}
 }

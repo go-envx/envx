@@ -4,20 +4,16 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/go-envx/envx/app/internal/core"
-	"github.com/go-envx/envx/app/internal/features/secrets"
+	"github.com/go-envx/envx/app/internal/app"
+	"github.com/go-envx/envx/app/internal/core/secrets"
 )
 
 // managerFor composes the secrets service for the workspace at manifest.
 func managerFor(t *testing.T, manifest string) *secrets.Service {
 	t.Helper()
-	app, err := core.NewAppFactory()
+	manager, err := app.Factory{}.NewSecretsService(manifest)
 	if err != nil {
-		t.Fatalf("NewAppFactory(): %v", err)
-	}
-	manager, err := app.SecretsService(manifest)
-	if err != nil {
-		t.Fatalf("SecretsService(): %v", err)
+		t.Fatalf("NewSecretsService(): %v", err)
 	}
 	return manager
 }

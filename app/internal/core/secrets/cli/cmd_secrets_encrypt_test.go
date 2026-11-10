@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/go-envx/envx/app/internal/features/secrets"
+	"github.com/go-envx/envx/app/internal/core/secrets"
 	"github.com/go-envx/envx/app/internal/lib/filex"
 	"github.com/go-envx/envx/app/internal/lib/printer"
 )
@@ -85,7 +85,7 @@ func TestOutputEncryptReportsEncryptedCount(t *testing.T) {
 	err := outputSecretsEncrypt(
 		printer.NewPlain(&out, &errOut),
 		secrets.EncryptSecretsResult{
-			Secrets: []secrets.SecretReference{
+			Secrets: []secrets.Reference{
 				{Group: "production", Key: "api_key"},
 			},
 			Location: "/workspace/secrets.yaml",

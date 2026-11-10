@@ -26,23 +26,23 @@ func TestEncryptIsIdempotentAndStagesAllGroups(t *testing.T) {
 		Values:    map[string]string{"C": "3"},
 	})
 
-	res, err := f.service.Encrypt(secrets.Selection{})
+	res, err := f.service.EncryptSecrets("", "")
 	if err != nil {
 		t.Fatalf("Encrypt: %v", err)
 	}
-	if len(res.Changed) != 3 {
-		t.Errorf("Changed = %v, want 3 references", res.Changed)
+	if len(res.Secrets) != 3 {
+		t.Errorf("Secrets = %v, want 3 references", res.Secrets)
 	}
 
-	res, err = f.service.Encrypt(secrets.Selection{})
+	res, err = f.service.EncryptSecrets("", "")
 	if err != nil {
 		t.Fatalf("second Encrypt: %v", err)
 	}
-	if len(res.Changed) != 0 {
-		t.Errorf("second Encrypt changed %v, want none", res.Changed)
+	if len(res.Secrets) != 0 {
+		t.Errorf("second Encrypt changed %v, want none", res.Secrets)
 	}
 
-	got, err := f.service.Get(secrets.Reference{Group: "web", Key: "C"})
+	got, err := f.service.GetSecret("web", "C")
 	if err != nil || got.Value != "3" {
 		t.Errorf("Get after Encrypt = %q, %v", got.Value, err)
 	}
@@ -62,7 +62,7 @@ func TestEncryptFailureCommitsNothing(t *testing.T) {
 	f.store.put(secrets.Group{Name: "orphan", Values: map[string]string{"B": "2"}})
 	commits := f.store.commits
 
-	_, err := f.service.Encrypt(secrets.Selection{})
+	_, err := f.service.EncryptSecrets("", "")
 	mustErrorIs(t, err, secrets.ErrGroupNotFound)
 	if f.store.commits != commits {
 		t.Errorf("committed %d groups after failure", f.store.commits-commits)
@@ -89,11 +89,11 @@ func TestEncryptReportsCommittedGroupsOnFailure(t *testing.T) {
 		}
 	}
 
-	res, err := f.service.Encrypt(secrets.Selection{})
+	res, err := f.service.EncryptSecrets("", "")
 	mustErrorIs(t, err, secrets.ErrConflict)
 	want := []secrets.Reference{{Group: "api", Key: "K"}}
-	if !slices.Equal(res.Changed, want) {
-		t.Errorf("Changed = %v, want %v", res.Changed, want)
+	if !slices.Equal(res.Secrets, want) {
+		t.Errorf("Secrets = %v, want %v", res.Secrets, want)
 	}
 }
 
@@ -109,13 +109,13 @@ func TestDecryptReportsUnavailableGroups(t *testing.T) {
 	f.set(t, "web", "C", "3")
 	delete(f.keys.byPublic, "web")
 
-	res, err := f.service.Decrypt(secrets.Selection{})
+	res, err := f.service.DecryptSecrets("", "")
 	if err != nil {
 		t.Fatalf("Decrypt: %v", err)
 	}
 	want := []secrets.Reference{{Group: "api", Key: "A"}}
-	if !slices.Equal(res.Changed, want) {
-		t.Errorf("Changed = %v, want %v", res.Changed, want)
+	if !slices.Equal(res.Secrets, want) {
+		t.Errorf("Secrets = %v, want %v", res.Secrets, want)
 	}
 	if !slices.Equal(res.UnavailableGroups, []string{"web"}) {
 		t.Errorf("UnavailableGroups = %v, want [web]", res.UnavailableGroups)
@@ -134,18 +134,19 @@ func TestSelection(t *testing.T) {
 	f.set(t, "api", "A", "1")
 
 	tests := []struct {
-		name      string
-		selection secrets.Selection
-		wantErr   string
+		name    string
+		group   string
+		key     string
+		wantErr string
 	}{
-		{"key without group", secrets.Selection{Key: "A"}, "requires a group"},
-		{"unknown group", secrets.Selection{Group: "web"}, "no secrets found"},
-		{"unknown key", secrets.Selection{Group: "api", Key: "Z"}, `no secret "Z"`},
-		{"matching key", secrets.Selection{Group: "API", Key: "A"}, ""},
+		{"key without group", "", "A", "requires a group"},
+		{"unknown group", "web", "", "no secrets found"},
+		{"unknown key", "api", "Z", `no secret "Z"`},
+		{"matching key", "API", "A", ""},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			_, err := f.service.Encrypt(tt.selection)
+			_, err := f.service.EncryptSecrets(tt.group, tt.key)
 			if tt.wantErr == "" {
 				if err != nil {
 					t.Fatalf("Encrypt: %v", err)

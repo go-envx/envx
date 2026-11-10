@@ -85,9 +85,9 @@ func TestNewEnvServiceBindsOperationSnapshot(t *testing.T) {
 	if _, err := manager.GenerateKeypair("app"); err != nil {
 		t.Fatalf("GenerateKeypair: %v", err)
 	}
-	reference := secrets.Reference{Group: "app", Key: "token"}
-	if _, err := manager.Set(reference, "s3cr3t"); err != nil {
-		t.Fatalf("Set: %v", err)
+	plaintext := func() (string, error) { return "s3cr3t", nil }
+	if _, err := manager.SetSecret("app", "token", plaintext); err != nil {
+		t.Fatalf("SetSecret: %v", err)
 	}
 	getParams := env.GetParams{
 		Query:  env.Query{Project: "app"},

@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/go-envx/envx/app/internal/features/secrets"
+	"github.com/go-envx/envx/app/internal/core/secrets"
 	"github.com/go-envx/envx/app/internal/lib/filex"
 	"github.com/go-envx/envx/app/internal/lib/printer"
 )
@@ -97,7 +97,7 @@ func TestNewKeypairRotateCommand(t *testing.T) {
 		t.Fatalf("GenerateKeypair(): %v", err)
 	}
 
-	parent := NewKeypairCmd(&mockSecretsFactory{svc: manager})
+	parent := NewKeypairCommand(&mockSecretsFactory{svc: manager})
 	parent.PersistentFlags().String("config", manifest, "")
 	parent.SetArgs([]string{"rotate", "production", "--config", manifest})
 
@@ -125,7 +125,7 @@ func TestOutputRotateReportsResults(t *testing.T) {
 				Group:     "production",
 				PublicKey: "age1newkey...",
 			},
-			Secrets: []secrets.SecretReference{
+			Secrets: []secrets.Reference{
 				{Group: "production", Key: "k1"},
 				{Group: "production", Key: "k2"},
 				{Group: "production", Key: "k3"},

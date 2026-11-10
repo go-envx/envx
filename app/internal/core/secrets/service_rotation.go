@@ -7,44 +7,57 @@ import (
 	"github.com/go-envx/envx/app/internal/lib/crypt"
 )
 
+// RotateKeypairResult reports a rotated keypair and the values re-encrypted
+// under it.
+type RotateKeypairResult struct {
+	// Keypair describes the newly committed public key.
+	Keypair KeypairMetadata
+	// PublicKeyLocation identifies the store holding the public key.
+	PublicKeyLocation string
+	// PrivateKeyLocation identifies where the private key was retained.
+	PrivateKeyLocation string
+	// Secrets lists the references re-encrypted under the new public key.
+	Secrets []Reference
+}
+
 // RotateKeypair replaces a group's identity and re-encrypts all of its values.
 // The new private key is retained, and verified not to be shadowed, before the
 // new public key and ciphertext are committed together. The old private key
 // is left in place.
-func (s *Service) RotateKeypair(group string) (KeypairResult, error) {
+func (s *Service) RotateKeypair(group string) (RotateKeypairResult, error) {
 	group, err := NormalizeGroup(group)
 	if err != nil {
-		return KeypairResult{}, err
+		return RotateKeypairResult{}, err
 	}
 	snap, err := s.store.Read(group)
 	if err != nil {
-		return KeypairResult{}, err
+		return RotateKeypairResult{}, err
 	}
 	if snap.Group.PublicKey == "" {
-		return KeypairResult{}, s.noPublicKey(group)
+		return RotateKeypairResult{}, s.noPublicKey(group)
 	}
 	oldKey, err := s.keys.Resolve(group, snap.Group.PublicKey)
 	if errors.Is(err, ErrKeyNotAvailable) {
-		return KeypairResult{}, fmt.Errorf(
+		return RotateKeypairResult{}, fmt.Errorf(
 			"cannot rotate group %q: its private key is not available", group,
 		)
 	}
 	if err != nil {
-		return KeypairResult{}, fmt.Errorf(
+		return RotateKeypairResult{}, fmt.Errorf(
 			"resolving private key for group %q: %w", group, err,
 		)
 	}
 	if oldKey.Origin != OriginStore {
-		return KeypairResult{}, s.rotationShadowed(group, oldKey.Origin)
+		return RotateKeypairResult{}, s.rotationShadowed(group, oldKey.Origin)
 	}
 	plaintexts, err := s.decryptForRotation(group, snap.Group.Values, oldKey.Value)
 	if err != nil {
-		return KeypairResult{}, err
+		return RotateKeypairResult{}, err
 	}
 
 	pair, err := s.newKeypair(group)
 	if err != nil {
-		return KeypairResult{}, err
+		return RotateKeypairResult{}, err
 	}
 	replacement := Group{
 		Name:      snap.Group.Name,
@@ -56,21 +69,26 @@ func (s *Service) RotateKeypair(group string) (KeypairResult, error) {
 		ref := Reference{Group: group, Key: key}
 		sealed, err := s.seal(ref, plaintexts[key], pair.PublicKey)
 		if err != nil {
-			return KeypairResult{}, err
+			return RotateKeypairResult{}, err
 		}
 		replacement.Values[key] = sealed
 		refs = append(refs, ref)
 	}
 
 	if err := s.retainForRotation(group, pair); err != nil {
-		return KeypairResult{}, err
+		return RotateKeypairResult{}, err
 	}
 	if err := s.store.Commit(snap, replacement); err != nil {
-		return KeypairResult{}, fmt.Errorf(
+		return RotateKeypairResult{}, fmt.Errorf(
 			"committing rotated keypair for group %q: %w", group, err,
 		)
 	}
-	return s.keypairResult(group, pair.PublicKey, refs), nil
+	return RotateKeypairResult{
+		Keypair:            s.committedKeypair(group, pair.PublicKey),
+		PublicKeyLocation:  s.store.Location(),
+		PrivateKeyLocation: s.keys.Location(),
+		Secrets:            refs,
+	}, nil
 }
 
 // decryptForRotation decrypts every value in a group, requiring each to be encrypted.

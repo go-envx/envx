@@ -45,10 +45,14 @@ func (f *fixture) generate(t *testing.T, group string) string {
 // set stores plaintext through the service.
 func (f *fixture) set(t *testing.T, group, key, plaintext string) {
 	t.Helper()
-	ref := secrets.Reference{Group: group, Key: key}
-	if _, err := f.service.Set(ref, plaintext); err != nil {
-		t.Fatalf("Set(%v): %v", ref, err)
+	if _, err := f.service.SetSecret(group, key, plaintextOf(plaintext)); err != nil {
+		t.Fatalf("SetSecret(%s/%s): %v", group, key, err)
 	}
+}
+
+// plaintextOf returns a plaintext source yielding value.
+func plaintextOf(value string) func() (string, error) {
+	return func() (string, error) { return value, nil }
 }
 
 // stored returns the raw stored value.

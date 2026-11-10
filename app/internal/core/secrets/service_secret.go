@@ -5,106 +5,123 @@ import (
 	"fmt"
 )
 
-// GetResult reports a decrypted value and the store it was read from.
-type GetResult struct {
+// GetSecretResult reports a decrypted value and the store it was read from.
+type GetSecretResult struct {
 	// Value is the decrypted plaintext.
 	Value string
 	// Location identifies the store that held the value.
 	Location string
 }
 
-// MutationResult reports the references a mutation changed.
-type MutationResult struct {
+// SetSecretResult reports a stored secret and the store that holds it.
+type SetSecretResult struct {
 	// Location identifies the store that was changed.
 	Location string
-	// Changed lists the references whose stored values were committed.
-	Changed []Reference
-	// UnavailableGroups lists groups skipped because no private key was found.
-	UnavailableGroups []string
+	// Secret identifies the stored secret.
+	Secret Reference
 }
 
-// Get decrypts one stored secret.
-func (s *Service) Get(reference Reference) (GetResult, error) {
-	ref, err := reference.normalized()
+// DeleteSecretResult reports a removed secret and the store it was removed from.
+type DeleteSecretResult struct {
+	// Location identifies the store that was changed.
+	Location string
+	// Secret identifies the removed secret.
+	Secret Reference
+}
+
+// GetSecret decrypts one stored secret.
+func (s *Service) GetSecret(group, key string) (GetSecretResult, error) {
+	ref, err := Reference{Group: group, Key: key}.normalized()
 	if err != nil {
-		return GetResult{}, err
+		return GetSecretResult{}, err
 	}
 	snap, err := s.store.Read(ref.Group)
 	if err != nil {
-		return GetResult{}, err
+		return GetSecretResult{}, err
 	}
 	stored, ok := snap.Group.Values[ref.Key]
 	if !ok {
-		return GetResult{}, notFound(ref)
+		return GetSecretResult{}, notFound(ref)
 	}
 	payload, err := openEnvelope(ref, stored, s.cipher.Algorithm())
 	if err != nil {
-		return GetResult{}, err
+		return GetSecretResult{}, err
 	}
-	key, err := s.keys.Resolve(ref.Group, snap.Group.PublicKey)
+	privateKey, err := s.keys.Resolve(ref.Group, snap.Group.PublicKey)
 	if err != nil {
-		return GetResult{}, fmt.Errorf(
+		return GetSecretResult{}, fmt.Errorf(
 			"resolving private key for group %q: %w", ref.Group, err,
 		)
 	}
-	plaintext, err := s.cipher.Decrypt(payload, key.Value)
+	plaintext, err := s.cipher.Decrypt(payload, privateKey.Value)
 	if err != nil {
-		return GetResult{}, fmt.Errorf(
+		return GetSecretResult{}, fmt.Errorf(
 			"decrypting secret %q in group %q: %w", ref.Key, ref.Group, err,
 		)
 	}
-	return GetResult{Value: plaintext, Location: s.store.Location()}, nil
+	return GetSecretResult{Value: plaintext, Location: s.store.Location()}, nil
 }
 
-// Set encrypts plaintext under the group's public key and stores it.
-func (s *Service) Set(reference Reference, plaintext string) (MutationResult, error) {
-	ref, err := reference.normalized()
+// SetSecret encrypts a plaintext value under the group's public key and stores
+// it. The plaintext source is called only after the reference is valid and the
+// group has a public key, so a caller never prompts for a value it cannot store.
+func (s *Service) SetSecret(
+	group, key string, plaintext func() (string, error),
+) (SetSecretResult, error) {
+	ref, err := Reference{Group: group, Key: key}.normalized()
 	if err != nil {
-		return MutationResult{}, err
+		return SetSecretResult{}, err
 	}
-	if plaintext == "" {
-		return MutationResult{}, errors.New("secret plaintext is empty")
+	if plaintext == nil {
+		return SetSecretResult{}, errors.New("plaintext source is nil")
 	}
 	snap, err := s.store.Read(ref.Group)
 	if err != nil {
-		return MutationResult{}, err
+		return SetSecretResult{}, err
 	}
 	if snap.Group.PublicKey == "" {
-		return MutationResult{}, s.noPublicKey(ref.Group)
+		return SetSecretResult{}, s.noPublicKey(ref.Group)
 	}
-	sealed, err := s.seal(ref, plaintext, snap.Group.PublicKey)
+	value, err := plaintext()
 	if err != nil {
-		return MutationResult{}, err
+		return SetSecretResult{}, err
+	}
+	if value == "" {
+		return SetSecretResult{}, errors.New("secret plaintext is empty")
+	}
+	sealed, err := s.seal(ref, value, snap.Group.PublicKey)
+	if err != nil {
+		return SetSecretResult{}, err
 	}
 	replacement := s.cloneGroup(snap, ref.Group)
 	replacement.Values[ref.Key] = sealed
 	if err := s.store.Commit(snap, replacement); err != nil {
-		return MutationResult{}, fmt.Errorf(
+		return SetSecretResult{}, fmt.Errorf(
 			"saving secret %q in group %q: %w", ref.Key, ref.Group, err,
 		)
 	}
-	return s.mutated([]Reference{ref}, nil), nil
+	return SetSecretResult{Location: s.store.Location(), Secret: ref}, nil
 }
 
-// Delete removes one stored secret, keeping the group's public key.
-func (s *Service) Delete(reference Reference) (MutationResult, error) {
-	ref, err := reference.normalized()
+// DeleteSecret removes one stored secret, keeping the group's public key.
+func (s *Service) DeleteSecret(group, key string) (DeleteSecretResult, error) {
+	ref, err := Reference{Group: group, Key: key}.normalized()
 	if err != nil {
-		return MutationResult{}, err
+		return DeleteSecretResult{}, err
 	}
 	snap, err := s.store.Read(ref.Group)
 	if err != nil {
-		return MutationResult{}, err
+		return DeleteSecretResult{}, err
 	}
 	if _, ok := snap.Group.Values[ref.Key]; !ok {
-		return MutationResult{}, notFound(ref)
+		return DeleteSecretResult{}, notFound(ref)
 	}
 	replacement := s.cloneGroup(snap, ref.Group)
 	delete(replacement.Values, ref.Key)
 	if err := s.store.Commit(snap, replacement); err != nil {
-		return MutationResult{}, fmt.Errorf(
+		return DeleteSecretResult{}, fmt.Errorf(
 			"deleting secret %q in group %q: %w", ref.Key, ref.Group, err,
 		)
 	}
-	return s.mutated([]Reference{ref}, nil), nil
+	return DeleteSecretResult{Location: s.store.Location(), Secret: ref}, nil
 }

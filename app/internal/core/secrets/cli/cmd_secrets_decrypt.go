@@ -4,10 +4,10 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/go-envx/envx/app/internal/features/secrets"
+	"github.com/go-envx/envx/app/internal/core/secrets"
+	workspacecli "github.com/go-envx/envx/app/internal/core/workspace/cli"
 	"github.com/go-envx/envx/app/internal/lib/printer"
 	"github.com/go-envx/envx/app/internal/lib/str"
-	"github.com/go-envx/envx/app/internal/shared/flags"
 	"github.com/spf13/cobra"
 )
 
@@ -44,14 +44,13 @@ func newSecretsDecryptCommand(f Factory) *cobra.Command {
 		Args:    cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			// Extract command-line flag values.
-			fs := cmd.Flags()
-			configPath := flags.Config.Get(fs)
-			group := groupFlag.Get(fs)
-			key := keyFlag.Get(fs)
-			verbose := flags.Verbose.Get(fs)
+			configPath := workspacecli.ConfigPath(cmd)
+			group := groupFlag.Value(cmd)
+			key := keyFlag.Value(cmd)
+			verbose := verboseFlag.Value(cmd)
 
 			// Obtain the secrets service using the configuration path.
-			secretsService, err := f.SecretsService(configPath)
+			secretsService, err := f.NewSecretsService(configPath)
 			if err != nil {
 				return err
 			}
@@ -74,12 +73,9 @@ func newSecretsDecryptCommand(f Factory) *cobra.Command {
 	}
 
 	// Bind the command-line flags.
-	{
-		fs := cmd.Flags()
-		flags.Bind(fs, &groupFlag)
-		flags.Bind(fs, &keyFlag)
-		flags.Bind(fs, &flags.Verbose)
-	}
+	groupFlag.Bind(cmd)
+	keyFlag.Bind(cmd)
+	verboseFlag.Bind(cmd)
 
 	return cmd
 }

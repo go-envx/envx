@@ -9,7 +9,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/go-envx/envx/app/internal/features/secrets"
+	"github.com/go-envx/envx/app/internal/core/secrets"
 	"github.com/go-envx/envx/app/internal/lib/filex"
 	"github.com/go-envx/envx/app/internal/lib/printer"
 )
@@ -141,7 +141,7 @@ func TestOutputSetReportsKeyGroupAndStorePath(t *testing.T) {
 		printer.NewPlain(&out, &errOut),
 		secrets.SetSecretResult{
 			Location: "/workspace/secrets.yaml",
-			Secret: secrets.SecretReference{
+			Secret: secrets.Reference{
 				Group: "production",
 				Key:   "api_key",
 			},

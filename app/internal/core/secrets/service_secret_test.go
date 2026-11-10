@@ -2,7 +2,6 @@ package secrets_test
 
 import (
 	"errors"
-	"slices"
 	"strings"
 	"testing"
 
@@ -16,19 +15,19 @@ func TestSetGetRoundTrip(t *testing.T) {
 	f := newFixture(t)
 	f.generate(t, "API")
 
-	res, err := f.service.Set(secrets.Reference{Group: "API", Key: "TOKEN"}, "s3cr3t")
+	res, err := f.service.SetSecret("API", "TOKEN", plaintextOf("s3cr3t"))
 	if err != nil {
 		t.Fatalf("Set: %v", err)
 	}
-	want := []secrets.Reference{{Group: "api", Key: "TOKEN"}}
-	if !slices.Equal(res.Changed, want) || res.Location != "mem://secrets" {
+	want := secrets.Reference{Group: "api", Key: "TOKEN"}
+	if res.Secret != want || res.Location != "mem://secrets" {
 		t.Errorf("Set result = %+v", res)
 	}
 	if stored := f.stored("api", "TOKEN"); !strings.HasPrefix(stored, "encrypted-age:") {
 		t.Errorf("stored value = %q, want age envelope", stored)
 	}
 
-	got, err := f.service.Get(secrets.Reference{Group: "api", Key: "TOKEN"})
+	got, err := f.service.GetSecret("api", "TOKEN")
 	if err != nil {
 		t.Fatalf("Get: %v", err)
 	}
@@ -46,23 +45,19 @@ func TestSetRejectsInvalidInput(t *testing.T) {
 
 	tests := []struct {
 		name      string
-		ref       secrets.Reference
+		group     string
+		key       string
 		plaintext string
 		target    error
 	}{
-		{
-			"missing public key",
-			secrets.Reference{Group: "web", Key: "K"},
-			"v",
-			secrets.ErrGroupNotFound,
-		},
-		{"empty plaintext", secrets.Reference{Group: "api", Key: "K"}, "", nil},
-		{"invalid group", secrets.Reference{Group: "a b", Key: "K"}, "v", nil},
-		{"invalid key", secrets.Reference{Group: "api", Key: "a/b"}, "v", nil},
+		{"missing public key", "web", "K", "v", secrets.ErrGroupNotFound},
+		{"empty plaintext", "api", "K", "", nil},
+		{"invalid group", "a b", "K", "v", nil},
+		{"invalid key", "api", "a/b", "v", nil},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			_, err := f.service.Set(tt.ref, tt.plaintext)
+			_, err := f.service.SetSecret(tt.group, tt.key, plaintextOf(tt.plaintext))
 			if err == nil {
 				t.Fatal("Set succeeded, want error")
 			}
@@ -70,6 +65,27 @@ func TestSetRejectsInvalidInput(t *testing.T) {
 				t.Errorf("error = %v, want %v", err, tt.target)
 			}
 		})
+	}
+}
+
+// TestSetReadsPlaintextAfterValidation verifies the plaintext source is not
+// called when the reference is invalid or the group has no public key.
+func TestSetReadsPlaintextAfterValidation(t *testing.T) {
+	t.Parallel()
+	f := newFixture(t)
+
+	called := false
+	source := func() (string, error) {
+		called = true
+		return "v", nil
+	}
+	if _, err := f.service.SetSecret("a b", "K", source); err == nil {
+		t.Error("Set with invalid group succeeded")
+	}
+	_, err := f.service.SetSecret("web", "K", source)
+	mustErrorIs(t, err, secrets.ErrGroupNotFound)
+	if called {
+		t.Error("plaintext source was called before validation passed")
 	}
 }
 
@@ -83,10 +99,10 @@ func TestGetFailures(t *testing.T) {
 	})
 	f.generate(t, "api")
 
-	_, err := f.service.Get(secrets.Reference{Group: "api", Key: "MISSING"})
+	_, err := f.service.GetSecret("api", "MISSING")
 	mustErrorIs(t, err, secrets.ErrSecretNotFound)
 
-	_, err = f.service.Get(secrets.Reference{Group: "legacy", Key: "PLAIN"})
+	_, err = f.service.GetSecret("legacy", "PLAIN")
 	if err == nil || !strings.Contains(err.Error(), "not encrypted") {
 		t.Errorf("Get plaintext error = %v, want not encrypted", err)
 	}
@@ -103,8 +119,7 @@ func TestDeleteKeepsPublicKey(t *testing.T) {
 	publicKey := f.generate(t, "api")
 	f.set(t, "api", "TOKEN", "v")
 
-	ref := secrets.Reference{Group: "api", Key: "TOKEN"}
-	if _, err := f.service.Delete(ref); err != nil {
+	if _, err := f.service.DeleteSecret("api", "TOKEN"); err != nil {
 		t.Fatalf("Delete: %v", err)
 	}
 	group := f.store.groups["api"]
@@ -112,6 +127,6 @@ func TestDeleteKeepsPublicKey(t *testing.T) {
 		t.Errorf("group after delete = %+v", group)
 	}
 
-	_, err := f.service.Delete(ref)
+	_, err := f.service.DeleteSecret("api", "TOKEN")
 	mustErrorIs(t, err, secrets.ErrSecretNotFound)
 }

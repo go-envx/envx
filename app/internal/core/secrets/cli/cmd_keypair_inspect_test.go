@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/go-envx/envx/app/internal/features/secrets"
+	"github.com/go-envx/envx/app/internal/core/secrets"
 	"github.com/go-envx/envx/app/internal/lib/filex"
 	"github.com/go-envx/envx/app/internal/lib/printer"
 )
@@ -73,7 +73,7 @@ func TestNewKeypairInspectCommand(t *testing.T) {
 		t.Fatalf("GenerateKeypair(): %v", err)
 	}
 
-	parent := NewKeypairCmd(&mockSecretsFactory{svc: manager})
+	parent := NewKeypairCommand(&mockSecretsFactory{svc: manager})
 	parent.PersistentFlags().String("config", manifest, "")
 	parent.SetArgs([]string{"inspect", "production", "--config", manifest})
 

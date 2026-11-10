@@ -15,8 +15,8 @@ const (
 	`
 )
 
-// NewKeypairCmd builds the "keypair" parent command and registers its subcommands.
-func NewKeypairCmd(factory Factory) *cobra.Command {
+// NewKeypairCommand builds the "keypair" parent command and registers its subcommands.
+func NewKeypairCommand(factory Factory) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   keypairUsage,
 		Short: keypairShort,

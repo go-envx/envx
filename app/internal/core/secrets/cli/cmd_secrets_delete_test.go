@@ -2,12 +2,13 @@ package cli
 
 import (
 	"bytes"
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 
-	"github.com/go-envx/envx/app/internal/features/secrets"
+	"github.com/go-envx/envx/app/internal/core/secrets"
 	"github.com/go-envx/envx/app/internal/lib/filex"
 	"github.com/go-envx/envx/app/internal/lib/printer"
 )
@@ -69,12 +70,9 @@ func TestExecuteDeleteRemovesStoredSecret(t *testing.T) {
 		)
 	}
 
-	exists, err := manager.Has("production", "database_password")
-	if err != nil {
-		t.Fatalf("Has(): %v", err)
-	}
-	if exists {
-		t.Error("DeleteSecret() left the removed secret in the store")
+	_, err = manager.GetSecret("production", "database_password")
+	if !errors.Is(err, secrets.ErrSecretNotFound) {
+		t.Errorf("GetSecret() after delete = %v, want ErrSecretNotFound", err)
 	}
 
 	data, err := filex.Read(secretsPathFor(manifest))
@@ -116,7 +114,7 @@ func TestOutputDeleteReportsKeyGroupAndStorePath(t *testing.T) {
 		printer.NewPlain(&out, &errOut),
 		secrets.DeleteSecretResult{
 			Location: "/workspace/secrets.yaml",
-			Secret: secrets.SecretReference{
+			Secret: secrets.Reference{
 				Group: "production",
 				Key:   "database_password",
 			},

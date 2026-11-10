@@ -63,15 +63,6 @@ func (s *Service) open(ref Reference, stored, privateKey string) (string, error)
 	return plaintext, nil
 }
 
-// mutated builds a mutation result located at the store.
-func (s *Service) mutated(changed []Reference, unavailable []string) MutationResult {
-	return MutationResult{
-		Location:          s.store.Location(),
-		Changed:           changed,
-		UnavailableGroups: unavailable,
-	}
-}
-
 // cloneGroup copies a snapshot's group so it can be edited as a replacement,
 // naming a new group when the snapshot does not exist.
 func (s *Service) cloneGroup(snap Snapshot, name string) Group {

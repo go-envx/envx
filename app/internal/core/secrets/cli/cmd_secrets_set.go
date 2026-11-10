@@ -3,10 +3,10 @@ package cli
 import (
 	"fmt"
 
-	"github.com/go-envx/envx/app/internal/features/secrets"
+	"github.com/go-envx/envx/app/internal/core/secrets"
+	workspacecli "github.com/go-envx/envx/app/internal/core/workspace/cli"
 	"github.com/go-envx/envx/app/internal/lib/printer"
 	"github.com/go-envx/envx/app/internal/lib/str"
-	"github.com/go-envx/envx/app/internal/shared/flags"
 	"github.com/spf13/cobra"
 )
 
@@ -44,11 +44,10 @@ func newSecretsSetCommand(f Factory) *cobra.Command {
 			}
 
 			// Extract command-line flag values.
-			fs := cmd.Flags()
-			configPath := flags.Config.Get(fs)
+			configPath := workspacecli.ConfigPath(cmd)
 
 			// Obtain the secrets service using the configuration path.
-			secretsService, err := f.SecretsService(configPath)
+			secretsService, err := f.NewSecretsService(configPath)
 			if err != nil {
 				return err
 			}
@@ -62,7 +61,7 @@ func newSecretsSetCommand(f Factory) *cobra.Command {
 				return newSecretPrompt(secretPromptParams{
 					Stdin:     cmd.InOrStdin(),
 					Stderr:    cmd.ErrOrStderr(),
-					NoConfirm: noConfirmFlag.Get(fs),
+					NoConfirm: noConfirmFlag.Value(cmd),
 				}).readSecret()
 			}
 
@@ -84,10 +83,7 @@ func newSecretsSetCommand(f Factory) *cobra.Command {
 	}
 
 	// Bind the command-line flags.
-	{
-		fs := cmd.Flags()
-		flags.Bind(fs, &noConfirmFlag)
-	}
+	noConfirmFlag.Bind(cmd)
 
 	return cmd
 }

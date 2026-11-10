@@ -3,10 +3,10 @@ package cli
 import (
 	"fmt"
 
-	"github.com/go-envx/envx/app/internal/features/secrets"
+	"github.com/go-envx/envx/app/internal/core/secrets"
+	workspacecli "github.com/go-envx/envx/app/internal/core/workspace/cli"
 	"github.com/go-envx/envx/app/internal/lib/printer"
 	"github.com/go-envx/envx/app/internal/lib/str"
-	"github.com/go-envx/envx/app/internal/shared/flags"
 	"github.com/spf13/cobra"
 )
 
@@ -38,11 +38,10 @@ func newSecretsDeleteCommand(f Factory) *cobra.Command {
 			key := args[1]
 
 			// Extract the configuration path from the command flags.
-			fs := cmd.Flags()
-			configPath := flags.Config.Get(fs)
+			configPath := workspacecli.ConfigPath(cmd)
 
 			// Obtain the secrets service using the configuration path.
-			secretsService, err := f.SecretsService(configPath)
+			secretsService, err := f.NewSecretsService(configPath)
 			if err != nil {
 				return err
 			}

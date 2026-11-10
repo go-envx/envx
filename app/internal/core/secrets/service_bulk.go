@@ -6,54 +6,74 @@ import (
 	"strings"
 )
 
+// EncryptSecretsResult reports the values encrypted in place.
+type EncryptSecretsResult struct {
+	// Location identifies the store that was changed.
+	Location string
+	// Secrets lists the references whose values were encrypted.
+	Secrets []Reference
+}
+
+// DecryptSecretsResult reports the values decrypted in place and the groups
+// skipped for lack of a private key.
+type DecryptSecretsResult struct {
+	// Location identifies the store that was changed.
+	Location string
+	// Secrets lists the references whose values were decrypted.
+	Secrets []Reference
+	// UnavailableGroups lists groups skipped because no private key was found.
+	UnavailableGroups []string
+}
+
 // transform returns a selected value's replacement and whether it changed.
 type transform func(snap *Snapshot, ref Reference, stored string) (string, bool, error)
 
-// Selection narrows bulk operations. Empty selects every group and key.
-type Selection struct {
-	// Group limits the operation to one group; empty selects all groups.
-	Group string
-	// Key limits the operation to one key and requires Group.
-	Key string
+// selection narrows bulk operations. Empty selects every group and key.
+type selection struct {
+	// group limits the operation to one group; empty selects all groups.
+	group string
+	// key limits the operation to one key and requires group.
+	key string
 }
 
 // normalized validates s and returns it with a lowercase group.
-func (s Selection) normalized() (Selection, error) {
-	if s.Group != "" {
-		group, err := NormalizeGroup(s.Group)
+func (s selection) normalized() (selection, error) {
+	if s.group != "" {
+		group, err := NormalizeGroup(s.group)
 		if err != nil {
-			return Selection{}, err
+			return selection{}, err
 		}
-		s.Group = group
+		s.group = group
 	}
-	if s.Key != "" {
-		if s.Group == "" {
-			return Selection{}, errors.New("selecting a secret key requires a group")
+	if s.key != "" {
+		if s.group == "" {
+			return selection{}, errors.New("selecting a secret key requires a group")
 		}
-		if err := ValidateKey(s.Key); err != nil {
-			return Selection{}, err
+		if err := ValidateKey(s.key); err != nil {
+			return selection{}, err
 		}
 	}
 	return s, nil
 }
 
 // explicit reports whether the selection narrows the store, so it must match.
-func (s Selection) explicit() bool {
-	return s.Group != ""
+func (s selection) explicit() bool {
+	return s.group != ""
 }
 
 // noMatch reports an explicit selection that matched no stored value.
-func (s Selection) noMatch() error {
-	if s.Key != "" {
-		return fmt.Errorf("no secret %q found in group %q", s.Key, s.Group)
+func (s selection) noMatch() error {
+	if s.key != "" {
+		return fmt.Errorf("no secret %q found in group %q", s.key, s.group)
 	}
-	return fmt.Errorf("no secrets found in group %q", s.Group)
+	return fmt.Errorf("no secrets found in group %q", s.group)
 }
 
-// Encrypt encrypts selected plaintext values in place. Values that are already
-// encrypted are skipped, and every group is staged before any commit.
-func (s *Service) Encrypt(selection Selection) (MutationResult, error) {
-	return s.bulk(selection, func(
+// EncryptSecrets encrypts plaintext values in place. An empty group selects
+// every group; a key requires a group. Values that are already encrypted are
+// skipped, and every group is staged before any commit.
+func (s *Service) EncryptSecrets(group, key string) (EncryptSecretsResult, error) {
+	changed, err := s.bulk(selection{group: group, key: key}, func(
 		snap *Snapshot, ref Reference, stored string,
 	) (string, bool, error) {
 		if isEnvelope(stored) {
@@ -65,14 +85,16 @@ func (s *Service) Encrypt(selection Selection) (MutationResult, error) {
 		sealed, err := s.seal(ref, stored, snap.Group.PublicKey)
 		return sealed, err == nil, err
 	})
+	return EncryptSecretsResult{Location: s.store.Location(), Secrets: changed}, err
 }
 
-// Decrypt decrypts selected ciphertext values in place. Groups without an
-// available private key are skipped and reported as unavailable.
-func (s *Service) Decrypt(selection Selection) (MutationResult, error) {
+// DecryptSecrets decrypts ciphertext values in place. An empty group selects
+// every group; a key requires a group. Groups without an available private key
+// are skipped and reported as unavailable.
+func (s *Service) DecryptSecrets(group, key string) (DecryptSecretsResult, error) {
 	keys := make(map[string]string)
 	var unavailable []string
-	result, err := s.bulk(selection, func(
+	changed, err := s.bulk(selection{group: group, key: key}, func(
 		snap *Snapshot, ref Reference, stored string,
 	) (string, bool, error) {
 		if !isEnvelope(stored) {
@@ -98,22 +120,25 @@ func (s *Service) Decrypt(selection Selection) (MutationResult, error) {
 		plaintext, err := s.open(ref, stored, key)
 		return plaintext, err == nil, err
 	})
-	result.UnavailableGroups = unavailable
-	return result, err
+	return DecryptSecretsResult{
+		Location:          s.store.Location(),
+		Secrets:           changed,
+		UnavailableGroups: unavailable,
+	}, err
 }
 
 // bulk applies apply to every selected value, staging all groups in memory
 // before committing any of them. Each group commits atomically; when a later
-// commit fails, the result still reports the references already committed.
+// commit fails, the references already committed are still returned.
 // An explicit selection must match a value.
-func (s *Service) bulk(selection Selection, apply transform) (MutationResult, error) {
-	sel, err := selection.normalized()
+func (s *Service) bulk(sel selection, apply transform) ([]Reference, error) {
+	sel, err := sel.normalized()
 	if err != nil {
-		return MutationResult{}, err
+		return nil, err
 	}
 	snaps, err := s.store.List()
 	if err != nil {
-		return MutationResult{}, err
+		return nil, err
 	}
 
 	type commit struct {
@@ -129,20 +154,20 @@ func (s *Service) bulk(selection Selection, apply transform) (MutationResult, er
 	for i := range snaps {
 		snap := &snaps[i]
 		group := strings.ToLower(snap.Group.Name)
-		if sel.Group != "" && sel.Group != group {
+		if sel.group != "" && sel.group != group {
 			continue
 		}
 		replacement := s.cloneGroup(*snap, group)
 		var refs []Reference
 		for _, key := range s.sortedKeys(snap.Group.Values) {
-			if sel.Key != "" && sel.Key != key {
+			if sel.key != "" && sel.key != key {
 				continue
 			}
 			matched = true
 			ref := Reference{Group: group, Key: key}
 			updated, ok, err := apply(snap, ref, snap.Group.Values[key])
 			if err != nil {
-				return MutationResult{}, err
+				return nil, err
 			}
 			if ok {
 				replacement.Values[key] = updated
@@ -154,18 +179,18 @@ func (s *Service) bulk(selection Selection, apply transform) (MutationResult, er
 		}
 	}
 	if sel.explicit() && !matched {
-		return MutationResult{}, sel.noMatch()
+		return nil, sel.noMatch()
 	}
 
 	var changed []Reference
 	for i := range commits {
 		c := &commits[i]
 		if err := s.store.Commit(c.expected, c.replacement); err != nil {
-			return s.mutated(changed, nil), fmt.Errorf(
+			return changed, fmt.Errorf(
 				"saving secrets for group %q: %w", c.replacement.Name, err,
 			)
 		}
 		changed = append(changed, c.refs...)
 	}
-	return s.mutated(changed, nil), nil
+	return changed, nil
 }

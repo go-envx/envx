@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/go-envx/envx/app/internal/features/secrets"
+	"github.com/go-envx/envx/app/internal/core/secrets"
 	"github.com/go-envx/envx/app/internal/lib/filex"
 	"github.com/go-envx/envx/app/internal/lib/printer"
 )
@@ -103,7 +103,7 @@ func TestOutputDecryptReportsDecryptedCount(t *testing.T) {
 	err := outputSecretsDecrypt(
 		printer.NewPlain(&out, &errOut),
 		secrets.DecryptSecretsResult{
-			Secrets: []secrets.SecretReference{
+			Secrets: []secrets.Reference{
 				{Group: "production", Key: "database_password"},
 			},
 			Location: "/workspace/secrets.yaml",
@@ -133,7 +133,7 @@ type mockSecretsFactory struct {
 	err error
 }
 
-func (m *mockSecretsFactory) SecretsService(
+func (m *mockSecretsFactory) NewSecretsService(
 	_ string,
 ) (*secrets.Service, error) {
 	return m.svc, m.err

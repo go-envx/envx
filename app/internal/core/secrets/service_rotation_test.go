@@ -28,14 +28,14 @@ func TestRotateReencryptsAndRetainsOldKey(t *testing.T) {
 		t.Errorf("public key not replaced")
 	}
 	want := []secrets.Reference{{Group: "api", Key: "A"}, {Group: "api", Key: "B"}}
-	if !slices.Equal(res.Reencrypted, want) {
-		t.Errorf("Reencrypted = %v, want %v", res.Reencrypted, want)
+	if !slices.Equal(res.Secrets, want) {
+		t.Errorf("Secrets = %v, want %v", res.Secrets, want)
 	}
 	if f.keys.byPublic["api"][oldPublic] != oldPrivate {
 		t.Error("old private key was not retained")
 	}
 	for key, plaintext := range map[string]string{"A": "1", "B": "2"} {
-		got, err := f.service.Get(secrets.Reference{Group: "api", Key: key})
+		got, err := f.service.GetSecret("api", key)
 		if err != nil || got.Value != plaintext {
 			t.Errorf("Get %s after rotation = %q, %v", key, got.Value, err)
 		}

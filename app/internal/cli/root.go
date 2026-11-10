@@ -51,14 +51,14 @@ func NewRootCmd(info BuildInfo) (*cobra.Command, error) {
 	root.AddCommand(
 		scaffoldcli.NewCreateCommand(app.Factory{}),
 		envcli.NewGetCommand(appFactory),
-		secretscli.NewKeypairCmd(appFactory),
+		secretscli.NewKeypairCommand(app.Factory{}),
 		packcli.NewPackCommand(app.Factory{}),
 		envcli.NewRunCommand(appFactory),
 		envcli.NewSetCommand(appFactory),
 		envcli.NewExplainCommand(appFactory),
 		envcli.NewEmitCommand(appFactory),
 		envcli.NewDiffCommand(appFactory),
-		secretscli.NewSecretsCommand(appFactory),
+		secretscli.NewSecretsCommand(app.Factory{}),
 		validatecli.NewValidateCommand(app.Factory{}),
 	)
 	return root, nil

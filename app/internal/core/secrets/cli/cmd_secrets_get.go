@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"io"
 
+	workspacecli "github.com/go-envx/envx/app/internal/core/workspace/cli"
 	"github.com/go-envx/envx/app/internal/lib/str"
-	"github.com/go-envx/envx/app/internal/shared/flags"
 	"github.com/spf13/cobra"
 )
 
@@ -37,11 +37,10 @@ func newSecretsGetCommand(f Factory) *cobra.Command {
 			key := args[1]
 
 			// Extract the configuration path from the command flags.
-			fs := cmd.Flags()
-			configPath := flags.Config.Get(fs)
+			configPath := workspacecli.ConfigPath(cmd)
 
 			// Obtain the secrets service using the configuration path.
-			secretsService, err := f.SecretsService(configPath)
+			secretsService, err := f.NewSecretsService(configPath)
 			if err != nil {
 				return err
 			}
