@@ -12,6 +12,7 @@ import (
 	"github.com/go-envx/envx/app/internal/core/secrets/filestore"
 	"github.com/go-envx/envx/app/internal/lib/filex"
 	"github.com/go-envx/envx/app/internal/lib/str"
+	"github.com/go-envx/envx/app/internal/testutil"
 )
 
 const (
@@ -118,13 +119,7 @@ func TestCommitTightensPermissions(t *testing.T) {
 	if err := repo.Commit(snap, snap.Group); err != nil {
 		t.Fatalf("Commit: %v", err)
 	}
-	info, err := os.Stat(path)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if info.Mode().Perm() != 0o600 {
-		t.Errorf("mode = %v, want 0600", info.Mode().Perm())
-	}
+	testutil.AssertPerm(t, path, 0o600)
 }
 
 // TestCommitUsesIgnoredDirectoryLock verifies commits lock through a

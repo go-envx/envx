@@ -1,5 +1,12 @@
 version: '3'
 
+vars:
+  # The race detector needs cgo, which Go disables when no C compiler is found.
+  RACE:
+    sh: go env CGO_ENABLED
+  RACE_FLAG: '{{if eq .RACE "1"}}-race{{end}}'
+  INSTALL_DIR: '{{if eq OS "windows"}}{{.LOCALAPPDATA}}/Programs/envx{{else}}{{.HOME}}/.local/bin{{end}}'
+
 tasks:
   all:
     desc: 'Run the full pipeline in series: check, test, build, install'
@@ -17,12 +24,12 @@ tasks:
   build:
     desc: Build the CLI binary
     cmds:
-      - go build -o bin/envx ./cmd/envx
+      - go build -o bin/envx{{exeExt}} ./cmd/envx
 
   install:
-    desc: Install the CLI to ~/.local/bin (on PATH, stable across Go versions)
+    desc: 'Install the CLI to ~/.local/bin (Windows: %LOCALAPPDATA%\Programs\envx); add it to PATH'
     cmds:
-      - go build -o "$HOME/.local/bin/envx" ./cmd/envx
+      - go build -o "{{.INSTALL_DIR}}/envx{{exeExt}}" ./cmd/envx
 
   test:
     desc: Run the entire test suite for the CLI (unit and e2e)
@@ -33,12 +40,12 @@ tasks:
   test:unit:
     desc: Run unit tests for the CLI
     cmds:
-      - go test -race -coverpkg=./... -coverprofile=coverage.out ./...
+      - go test {{.RACE_FLAG}} -coverpkg=./... -coverprofile=coverage.out ./...
 
   test:e2e:
     desc: Run end-to-end integration tests for the CLI
     cmds:
-      - go test -race -tags=e2e ./test/...
+      - go test {{.RACE_FLAG}} -tags=e2e ./test/...
 
   check:
     desc: Run formatting, static analysis, and vulnerability scanning

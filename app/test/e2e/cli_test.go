@@ -133,10 +133,10 @@ func TestRun(t *testing.T) {
 	t.Parallel()
 
 	cfg := basicWorkspace(t)
-	res := mustEnvx(t, nil,
+	res := mustEnvx(t, nil, append([]string{
 		"run", "--config", cfg, "--env", "development", "--overload",
-		"api-core", "--", "printenv", "APP_NAME",
-	)
+		"api-core", "--",
+	}, helper(t, "printenv", "APP_NAME")...)...)
 	if got := strings.TrimSpace(res.stdout); got != "api-core" {
 		t.Errorf("child APP_NAME = %q, want api-core", got)
 	}

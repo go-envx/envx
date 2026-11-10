@@ -280,13 +280,7 @@ func TestEmitCommandWritesFile(t *testing.T) {
 	if !strings.Contains(string(data), "APP_NAME=myapp\n") {
 		t.Errorf("output file missing APP_NAME:\n%s", data)
 	}
-	info, err := os.Stat(outPath)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if perm := info.Mode().Perm(); perm != 0o600 {
-		t.Errorf("output file mode = %o, want 600", perm)
-	}
+	testutil.AssertPerm(t, outPath, 0o600)
 
 	configPath := filepath.Join(dir, "config.json")
 	stdout, stderr, err = executeEmit(

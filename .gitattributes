@@ -1,5 +1,5 @@
-# Ensure consistent line endings
-* text=auto
+# Ensure consistent line endings; LF everywhere keeps goldens and gofumpt stable on Windows
+* text=auto eol=lf
 
 # Explicitly define line endings for common file types
 *.css text eol=lf

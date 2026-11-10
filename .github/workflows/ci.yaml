@@ -84,15 +84,23 @@ jobs:
           install_args: go golangci-lint task
       - name: Run checks
         run: task check
+      - name: Lint for macOS and Windows
+        run: |
+          GOOS=darwin golangci-lint run
+          GOOS=windows golangci-lint run
 
   # ─────────────────────────────────────────────────────────────
-  # Test: Run the test suite
+  # Test: Run the test suite on every supported OS
   # ─────────────────────────────────────────────────────────────
   test:
-    name: Test
+    name: Test (${{ matrix.os }})
     needs: changes
     if: needs.changes.outputs.app == 'true'
-    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
     defaults:
       run:
         working-directory: app
@@ -106,6 +114,7 @@ jobs:
       - name: Run tests
         run: task test
       - name: Upload coverage
+        if: matrix.os == 'ubuntu-latest'
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: coverage

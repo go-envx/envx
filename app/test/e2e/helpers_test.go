@@ -9,7 +9,10 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"os/signal"
 	"path/filepath"
+	"runtime"
+	"strconv"
 	"syscall"
 	"testing"
 	"time"
@@ -25,6 +28,8 @@ const (
 	commandTimeout = 30 * time.Second
 	// waitDelay bounds draining output after an invocation is killed.
 	waitDelay = 5 * time.Second
+	// helperArg makes the test binary act as a portable child command.
+	helperArg = "-envx-e2e-helper"
 )
 
 // envxPath is the binary built once by TestMain for the whole suite.
@@ -40,9 +45,48 @@ type result struct {
 	code int
 }
 
-// TestMain builds the envx binary once, runs the suite, and removes the build.
+// TestMain dispatches helper invocations, otherwise builds the envx binary
+// once, runs the suite, and removes the build.
 func TestMain(m *testing.M) {
+	if len(os.Args) > 2 && os.Args[1] == helperArg {
+		os.Exit(runHelper(os.Args[2], os.Args[3:]))
+	}
 	os.Exit(runSuite(m))
+}
+
+// runHelper implements the child commands envx runs in tests: printenv KEY,
+// exit CODE, and await-term (prints "ready", exits 42 on SIGTERM).
+func runHelper(name string, args []string) int {
+	switch name {
+	case "printenv":
+		value, ok := os.LookupEnv(args[0])
+		if !ok {
+			return 1
+		}
+		fmt.Println(value)
+	case "exit":
+		code, _ := strconv.Atoi(args[0])
+		return code
+	case "await-term":
+		term := make(chan os.Signal, 1)
+		signal.Notify(term, syscall.SIGTERM)
+		fmt.Println("ready")
+		<-term
+		return 42
+	default:
+		return 2
+	}
+	return 0
+}
+
+// helper returns the run arguments (after "--") that start a helper command.
+func helper(t *testing.T, args ...string) []string {
+	t.Helper()
+	self, err := os.Executable()
+	if err != nil {
+		t.Fatal(err)
+	}
+	return append([]string{self, helperArg}, args...)
 }
 
 // runSuite builds envx into a temporary directory and runs the tests against it.
@@ -55,6 +99,9 @@ func runSuite(m *testing.M) int {
 	defer func() { _ = os.RemoveAll(dir) }()
 
 	envxPath = filepath.Join(dir, "envx")
+	if runtime.GOOS == "windows" {
+		envxPath += ".exe"
+	}
 	ctx, cancel := context.WithTimeout(context.Background(), buildTimeout)
 	defer cancel()
 	build := exec.CommandContext(
@@ -73,8 +120,8 @@ func runSuite(m *testing.M) int {
 }
 
 // command prepares envx in its own process group with a controlled environment
-// (PATH, a scratch HOME, and env), a scratch working directory, and a deadline.
-// Cleanup kills the whole group so children never outlive the test. The
+// (baseEnv plus env), a scratch working directory, and a deadline. Cleanup
+// kills the whole process tree so children never outlive the test. The
 // returned context reports whether the deadline cut the invocation short.
 func command(
 	t *testing.T,
@@ -86,30 +133,15 @@ func command(
 	//nolint:gosec // the suite's own freshly built binary.
 	cmd := exec.CommandContext(ctx, envxPath, args...)
 	cmd.Dir = t.TempDir()
-	cmd.Env = append([]string{
-		"PATH=" + os.Getenv("PATH"),
-		"HOME=" + t.TempDir(),
-	}, env...)
-	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
-	cmd.Cancel = func() error { return killGroup(cmd) }
+	cmd.Env = append(baseEnv(t.TempDir()), env...)
+	isolate(cmd)
+	cmd.Cancel = func() error { return killTree(cmd.Process.Pid) }
 	cmd.WaitDelay = waitDelay
 	t.Cleanup(func() {
 		cancel()
-		_ = killGroup(cmd)
+		cleanupTree(cmd)
 	})
 	return cmd, ctx
-}
-
-// killGroup kills the process group led by a started command.
-func killGroup(cmd *exec.Cmd) error {
-	if cmd.Process == nil {
-		return nil
-	}
-	err := syscall.Kill(-cmd.Process.Pid, syscall.SIGKILL)
-	if errors.Is(err, syscall.ESRCH) {
-		return nil
-	}
-	return err
 }
 
 // envx runs the binary with args and the extra env entries and returns its

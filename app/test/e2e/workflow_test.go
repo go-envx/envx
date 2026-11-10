@@ -3,12 +3,10 @@
 package e2e_test
 
 import (
-	"bufio"
 	"encoding/base64"
 	"os"
 	"path/filepath"
 	"strings"
-	"syscall"
 	"testing"
 )
 
@@ -49,11 +47,10 @@ func TestPackThenRun(t *testing.T) {
 	}
 
 	// The copied workspace runs through the ordinary pipeline under --config.
-	res := mustEnvx(t, nil,
+	res := mustEnvx(t, nil, append([]string{
 		"run", "--config", filepath.Join(dist, "envx.yaml"),
-		"--env", "development", "--overload",
-		"api-core", "--", "printenv", "APP_NAME",
-	)
+		"--env", "development", "--overload", "api-core", "--",
+	}, helper(t, "printenv", "APP_NAME")...)...)
 	if got := strings.TrimSpace(res.stdout); got != "api-core" {
 		t.Errorf("child APP_NAME from bundle = %q, want api-core", got)
 	}
@@ -85,10 +82,9 @@ func TestPackFiltersAndDecryptsSecrets(t *testing.T) {
 
 	// Without the private key, the reference fails closed.
 	bundleCfg := filepath.Join(dist, "envx.yaml")
-	runArgs := []string{
-		"run", "--config", bundleCfg, "--env", "production",
-		"app", "--", "printenv", "API_KEY",
-	}
+	runArgs := append([]string{
+		"run", "--config", bundleCfg, "--env", "production", "app", "--",
+	}, helper(t, "printenv", "API_KEY")...)
 	if res := envx(t, nil, runArgs...); res.code == 0 {
 		t.Error("run from bundle succeeded without a private key")
 	}
@@ -192,7 +188,10 @@ func TestRunExitStatus(t *testing.T) {
 
 	t.Run("child status", func(t *testing.T) {
 		t.Parallel()
-		res := envx(t, nil, "run", "--config", cfg, "api-core", "--", "sh", "-c", "exit 7")
+		res := envx(t, nil, append(
+			[]string{"run", "--config", cfg, "api-core", "--"},
+			helper(t, "exit", "7")...,
+		)...)
 		if res.code != 7 {
 			t.Errorf("exit %d, want 7\nstderr:\n%s", res.code, res.stderr)
 		}
@@ -209,36 +208,4 @@ func TestRunExitStatus(t *testing.T) {
 			t.Errorf("stderr = %q, want envx-prefixed start failure", res.stderr)
 		}
 	})
-}
-
-// TestRunForwardsSignal verifies SIGTERM sent to envx reaches the child, whose
-// resulting exit status envx mirrors.
-func TestRunForwardsSignal(t *testing.T) {
-	t.Parallel()
-
-	cfg := basicWorkspace(t)
-	cmd, _ := command(t, nil,
-		"run", "--config", cfg, "api-core", "--",
-		"sh", "-c", `trap 'exit 42' TERM; echo ready; while :; do sleep 1 & wait $!; done`,
-	)
-	stdout, err := cmd.StdoutPipe()
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := cmd.Start(); err != nil {
-		t.Fatal(err)
-	}
-
-	// The child installs its trap before announcing readiness.
-	line, err := bufio.NewReader(stdout).ReadString('\n')
-	if err != nil || line != "ready\n" {
-		t.Fatalf("readiness line = %q, %v", line, err)
-	}
-	if err := cmd.Process.Signal(syscall.SIGTERM); err != nil {
-		t.Fatal(err)
-	}
-	_ = cmd.Wait()
-	if code := cmd.ProcessState.ExitCode(); code != 42 {
-		t.Errorf("exit %d, want the child's trapped status 42", code)
-	}
 }

@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/go-envx/envx/app/internal/lib/atomicfile"
+	"github.com/go-envx/envx/app/internal/testutil"
 )
 
 func TestWriteCreates(t *testing.T) {
@@ -29,13 +30,7 @@ func TestWriteCreates(t *testing.T) {
 		t.Errorf("contents = %q, want %q", got, want)
 	}
 
-	info, err := os.Stat(target)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if perm := info.Mode().Perm(); perm != 0o644 {
-		t.Errorf("permissions = %o, want 644", perm)
-	}
+	testutil.AssertPerm(t, target, 0o644)
 }
 
 func TestWriteOverwritesPreservingPermissions(t *testing.T) {
@@ -64,13 +59,7 @@ func TestWriteOverwritesPreservingPermissions(t *testing.T) {
 		t.Errorf("contents = %q, want %q", got, "new")
 	}
 
-	info, err := os.Stat(target)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if perm := info.Mode().Perm(); perm != 0o640 {
-		t.Errorf("permissions = %o, want 640", perm)
-	}
+	testutil.AssertPerm(t, target, 0o640)
 
 	entries, err := os.ReadDir(dir)
 	if err != nil {
@@ -91,13 +80,7 @@ func TestWritePrivateCreates(t *testing.T) {
 		t.Fatalf("WritePrivate: %v", err)
 	}
 
-	info, err := os.Stat(target)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if perm := info.Mode().Perm(); perm != 0o600 {
-		t.Errorf("permissions = %o, want 600", perm)
-	}
+	testutil.AssertPerm(t, target, 0o600)
 }
 
 func TestWritePrivateOverwrites(t *testing.T) {
@@ -117,13 +100,7 @@ func TestWritePrivateOverwrites(t *testing.T) {
 		t.Fatalf("WritePrivate: %v", err)
 	}
 
-	info, err := os.Stat(target)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if perm := info.Mode().Perm(); perm != 0o600 {
-		t.Errorf("permissions = %o, want 600", perm)
-	}
+	testutil.AssertPerm(t, target, 0o600)
 }
 
 func TestWriteAtomicAliases(t *testing.T) {
@@ -135,23 +112,11 @@ func TestWriteAtomicAliases(t *testing.T) {
 	if err := atomicfile.WriteAtomic(target, []byte("public")); err != nil {
 		t.Fatalf("WriteAtomic: %v", err)
 	}
-	info, err := os.Stat(target)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if perm := info.Mode().Perm(); perm != 0o644 {
-		t.Errorf("permissions = %o, want 644", perm)
-	}
+	testutil.AssertPerm(t, target, 0o644)
 
 	privateTarget := filepath.Join(dir, "private_alias.dat")
 	if err := atomicfile.WriteAtomicPrivate(privateTarget, []byte("priv")); err != nil {
 		t.Fatalf("WriteAtomicPrivate: %v", err)
 	}
-	infoPriv, err := os.Stat(privateTarget)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if perm := infoPriv.Mode().Perm(); perm != 0o600 {
-		t.Errorf("permissions = %o, want 600", perm)
-	}
+	testutil.AssertPerm(t, privateTarget, 0o600)
 }

@@ -6,6 +6,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/go-envx/envx/app/internal/testutil"
 )
 
 func TestEnsureIgnoredRejectsEmptyPath(t *testing.T) {
@@ -74,14 +76,7 @@ func TestEnsureIgnoredAppendsToExistingWithoutTrailingNewline(t *testing.T) {
 		t.Errorf(".gitignore = %q, want %q", string(data), expected)
 	}
 
-	// Verify permissions were preserved (0600).
-	info, err := os.Stat(ignoreFile)
-	if err != nil {
-		t.Fatalf("Stat(.gitignore): %v", err)
-	}
-	if perm := info.Mode().Perm(); perm != 0o600 {
-		t.Errorf(".gitignore perm = %o, want %o", perm, 0o600)
-	}
+	testutil.AssertPerm(t, ignoreFile, 0o600)
 }
 
 func TestEnsureIgnoredSkipsWhenAlreadyIgnoredWithSlash(t *testing.T) {

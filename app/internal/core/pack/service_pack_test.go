@@ -6,13 +6,13 @@ import (
 	"maps"
 	"os"
 	"path/filepath"
-	"runtime"
 	"slices"
 	"strings"
 	"testing"
 
 	"github.com/go-envx/envx/app/internal/core/secrets"
 	"github.com/go-envx/envx/app/internal/core/workspace"
+	"github.com/go-envx/envx/app/internal/testutil"
 )
 
 // TestPackWritesPerProjectDirectories verifies each project's selected files
@@ -274,15 +274,7 @@ func TestPackFiltersSecrets(t *testing.T) {
 	if got := readFile(t, out, "secrets.yaml"); got != want {
 		t.Errorf("bundled store = %q, want %q", got, want)
 	}
-	if runtime.GOOS != "windows" {
-		info, err := os.Stat(filepath.Join(out, "secrets.yaml"))
-		if err != nil {
-			t.Fatal(err)
-		}
-		if perm := info.Mode().Perm(); perm != 0o600 {
-			t.Errorf("store mode = %v, want 0600", perm)
-		}
-	}
+	testutil.AssertPerm(t, filepath.Join(out, "secrets.yaml"), 0o600)
 }
 
 // TestPackOmitsStore verifies no store is written without a source store or

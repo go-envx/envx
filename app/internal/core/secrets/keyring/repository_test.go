@@ -11,6 +11,7 @@ import (
 	"github.com/go-envx/envx/app/internal/core/secrets/keyring"
 	"github.com/go-envx/envx/app/internal/lib/crypt"
 	"github.com/go-envx/envx/app/internal/lib/filex"
+	"github.com/go-envx/envx/app/internal/testutil"
 )
 
 // env returns a lookup function over vars.
@@ -153,13 +154,7 @@ func TestRetainPreservesExistingKeys(t *testing.T) {
 			t.Errorf("key file lost %q:\n%s", line, content)
 		}
 	}
-	info, err := os.Stat(path)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if info.Mode().Perm() != 0o600 {
-		t.Errorf("mode = %v, want 0600", info.Mode().Perm())
-	}
+	testutil.AssertPerm(t, path, 0o600)
 
 	tests := []struct{ publicKey, want string }{
 		{"pub-new", "new-key"},
