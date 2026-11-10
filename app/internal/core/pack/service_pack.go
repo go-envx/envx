@@ -11,8 +11,8 @@ import (
 	"github.com/go-envx/envx/app/internal/lib/filex"
 )
 
-// Params are the caller's selections and destination.
-type Params struct {
+// PackParams are the caller's selections and destination.
+type PackParams struct {
 	// Projects selects the projects to bundle; empty selects every project.
 	Projects []string
 	// Environments selects the overlays to bundle; empty selects every
@@ -24,8 +24,8 @@ type Params struct {
 	Force bool
 }
 
-// Result reports what a completed pack published.
-type Result struct {
+// PackResult reports what a completed pack published.
+type PackResult struct {
 	// OutDir is the absolute destination.
 	OutDir string
 	// ManifestFile is the bundle-relative manifest filename.
@@ -42,38 +42,38 @@ type Result struct {
 // destination is refused unless params.Force is set; a destination that is or
 // contains a source is always refused. Nothing is published unless every read
 // and write succeeds, and a replaced destination survives a failed swap.
-func (s *Service) Pack(params Params) (Result, error) {
+func (s *Service) Pack(params PackParams) (PackResult, error) {
 	if strings.TrimSpace(params.OutDir) == "" {
-		return Result{}, ErrOutputRequired
+		return PackResult{}, ErrOutputRequired
 	}
 	outDir, err := filepath.Abs(params.OutDir)
 	if err != nil {
-		return Result{}, fmt.Errorf(
+		return PackResult{}, fmt.Errorf(
 			"resolving output directory %q: %w", params.OutDir, err,
 		)
 	}
 	if !params.Force {
 		if err := ensureOutDirEmpty(outDir); err != nil {
-			return Result{}, err
+			return PackResult{}, err
 		}
 	}
 
 	if len(s.environments) == 0 {
-		return Result{}, ErrNoEnvironments
+		return PackResult{}, ErrNoEnvironments
 	}
 	environments, err := selectDeclared(
 		s.environments, params.Environments,
 		func(name string) string { return name }, ErrEnvironmentNotDeclared,
 	)
 	if err != nil {
-		return Result{}, err
+		return PackResult{}, err
 	}
 	projects, err := selectDeclared(
 		s.projects, params.Projects,
 		func(p project) string { return p.name }, ErrProjectNotDeclared,
 	)
 	if err != nil {
-		return Result{}, err
+		return PackResult{}, err
 	}
 
 	hasStore := s.secretsPath != "" && exists(s.secretsPath)
@@ -83,42 +83,42 @@ func (s *Service) Pack(params Params) (Result, error) {
 	}
 	dirs, err := assignProjectDirs(projects, reserved)
 	if err != nil {
-		return Result{}, err
+		return PackResult{}, err
 	}
 	bundles, err := planProjects(projects, environments, dirs)
 	if err != nil {
-		return Result{}, err
+		return PackResult{}, err
 	}
 	if err := s.ensureOutsideSources(outDir); err != nil {
-		return Result{}, err
+		return PackResult{}, err
 	}
 	var b bundle
 	if b.items, err = planFiles(bundles); err != nil {
-		return Result{}, err
+		return PackResult{}, err
 	}
 
 	manifest, err := filex.Read(s.manifestPath)
 	if err != nil {
-		return Result{}, fmt.Errorf("reading manifest %s: %w", s.manifestPath, err)
+		return PackResult{}, fmt.Errorf("reading manifest %s: %w", s.manifestPath, err)
 	}
 	if b.manifest, err = rewriteManifest(manifest, bundles); err != nil {
-		return Result{}, err
+		return PackResult{}, err
 	}
 	if hasStore {
 		if b.store, err = s.exportSecrets(b.items); err != nil {
-			return Result{}, err
+			return PackResult{}, err
 		}
 	}
 
 	if err := stage(outDir, b, params.Force); err != nil {
-		return Result{}, err
+		return PackResult{}, err
 	}
 
 	names := make([]string, len(projects))
 	for i, p := range projects {
 		names[i] = p.name
 	}
-	return Result{
+	return PackResult{
 		OutDir:       outDir,
 		ManifestFile: bundleManifestName,
 		Files:        b.files(),

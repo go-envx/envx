@@ -98,7 +98,7 @@ func (f *fixture) service(t *testing.T) *Service {
 }
 
 // pack runs Pack and fails the test on error.
-func (f *fixture) pack(t *testing.T, params Params) Result {
+func (f *fixture) pack(t *testing.T, params PackParams) PackResult {
 	t.Helper()
 	result, err := f.service(t).Pack(params)
 	if err != nil {

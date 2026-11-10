@@ -5,10 +5,10 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/go-envx/envx/app/internal/features/pack"
+	"github.com/go-envx/envx/app/internal/core/pack"
+	workspacecli "github.com/go-envx/envx/app/internal/core/workspace/cli"
 	"github.com/go-envx/envx/app/internal/lib/printer"
 	"github.com/go-envx/envx/app/internal/lib/str"
-	"github.com/go-envx/envx/app/internal/shared/flags"
 	"github.com/spf13/cobra"
 )
 
@@ -61,15 +61,14 @@ func NewPackCommand(f Factory) *cobra.Command {
 		Args:    cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			// Extract command-line flag values.
-			fs := cmd.Flags()
-			configPath := flags.Config.Get(fs)
-			environments := envFlag.Get(fs)
-			projects := projectFlag.Get(fs)
-			out := outFlag.Get(fs)
-			force := forceFlag.Get(fs)
+			configPath := workspacecli.ConfigPath(cmd)
+			environments := envFlag.Value(cmd)
+			projects := projectFlag.Value(cmd)
+			out := outFlag.Value(cmd)
+			force := forceFlag.Value(cmd)
 
 			// Obtain the pack service using the configuration path.
-			packService, err := f.PackService(configPath)
+			packService, err := f.NewPackService(configPath)
 			if err != nil {
 				return err
 			}
@@ -98,14 +97,11 @@ func NewPackCommand(f Factory) *cobra.Command {
 	}
 
 	// Bind the command-line flags.
-	{
-		fs := cmd.Flags()
-		flags.Bind(fs, &outFlag)
-		flags.Bind(fs, &envFlag)
-		flags.Bind(fs, &projectFlag)
-		flags.Bind(fs, &forceFlag)
-		_ = cmd.MarkFlagRequired(outFlag.Name)
-	}
+	outFlag.Bind(cmd)
+	envFlag.Bind(cmd)
+	projectFlag.Bind(cmd)
+	forceFlag.Bind(cmd)
+	_ = cmd.MarkFlagRequired(outFlag.Name)
 
 	return cmd
 }

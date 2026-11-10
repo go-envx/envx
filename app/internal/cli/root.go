@@ -52,7 +52,7 @@ func NewRootCmd(info BuildInfo) (*cobra.Command, error) {
 		scaffoldcli.NewCreateCommand(app.Factory{}),
 		envcli.NewGetCommand(appFactory),
 		secretscli.NewKeypairCmd(appFactory),
-		packcli.NewPackCommand(appFactory),
+		packcli.NewPackCommand(app.Factory{}),
 		envcli.NewRunCommand(appFactory),
 		envcli.NewSetCommand(appFactory),
 		envcli.NewExplainCommand(appFactory),

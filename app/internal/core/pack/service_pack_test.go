@@ -24,7 +24,7 @@ func TestPackWritesPerProjectDirectories(t *testing.T) {
 	f.write(t, "envx.keys", "shared: PRIVATE\n")
 	out := filepath.Join(t.TempDir(), "dist")
 
-	result := f.pack(t, Params{Environments: []string{"production"}, OutDir: out})
+	result := f.pack(t, PackParams{Environments: []string{"production"}, OutDir: out})
 
 	want := []string{
 		"api/api.yaml",
@@ -58,7 +58,7 @@ func TestPackRewritesManifestIncludes(t *testing.T) {
 	f := newSampleFixture(t)
 	out := filepath.Join(t.TempDir(), "dist")
 
-	f.pack(t, Params{OutDir: out})
+	f.pack(t, PackParams{OutDir: out})
 
 	projects := manifestProjects(t, out)
 	if got := projects["api"]; !slices.Equal(got, []string{"api/app", "api/api"}) {
@@ -139,7 +139,7 @@ func TestPackNamesFiles(t *testing.T) {
 			}
 			out := filepath.Join(t.TempDir(), "dist")
 
-			f.pack(t, Params{OutDir: out})
+			f.pack(t, PackParams{OutDir: out})
 
 			got := manifestProjects(t, out)
 			if !maps.EqualFunc(got, tt.want, slices.Equal[[]string]) {
@@ -162,7 +162,7 @@ func TestPackSelectsEnvironmentsAndProjects(t *testing.T) {
 		t.Parallel()
 		f := newSampleFixture(t)
 		out := filepath.Join(t.TempDir(), "dist")
-		result := f.pack(t, Params{OutDir: out})
+		result := f.pack(t, PackParams{OutDir: out})
 		if !slices.Equal(result.Environments, []string{"development", "production"}) {
 			t.Errorf("environments = %v, want all declared", result.Environments)
 		}
@@ -174,7 +174,7 @@ func TestPackSelectsEnvironmentsAndProjects(t *testing.T) {
 		t.Parallel()
 		f := newSampleFixture(t)
 		out := filepath.Join(t.TempDir(), "dist")
-		result := f.pack(t, Params{
+		result := f.pack(t, PackParams{
 			Environments: []string{"production", "development"},
 			OutDir:       out,
 		})
@@ -186,7 +186,7 @@ func TestPackSelectsEnvironmentsAndProjects(t *testing.T) {
 		t.Parallel()
 		f := newSampleFixture(t)
 		out := filepath.Join(t.TempDir(), "dist")
-		f.pack(t, Params{Projects: []string{"web"}, OutDir: out})
+		f.pack(t, PackParams{Projects: []string{"web"}, OutDir: out})
 		present(t, out, "web/app.yaml")
 		absent(t, out, "api")
 		got := manifestProjects(t, out)
@@ -202,19 +202,19 @@ func TestPackRejectsInvalidRequests(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
 		name   string
-		params Params
+		params PackParams
 		want   error
 	}{
-		{"no output", Params{}, ErrOutputRequired},
+		{"no output", PackParams{}, ErrOutputRequired},
 		{
 			"unknown environment",
-			Params{Environments: []string{"ghost"}},
+			PackParams{Environments: []string{"ghost"}},
 			ErrEnvironmentNotDeclared,
 		},
-		{"unknown project", Params{Projects: []string{"nope"}}, ErrProjectNotDeclared},
+		{"unknown project", PackParams{Projects: []string{"nope"}}, ErrProjectNotDeclared},
 		{
 			"unknown environment with force",
-			Params{Environments: []string{"ghost"}, Force: true},
+			PackParams{Environments: []string{"ghost"}, Force: true},
 			ErrEnvironmentNotDeclared,
 		},
 	}
@@ -243,7 +243,7 @@ func TestPackFailsOnEmptyInclude(t *testing.T) {
 	f := newSampleFixture(t)
 	f.project("typo", "env/missing")
 
-	_, err := f.service(t).Pack(Params{OutDir: filepath.Join(t.TempDir(), "dist")})
+	_, err := f.service(t).Pack(PackParams{OutDir: filepath.Join(t.TempDir(), "dist")})
 	if err == nil || !strings.Contains(err.Error(), "env/missing") {
 		t.Fatalf("err = %v, want an empty-include error", err)
 	}
@@ -268,7 +268,7 @@ func TestPackFiltersSecrets(t *testing.T) {
 	}))
 	out := filepath.Join(t.TempDir(), "dist")
 
-	f.pack(t, Params{OutDir: out})
+	f.pack(t, PackParams{OutDir: out})
 
 	want := "Shared/alpha=a0\nShared/beta=b0\n"
 	if got := readFile(t, out, "secrets.yaml"); got != want {
@@ -297,7 +297,7 @@ func TestPackOmitsStore(t *testing.T) {
 		}
 		f.store.readErr = errors.New("store must not be read")
 		out := filepath.Join(t.TempDir(), "dist")
-		f.pack(t, Params{OutDir: out})
+		f.pack(t, PackParams{OutDir: out})
 		absent(t, out, "secrets.yaml")
 	})
 	t.Run("nothing referenced", func(t *testing.T) {
@@ -305,7 +305,7 @@ func TestPackOmitsStore(t *testing.T) {
 		f := newSampleFixture(t)
 		f.write(t, "env/app.yaml", "A: base\n")
 		out := filepath.Join(t.TempDir(), "dist")
-		f.pack(t, Params{OutDir: out})
+		f.pack(t, PackParams{OutDir: out})
 		absent(t, out, "secrets.yaml")
 		if f.store.exported != nil {
 			t.Errorf("exported %v, want no export", f.store.exported)
@@ -342,7 +342,7 @@ func TestPackStandardizesManifest(t *testing.T) {
 			})
 			out := filepath.Join(t.TempDir(), "dist")
 
-			f.pack(t, Params{OutDir: out})
+			f.pack(t, PackParams{OutDir: out})
 
 			if got := listFiles(t, out); !slices.Equal(
 				got, []string{"app/app.yaml", "envx.yaml", "secrets.yaml"},
@@ -400,7 +400,7 @@ func TestPackOutputDirectoryPolicy(t *testing.T) {
 			out := filepath.Join(parent, "dist")
 			tt.setup(t, out)
 
-			_, err := f.service(t).Pack(Params{OutDir: out, Force: tt.force})
+			_, err := f.service(t).Pack(PackParams{OutDir: out, Force: tt.force})
 			if !errors.Is(err, tt.want) {
 				t.Fatalf("err = %v, want %v", err, tt.want)
 			}
@@ -436,7 +436,7 @@ func TestPackPreservesDestinationOnFailure(t *testing.T) {
 			out := filepath.Join(parent, "dist")
 			writeFile(t, out, "envx.yaml", "previous\n")
 
-			if _, err := f.service(t).Pack(Params{OutDir: out, Force: true}); err == nil {
+			if _, err := f.service(t).Pack(PackParams{OutDir: out, Force: true}); err == nil {
 				t.Fatal("Pack succeeded, want an error")
 			}
 			if got := readFile(t, out, "envx.yaml"); got != "previous\n" {
@@ -502,7 +502,7 @@ func TestPackRejectsOutputContainingSources(t *testing.T) {
 			f := newSampleFixture(t)
 			out := tt.out(t, f)
 
-			_, err := f.service(t).Pack(Params{
+			_, err := f.service(t).Pack(PackParams{
 				Projects: []string{"api"},
 				OutDir:   out,
 				Force:    true,
@@ -532,7 +532,7 @@ func TestPackForceKeepsDirectoryIdentity(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	f.pack(t, Params{OutDir: out, Force: true})
+	f.pack(t, PackParams{OutDir: out, Force: true})
 
 	after, err := os.Stat(out)
 	if err != nil {
@@ -560,7 +560,7 @@ func TestPackForceReplacesSymlink(t *testing.T) {
 		t.Skipf("symlinks unavailable: %v", err)
 	}
 
-	f.pack(t, Params{OutDir: out, Force: true})
+	f.pack(t, PackParams{OutDir: out, Force: true})
 
 	if info, err := os.Lstat(out); err != nil || !info.IsDir() {
 		t.Errorf("destination is not a directory: %v", err)
@@ -578,7 +578,7 @@ func TestPackRefusesInterruptedScratch(t *testing.T) {
 	out := filepath.Join(t.TempDir(), "dist")
 	writeFile(t, out, scratchName+"/previous/envx.yaml", "previous\n")
 
-	_, err := f.service(t).Pack(Params{OutDir: out, Force: true})
+	_, err := f.service(t).Pack(PackParams{OutDir: out, Force: true})
 	if err == nil || !strings.Contains(err.Error(), "interrupted") {
 		t.Fatalf("err = %v, want an interrupted-pack error", err)
 	}

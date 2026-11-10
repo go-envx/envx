@@ -8,10 +8,10 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/go-envx/envx/app/internal/core"
-	"github.com/go-envx/envx/app/internal/features/pack"
+	"github.com/go-envx/envx/app/internal/app"
+	"github.com/go-envx/envx/app/internal/core/pack"
+	workspacecli "github.com/go-envx/envx/app/internal/core/workspace/cli"
 	"github.com/go-envx/envx/app/internal/lib/printer"
-	"github.com/go-envx/envx/app/internal/shared/flags"
 )
 
 // mockPackFactory implements Factory for unit testing.
@@ -19,15 +19,11 @@ type mockPackFactory struct {
 	err error
 }
 
-func (m *mockPackFactory) PackService(configPath string) (*pack.Service, error) {
+func (m *mockPackFactory) NewPackService(configPath string) (*pack.Service, error) {
 	if m.err != nil {
 		return nil, m.err
 	}
-	app, err := core.NewAppFactory()
-	if err != nil {
-		return nil, err
-	}
-	return app.PackService(configPath)
+	return app.Factory{}.NewPackService(configPath)
 }
 
 // executePack builds the pack command, executes it with args, and returns its
@@ -38,7 +34,7 @@ func executePack(
 	t.Helper()
 
 	cmd := NewPackCommand(factory)
-	flags.Bind(cmd.PersistentFlags(), &flags.Config)
+	workspacecli.BindConfig(cmd)
 	cmd.SilenceUsage = true
 	cmd.SetArgs(append([]string{"--config", configPath}, args...))
 
