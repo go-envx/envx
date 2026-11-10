@@ -113,8 +113,8 @@ func TestGetHostSelection(t *testing.T) {
 	}
 
 	got, err = s.Get(GetParams{
-		Query: Query{Options: workspace.Settings{Overload: ptr(true)}},
-		Key:   "host",
+		Options: workspace.Settings{Overload: ptr(true)},
+		Key:     "host",
 	})
 	if err != nil || got.Value != "db.local" || got.Origin.Winner.Host {
 		t.Errorf("Get(host, overload) = %+v, %v; want file winner", got, err)

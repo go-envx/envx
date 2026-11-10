@@ -245,7 +245,9 @@ func TestLoadNamespacesOncePerDiff(t *testing.T) {
 
 	namespaces := newFakeNamespaces().base(t, appInclude, "host: a")
 	s := newService(t, testWorkspace(), Dependencies{EnvNamespaces: namespaces})
-	if _, err := s.Diff(DiffParams{From: "development", To: "production"}); err != nil {
+	if _, err := s.Diff(DiffParams{
+		EnvironmentA: "development", EnvironmentB: "production",
+	}); err != nil {
 		t.Fatalf("Diff: %v", err)
 	}
 	if namespaces.baseReads != 1 {

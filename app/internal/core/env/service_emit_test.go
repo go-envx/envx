@@ -14,7 +14,7 @@ type fakeRenderer struct {
 	// project is the last rendered project.
 	project string
 	// entries are the last rendered entries.
-	entries []Entry
+	entries []ExplainEntry
 }
 
 // Validate implements Renderer.
@@ -24,7 +24,7 @@ func (r *fakeRenderer) Validate(EmitOptions) error {
 
 // Render implements Renderer.
 func (r *fakeRenderer) Render(
-	out io.Writer, project string, entries []Entry, _ EmitOptions,
+	out io.Writer, project string, entries []ExplainEntry, _ EmitOptions,
 ) error {
 	r.project, r.entries = project, entries
 	_, err := io.WriteString(out, "rendered")

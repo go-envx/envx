@@ -1,10 +1,7 @@
 package cli
 
 import (
-	"fmt"
-
 	"github.com/go-envx/envx/app/internal/app"
-	"github.com/go-envx/envx/app/internal/core"
 	envcli "github.com/go-envx/envx/app/internal/core/env/cli"
 	packcli "github.com/go-envx/envx/app/internal/core/pack/cli"
 	scaffoldcli "github.com/go-envx/envx/app/internal/core/scaffold/cli"
@@ -23,10 +20,7 @@ const (
 // which every action reads back by name to locate the manifest.
 // The build metadata in info is rendered by the --version flag.
 func NewRootCmd(info BuildInfo) (*cobra.Command, error) {
-	appFactory, err := core.NewAppFactory()
-	if err != nil {
-		return nil, fmt.Errorf("composing application: %w", err)
-	}
+	factory := app.Factory{}
 
 	root := &cobra.Command{
 		Use:           rootUsage,
@@ -49,17 +43,17 @@ func NewRootCmd(info BuildInfo) (*cobra.Command, error) {
 	workspacecli.BindConfig(root)
 
 	root.AddCommand(
-		scaffoldcli.NewCreateCommand(app.Factory{}),
-		envcli.NewGetCommand(appFactory),
-		secretscli.NewKeypairCommand(app.Factory{}),
-		packcli.NewPackCommand(app.Factory{}),
-		envcli.NewRunCommand(appFactory),
-		envcli.NewSetCommand(appFactory),
-		envcli.NewExplainCommand(appFactory),
-		envcli.NewEmitCommand(appFactory),
-		envcli.NewDiffCommand(appFactory),
-		secretscli.NewSecretsCommand(app.Factory{}),
-		validatecli.NewValidateCommand(app.Factory{}),
+		scaffoldcli.NewCreateCommand(factory),
+		envcli.NewGetCommand(factory),
+		secretscli.NewKeypairCommand(factory),
+		packcli.NewPackCommand(factory),
+		envcli.NewRunCommand(factory),
+		envcli.NewSetCommand(factory),
+		envcli.NewExplainCommand(factory),
+		envcli.NewEmitCommand(factory),
+		envcli.NewDiffCommand(factory),
+		secretscli.NewSecretsCommand(factory),
+		validatecli.NewValidateCommand(factory),
 	)
 	return root, nil
 }

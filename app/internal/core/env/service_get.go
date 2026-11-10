@@ -3,16 +3,20 @@ package env
 import (
 	"fmt"
 	"strings"
+
+	"github.com/go-envx/envx/app/internal/core/workspace"
 )
 
 // GetParams selects one key and the reveal policy.
 type GetParams struct {
-	// Query selects the project and setting overrides.
-	Query Query
+	// Project names the declared project; empty selects the only project.
+	Project string
 	// Key is the case-insensitive variable name.
 	Key string
 	// Reveal decrypts secrets and substitutes references.
 	Reveal bool
+	// Options are setting overrides that win over the manifest.
+	Options workspace.Settings
 }
 
 // GetResult is one resolved value and its provenance.
@@ -30,7 +34,7 @@ type GetResult struct {
 // the key's transitive dependencies are resolved, so failures behind unrelated
 // keys never block the read. Errors never contain the value.
 func (s *Service) Get(params GetParams) (GetResult, error) {
-	op, err := s.begin(params.Query)
+	op, err := s.begin(params.Project, params.Options)
 	if err != nil {
 		return GetResult{}, err
 	}

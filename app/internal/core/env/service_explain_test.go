@@ -8,6 +8,7 @@ import (
 	"github.com/go-envx/envx/app/internal/core/diagnostic"
 	"github.com/go-envx/envx/app/internal/core/value"
 	"github.com/go-envx/envx/app/internal/core/workspace"
+	"github.com/go-envx/envx/app/internal/lib/severity"
 )
 
 // explainFixture serves secrets, templates, and failures for diagnosis.
@@ -34,14 +35,16 @@ func explainFixture(t *testing.T, host ...string) *Service {
 }
 
 // explainEntries explains every key and indexes entries by key.
-func explainEntries(t *testing.T, s *Service, params ExplainParams) map[string]Entry {
+func explainEntries(
+	t *testing.T, s *Service, params ExplainParams,
+) map[string]ExplainEntry {
 	t.Helper()
 	result, err := s.Explain(params)
 	if err != nil {
 		t.Fatalf("Explain: %v", err)
 	}
 	keys := make([]string, 0, len(result.Entries))
-	out := make(map[string]Entry, len(result.Entries))
+	out := make(map[string]ExplainEntry, len(result.Entries))
 	for i := range result.Entries {
 		keys = append(keys, result.Entries[i].Key)
 		out[result.Entries[i].Key] = result.Entries[i]
@@ -115,6 +118,24 @@ func TestExplainEvaluations(t *testing.T) {
 	}
 }
 
+// TestExplainSummary verifies the summary counts failed entries and reports
+// the worst severity.
+func TestExplainSummary(t *testing.T) {
+	t.Parallel()
+
+	result, err := explainFixture(t).Explain(ExplainParams{Reveal: true})
+	if err != nil {
+		t.Fatalf("Explain: %v", err)
+	}
+	got := result.Summary
+	if got.Errors != 3 || got.Warnings != 0 || got.Severity() != severity.Error {
+		t.Errorf("Summary = %+v (severity %v), want 3 errors", got, got.Severity())
+	}
+	if clean := (ExplanationSummary{}); clean.Severity() != severity.OK {
+		t.Errorf("empty Summary severity = %v, want OK", clean.Severity())
+	}
+}
+
 // TestExplainEntryMetadata verifies raw items, provenance, base declaration,
 // and secret derivation.
 func TestExplainEntryMetadata(t *testing.T) {
@@ -173,7 +194,7 @@ func TestExplainHostValues(t *testing.T) {
 	}
 
 	overloaded := explainEntries(t, s, ExplainParams{
-		Query: Query{Options: workspace.Settings{Overload: ptr(true)}},
+		Options: workspace.Settings{Overload: ptr(true)},
 	})
 	if !overloaded["URL"].Secret {
 		t.Error("URL should derive from the namespace secret under overload")

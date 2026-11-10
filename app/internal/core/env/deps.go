@@ -47,7 +47,9 @@ type Renderer interface {
 	// Validate rejects unsupported targets and option combinations.
 	Validate(options EmitOptions) error
 	// Render writes entries for project in the target's format.
-	Render(out io.Writer, project string, entries []Entry, options EmitOptions) error
+	Render(
+		out io.Writer, project string, entries []ExplainEntry, options EmitOptions,
+	) error
 }
 
 // Dependencies are the adapters a Service uses. Only EnvNamespaces is required;

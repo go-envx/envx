@@ -1,20 +1,16 @@
 package cli
 
 import (
-	"bytes"
 	"fmt"
 	"io"
 	"os"
 	"path/filepath"
-	"sort"
-	"strings"
 
-	"github.com/go-envx/envx/app/internal/features/emit"
-	"github.com/go-envx/envx/app/internal/features/env"
+	"github.com/go-envx/envx/app/internal/core/env"
+	workspacecli "github.com/go-envx/envx/app/internal/core/workspace/cli"
 	"github.com/go-envx/envx/app/internal/lib/atomicfile"
 	"github.com/go-envx/envx/app/internal/lib/printer"
 	"github.com/go-envx/envx/app/internal/lib/str"
-	"github.com/go-envx/envx/app/internal/shared/flags"
 	"github.com/spf13/cobra"
 )
 
@@ -60,14 +56,8 @@ const (
 	`
 )
 
-// Slice values accepted by --only.
-const (
-	onlySecrets = "secrets"
-	onlyConfig  = "config"
-)
-
 // NewEmitCommand builds the "emit" command.
-func NewEmitCommand(f EmitFactory) *cobra.Command {
+func NewEmitCommand(f Factory) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     emitUsage,
 		Short:   emitShort,
@@ -79,50 +69,15 @@ func NewEmitCommand(f EmitFactory) *cobra.Command {
 			project := args[0]
 
 			// Extract command-line flag values.
-			fs := cmd.Flags()
-			configPath := flags.Config.Get(fs)
-			target := targetFlag.Get(fs)
-			only := onlyFlag.Get(fs)
-			name := nameFlag.Get(fs)
-			key := keyFlag.Get(fs)
-			output := outputFlag.Get(fs)
-			envOptions := getEnvOptions(fs)
-
-			// Validate the target and its --name relationship up front so an unknown
-			// format or a misused --name fails before any resolution work.
-			parsedTarget, err := emit.ParseTarget(target)
-			if err != nil {
-				return err
+			configPath := workspacecli.ConfigPath(cmd)
+			options := env.EmitOptions{
+				Target: env.Target(targetFlag.Value(cmd)),
+				Only:   onlyFlag.Value(cmd),
+				Name:   nameFlag.Value(cmd),
+				Key:    keyFlag.Value(cmd),
 			}
-			if err := validateNameUsage(parsedTarget, fs.Changed(nameFlag.Name)); err != nil {
-				return err
-			}
-			if err := validateKeyUsage(parsedTarget, key, fs.Changed(keyFlag.Name)); err != nil {
-				return err
-			}
-
-			// Resolve which slice(s) to emit up front so an invalid --only value
-			// fails before any resolution work.
-			includeSecrets, includeConfig, err := resolveSlice(only)
-			if err != nil {
-				return err
-			}
-
-			// A k8s resource name defaults to the project, with the slice suffix
-			// appended so one project yields app-config / app-secrets without a flag.
-			// An explicit --name is honored verbatim instead.
-			nameBase := name
-			exactName := name != ""
-			if nameBase == "" {
-				nameBase = project
-			}
-
-			// A k8s-bundle data key (and mounted filename) defaults per slice, so the
-			// common case needs no --key: config.json, or secrets.json for a
-			// secrets-only bundle.
-			if parsedTarget == emit.TargetK8sBundle && key == "" {
-				key = defaultBundleKey(includeSecrets, includeConfig)
-			}
+			output := emitOutputFlag.Value(cmd)
+			settings := workspacecli.Settings(cmd)
 
 			// Fail fast, before any decryption, if the output directory is missing —
 			// emit writes the named file but does not create directories, so a bad
@@ -133,49 +88,19 @@ func NewEmitCommand(f EmitFactory) *cobra.Command {
 			}
 
 			// Obtain the environment service using the configuration path.
-			envService, err := f.EnvService(configPath)
+			envService, err := f.NewEnvService(configPath)
 			if err != nil {
 				return err
 			}
 
-			// Reveal and classify every winning value. Explain never aborts on a
-			// per-key failure — it carries the status instead — so emit enforces its
-			// own fail-closed contract in entriesFromExplanation below.
-			result, err := envService.Explain(env.ExplainParams{
-				Project: project,
-				Reveal:  true,
-				Options: envOptions,
+			// Render the environment. Emit validates the options first and fails
+			// closed, so a value that cannot be resolved aborts before any output.
+			artifact, err := envService.Emit(env.EmitParams{
+				Project:  project,
+				Options:  options,
+				Settings: settings,
 			})
 			if err != nil {
-				return err
-			}
-
-			entries, err := entriesFromExplanation(result)
-			if err != nil {
-				return err
-			}
-
-			// Buffer the render so no partial output escapes on a formatting error and
-			// a file target is committed atomically.
-			var buffer bytes.Buffer
-
-			// Obtain the emit service.
-			emitService, err := f.EmitService()
-			if err != nil {
-				return err
-			}
-
-			renderParams := emit.RenderParams{
-				Entries:        entries,
-				Target:         parsedTarget,
-				NameBase:       nameBase,
-				ExactName:      exactName,
-				IncludeSecrets: includeSecrets,
-				IncludeConfig:  includeConfig,
-				Key:            key,
-				Writer:         &buffer,
-			}
-			if err := emitService.Render(renderParams); err != nil {
 				return err
 			}
 
@@ -189,22 +114,19 @@ func NewEmitCommand(f EmitFactory) *cobra.Command {
 
 			// Output the rendered result to stdout or the chosen file.
 			return outputEmit(
-				console, cmd.OutOrStdout(), buffer.Bytes(), output, project, &renderParams,
+				console, cmd.OutOrStdout(), artifact, output, project, options,
 			)
 		},
 	}
 
 	// Bind the command-line flags.
-	{
-		fs := cmd.Flags()
-		flags.Bind(fs, &targetFlag)
-		flags.Bind(fs, &onlyFlag)
-		flags.Bind(fs, &nameFlag)
-		flags.Bind(fs, &keyFlag)
-		flags.Bind(fs, &outputFlag)
-		bindEnvOptionsFlags(fs)
-		_ = cmd.MarkFlagRequired(targetFlag.Name)
-	}
+	targetFlag.Bind(cmd)
+	onlyFlag.Bind(cmd)
+	nameFlag.Bind(cmd)
+	keyFlag.Bind(cmd)
+	emitOutputFlag.Bind(cmd)
+	workspacecli.BindSettings(cmd)
+	_ = cmd.MarkFlagRequired(targetFlag.Name)
 
 	return cmd
 }
@@ -217,26 +139,26 @@ func NewEmitCommand(f EmitFactory) *cobra.Command {
 func outputEmit(
 	console *printer.Printer,
 	stdout io.Writer,
-	rendered []byte,
+	artifact env.Artifact,
 	outputPath string,
 	project string,
-	params *emit.RenderParams,
+	options env.EmitOptions,
 ) error {
 	if outputPath == "" {
-		_, err := stdout.Write(rendered)
+		_, err := stdout.Write(artifact.Data)
 		return err
 	}
 
 	// The render may carry plaintext secrets, so persist it with private
 	// permissions rather than the world-readable default.
-	if err := atomicfile.WritePrivate(outputPath, rendered); err != nil {
+	if err := atomicfile.WritePrivate(outputPath, artifact.Data); err != nil {
 		return err
 	}
 
 	// Confirm where the file landed as normal output — the summary, then (for a
 	// k8s-bundle) the docs pointer in the same line.
-	summary := wroteSummary(project, outputPath, params)
-	if params.Target == emit.TargetK8sBundle {
+	summary := wroteSummary(project, outputPath, options.Only)
+	if options.Target == env.TargetKubernetesBundle {
 		summary += " Read the docs to learn how to use the file in a Kubernetes volume."
 	}
 	if err := console.LogMessage(summary); err != nil {
@@ -246,7 +168,7 @@ func outputEmit(
 	// When the file carries secret material — the values are unencrypted
 	// (plaintext, or base64 in a Secret) — add a blank line and a stderr caution
 	// not to commit it.
-	if !outputCarriesSecrets(params) {
+	if !artifact.ContainsSecrets {
 		return nil
 	}
 	if err := console.LogBlank(); err != nil {
@@ -255,63 +177,6 @@ func outputEmit(
 	return console.LogWarning(
 		"the output carries unencrypted secret values; do not commit it",
 	)
-}
-
-// resolveSlice translates the --only flag into the two slice selectors: an empty
-// value (the default) emits everything, "secrets" or "config" restricts to that
-// one slice, and any other value is rejected before resolution begins.
-func resolveSlice(only string) (includeSecrets, includeConfig bool, err error) {
-	switch only {
-	case "":
-		return true, true, nil
-	case onlySecrets:
-		return true, false, nil
-	case onlyConfig:
-		return false, true, nil
-	default:
-		return false, false, fmt.Errorf(
-			"invalid --only value %q (want %q or %q)", only, onlySecrets, onlyConfig,
-		)
-	}
-}
-
-// validateKeyUsage rejects --key on any target but k8s-bundle, since the data key
-// only exists for a bundled resource; the multi-key k8s target names keys after
-// the values, and dotenv/json have no keyed resource at all. keySet reports
-// whether the flag was explicitly given.
-func validateKeyUsage(target emit.Target, key string, keySet bool) error {
-	if !keySet {
-		return nil
-	}
-	if target != emit.TargetK8sBundle {
-		return fmt.Errorf("--key applies only to the k8s-bundle target, not %q", target)
-	}
-	// The extension picks the body format, so reject an unknown one up front.
-	return emit.ValidateBundleKey(key)
-}
-
-// validateNameUsage guards the --name/target relationship: the k8s targets accept
-// a name base (defaulting to the project when omitted), and the plain targets
-// reject one. nameSet reports whether the flag was explicitly given, so passing
-// --name to dotenv/json is an error even though those renderers never read it.
-func validateNameUsage(target emit.Target, nameSet bool) error {
-	if target.Kubernetes() {
-		return nil
-	}
-	if nameSet {
-		return fmt.Errorf("--name applies only to the k8s targets, not %q", target)
-	}
-	return nil
-}
-
-// defaultBundleKey picks the default k8s-bundle data key from the selected
-// slice: a secrets-only bundle defaults to secrets.json, and config-only or a
-// merged bundle to config.json. The .json extension makes the body JSON.
-func defaultBundleKey(includeSecrets, includeConfig bool) string {
-	if includeSecrets && !includeConfig {
-		return "secrets.json"
-	}
-	return "config.json"
 }
 
 // checkOutputDir reports an error when the file's parent directory does not
@@ -331,60 +196,13 @@ func checkOutputDir(outputPath string) error {
 
 // wroteSummary is the one-line confirmation printed after a file write: which
 // project's slice was written, and to which file.
-func wroteSummary(project, outputPath string, params *emit.RenderParams) string {
+func wroteSummary(project, outputPath, only string) string {
 	slice := "config and secrets"
-	switch {
-	case params.IncludeSecrets && !params.IncludeConfig:
+	switch only {
+	case env.OnlySecrets:
 		slice = "secrets"
-	case !params.IncludeSecrets && params.IncludeConfig:
+	case env.OnlyConfig:
 		slice = "config"
 	}
 	return fmt.Sprintf("Wrote %s %s to %s.", project, slice, outputPath)
-}
-
-// outputCarriesSecrets reports whether the rendered file will contain
-// secret-derived values, so the caller can warn that it must not be committed.
-// The file carries secrets only when the secret slice was selected and the
-// environment actually holds a secret-derived value; a config-only render never
-// triggers the warning.
-func outputCarriesSecrets(params *emit.RenderParams) bool {
-	if !params.IncludeSecrets {
-		return false
-	}
-	for i := range params.Entries {
-		if params.Entries[i].Secret {
-			return true
-		}
-	}
-	return false
-}
-
-// entriesFromExplanation converts a revealed explanation into emit entries,
-// enforcing emit's fail-closed contract: if any value did not resolve to
-// plaintext it returns an error naming every unresolved key and no entries, so
-// the caller emits nothing. A value classified as a secret reference becomes a
-// secret-derived entry, which the Kubernetes split routes into a Secret.
-func entriesFromExplanation(result *env.ExplainResult) ([]emit.Entry, error) {
-	entries := make([]emit.Entry, 0, len(result.Entries))
-	var unresolved []string
-	for i := range result.Entries {
-		e := &result.Entries[i]
-		if !e.Resolution.HasResolved {
-			unresolved = append(unresolved, e.Key)
-			continue
-		}
-		entries = append(entries, emit.Entry{
-			Key:    e.Key,
-			Value:  e.Resolution.Resolved,
-			Secret: e.Resolution.Kind == env.KindSecretReference,
-		})
-	}
-	if len(unresolved) > 0 {
-		sort.Strings(unresolved)
-		return nil, fmt.Errorf(
-			"cannot emit: %d value(s) did not resolve: %s",
-			len(unresolved), strings.Join(unresolved, ", "),
-		)
-	}
-	return entries, nil
 }

@@ -3,11 +3,13 @@ package cli
 import (
 	"fmt"
 
-	"github.com/go-envx/envx/app/internal/features/env"
+	"github.com/go-envx/envx/app/internal/core/diagnostic"
+	"github.com/go-envx/envx/app/internal/core/env"
+	workspacecli "github.com/go-envx/envx/app/internal/core/workspace/cli"
 	"github.com/go-envx/envx/app/internal/lib/arg"
 	"github.com/go-envx/envx/app/internal/lib/printer"
+	"github.com/go-envx/envx/app/internal/lib/severity"
 	"github.com/go-envx/envx/app/internal/lib/str"
-	"github.com/go-envx/envx/app/internal/shared/flags"
 	"github.com/spf13/cobra"
 )
 
@@ -49,15 +51,14 @@ func NewExplainCommand(f Factory) *cobra.Command {
 			key := arg.Optional(args, 1)
 
 			// Extract command-line flag values.
-			fs := cmd.Flags()
-			configPath := flags.Config.Get(fs)
-			reveal := revealFlag.Get(fs)
-			absolute := absoluteFlag.Get(fs)
-			output := flags.Output.Get(fs)
-			envOptions := getEnvOptions(fs)
+			configPath := workspacecli.ConfigPath(cmd)
+			reveal := revealFlag.Value(cmd)
+			absolute := absoluteFlag.Value(cmd)
+			output := outputFlag.Value(cmd)
+			settings := workspacecli.Settings(cmd)
 
 			// Obtain the environment service using the configuration path.
-			envService, err := f.EnvService(configPath)
+			envService, err := f.NewEnvService(configPath)
 			if err != nil {
 				return err
 			}
@@ -67,7 +68,7 @@ func NewExplainCommand(f Factory) *cobra.Command {
 				Project: project,
 				Key:     key,
 				Reveal:  reveal,
-				Options: envOptions,
+				Options: settings,
 			})
 			if err != nil {
 				return err
@@ -80,18 +81,15 @@ func NewExplainCommand(f Factory) *cobra.Command {
 			})
 
 			// Output the result of the environment explain operation.
-			return outputExplain(console, result, output, reveal, absolute)
+			return outputExplain(console, &result, output, reveal, absolute)
 		},
 	}
 
 	// Bind the command-line flags.
-	{
-		fs := cmd.Flags()
-		flags.Bind(fs, &flags.Output)
-		flags.Bind(fs, &revealFlag)
-		flags.Bind(fs, &absoluteFlag)
-		bindEnvOptionsFlags(fs)
-	}
+	outputFlag.Bind(cmd)
+	revealFlag.Bind(cmd)
+	absoluteFlag.Bind(cmd)
+	workspacecli.BindSettings(cmd)
 
 	return cmd
 }
@@ -125,4 +123,21 @@ func outputExplain(
 	default:
 		return fmt.Errorf("invalid output format %q (want table or json)", format)
 	}
+}
+
+// status returns the entry's finding, or an OK finding when it has none.
+func (r explainRenderer) status(e *env.ExplainEntry) diagnostic.Finding {
+	if e.Evaluation.Diagnostic.IsZero() {
+		return diagnostic.Finding{Code: diagnostic.OK, Level: severity.OK}
+	}
+	return e.Evaluation.Diagnostic
+}
+
+// resolved returns the entry's plaintext and whether it is shown: only when
+// revealing and the value resolved.
+func (r explainRenderer) resolved(e *env.ExplainEntry) (string, bool) {
+	if !r.reveal || !e.Evaluation.Resolved {
+		return "", false
+	}
+	return e.Evaluation.Value, true
 }

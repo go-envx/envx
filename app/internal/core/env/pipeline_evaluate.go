@@ -46,8 +46,8 @@ func newEvaluator(
 }
 
 // entries evaluates keys in order.
-func (e *evaluator) entries(keys []string) []Entry {
-	out := make([]Entry, 0, len(keys))
+func (e *evaluator) entries(keys []string) []ExplainEntry {
+	out := make([]ExplainEntry, 0, len(keys))
 	for _, key := range keys {
 		out = append(out, e.entry(key))
 	}
@@ -55,7 +55,7 @@ func (e *evaluator) entries(keys []string) []Entry {
 }
 
 // entry evaluates one winning key.
-func (e *evaluator) entry(key string) Entry {
+func (e *evaluator) entry(key string) ExplainEntry {
 	leaf := e.merged.values[key]
 	eval, findings := e.evaluate(key, leaf)
 	findings = slices.Clone(findings)
@@ -75,7 +75,7 @@ func (e *evaluator) entry(key string) Entry {
 	}
 	origin := e.merged.origins[key]
 	origin.Shadowed = slices.Clone(origin.Shadowed)
-	return Entry{
+	return ExplainEntry{
 		Key:            key,
 		Raw:            raw,
 		Items:          items,

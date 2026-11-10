@@ -7,16 +7,19 @@ import (
 	"slices"
 
 	"github.com/go-envx/envx/app/internal/core/diagnostic"
+	"github.com/go-envx/envx/app/internal/core/workspace"
 	"github.com/go-envx/envx/app/internal/lib/severity"
 )
 
 // MaterializeParams selects the environment to materialize and the failure
 // policy.
 type MaterializeParams struct {
-	// Query selects the project and setting overrides.
-	Query Query
+	// Project names the declared project; empty selects the only project.
+	Project string
 	// IgnoreErrors downgrades per-key failures to warnings.
 	IgnoreErrors bool
+	// Options are setting overrides that win over the manifest.
+	Options workspace.Settings
 }
 
 // MaterializeResult is a complete environment and any downgraded failures.
@@ -42,7 +45,7 @@ type failure struct {
 // warning and the key keeps its host value or is omitted. Structural failures
 // are fatal in both modes.
 func (s *Service) Materialize(params MaterializeParams) (MaterializeResult, error) {
-	op, err := s.begin(params.Query)
+	op, err := s.begin(params.Project, params.Options)
 	if err != nil {
 		return MaterializeResult{}, err
 	}

@@ -7,6 +7,8 @@ import (
 	"maps"
 	"slices"
 	"strings"
+
+	"github.com/go-envx/envx/app/internal/core/workspace"
 )
 
 // Target identifies an emit output format.
@@ -49,10 +51,12 @@ type EmitOptions struct {
 
 // EmitParams selects the environment and rendering options.
 type EmitParams struct {
-	// Query selects the project and setting overrides.
-	Query Query
+	// Project names the declared project; empty selects the only project.
+	Project string
 	// Options configures rendering.
 	Options EmitOptions
+	// Settings are setting overrides that win over the manifest.
+	Settings workspace.Settings
 }
 
 // Artifact is a rendered emit output. Data holds materialized values and must
@@ -74,7 +78,7 @@ func (s *Service) Emit(params EmitParams) (Artifact, error) {
 	if err := s.deps.FormatRenderer.Validate(params.Options); err != nil {
 		return Artifact{}, err
 	}
-	op, err := s.begin(params.Query)
+	op, err := s.begin(params.Project, params.Settings)
 	if err != nil {
 		return Artifact{}, err
 	}

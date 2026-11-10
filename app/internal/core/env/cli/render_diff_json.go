@@ -1,7 +1,7 @@
 package cli
 
 import (
-	"github.com/go-envx/envx/app/internal/features/env"
+	"github.com/go-envx/envx/app/internal/core/env"
 )
 
 // diffResultJSON is the exported, tagged view of the whole diff for JSON output.

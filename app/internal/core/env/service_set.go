@@ -11,8 +11,8 @@ import (
 
 // SetParams writes one value to a namespace's environment overlay.
 type SetParams struct {
-	// Include is a declared include path, relative to the workspace root.
-	Include string
+	// IncludePath is a declared include path, relative to the workspace root.
+	IncludePath string
 	// Key is the dotted key path to write.
 	Key string
 	// Value is the text to write.
@@ -38,14 +38,14 @@ func (s *Service) Set(params SetParams) (SetResult, error) {
 	if strings.TrimSpace(params.Key) == "" {
 		return SetResult{}, errors.New("key cannot be empty")
 	}
-	if strings.TrimSpace(params.Include) == "" {
+	if strings.TrimSpace(params.IncludePath) == "" {
 		return SetResult{}, errors.New("include path cannot be empty")
 	}
 	environment, err := s.environment(params.Environment)
 	if err != nil {
 		return SetResult{}, err
 	}
-	include, err := s.declaredInclude(params.Include)
+	include, err := s.declaredInclude(params.IncludePath)
 	if err != nil {
 		return SetResult{}, err
 	}

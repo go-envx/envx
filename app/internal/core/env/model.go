@@ -6,16 +6,7 @@ import (
 
 	"github.com/go-envx/envx/app/internal/core/diagnostic"
 	"github.com/go-envx/envx/app/internal/core/value"
-	"github.com/go-envx/envx/app/internal/core/workspace"
 )
-
-// Query selects a project and the setting overrides for an operation.
-type Query struct {
-	// Project names the declared project; empty selects the only project.
-	Project string
-	// Options are flag or environment overrides that win over the manifest.
-	Options workspace.Settings
-}
 
 // Source identifies one contribution to a value.
 type Source struct {
@@ -35,8 +26,8 @@ type Origin struct {
 	Shadowed []Source
 }
 
-// Entry is one winning variable with its provenance and evaluation.
-type Entry struct {
+// ExplainEntry is one winning variable with its provenance and evaluation.
+type ExplainEntry struct {
 	// Key is the canonical variable name.
 	Key string
 	// Raw is the winning value as declared, with list items joined; empty for a

@@ -98,16 +98,20 @@ func New(ws workspace.Workspace, deps Dependencies) (*Service, error) {
 
 // begin resolves the project, environment, settings, and grammar for a query
 // and captures the host environment.
-func (s *Service) begin(query Query) (operation, error) {
-	name, project, err := s.project(query.Project)
+// begin opens an operation on project with the given setting overrides; an
+// empty project selects the only declared project.
+func (s *Service) begin(
+	projectName string, options workspace.Settings,
+) (operation, error) {
+	name, project, err := s.project(projectName)
 	if err != nil {
 		return operation{}, err
 	}
-	environment, err := s.environment(query.Options.Env, project.Settings.Env)
+	environment, err := s.environment(options.Env, project.Settings.Env)
 	if err != nil {
 		return operation{}, err
 	}
-	settings := s.resolveSettings(query.Options, project.Settings)
+	settings := s.resolveSettings(options, project.Settings)
 	grammar := s.grammar
 	if settings.referencePattern != deref(s.settings.ReferencePattern) {
 		if grammar, err = syntax.Compile(settings.referencePattern); err != nil {
@@ -154,7 +158,9 @@ func (s *Service) project(name string) (string, workspace.Project, error) {
 	}
 	p, ok := s.projects[name]
 	if !ok {
-		return "", workspace.Project{}, fmt.Errorf("%w: %q", ErrProjectNotFound, name)
+		return "", workspace.Project{}, fmt.Errorf(
+			"%w: project %q not found in manifest", ErrProjectNotFound, name,
+		)
 	}
 	return name, p, nil
 }

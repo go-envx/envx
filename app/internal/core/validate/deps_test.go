@@ -11,7 +11,7 @@ import (
 // project in every environment.
 type fakeExplainer struct {
 	// entries holds each project's entries.
-	entries map[string][]env.Entry
+	entries map[string][]env.ExplainEntry
 	// calls records every request.
 	calls []env.ExplainParams
 	// err, when set, fails every call.
@@ -34,13 +34,13 @@ func (f *fakeExplainer) Explain(params env.ExplainParams) (env.ExplainResult, er
 	if f.err != nil {
 		return env.ExplainResult{}, f.err
 	}
-	entries := slices.Clone(f.entries[params.Query.Project])
+	entries := slices.Clone(f.entries[params.Project])
 	for i := range entries {
 		entries[i].Findings = slices.Clone(entries[i].Findings)
 		for j := range entries[i].Findings {
 			found := &entries[i].Findings[j]
-			found.Project = params.Query.Project
-			found.Environment = *params.Query.Options.Env
+			found.Project = params.Project
+			found.Environment = *params.Options.Env
 			found.Key = entries[i].Key
 		}
 	}

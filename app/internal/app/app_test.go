@@ -90,9 +90,9 @@ func TestNewEnvServiceBindsOperationSnapshot(t *testing.T) {
 		t.Fatalf("SetSecret: %v", err)
 	}
 	getParams := env.GetParams{
-		Query:  env.Query{Project: "app"},
-		Key:    "token",
-		Reveal: true,
+		Project: "app",
+		Key:     "token",
+		Reveal:  true,
 	}
 
 	f, captures := countingFactory()

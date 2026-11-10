@@ -1,7 +1,7 @@
 package cli
 
 import (
-	"github.com/go-envx/envx/app/internal/features/env"
+	"github.com/go-envx/envx/app/internal/core/env"
 	"github.com/go-envx/envx/app/internal/lib/filex"
 )
 
@@ -56,16 +56,16 @@ func (r explainRenderer) json(result *env.ExplainResult) error {
 
 // toEntryJSON converts an explained entry to its tagged JSON view.
 func (r explainRenderer) toEntryJSON(
-	e *env.ExplanationEntry,
+	e *env.ExplainEntry,
 	workspaceDir string,
 ) explainEntryJSON {
-	source := e.Origin.Winner.File
+	source := e.Origin.Winner.Path
 	if !r.absolute {
 		source = filex.RelativeTo(workspaceDir, source)
 	}
 	shadowed := make([]string, 0, len(e.Origin.Shadowed))
 	for _, s := range e.Origin.Shadowed {
-		path := s.File
+		path := s.Path
 		if !r.absolute {
 			path = filex.RelativeTo(workspaceDir, path)
 		}
@@ -73,22 +73,22 @@ func (r explainRenderer) toEntryJSON(
 	}
 
 	var resolved *string
-	if e.Resolution.HasResolved {
-		val := e.Resolution.Resolved
+	if val, ok := r.resolved(e); ok {
 		resolved = &val
 	}
 
+	status := r.status(e)
 	return explainEntryJSON{
 		Key:       e.Key,
-		Type:      e.Resolution.Kind.String(),
-		Value:     e.Literal,
+		Type:      e.Evaluation.Kind.String(),
+		Value:     e.Raw,
 		Source:    source,
 		SourceKey: e.Origin.Winner.Key,
 		Shadowed:  shadowed,
 		Status: explainStatusJSON{
-			Severity: e.Resolution.Severity.DisplayString(),
-			Code:     e.Resolution.Code,
-			Message:  e.Resolution.Message,
+			Severity: status.Level.DisplayString(),
+			Code:     string(status.Code),
+			Message:  status.Message,
 		},
 		Resolved: resolved,
 	}

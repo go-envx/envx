@@ -8,52 +8,22 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/go-envx/envx/app/internal/core"
-	"github.com/go-envx/envx/app/internal/features/env"
-	"github.com/go-envx/envx/app/internal/features/runner"
+	"github.com/go-envx/envx/app/internal/core/diagnostic"
+	workspacecli "github.com/go-envx/envx/app/internal/core/workspace/cli"
+	"github.com/go-envx/envx/app/internal/lib/crypt/age"
 	"github.com/go-envx/envx/app/internal/lib/printer"
-	"github.com/go-envx/envx/app/internal/resources/cipher/age"
-	"github.com/go-envx/envx/app/internal/shared/flags"
 	"github.com/go-envx/envx/app/test/fixtures"
 )
-
-// mockRunFactory implements RunFactory for unit testing.
-type mockRunFactory struct {
-	err       error
-	runnerErr error
-}
-
-func (m *mockRunFactory) EnvService(configPath string) (*env.Service, error) {
-	if m.err != nil {
-		return nil, m.err
-	}
-	app, err := core.NewAppFactory()
-	if err != nil {
-		return nil, err
-	}
-	return app.EnvService(configPath)
-}
-
-func (m *mockRunFactory) RunnerService() (*runner.Service, error) {
-	if m.runnerErr != nil {
-		return nil, m.runnerErr
-	}
-	app, err := core.NewAppFactory()
-	if err != nil {
-		return nil, err
-	}
-	return app.RunnerService()
-}
 
 // executeRun builds the run command, executes it with args, and returns its
 // captured stdout and stderr.
 func executeRun(
-	t *testing.T, factory RunFactory, configPath string, args ...string,
+	t *testing.T, factory Factory, configPath string, args ...string,
 ) (stdout, stderr string, err error) {
 	t.Helper()
 
 	cmd := NewRunCommand(factory)
-	flags.Bind(cmd.PersistentFlags(), &flags.Config)
+	workspacecli.BindConfig(cmd)
 	// The root command silences usage for runtime errors; mirror it here so a
 	// failed run leaves stdout to the child alone.
 	cmd.SilenceUsage = true
@@ -75,7 +45,7 @@ func TestNewRunCommandInjectsEnv(t *testing.T) {
 
 	path := fixtures.Manifest("basic")
 	stdout, _, err := executeRun(
-		t, &mockRunFactory{}, path, "api-core", "--", "printenv", "APP_NAME",
+		t, &mockEnvFactory{}, path, "api-core", "--", "printenv", "APP_NAME",
 	)
 	if err != nil {
 		t.Fatalf("Execute(): %v", err)
@@ -93,7 +63,7 @@ func TestNewRunCommandOverloadFromEnv(t *testing.T) {
 
 	path := fixtures.Manifest("basic")
 	stdout, _, err := executeRun(
-		t, &mockRunFactory{}, path, "api-core", "--", "printenv", "APP_NAME",
+		t, &mockEnvFactory{}, path, "api-core", "--", "printenv", "APP_NAME",
 	)
 	if err != nil {
 		t.Fatalf("Execute(): %v", err)
@@ -110,7 +80,7 @@ func TestNewRunCommandOverloadFlag(t *testing.T) {
 
 	path := fixtures.Manifest("basic")
 	stdout, _, err := executeRun(
-		t, &mockRunFactory{}, path,
+		t, &mockEnvFactory{}, path,
 		"api-core", "--overload", "--", "printenv", "APP_NAME",
 	)
 	if err != nil {
@@ -129,7 +99,7 @@ func TestNewRunCommandUnionsOSKeys(t *testing.T) {
 
 	path := fixtures.Manifest("basic")
 	stdout, _, err := executeRun(
-		t, &mockRunFactory{}, path, "api-core", "--", "printenv", "OS_ONLY_VAR",
+		t, &mockEnvFactory{}, path, "api-core", "--", "printenv", "OS_ONLY_VAR",
 	)
 	if err != nil {
 		t.Fatalf("Execute(): %v", err)
@@ -146,25 +116,7 @@ func TestNewRunCommandFactoryError(t *testing.T) {
 
 	expectedErr := errors.New("factory failure")
 	stdout, _, err := executeRun(
-		t, &mockRunFactory{err: expectedErr}, "envx.yaml",
-		"api-core", "--", "printenv", "APP_NAME",
-	)
-	if !errors.Is(err, expectedErr) {
-		t.Fatalf("got err = %v, want %v", err, expectedErr)
-	}
-	if stdout != "" {
-		t.Errorf("child produced output %q despite the factory failure", stdout)
-	}
-}
-
-// TestNewRunCommandRunnerFactoryError verifies a runner service failure aborts
-// the run before any child starts.
-func TestNewRunCommandRunnerFactoryError(t *testing.T) {
-	t.Parallel()
-
-	expectedErr := errors.New("runner failure")
-	stdout, _, err := executeRun(
-		t, &mockRunFactory{runnerErr: expectedErr}, fixtures.Manifest("basic"),
+		t, &mockEnvFactory{err: expectedErr}, "envx.yaml",
 		"api-core", "--", "printenv", "APP_NAME",
 	)
 	if !errors.Is(err, expectedErr) {
@@ -184,10 +136,7 @@ func TestNewRunCommandRevealFailurePreventsChildStartup(t *testing.T) {
 
 	// Encrypt a value to a fresh keypair whose private key is never written, so
 	// revealing the reference must fail for want of a key.
-	selected, err := age.New(age.Params{})
-	if err != nil {
-		t.Fatalf("age.New(): %v", err)
-	}
+	selected := age.Cipher{}
 	pair, err := selected.Keypair()
 	if err != nil {
 		t.Fatalf("Keypair(): %v", err)
@@ -207,7 +156,7 @@ func TestNewRunCommandRevealFailurePreventsChildStartup(t *testing.T) {
 			"\nsecrets:\n  production:\n    db: "+ciphertext+"\n")
 
 	stdout, _, err := executeRun(
-		t, &mockRunFactory{}, filepath.Join(dir, "envx.yaml"),
+		t, &mockEnvFactory{}, filepath.Join(dir, "envx.yaml"),
 		"api", "--", "printenv", "PASSWORD",
 	)
 	if err == nil {
@@ -230,7 +179,7 @@ func TestNewRunCommandIgnoreErrorsFailsClosedByDefault(t *testing.T) {
 		"good: value\nbroken: \"{{NOPE}}\"\n")
 
 	stdout, _, err := executeRun(
-		t, &mockRunFactory{}, filepath.Join(dir, "envx.yaml"),
+		t, &mockEnvFactory{}, filepath.Join(dir, "envx.yaml"),
 		"api", "--", "printenv", "GOOD",
 	)
 	if err == nil {
@@ -254,7 +203,7 @@ func TestNewRunCommandIgnoreErrorsStartsChild(t *testing.T) {
 		"good: value\nbroken: \"{{NOPE}}\"\n")
 
 	stdout, stderr, err := executeRun(
-		t, &mockRunFactory{}, filepath.Join(dir, "envx.yaml"),
+		t, &mockEnvFactory{}, filepath.Join(dir, "envx.yaml"),
 		"api", "--ignore-errors", "--",
 		"sh", "-c", "echo GOOD=$GOOD; echo BROKEN=${BROKEN-<unset>}",
 	)
@@ -285,7 +234,7 @@ func TestNewRunCommandIgnoreErrorsKeepsAmbientValue(t *testing.T) {
 		"broken: \"{{MISSING}}\"\n")
 
 	stdout, stderr, err := executeRun(
-		t, &mockRunFactory{}, filepath.Join(dir, "envx.yaml"),
+		t, &mockEnvFactory{}, filepath.Join(dir, "envx.yaml"),
 		"api", "--ignore-errors", "--", "sh", "-c", "echo BROKEN=$BROKEN",
 	)
 	if err != nil {
@@ -318,7 +267,7 @@ func TestNewRunCommandArgsValidation(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			cmd := NewRunCommand(&mockRunFactory{})
+			cmd := NewRunCommand(&mockEnvFactory{})
 			cmd.SetArgs(tt.args)
 			cmd.SetOut(&bytes.Buffer{})
 			cmd.SetErr(&bytes.Buffer{})
@@ -331,8 +280,8 @@ func TestNewRunCommandArgsValidation(t *testing.T) {
 	}
 }
 
-// TestOutputRunWarnings verifies each downgraded failure is printed as a warning.
-func TestOutputRunWarnings(t *testing.T) {
+// TestOutputRunWarning verifies a downgraded failure is printed as a warning.
+func TestOutputRunWarning(t *testing.T) {
 	t.Parallel()
 
 	var stderr bytes.Buffer
@@ -341,18 +290,12 @@ func TestOutputRunWarnings(t *testing.T) {
 		Err: &stderr,
 	})
 
-	err := outputRunWarnings(console, []error{
-		errors.New("first problem"),
-		errors.New("second problem"),
-	})
+	err := outputRunWarning(console, diagnostic.Finding{Message: "first problem"})
 	if err != nil {
-		t.Fatalf("outputRunWarnings(): %v", err)
+		t.Fatalf("outputRunWarning(): %v", err)
 	}
 
-	got := stderr.String()
-	for _, want := range []string{"first problem", "second problem"} {
-		if !strings.Contains(got, want) {
-			t.Errorf("stderr missing %q:\n%s", want, got)
-		}
+	if got := stderr.String(); !strings.Contains(got, "first problem") {
+		t.Errorf("stderr missing the warning:\n%s", got)
 	}
 }

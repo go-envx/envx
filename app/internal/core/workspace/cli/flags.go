@@ -79,6 +79,11 @@ func ConfigPath(cmd *cobra.Command) string {
 	return configFlag.Value(cmd)
 }
 
+// BindEnv registers only the --env setting flag on cmd.
+func BindEnv(cmd *cobra.Command) {
+	envFlag.Bind(cmd)
+}
+
 // BindSettings registers the workspace setting flags on cmd, except those
 // whose names are listed in omit.
 func BindSettings(cmd *cobra.Command, omit ...string) {

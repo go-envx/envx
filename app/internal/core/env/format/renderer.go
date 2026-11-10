@@ -88,7 +88,7 @@ func (Renderer) Validate(options env.EmitOptions) error {
 // Render writes the selected slice of entries in sorted key order. Kubernetes
 // names derive from project with a slice suffix unless options.Name is set.
 func (r Renderer) Render(
-	out io.Writer, project string, entries []env.Entry, options env.EmitOptions,
+	out io.Writer, project string, entries []env.ExplainEntry, options env.EmitOptions,
 ) error {
 	if err := r.Validate(options); err != nil {
 		return err

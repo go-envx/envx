@@ -36,7 +36,7 @@ func newFixture(projects ...string) *fixture {
 	}
 	return &fixture{
 		ws:        ws,
-		explainer: &fakeExplainer{entries: make(map[string][]env.Entry)},
+		explainer: &fakeExplainer{entries: make(map[string][]env.ExplainEntry)},
 		inspector: &fakeInspector{},
 	}
 }
@@ -71,12 +71,12 @@ func (f *fixture) validate(t *testing.T, params ValidateParams) Report {
 }
 
 // entry returns a base-declared entry with raw items and no finding.
-func entry(key string, items ...string) env.Entry {
-	return env.Entry{Key: key, Items: items, DeclaredInBase: true}
+func entry(key string, items ...string) env.ExplainEntry {
+	return env.ExplainEntry{Key: key, Items: items, DeclaredInBase: true}
 }
 
 // failing returns a base-declared entry whose evaluation reports code.
-func failing(key string, code diagnostic.Code, items ...string) env.Entry {
+func failing(key string, code diagnostic.Code, items ...string) env.ExplainEntry {
 	e := entry(key, items...)
 	def, _ := diagnostic.Lookup(code)
 	found := diagnostic.Finding{Code: code, Level: def.Level, Message: "m"}

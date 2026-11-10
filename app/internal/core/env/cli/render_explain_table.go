@@ -1,7 +1,7 @@
 package cli
 
 import (
-	"github.com/go-envx/envx/app/internal/features/env"
+	"github.com/go-envx/envx/app/internal/core/env"
 	"github.com/go-envx/envx/app/internal/lib/filex"
 	"github.com/go-envx/envx/app/internal/lib/printer"
 	"github.com/go-envx/envx/app/internal/lib/str"
@@ -28,25 +28,27 @@ func (r explainRenderer) table(result *env.ExplainResult) error {
 
 // toTableRow formats one row of explain output.
 func (r explainRenderer) toTableRow(
-	e *env.ExplanationEntry,
+	e *env.ExplainEntry,
 	workspaceDir string,
 ) []printer.Cell {
-	source := e.Origin.Winner.File
+	source := e.Origin.Winner.Path
 	if !r.absolute {
 		source = filex.RelativeTo(workspaceDir, source)
 	}
+	status := r.status(e)
 	row := []printer.Cell{
 		{Text: e.Key},
-		{Text: e.Resolution.Kind.String()},
-		{Text: e.Literal},
+		{Text: e.Evaluation.Kind.String()},
+		{Text: e.Raw},
 		{Text: source},
 		{
-			Text:     e.Resolution.Code,
-			Severity: e.Resolution.Severity,
+			Text:     string(status.Code),
+			Severity: status.Level,
 		},
 	}
 	if r.reveal {
-		row = append(row, printer.Cell{Text: e.Resolution.Resolved})
+		resolved, _ := r.resolved(e)
+		row = append(row, printer.Cell{Text: resolved})
 	}
 	return row
 }

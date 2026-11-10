@@ -65,6 +65,18 @@ func TestBindConfig(t *testing.T) {
 	})
 }
 
+func TestBindEnv(t *testing.T) {
+	t.Parallel()
+
+	cmd, _ := parseCommand(t, BindEnv, "--env", "prod")
+	if cmd.Flags().Lookup("prefix") != nil {
+		t.Error("BindEnv registered --prefix")
+	}
+	if got := Settings(cmd).Env; got == nil || *got != "prod" {
+		t.Errorf("Env = %v, want prod", got)
+	}
+}
+
 func TestBindSettingsOmission(t *testing.T) {
 	t.Parallel()
 

@@ -3,10 +3,10 @@ package cli
 import (
 	"fmt"
 
-	"github.com/go-envx/envx/app/internal/features/env"
+	"github.com/go-envx/envx/app/internal/core/env"
+	workspacecli "github.com/go-envx/envx/app/internal/core/workspace/cli"
 	"github.com/go-envx/envx/app/internal/lib/printer"
 	"github.com/go-envx/envx/app/internal/lib/str"
-	"github.com/go-envx/envx/app/internal/shared/flags"
 	"github.com/spf13/cobra"
 )
 
@@ -47,25 +47,19 @@ func NewSetCommand(f Factory) *cobra.Command {
 			value := args[2]
 
 			// Extract command-line flag values.
-			fs := cmd.Flags()
-			configPath := flags.Config.Get(fs)
-			envOptions := getEnvOptions(fs)
+			configPath := workspacecli.ConfigPath(cmd)
+			settings := workspacecli.Settings(cmd)
 
 			// Obtain the environment service using the configuration path.
-			envService, err := f.EnvService(configPath)
+			envService, err := f.NewEnvService(configPath)
 			if err != nil {
 				return err
-			}
-
-			var envTarget string
-			if envOptions.Env != nil {
-				envTarget = *envOptions.Env
 			}
 
 			// Perform the environment set operation.
 			result, err := envService.Set(env.SetParams{
 				IncludePath: includePath,
-				Environment: envTarget,
+				Environment: settings.Env,
 				Key:         key,
 				Value:       value,
 			})
@@ -85,10 +79,7 @@ func NewSetCommand(f Factory) *cobra.Command {
 	}
 
 	// Bind the command-line flags.
-	{
-		fs := cmd.Flags()
-		flags.Bind(fs, &envFlag)
-	}
+	workspacecli.BindEnv(cmd)
 
 	return cmd
 }

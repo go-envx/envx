@@ -5,14 +5,15 @@ import (
 	"slices"
 
 	"github.com/go-envx/envx/app/internal/core/diagnostic"
+	"github.com/go-envx/envx/app/internal/core/workspace"
 	"github.com/go-envx/envx/app/internal/lib/process"
 	"github.com/go-envx/envx/app/internal/lib/stdio"
 )
 
 // RunParams selects the environment and the child command.
 type RunParams struct {
-	// Query selects the project and setting overrides.
-	Query Query
+	// Project names the declared project; empty selects the only project.
+	Project string
 	// Args is the command followed by its arguments.
 	Args []string
 	// Streams are the child's standard streams; nil streams are EOF or discard.
@@ -22,6 +23,8 @@ type RunParams struct {
 	// OnWarning presents each downgraded failure before the child starts; an
 	// error aborts the run. Nil discards warnings.
 	OnWarning func(diagnostic.Finding) error
+	// Options are setting overrides that win over the manifest.
+	Options workspace.Settings
 }
 
 // Run materializes the environment and executes the command with exactly that
@@ -34,8 +37,9 @@ func (s *Service) Run(params RunParams) error {
 		return process.ErrNoCommand
 	}
 	result, err := s.Materialize(MaterializeParams{
-		Query:        params.Query,
+		Project:      params.Project,
 		IgnoreErrors: params.IgnoreErrors,
+		Options:      params.Options,
 	})
 	if err != nil {
 		return err

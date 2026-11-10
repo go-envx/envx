@@ -9,51 +9,35 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/go-envx/envx/app/internal/core"
-	"github.com/go-envx/envx/app/internal/features/emit"
-	"github.com/go-envx/envx/app/internal/features/env"
-	"github.com/go-envx/envx/app/internal/resources/cipher/age"
-	"github.com/go-envx/envx/app/internal/shared/flags"
+	"github.com/go-envx/envx/app/internal/app"
+	"github.com/go-envx/envx/app/internal/core/env"
+	"github.com/go-envx/envx/app/internal/core/env/format"
+	workspacecli "github.com/go-envx/envx/app/internal/core/workspace/cli"
+	"github.com/go-envx/envx/app/internal/lib/crypt/age"
 	"github.com/go-envx/envx/app/test/fixtures"
 )
 
-// mockEmitFactory implements EmitFactory for unit testing.
+// mockEmitFactory implements Factory for unit testing.
 type mockEmitFactory struct {
-	err     error
-	emitErr error
+	err error
 }
 
-func (m *mockEmitFactory) EnvService(configPath string) (*env.Service, error) {
+func (m *mockEmitFactory) NewEnvService(configPath string) (*env.Service, error) {
 	if m.err != nil {
 		return nil, m.err
 	}
-	app, err := core.NewAppFactory()
-	if err != nil {
-		return nil, err
-	}
-	return app.EnvService(configPath)
-}
-
-func (m *mockEmitFactory) EmitService() (*emit.Service, error) {
-	if m.emitErr != nil {
-		return nil, m.emitErr
-	}
-	app, err := core.NewAppFactory()
-	if err != nil {
-		return nil, err
-	}
-	return app.EmitService()
+	return app.Factory{}.NewEnvService(configPath)
 }
 
 // executeEmit builds the emit command, executes it with args, and returns its
 // captured stdout and stderr.
 func executeEmit(
-	t *testing.T, factory EmitFactory, configPath string, args ...string,
+	t *testing.T, factory Factory, configPath string, args ...string,
 ) (stdout, stderr string, err error) {
 	t.Helper()
 
 	cmd := NewEmitCommand(factory)
-	flags.Bind(cmd.PersistentFlags(), &flags.Config)
+	workspacecli.BindConfig(cmd)
 	// The root command silences usage for runtime errors; mirror it here so a
 	// failed emit leaves stdout to the rendered output alone.
 	cmd.SilenceUsage = true
@@ -88,10 +72,7 @@ func encryptedWorkspace(t *testing.T) (cfgPath, privateKey string) {
 	t.Helper()
 	dir := t.TempDir()
 
-	selected, err := age.New(age.Params{})
-	if err != nil {
-		t.Fatalf("age.New(): %v", err)
-	}
+	selected := age.Cipher{}
 	pair, err := selected.Keypair()
 	if err != nil {
 		t.Fatalf("Keypair(): %v", err)
@@ -111,105 +92,6 @@ func encryptedWorkspace(t *testing.T) (cfgPath, privateKey string) {
 			"\nsecrets:\n  production:\n    db: "+ciphertext+"\n")
 
 	return filepath.Join(dir, "envx.yaml"), pair.PrivateKey
-}
-
-// TestValidateNameUsage verifies --name is accepted on the k8s targets (optional,
-// since it defaults to the project) and rejected on the plain targets.
-func TestValidateNameUsage(t *testing.T) {
-	t.Parallel()
-
-	tests := []struct {
-		name    string
-		target  emit.Target
-		nameSet bool
-		wantErr bool
-	}{
-		{"k8s with name", emit.TargetK8s, true, false},
-		{"k8s without name", emit.TargetK8s, false, false},
-		{"k8s-bundle with name", emit.TargetK8sBundle, true, false},
-		{"dotenv without name", emit.TargetDotenv, false, false},
-		{"dotenv with name", emit.TargetDotenv, true, true},
-		{"json with name", emit.TargetJSON, true, true},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-			err := validateNameUsage(tt.target, tt.nameSet)
-			if tt.wantErr != (err != nil) {
-				t.Errorf("validateNameUsage(%s, %v) error = %v, wantErr %v",
-					tt.target, tt.nameSet, err, tt.wantErr)
-			}
-		})
-	}
-}
-
-// TestValidateKeyUsage verifies --key is accepted only on k8s-bundle, rejected on
-// the other targets, and rejected when its extension names no known format.
-func TestValidateKeyUsage(t *testing.T) {
-	t.Parallel()
-
-	tests := []struct {
-		name    string
-		target  emit.Target
-		key     string
-		keySet  bool
-		wantErr bool
-	}{
-		{"bundle with json key", emit.TargetK8sBundle, "config.json", true, false},
-		{"bundle with env key", emit.TargetK8sBundle, "app.env", true, false},
-		{"bundle with bad ext", emit.TargetK8sBundle, "config.yaml", true, true},
-		{"bundle without key", emit.TargetK8sBundle, "", false, false},
-		{"k8s with key", emit.TargetK8s, "config.json", true, true},
-		{"json with key", emit.TargetJSON, "config.json", true, true},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-			err := validateKeyUsage(tt.target, tt.key, tt.keySet)
-			if tt.wantErr != (err != nil) {
-				t.Errorf("validateKeyUsage(%s, %q, %v) error = %v, wantErr %v",
-					tt.target, tt.key, tt.keySet, err, tt.wantErr)
-			}
-		})
-	}
-}
-
-// TestResolveSlice verifies the --only value maps to the right slice selectors:
-// empty selects both, the named slices select one, and anything else is rejected.
-func TestResolveSlice(t *testing.T) {
-	t.Parallel()
-
-	tests := []struct {
-		only        string
-		wantSecrets bool
-		wantConfig  bool
-		wantErr     bool
-	}{
-		{"", true, true, false},
-		{"secrets", true, false, false},
-		{"config", false, true, false},
-		{"plain", false, false, true},
-		{"both", false, false, true},
-	}
-	for _, tt := range tests {
-		t.Run(tt.only, func(t *testing.T) {
-			t.Parallel()
-			gotSecrets, gotConfig, err := resolveSlice(tt.only)
-			if tt.wantErr {
-				if err == nil {
-					t.Errorf("resolveSlice(%q) = nil error, want error", tt.only)
-				}
-				return
-			}
-			if err != nil {
-				t.Fatalf("resolveSlice(%q): %v", tt.only, err)
-			}
-			if gotSecrets != tt.wantSecrets || gotConfig != tt.wantConfig {
-				t.Errorf("resolveSlice(%q) = (%v, %v), want (%v, %v)",
-					tt.only, gotSecrets, gotConfig, tt.wantSecrets, tt.wantConfig)
-			}
-		})
-	}
 }
 
 // TestNewEmitCommandDotenv verifies emit resolves a project and renders its
@@ -258,15 +140,15 @@ func TestNewEmitCommandRequiresTarget(t *testing.T) {
 }
 
 // TestNewEmitCommandUnknownTarget verifies an unknown --target fails with the
-// domain sentinel before any resolution work.
+// format sentinel before any output is written.
 func TestNewEmitCommandUnknownTarget(t *testing.T) {
 	t.Parallel()
 
 	stdout, _, err := executeEmit(
-		t, &mockEmitFactory{err: errors.New("must not resolve")},
+		t, &mockEmitFactory{},
 		fixtures.Manifest("basic"), "api-core", "--target", "toml",
 	)
-	if !errors.Is(err, emit.ErrUnknownTarget) {
+	if !errors.Is(err, format.ErrUnknownTarget) {
 		t.Fatalf("got err = %v, want ErrUnknownTarget", err)
 	}
 	if stdout != "" {
@@ -282,24 +164,6 @@ func TestNewEmitCommandFactoryError(t *testing.T) {
 	expectedErr := errors.New("factory failure")
 	stdout, _, err := executeEmit(
 		t, &mockEmitFactory{err: expectedErr}, "envx.yaml",
-		"api-core", "--target", "dotenv",
-	)
-	if !errors.Is(err, expectedErr) {
-		t.Fatalf("got err = %v, want %v", err, expectedErr)
-	}
-	if stdout != "" {
-		t.Errorf("emit wrote output despite the factory failure: %q", stdout)
-	}
-}
-
-// TestNewEmitCommandEmitFactoryError verifies an emit service failure aborts
-// emit before any output is written.
-func TestNewEmitCommandEmitFactoryError(t *testing.T) {
-	t.Parallel()
-
-	expectedErr := errors.New("emit failure")
-	stdout, _, err := executeEmit(
-		t, &mockEmitFactory{emitErr: expectedErr}, fixtures.Manifest("basic"),
 		"api-core", "--target", "dotenv",
 	)
 	if !errors.Is(err, expectedErr) {

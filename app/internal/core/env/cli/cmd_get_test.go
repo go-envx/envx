@@ -6,16 +6,17 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/go-envx/envx/app/internal/core"
-	"github.com/go-envx/envx/app/internal/features/env"
+	"github.com/go-envx/envx/app/internal/app"
+	"github.com/go-envx/envx/app/internal/core/env"
 )
 
+// mockEnvFactory implements Factory for unit testing.
 type mockEnvFactory struct {
 	svc *env.Service
 	err error
 }
 
-func (m *mockEnvFactory) EnvService(
+func (m *mockEnvFactory) NewEnvService(
 	configPath string,
 ) (*env.Service, error) {
 	if m.err != nil {
@@ -24,11 +25,17 @@ func (m *mockEnvFactory) EnvService(
 	if m.svc != nil {
 		return m.svc, nil
 	}
-	app, err := core.NewAppFactory()
+	return app.Factory{}.NewEnvService(configPath)
+}
+
+// newEnvService assembles the environment service for manifest.
+func newEnvService(t *testing.T, manifest string) *env.Service {
+	t.Helper()
+	svc, err := app.Factory{}.NewEnvService(manifest)
 	if err != nil {
-		return nil, err
+		t.Fatalf("NewEnvService(): %v", err)
 	}
-	return app.EnvService(configPath)
+	return svc
 }
 
 func writeGetManifest(t *testing.T) (manifestPath, dir string) {
@@ -76,15 +83,7 @@ func TestNewGetCommand(t *testing.T) {
 	t.Parallel()
 
 	manifest, _ := writeGetManifest(t)
-	app, err := core.NewAppFactory()
-	if err != nil {
-		t.Fatalf("NewAppFactory(): %v", err)
-	}
-
-	svc, err := app.EnvService(manifest)
-	if err != nil {
-		t.Fatalf("EnvService(): %v", err)
-	}
+	svc := newEnvService(t, manifest)
 
 	factory := &mockEnvFactory{svc: svc}
 	cmd := NewGetCommand(factory)
@@ -112,15 +111,7 @@ func TestNewGetCommandMissingKey(t *testing.T) {
 	t.Parallel()
 
 	manifest, _ := writeGetManifest(t)
-	app, err := core.NewAppFactory()
-	if err != nil {
-		t.Fatalf("NewAppFactory(): %v", err)
-	}
-
-	svc, err := app.EnvService(manifest)
-	if err != nil {
-		t.Fatalf("EnvService(): %v", err)
-	}
+	svc := newEnvService(t, manifest)
 
 	factory := &mockEnvFactory{svc: svc}
 	cmd := NewGetCommand(factory)

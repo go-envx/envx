@@ -97,7 +97,7 @@ func TestMaterializeTolerant(t *testing.T) {
 	`, "DANGLING=from-host", "LOOP=from-host")
 	overload := workspace.Settings{Overload: ptr(true)}
 	result, err := s.Materialize(MaterializeParams{
-		Query: Query{Options: overload}, IgnoreErrors: true,
+		Options: overload, IgnoreErrors: true,
 	})
 	if err != nil {
 		t.Fatalf("Materialize: %v", err)

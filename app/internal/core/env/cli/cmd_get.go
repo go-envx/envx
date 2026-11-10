@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/go-envx/envx/app/internal/features/env"
+	"github.com/go-envx/envx/app/internal/core/env"
+	workspacecli "github.com/go-envx/envx/app/internal/core/workspace/cli"
 	"github.com/go-envx/envx/app/internal/lib/str"
-	"github.com/go-envx/envx/app/internal/shared/flags"
 	"github.com/spf13/cobra"
 )
 
@@ -45,13 +45,12 @@ func NewGetCommand(f Factory) *cobra.Command {
 			key := args[1]
 
 			// Extract command-line flag values.
-			fs := cmd.Flags()
-			configPath := flags.Config.Get(fs)
-			reveal := revealFlag.Get(fs)
-			envOptions := getEnvOptions(fs)
+			configPath := workspacecli.ConfigPath(cmd)
+			reveal := revealFlag.Value(cmd)
+			settings := workspacecli.Settings(cmd)
 
 			// Obtain the environment service using the configuration path.
-			envService, err := f.EnvService(configPath)
+			envService, err := f.NewEnvService(configPath)
 			if err != nil {
 				return err
 			}
@@ -61,7 +60,7 @@ func NewGetCommand(f Factory) *cobra.Command {
 				Project: project,
 				Key:     key,
 				Reveal:  reveal,
-				Options: envOptions,
+				Options: settings,
 			})
 			if err != nil {
 				return err
@@ -73,11 +72,8 @@ func NewGetCommand(f Factory) *cobra.Command {
 	}
 
 	// Bind the command-line flags.
-	{
-		fs := cmd.Flags()
-		flags.Bind(fs, &revealFlag)
-		bindEnvOptionsFlags(fs)
-	}
+	revealFlag.Bind(cmd)
+	workspacecli.BindSettings(cmd)
 
 	return cmd
 }

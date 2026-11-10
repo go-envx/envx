@@ -5,46 +5,44 @@ import (
 	"fmt"
 	"maps"
 	"slices"
+
+	"github.com/go-envx/envx/app/internal/core/workspace"
 )
 
 // DiffParams selects two environments of one project to compare.
 type DiffParams struct {
-	// Query selects the project and setting overrides; its environment is the
-	// default for an empty side.
-	Query Query
-	// From is the "before" environment; empty uses the default.
-	From string
-	// To is the "after" environment; empty uses the default.
-	To string
+	// Project names the declared project; empty selects the only project.
+	Project string
+	// EnvironmentA is the "before" environment; empty uses the default.
+	EnvironmentA string
+	// EnvironmentB is the "after" environment; empty uses the default.
+	EnvironmentB string
 	// Reveal compares resolved values instead of declared literals.
 	Reveal bool
+	// Options are setting overrides that win over the manifest; their
+	// environment is the default for an empty side.
+	Options workspace.Settings
 }
 
-// Change is one differing key. Before is nil for an addition and After is nil
-// for a removal.
+// Change is one differing key and the text each side compared by: the
+// declared literal, or the resolved value when revealing.
 type Change struct {
 	// Key is the variable name.
 	Key string
-	// Before is the entry in From.
-	Before *Entry
-	// After is the entry in To.
-	After *Entry
+	// Before is the value in EnvironmentA; empty for an addition.
+	Before string
+	// After is the value in EnvironmentB; empty for a removal.
+	After string
 }
 
-// DiffResult is the sorted comparison of two environments.
+// DiffResult is the comparison of two environments, each list sorted by key.
 type DiffResult struct {
-	// WorkspaceDir is the workspace root that source paths are relative to.
-	WorkspaceDir string
-	// Changes lists added, removed, and changed keys, sorted by key.
-	Changes []Change
-}
-
-// diffEntry pairs an entry with the text it is compared by.
-type diffEntry struct {
-	// entry is the evaluated winner.
-	entry Entry
-	// compared is the declared literal, or the resolved value when revealing.
-	compared string
+	// Added lists keys present only in EnvironmentB.
+	Added []Change
+	// Removed lists keys present only in EnvironmentA.
+	Removed []Change
+	// Changed lists keys present in both with differing values.
+	Changed []Change
 }
 
 // Diff compares two environments over one read of the base namespaces. Masked,
@@ -53,15 +51,15 @@ type diffEntry struct {
 // any value that does not resolve on either side is fatal. Host-only keys are
 // not compared.
 func (s *Service) Diff(params DiffParams) (DiffResult, error) {
-	op, err := s.begin(params.Query)
+	op, err := s.begin(params.Project, params.Options)
 	if err != nil {
 		return DiffResult{}, err
 	}
-	from, err := s.diffEnvironment(op, params.From)
+	from, err := s.diffEnvironment(op, params.EnvironmentA)
 	if err != nil {
 		return DiffResult{}, err
 	}
-	to, err := s.diffEnvironment(op, params.To)
+	to, err := s.diffEnvironment(op, params.EnvironmentB)
 	if err != nil {
 		return DiffResult{}, err
 	}
@@ -91,22 +89,22 @@ func (s *Service) Diff(params DiffParams) (DiffResult, error) {
 	for key := range after {
 		keys[key] = struct{}{}
 	}
-	var changes []Change
+	var result DiffResult
 	for _, key := range slices.Sorted(maps.Keys(keys)) {
 		a, inBefore := before[key]
 		b, inAfter := after[key]
 		switch {
-		case inBefore && inAfter && a.compared == b.compared:
+		case inBefore && inAfter && a == b:
 			continue
 		case inBefore && inAfter:
-			changes = append(changes, Change{Key: key, Before: &a.entry, After: &b.entry})
+			result.Changed = append(result.Changed, Change{Key: key, Before: a, After: b})
 		case inBefore:
-			changes = append(changes, Change{Key: key, Before: &a.entry})
+			result.Removed = append(result.Removed, Change{Key: key, Before: a})
 		default:
-			changes = append(changes, Change{Key: key, After: &b.entry})
+			result.Added = append(result.Added, Change{Key: key, After: b})
 		}
 	}
-	return DiffResult{WorkspaceDir: s.root, Changes: changes}, nil
+	return result, nil
 }
 
 // diffEnvironment validates an explicit side or falls back to op's default.
@@ -122,11 +120,12 @@ func (s *Service) diffEnvironment(op operation, environment string) (operation, 
 	return op, nil
 }
 
-// diffSide merges and evaluates one side. Masked, list rendering is still
-// validated; revealed, every value must resolve.
+// diffSide merges and evaluates one side, returning each key's compared text.
+// Masked, list rendering is still validated; revealed, every value must
+// resolve.
 func (s *Service) diffSide(
 	namespaces []namespace, resolver ValueResolver, op operation, reveal bool,
-) (map[string]diffEntry, error) {
+) (map[string]string, error) {
 	merged, err := s.merge(namespaces, op)
 	if err != nil {
 		return nil, err
@@ -135,7 +134,7 @@ func (s *Service) diffSide(
 
 	keys := slices.Sorted(maps.Keys(merged.values))
 	entries := newEvaluator(merged, resolver, op, reveal).entries(keys)
-	out := make(map[string]diffEntry, len(entries))
+	out := make(map[string]string, len(entries))
 	var unresolved []error
 	for i := range entries {
 		entry := &entries[i]
@@ -149,7 +148,7 @@ func (s *Service) diffSide(
 		} else if !entry.Evaluation.Resolved {
 			unresolved = append(unresolved, s.unresolvedError(entry))
 		}
-		out[entry.Key] = diffEntry{entry: *entry, compared: compared}
+		out[entry.Key] = compared
 	}
 	if len(unresolved) > 0 {
 		return nil, fmt.Errorf(
@@ -160,7 +159,7 @@ func (s *Service) diffSide(
 }
 
 // unresolvedError describes an unresolved entry without its value.
-func (s *Service) unresolvedError(entry *Entry) error {
+func (s *Service) unresolvedError(entry *ExplainEntry) error {
 	message := "did not resolve"
 	if !entry.Evaluation.Diagnostic.IsZero() {
 		message = entry.Evaluation.Diagnostic.Message

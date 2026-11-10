@@ -3,10 +3,10 @@ package cli
 import (
 	"fmt"
 
-	"github.com/go-envx/envx/app/internal/features/env"
+	"github.com/go-envx/envx/app/internal/core/env"
+	workspacecli "github.com/go-envx/envx/app/internal/core/workspace/cli"
 	"github.com/go-envx/envx/app/internal/lib/printer"
 	"github.com/go-envx/envx/app/internal/lib/str"
-	"github.com/go-envx/envx/app/internal/shared/flags"
 	"github.com/spf13/cobra"
 )
 
@@ -45,14 +45,13 @@ func NewDiffCommand(f Factory) *cobra.Command {
 			envB := args[2]
 
 			// Extract command-line flag values.
-			fs := cmd.Flags()
-			configPath := flags.Config.Get(fs)
-			reveal := revealFlag.Get(fs)
-			output := flags.Output.Get(fs)
-			envOptions := getEnvOptions(fs)
+			configPath := workspacecli.ConfigPath(cmd)
+			reveal := revealFlag.Value(cmd)
+			output := outputFlag.Value(cmd)
+			settings := workspacecli.Settings(cmd)
 
 			// Obtain the environment service using the configuration path.
-			envService, err := f.EnvService(configPath)
+			envService, err := f.NewEnvService(configPath)
 			if err != nil {
 				return err
 			}
@@ -63,7 +62,7 @@ func NewDiffCommand(f Factory) *cobra.Command {
 				EnvironmentA: envA,
 				EnvironmentB: envB,
 				Reveal:       reveal,
-				Options:      envOptions,
+				Options:      settings,
 			})
 			if err != nil {
 				return err
@@ -76,17 +75,14 @@ func NewDiffCommand(f Factory) *cobra.Command {
 			})
 
 			// Output the result of the environment diff operation.
-			return outputDiff(console, result, output)
+			return outputDiff(console, &result, output)
 		},
 	}
 
 	// Bind the command-line flags.
-	{
-		fs := cmd.Flags()
-		flags.Bind(fs, &flags.Output)
-		flags.Bind(fs, &revealFlag)
-		bindEnvOptionsFlags(fs, without(&envFlag))
-	}
+	outputFlag.Bind(cmd)
+	revealFlag.Bind(cmd)
+	workspacecli.BindSettings(cmd, "env")
 
 	return cmd
 }

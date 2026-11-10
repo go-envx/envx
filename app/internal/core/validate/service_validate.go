@@ -119,9 +119,12 @@ func (s *Service) diagnose(r *run) error {
 	}
 	for _, project := range s.projects {
 		for _, environment := range s.environments {
-			query := env.Query{Project: project, Options: r.params.Options}
-			query.Options.Env = &environment
-			result, err := explainer.Explain(env.ExplainParams{Query: query})
+			options := r.params.Options
+			options.Env = &environment
+			result, err := explainer.Explain(env.ExplainParams{
+				Project: project,
+				Options: options,
+			})
 			if err != nil {
 				return fmt.Errorf(
 					"diagnosing project %q environment %q: %w", project, environment, err,

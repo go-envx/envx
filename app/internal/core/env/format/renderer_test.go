@@ -14,8 +14,8 @@ import (
 )
 
 // entry builds a resolved entry.
-func entry(key, text string, secret bool) env.Entry {
-	return env.Entry{
+func entry(key, text string, secret bool) env.ExplainEntry {
+	return env.ExplainEntry{
 		Key:        key,
 		Evaluation: value.Evaluation{Value: text, Resolved: true},
 		Secret:     secret,
@@ -23,8 +23,8 @@ func entry(key, text string, secret bool) env.Entry {
 }
 
 // sampleEntries mixes secret and plain values in unsorted order.
-func sampleEntries() []env.Entry {
-	return []env.Entry{
+func sampleEntries() []env.ExplainEntry {
+	return []env.ExplainEntry{
 		entry("PORT", "5432", false),
 		entry("DB_PASSWORD", "s3cr3t", true),
 		entry("APP_NAME", "api", false),
@@ -33,7 +33,7 @@ func sampleEntries() []env.Entry {
 }
 
 // render renders entries for project "api", failing the test on error.
-func render(t *testing.T, entries []env.Entry, options env.EmitOptions) string {
+func render(t *testing.T, entries []env.ExplainEntry, options env.EmitOptions) string {
 	t.Helper()
 	var buffer bytes.Buffer
 	if err := (format.Renderer{}).Render(&buffer, "api", entries, options); err != nil {
@@ -96,7 +96,7 @@ func TestRenderGolden(t *testing.T) {
 func TestRenderDotenvQuoting(t *testing.T) {
 	t.Parallel()
 
-	got := render(t, []env.Entry{
+	got := render(t, []env.ExplainEntry{
 		entry("PLAIN", "http://host:8080/path", false),
 		entry("SPACED", "two words", false),
 		entry("QUOTED", `a "b" c`, false),

@@ -7,8 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/go-envx/envx/app/internal/core"
-	"github.com/go-envx/envx/app/internal/features/env"
+	"github.com/go-envx/envx/app/internal/core/env"
 	"github.com/go-envx/envx/app/internal/lib/printer"
 )
 
@@ -37,15 +36,7 @@ func TestNewDiffCommandTable(t *testing.T) {
 	t.Parallel()
 
 	manifest, _ := writeDiffManifest(t)
-	app, err := core.NewAppFactory()
-	if err != nil {
-		t.Fatalf("NewAppFactory(): %v", err)
-	}
-
-	svc, err := app.EnvService(manifest)
-	if err != nil {
-		t.Fatalf("EnvService(): %v", err)
-	}
+	svc := newEnvService(t, manifest)
 
 	factory := &mockEnvFactory{svc: svc}
 	cmd := NewDiffCommand(factory)
@@ -75,15 +66,7 @@ func TestNewDiffCommandJSON(t *testing.T) {
 	t.Parallel()
 
 	manifest, _ := writeDiffManifest(t)
-	app, err := core.NewAppFactory()
-	if err != nil {
-		t.Fatalf("NewAppFactory(): %v", err)
-	}
-
-	svc, err := app.EnvService(manifest)
-	if err != nil {
-		t.Fatalf("EnvService(): %v", err)
-	}
+	svc := newEnvService(t, manifest)
 
 	factory := &mockEnvFactory{svc: svc}
 	cmd := NewDiffCommand(factory)

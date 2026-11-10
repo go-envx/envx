@@ -4,11 +4,12 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/go-envx/envx/app/internal/features/env"
-	"github.com/go-envx/envx/app/internal/features/runner"
+	"github.com/go-envx/envx/app/internal/core/diagnostic"
+	"github.com/go-envx/envx/app/internal/core/env"
+	workspacecli "github.com/go-envx/envx/app/internal/core/workspace/cli"
 	"github.com/go-envx/envx/app/internal/lib/printer"
+	"github.com/go-envx/envx/app/internal/lib/stdio"
 	"github.com/go-envx/envx/app/internal/lib/str"
-	"github.com/go-envx/envx/app/internal/shared/flags"
 	"github.com/spf13/cobra"
 )
 
@@ -40,7 +41,7 @@ const (
 )
 
 // NewRunCommand builds the "run" command.
-func NewRunCommand(f RunFactory) *cobra.Command {
+func NewRunCommand(f Factory) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     runUsage,
 		Short:   runShort,
@@ -65,34 +66,12 @@ func NewRunCommand(f RunFactory) *cobra.Command {
 			execArgs := args[1:]
 
 			// Extract command-line flag values.
-			fs := cmd.Flags()
-			configPath := flags.Config.Get(fs)
-			ignoreErrors := ignoreErrorsFlag.Get(fs)
-			envOptions := getEnvOptions(fs)
+			configPath := workspacecli.ConfigPath(cmd)
+			ignoreErrors := ignoreErrorsFlag.Value(cmd)
+			settings := workspacecli.Settings(cmd)
 
 			// Obtain the environment service using the configuration path.
-			envService, err := f.EnvService(configPath)
-			if err != nil {
-				return err
-			}
-
-			// Obtain the runner service from the factory.
-			runnerService, err := f.RunnerService()
-			if err != nil {
-				return err
-			}
-
-			// Materialize the complete environment. By default a single unresolved
-			// value aborts here, before the child starts, so it can never receive an
-			// unresolved reference as plaintext. Under --ignore-errors each
-			// resolution failure is downgraded to a warning and its key is omitted,
-			// so the child still starts and inherits the omitted key from the
-			// ambient environment. Structural failures stay fatal in both modes.
-			result, err := envService.Materialize(env.MaterializeParams{
-				Project:      project,
-				IgnoreErrors: ignoreErrors,
-				Options:      envOptions,
-			})
+			envService, err := f.NewEnvService(configPath)
 			if err != nil {
 				return err
 			}
@@ -103,41 +82,39 @@ func NewRunCommand(f RunFactory) *cobra.Command {
 				Err: cmd.ErrOrStderr(),
 			})
 
-			// Output any downgraded resolution warnings.
-			if err := outputRunWarnings(console, result.Warnings); err != nil {
-				return err
-			}
-
-			// Run the child process with the ready environment. The runner injects it
-			// verbatim, forwards signals to the child, and surfaces a non-zero or
-			// signal-terminated exit as an *exitcode.Error so main.go can propagate
-			// it.
-			return runnerService.Run(runner.RunParams{
-				Args:   execArgs,
-				Env:    result.Environment.All(),
-				Stdout: cmd.OutOrStdout(),
-				Stderr: cmd.ErrOrStderr(),
-				Stdin:  cmd.InOrStdin(),
+			// Materialize the environment and run the child with exactly it. By
+			// default a single unresolved value aborts before the child starts, so it
+			// can never receive an unresolved reference as plaintext. Under
+			// --ignore-errors each resolution failure is printed as a warning and its
+			// key is omitted, so the child still starts and inherits the omitted key
+			// from the ambient environment. Structural failures stay fatal in both
+			// modes. A non-zero or signal-terminated child exit surfaces as an
+			// *exitcode.Error so main.go can propagate it.
+			return envService.Run(env.RunParams{
+				Project: project,
+				Args:    execArgs,
+				Streams: stdio.Streams{
+					In:     cmd.InOrStdin(),
+					Out:    cmd.OutOrStdout(),
+					ErrOut: cmd.ErrOrStderr(),
+				},
+				OnWarning: func(warning diagnostic.Finding) error {
+					return outputRunWarning(console, warning)
+				},
+				IgnoreErrors: ignoreErrors,
+				Options: settings,
 			})
 		},
 	}
 
 	// Bind the command-line flags.
-	{
-		fs := cmd.Flags()
-		flags.Bind(fs, &ignoreErrorsFlag)
-		bindEnvOptionsFlags(fs)
-	}
+	ignoreErrorsFlag.Bind(cmd)
+	workspacecli.BindSettings(cmd)
 
 	return cmd
 }
 
-// outputRunWarnings prints each downgraded resolution failure as a warning.
-func outputRunWarnings(console *printer.Printer, warnings []error) error {
-	for _, warning := range warnings {
-		if err := console.LogWarning(warning.Error()); err != nil {
-			return err
-		}
-	}
-	return nil
+// outputRunWarning prints one downgraded resolution failure as a warning.
+func outputRunWarning(console *printer.Printer, warning diagnostic.Finding) error {
+	return console.LogWarning(warning.Message)
 }

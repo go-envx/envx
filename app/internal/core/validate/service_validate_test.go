@@ -17,7 +17,7 @@ import (
 func TestValidateDiagnosesEveryProjectEnvironment(t *testing.T) {
 	t.Parallel()
 	f := newFixture("web", "api")
-	f.explainer.entries["api"] = []env.Entry{
+	f.explainer.entries["api"] = []env.ExplainEntry{
 		failing("PASSWORD", diagnostic.SecretReferenceNotFound, "secret://shared/pw"),
 	}
 	prefix := "APP_"
@@ -33,10 +33,10 @@ func TestValidateDiagnosesEveryProjectEnvironment(t *testing.T) {
 		if params.Reveal {
 			t.Error("Explain revealed plaintext")
 		}
-		if p := params.Query.Options.Prefix; p == nil || *p != prefix {
+		if p := params.Options.Prefix; p == nil || *p != prefix {
 			t.Errorf("prefix = %v, want %q", p, prefix)
 		}
-		got = append(got, call{params.Query.Project, *params.Query.Options.Env})
+		got = append(got, call{params.Project, *params.Options.Env})
 	}
 	want := []call{
 		{"api", "development"},
@@ -98,7 +98,7 @@ func TestValidateGradesBySeverity(t *testing.T) {
 			f.ws.ValidateSeverities = tt.overrides
 			overlayOnly := failing("PASSWORD", diagnostic.SecretReferenceNotFound)
 			overlayOnly.DeclaredInBase = false
-			f.explainer.entries["api"] = []env.Entry{overlayOnly}
+			f.explainer.entries["api"] = []env.ExplainEntry{overlayOnly}
 
 			report := f.validate(t, ValidateParams{Strict: tt.strict})
 
@@ -116,7 +116,7 @@ func TestValidateGradesBySeverity(t *testing.T) {
 func TestValidateReportsStoreFindings(t *testing.T) {
 	t.Parallel()
 	f := newFixture("api")
-	f.explainer.entries["api"] = []env.Entry{
+	f.explainer.entries["api"] = []env.ExplainEntry{
 		entry("TOKEN", "plain", "secret://Shared/token", `\secret://shared/escaped`),
 	}
 	f.inspector.audit = secrets.Audit{
@@ -203,7 +203,7 @@ func TestValidateReportsStoreProblemsOnce(t *testing.T) {
 			t.Parallel()
 			f := newFixture("api", "web")
 			for _, project := range []string{"api", "web"} {
-				f.explainer.entries[project] = []env.Entry{
+				f.explainer.entries[project] = []env.ExplainEntry{
 					failing("PASSWORD", tt.code, "secret://shared/pw"),
 					failing("DSN", tt.code, "secret://shared/pw"),
 					failing("MISSING", diagnostic.SecretReferenceNotFound, "secret://x/y"),
@@ -252,7 +252,7 @@ func TestValidateDeduplicatesFindings(t *testing.T) {
 	t.Run("store code under resolution selection", func(t *testing.T) {
 		t.Parallel()
 		f := newFixture("api")
-		f.explainer.entries["api"] = []env.Entry{
+		f.explainer.entries["api"] = []env.ExplainEntry{
 			failing("PASSWORD", diagnostic.SecretIsNotEncrypted, "secret://shared/pw"),
 		}
 		report := f.validate(t, ValidateParams{
@@ -276,7 +276,7 @@ func TestValidateReportsMaskedResolutionFindings(t *testing.T) {
 	mixed.Findings = append(mixed.Findings, diagnostic.Finding{
 		Code: diagnostic.SecretReferenceNotFound, Level: def.Level, Message: "m",
 	})
-	f.explainer.entries["api"] = []env.Entry{mixed}
+	f.explainer.entries["api"] = []env.ExplainEntry{mixed}
 
 	report := f.validate(t, ValidateParams{
 		Selected: []diagnostic.Code{diagnostic.SecretReferenceNotFound},
@@ -294,7 +294,7 @@ func TestValidateCountsOverriddenReferences(t *testing.T) {
 	t.Parallel()
 	f := newFixture("api")
 	overridden := entry("PASSWORD", "secret://shared/pw")
-	f.explainer.entries["api"] = []env.Entry{overridden}
+	f.explainer.entries["api"] = []env.ExplainEntry{overridden}
 	f.inspector.audit = secrets.Audit{Secrets: []secrets.StoredSecret{
 		stored("shared", "pw", true, false),
 	}}
@@ -353,7 +353,7 @@ func TestValidateSelectsChecks(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			f := newFixture("api")
-			f.explainer.entries["api"] = []env.Entry{
+			f.explainer.entries["api"] = []env.ExplainEntry{
 				failing("MISSING", diagnostic.SecretReferenceNotFound, "secret://x/y"),
 			}
 			f.ws.Environments = []string{"production"}
@@ -390,10 +390,10 @@ func TestValidateSortsFindings(t *testing.T) {
 	t.Parallel()
 	f := newFixture("web", "api")
 	f.ws.Environments = []string{"production"}
-	f.explainer.entries["web"] = []env.Entry{
+	f.explainer.entries["web"] = []env.ExplainEntry{
 		failing("TOKEN", diagnostic.SecretReferenceNotFound, "secret://shared/token"),
 	}
-	f.explainer.entries["api"] = []env.Entry{
+	f.explainer.entries["api"] = []env.ExplainEntry{
 		failing("PASSWORD", diagnostic.SecretReferenceNotFound, "secret://shared/pw"),
 	}
 	f.inspector.audit = secrets.Audit{

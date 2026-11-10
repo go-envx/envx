@@ -113,7 +113,7 @@ func TestProjectSelection(t *testing.T) {
 	if got, err := single.Get(GetParams{Key: "host"}); err != nil || got.Value != "app" {
 		t.Errorf("Get(only project) = %q, %v; want app", got.Value, err)
 	}
-	_, err := single.Get(GetParams{Query: Query{Project: "missing"}, Key: "host"})
+	_, err := single.Get(GetParams{Project: "missing", Key: "host"})
 	if !errors.Is(err, ErrProjectNotFound) {
 		t.Errorf("unknown project error = %v, want ErrProjectNotFound", err)
 	}
@@ -124,7 +124,7 @@ func TestProjectSelection(t *testing.T) {
 	if _, err := multi.Get(GetParams{Key: "host"}); !errors.Is(err, ErrProjectNotFound) {
 		t.Errorf("ambiguous project error = %v, want ErrProjectNotFound", err)
 	}
-	got, err := multi.Get(GetParams{Query: Query{Project: "web"}, Key: "host"})
+	got, err := multi.Get(GetParams{Project: "web", Key: "host"})
 	if err != nil || got.Value != "web" {
 		t.Errorf("Get(web) = %q, %v; want web", got.Value, err)
 	}
@@ -183,8 +183,8 @@ func TestEnvironmentPrecedence(t *testing.T) {
 			s := newService(t, ws, Dependencies{EnvNamespaces: namespaces})
 
 			got, err := s.Get(GetParams{
-				Query: Query{Options: workspace.Settings{Env: tt.override}},
-				Key:   "host",
+				Options: workspace.Settings{Env: tt.override},
+				Key:     "host",
 			})
 			if !errors.Is(err, tt.wantErr) {
 				t.Fatalf("Get error = %v, want %v", err, tt.wantErr)
@@ -234,7 +234,7 @@ func TestSettingsPrecedence(t *testing.T) {
 				EnvNamespaces: newFakeNamespaces().base(t, appInclude, "host: x"),
 			})
 			result, err := s.Explain(ExplainParams{
-				Query: Query{Options: workspace.Settings{Prefix: tt.override}},
+				Options: workspace.Settings{Prefix: tt.override},
 			})
 			if err != nil {
 				t.Fatalf("Explain: %v", err)
