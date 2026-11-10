@@ -55,10 +55,7 @@ type include struct {
 // New privately copies the workspace configuration without performing I/O.
 func New(ws workspace.Workspace, deps Dependencies) (*Service, error) {
 	if deps.Secrets == nil {
-		return nil, errors.New("secrets reader is required")
-	}
-	if deps.ExportSecrets == nil {
-		return nil, errors.New("secrets exporter is required")
+		return nil, errors.New("secrets store is required")
 	}
 	protected := []string{ws.Path}
 	for _, path := range []string{ws.Secrets.SecretsPath, ws.Secrets.KeysPath} {

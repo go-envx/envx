@@ -307,8 +307,8 @@ func TestPackOmitsStore(t *testing.T) {
 		out := filepath.Join(t.TempDir(), "dist")
 		f.pack(t, Params{OutDir: out})
 		absent(t, out, "secrets.yaml")
-		if f.exporter.groups != nil {
-			t.Errorf("exported %v, want no export", f.exporter.groups)
+		if f.store.exported != nil {
+			t.Errorf("exported %v, want no export", f.store.exported)
 		}
 	})
 }
@@ -425,7 +425,7 @@ func TestPackPreservesDestinationOnFailure(t *testing.T) {
 		fail func(f *fixture)
 	}{
 		{"read failure", func(f *fixture) { f.store.readErr = errors.New("boom") }},
-		{"export failure", func(f *fixture) { f.exporter.err = errors.New("boom") }},
+		{"export failure", func(f *fixture) { f.store.exportErr = errors.New("boom") }},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -591,7 +591,6 @@ func TestPackRefusesInterruptedScratch(t *testing.T) {
 // and unresolved include paths.
 func TestNewRequiresDependencies(t *testing.T) {
 	t.Parallel()
-	export := (&exporter{}).export
 	unresolved := workspace.Workspace{Projects: map[string]workspace.Project{
 		"app": {Includes: []string{"env/app"}},
 	}}
@@ -600,11 +599,8 @@ func TestNewRequiresDependencies(t *testing.T) {
 		ws   workspace.Workspace
 		deps Dependencies
 	}{
-		{"no reader", workspace.Workspace{}, Dependencies{ExportSecrets: export}},
-		{"no exporter", workspace.Workspace{}, Dependencies{Secrets: newMemSecrets()}},
-		{"unresolved includes", unresolved, Dependencies{
-			Secrets: newMemSecrets(), ExportSecrets: export,
-		}},
+		{"no store", workspace.Workspace{}, Dependencies{}},
+		{"unresolved includes", unresolved, Dependencies{Secrets: newMemSecrets()}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

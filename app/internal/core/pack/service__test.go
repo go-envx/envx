@@ -18,10 +18,8 @@ type fixture struct {
 	root string
 	// ws is the workspace configuration passed to New.
 	ws workspace.Workspace
-	// store is the in-memory secrets reader.
+	// store is the in-memory secrets store.
 	store *memSecrets
-	// exporter records the exported store.
-	exporter *exporter
 }
 
 // newFixture returns an empty workspace in a temporary directory.
@@ -36,8 +34,7 @@ func newFixture(t *testing.T, environments ...string) *fixture {
 			Environments: environments,
 			Projects:     make(map[string]workspace.Project),
 		},
-		store:    newMemSecrets(),
-		exporter: &exporter{},
+		store: newMemSecrets(),
 	}
 }
 
@@ -93,10 +90,7 @@ func (f *fixture) useStore(t *testing.T, rel string, groups ...secrets.Group) {
 // service constructs a Service over the fixture.
 func (f *fixture) service(t *testing.T) *Service {
 	t.Helper()
-	service, err := New(f.ws, Dependencies{
-		Secrets:       f.store,
-		ExportSecrets: f.exporter.export,
-	})
+	service, err := New(f.ws, Dependencies{Secrets: f.store})
 	if err != nil {
 		t.Fatalf("New: %v", err)
 	}

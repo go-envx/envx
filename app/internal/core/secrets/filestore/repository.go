@@ -121,8 +121,9 @@ func (r *Repository) Commit(
 }
 
 // Export writes the groups' stored values as a standalone secrets document
-// without public keys. It never decrypts values.
-func Export(out io.Writer, groups []secrets.Group) error {
+// without public keys, using the repository's indentation. It never decrypts
+// values and does not touch the repository's document.
+func (r *Repository) Export(out io.Writer, groups []secrets.Group) error {
 	doc, err := parseDocument(nil)
 	if err != nil {
 		return err
@@ -137,7 +138,7 @@ func Export(out io.Writer, groups []secrets.Group) error {
 			return err
 		}
 	}
-	data, err := doc.encode(defaultIndent)
+	data, err := doc.encode(r.indent)
 	if err != nil {
 		return err
 	}

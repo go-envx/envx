@@ -50,7 +50,7 @@ func (s *Service) exportSecrets(items []copyItem) ([]byte, error) {
 	}
 
 	var out bytes.Buffer
-	if err := s.deps.ExportSecrets(&out, groups); err != nil {
+	if err := s.deps.Secrets.Export(&out, groups); err != nil {
 		return nil, fmt.Errorf("exporting bundled secrets: %w", err)
 	}
 	return out.Bytes(), nil

@@ -210,22 +210,38 @@ func TestCommitRejectsStaleSnapshotWithEmbeddedNUL(t *testing.T) {
 	}
 }
 
-// TestExportOmitsPublicKeys verifies exports contain only stored values and
-// skip empty groups.
+// TestExportOmitsPublicKeys verifies exports contain only stored values, skip
+// empty groups, and use the repository's indentation.
 func TestExportOmitsPublicKeys(t *testing.T) {
 	t.Parallel()
-	var out bytes.Buffer
-
-	err := filestore.Export(&out, []secrets.Group{
+	groups := []secrets.Group{
 		{Name: "api", PublicKey: "pub", Values: map[string]string{"TOKEN": envelopeA}},
 		{Name: "empty", PublicKey: "pub"},
-	})
-	if err != nil {
-		t.Fatalf("Export: %v", err)
 	}
-	want := "secrets:\n  api:\n    TOKEN: " + envelopeA + "\n"
-	if out.String() != want {
-		t.Errorf("Export =\n%s\nwant\n%s", out.String(), want)
+	tests := []struct {
+		// indent is the repository's configured indentation.
+		indent int
+		// want is the expected document.
+		want string
+	}{
+		{indent: 0, want: "secrets:\n  api:\n    TOKEN: " + envelopeA + "\n"},
+		{indent: 4, want: "secrets:\n    api:\n        TOKEN: " + envelopeA + "\n"},
+	}
+	for _, tt := range tests {
+		repository, err := filestore.New(
+			filepath.Join(t.TempDir(), "secrets.yaml"),
+			filestore.Options{Indent: tt.indent},
+		)
+		if err != nil {
+			t.Fatalf("New: %v", err)
+		}
+		var out bytes.Buffer
+		if err := repository.Export(&out, groups); err != nil {
+			t.Fatalf("Export: %v", err)
+		}
+		if out.String() != tt.want {
+			t.Errorf("Export indent %d =\n%s\nwant\n%s", tt.indent, out.String(), tt.want)
+		}
 	}
 }
 

@@ -10,23 +10,20 @@ import (
 	"github.com/go-envx/envx/app/internal/core/secrets"
 )
 
-// memSecrets is an in-memory SecretReader.
+// memSecrets is an in-memory SecretStore whose exports write
+// "group/key=value" lines.
 type memSecrets struct {
 	// groups holds stored groups by lowercase name.
 	groups map[string]secrets.Group
 	// readErr, when set, fails every Read.
 	readErr error
+	// exported are the groups passed to the last Export.
+	exported []secrets.Group
+	// exportErr, when set, fails every Export.
+	exportErr error
 }
 
-// exporter records exported groups and writes "group/key=value" lines.
-type exporter struct {
-	// groups are the groups passed to the last export.
-	groups []secrets.Group
-	// err, when set, fails every export.
-	err error
-}
-
-// newMemSecrets returns a reader seeded with groups.
+// newMemSecrets returns a store seeded with groups.
 func newMemSecrets(groups ...secrets.Group) *memSecrets {
 	m := &memSecrets{groups: make(map[string]secrets.Group)}
 	for _, group := range groups {
@@ -47,12 +44,12 @@ func (m *memSecrets) Read(group string) (secrets.Snapshot, error) {
 	return secrets.Snapshot{Group: stored, Revision: "1", Exists: true}, nil
 }
 
-// export records groups and writes one sorted line per value.
-func (e *exporter) export(out io.Writer, groups []secrets.Group) error {
-	if e.err != nil {
-		return e.err
+// Export records groups and writes one sorted line per value.
+func (m *memSecrets) Export(out io.Writer, groups []secrets.Group) error {
+	if m.exportErr != nil {
+		return m.exportErr
 	}
-	e.groups = groups
+	m.exported = groups
 	for _, group := range groups {
 		if group.PublicKey != "" {
 			return fmt.Errorf("group %q exported with a public key", group.Name)
