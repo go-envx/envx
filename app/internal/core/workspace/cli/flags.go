@@ -9,8 +9,14 @@ import (
 	"github.com/spf13/pflag"
 )
 
-// Environment setting flags shared by commands that resolve an environment.
 var (
+	// configFlag selects the manifest path (auto-discovered when unset).
+	configFlag = flagspec.Spec[string]{
+		Name:  "config",
+		Env:   "ENVX_CONFIG",
+		Usage: "path to envx.yaml, or a directory containing it",
+	}
+
 	// envFlag selects the target environment.
 	envFlag = flagspec.Spec[string]{
 		Name:  "env",
@@ -62,10 +68,21 @@ var (
 	}
 )
 
-// bindEnvFlags registers the environment setting flags on fs, except those
+// BindConfig registers the persistent --config flag on fs.
+func BindConfig(fs *pflag.FlagSet) {
+	configFlag.Bind(fs)
+}
+
+// ConfigPath returns the manifest path specified by the --config flag or
+// ENVX_CONFIG environment variable, or empty when unset.
+func ConfigPath(cmd *cobra.Command) string {
+	return configFlag.Value(cmd)
+}
+
+// BindSettings registers the workspace setting flags on fs, except those
 // whose names are listed in omit.
-func bindEnvFlags(fs *pflag.FlagSet, omit ...string) {
-	all := pflag.NewFlagSet("env", pflag.ContinueOnError)
+func BindSettings(fs *pflag.FlagSet, omit ...string) {
+	all := pflag.NewFlagSet("settings", pflag.ContinueOnError)
 	delimiterFlag.Bind(all)
 	envFlag.Bind(all)
 	overloadFlag.Bind(all)
@@ -81,9 +98,9 @@ func bindEnvFlags(fs *pflag.FlagSet, omit ...string) {
 	})
 }
 
-// envOverrides returns the settings given by flag or ENVX_* variable on cmd.
+// Settings returns the settings given by flag or ENVX_* variable on cmd.
 // Unset or unregistered settings stay nil so the manifest layers apply.
-func envOverrides(cmd *cobra.Command) workspace.Settings {
+func Settings(cmd *cobra.Command) workspace.Settings {
 	return workspace.Settings{
 		Delimiter:        delimiterFlag.Lookup(cmd),
 		Env:              envFlag.Lookup(cmd),

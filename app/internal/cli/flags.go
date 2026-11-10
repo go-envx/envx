@@ -4,13 +4,6 @@ import "github.com/go-envx/envx/app/internal/lib/flagspec"
 
 // Flags shared across commands.
 var (
-	// configFlag selects the manifest path (auto-discovered when unset).
-	configFlag = flagspec.Spec[string]{
-		Name:  "config",
-		Env:   "ENVX_CONFIG",
-		Usage: "path to envx.yaml, or a directory containing it",
-	}
-
 	// outputFlag selects the rendering format for tabular commands.
 	//nolint:unused // Relocated to core/env/cli in Phase 6.3.
 	outputFlag = flagspec.Spec[string]{

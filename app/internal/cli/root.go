@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/go-envx/envx/app/internal/core"
+	workspacecli "github.com/go-envx/envx/app/internal/core/workspace/cli"
 	emitcli "github.com/go-envx/envx/app/internal/features/emit/cli"
 	envcli "github.com/go-envx/envx/app/internal/features/env/cli"
 	packcli "github.com/go-envx/envx/app/internal/features/pack/cli"
@@ -46,7 +47,7 @@ func NewRootCmd(info BuildInfo) (*cobra.Command, error) {
 		},
 	}
 
-	configFlag.Bind(root.PersistentFlags())
+	workspacecli.BindConfig(root.PersistentFlags())
 
 	root.AddCommand(
 		scaffoldcli.NewCreateCommand(appFactory),
