@@ -1,8 +1,6 @@
 package env
 
 import (
-	"io"
-
 	"github.com/go-envx/envx/app/internal/core/value"
 	"github.com/go-envx/envx/app/internal/lib/hostenv"
 	"github.com/go-envx/envx/app/internal/lib/process"
@@ -42,16 +40,6 @@ type ValueResolver interface {
 // Executor runs a child process.
 type Executor func(process.Command) error
 
-// Renderer serializes resolved entries to an emit target.
-type Renderer interface {
-	// Validate rejects unsupported targets and option combinations.
-	Validate(options EmitOptions) error
-	// Render writes entries for project in the target's format.
-	Render(
-		out io.Writer, project string, entries []ExplainEntry, options EmitOptions,
-	) error
-}
-
 // Dependencies are the adapters a Service uses. Only EnvNamespaces is required;
 // the others are required only by the operations that use them.
 type Dependencies struct {
@@ -66,6 +54,4 @@ type Dependencies struct {
 	NewValueResolver func(reveal bool, host hostenv.Snapshot) (ValueResolver, error)
 	// ProcessRunner runs child processes; required by Run.
 	ProcessRunner Executor
-	// FormatRenderer serializes emit output; required by Emit.
-	FormatRenderer Renderer
 }

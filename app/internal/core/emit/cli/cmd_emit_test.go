@@ -10,8 +10,8 @@ import (
 	"testing"
 
 	"github.com/go-envx/envx/app/internal/app"
-	"github.com/go-envx/envx/app/internal/core/env"
-	"github.com/go-envx/envx/app/internal/core/env/format"
+	"github.com/go-envx/envx/app/internal/core/emit"
+	"github.com/go-envx/envx/app/internal/core/emit/format"
 	workspacecli "github.com/go-envx/envx/app/internal/core/workspace/cli"
 	"github.com/go-envx/envx/app/internal/lib/crypt/age"
 	"github.com/go-envx/envx/app/test/fixtures"
@@ -22,11 +22,11 @@ type mockEmitFactory struct {
 	err error
 }
 
-func (m *mockEmitFactory) NewEnvService(configPath string) (*env.Service, error) {
+func (m *mockEmitFactory) NewEmitService(configPath string) (*emit.Service, error) {
 	if m.err != nil {
 		return nil, m.err
 	}
-	return app.Factory{}.NewEnvService(configPath)
+	return app.Factory{}.NewEmitService(configPath)
 }
 
 // executeEmit builds the emit command, executes it with args, and returns its
@@ -156,7 +156,7 @@ func TestNewEmitCommandUnknownTarget(t *testing.T) {
 	}
 }
 
-// TestNewEmitCommandFactoryError verifies an environment service failure aborts
+// TestNewEmitCommandFactoryError verifies an emit service failure aborts
 // emit before any output is written.
 func TestNewEmitCommandFactoryError(t *testing.T) {
 	t.Parallel()

@@ -102,7 +102,7 @@ func NewRunCommand(f Factory) *cobra.Command {
 					return outputRunWarning(console, warning)
 				},
 				IgnoreErrors: ignoreErrors,
-				Options: settings,
+				Options:      settings,
 			})
 		},
 	}

@@ -2,6 +2,7 @@ package cli
 
 import (
 	"github.com/go-envx/envx/app/internal/app"
+	emitcli "github.com/go-envx/envx/app/internal/core/emit/cli"
 	envcli "github.com/go-envx/envx/app/internal/core/env/cli"
 	packcli "github.com/go-envx/envx/app/internal/core/pack/cli"
 	scaffoldcli "github.com/go-envx/envx/app/internal/core/scaffold/cli"
@@ -50,7 +51,7 @@ func NewRootCmd(info BuildInfo) (*cobra.Command, error) {
 		envcli.NewRunCommand(factory),
 		envcli.NewSetCommand(factory),
 		envcli.NewExplainCommand(factory),
-		envcli.NewEmitCommand(factory),
+		emitcli.NewEmitCommand(factory),
 		envcli.NewDiffCommand(factory),
 		secretscli.NewSecretsCommand(factory),
 		validatecli.NewValidateCommand(factory),

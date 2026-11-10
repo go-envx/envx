@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/base64"
 	"errors"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -36,6 +37,19 @@ func executeRun(
 
 	err = cmd.Execute()
 	return out.String(), errBuf.String(), err
+}
+
+// writeWorkspaceFile writes body to a workspace-relative path under dir, creating
+// parent directories as needed.
+func writeWorkspaceFile(t *testing.T, dir, name, body string) {
+	t.Helper()
+	path := filepath.Join(dir, name)
+	if err := os.MkdirAll(filepath.Dir(path), 0o750); err != nil {
+		t.Fatalf("MkdirAll(%q): %v", filepath.Dir(path), err)
+	}
+	if err := os.WriteFile(path, []byte(body), 0o600); err != nil {
+		t.Fatalf("WriteFile(%q): %v", path, err)
+	}
 }
 
 // TestNewRunCommandInjectsEnv verifies the resolved environment reaches the child

@@ -3,12 +3,12 @@ package cli
 import (
 	"fmt"
 	"io"
-	"os"
 	"path/filepath"
 
-	"github.com/go-envx/envx/app/internal/core/env"
+	"github.com/go-envx/envx/app/internal/core/emit"
 	workspacecli "github.com/go-envx/envx/app/internal/core/workspace/cli"
 	"github.com/go-envx/envx/app/internal/lib/atomicfile"
+	"github.com/go-envx/envx/app/internal/lib/filex"
 	"github.com/go-envx/envx/app/internal/lib/printer"
 	"github.com/go-envx/envx/app/internal/lib/str"
 	"github.com/spf13/cobra"
@@ -70,32 +70,35 @@ func NewEmitCommand(f Factory) *cobra.Command {
 
 			// Extract command-line flag values.
 			configPath := workspacecli.ConfigPath(cmd)
-			options := env.EmitOptions{
-				Target: env.Target(targetFlag.Value(cmd)),
+			options := emit.EmitOptions{
+				Target: emit.Target(targetFlag.Value(cmd)),
 				Only:   onlyFlag.Value(cmd),
 				Name:   nameFlag.Value(cmd),
 				Key:    keyFlag.Value(cmd),
 			}
-			output := emitOutputFlag.Value(cmd)
+			outputPath := outputFlag.Value(cmd)
 			settings := workspacecli.Settings(cmd)
 
 			// Fail fast, before any decryption, if the output directory is missing —
 			// emit writes the named file but does not create directories, so a bad
 			// path is surfaced clearly rather than as a temp-file error after the
 			// work is done.
-			if err := checkOutputDir(output); err != nil {
-				return err
+			if outputPath != "" {
+				dir := filepath.Dir(outputPath)
+				if err := filex.AssertDirectoryExists(dir); err != nil {
+					return fmt.Errorf("output directory %s does not exist", dir)
+				}
 			}
 
-			// Obtain the environment service using the configuration path.
-			envService, err := f.NewEnvService(configPath)
+			// Obtain the emit service using the configuration path.
+			emitService, err := f.NewEmitService(configPath)
 			if err != nil {
 				return err
 			}
 
 			// Render the environment. Emit validates the options first and fails
 			// closed, so a value that cannot be resolved aborts before any output.
-			artifact, err := envService.Emit(env.EmitParams{
+			result, err := emitService.Emit(emit.EmitParams{
 				Project:  project,
 				Options:  options,
 				Settings: settings,
@@ -114,7 +117,7 @@ func NewEmitCommand(f Factory) *cobra.Command {
 
 			// Output the rendered result to stdout or the chosen file.
 			return outputEmit(
-				console, cmd.OutOrStdout(), artifact, output, project, options,
+				console, cmd.OutOrStdout(), result, outputPath, project, options,
 			)
 		},
 	}
@@ -124,7 +127,7 @@ func NewEmitCommand(f Factory) *cobra.Command {
 	onlyFlag.Bind(cmd)
 	nameFlag.Bind(cmd)
 	keyFlag.Bind(cmd)
-	emitOutputFlag.Bind(cmd)
+	outputFlag.Bind(cmd)
 	workspacecli.BindSettings(cmd)
 	_ = cmd.MarkFlagRequired(targetFlag.Name)
 
@@ -139,26 +142,32 @@ func NewEmitCommand(f Factory) *cobra.Command {
 func outputEmit(
 	console *printer.Printer,
 	stdout io.Writer,
-	artifact env.Artifact,
+	result emit.EmitResult,
 	outputPath string,
 	project string,
-	options env.EmitOptions,
+	options emit.EmitOptions,
 ) error {
 	if outputPath == "" {
-		_, err := stdout.Write(artifact.Data)
+		_, err := stdout.Write(result.Data)
 		return err
 	}
 
 	// The render may carry plaintext secrets, so persist it with private
 	// permissions rather than the world-readable default.
-	if err := atomicfile.WritePrivate(outputPath, artifact.Data); err != nil {
+	if err := atomicfile.WritePrivate(outputPath, result.Data); err != nil {
 		return err
 	}
 
-	// Confirm where the file landed as normal output — the summary, then (for a
-	// k8s-bundle) the docs pointer in the same line.
-	summary := wroteSummary(project, outputPath, options.Only)
-	if options.Target == env.TargetKubernetesBundle {
+	// Confirm where the file landed; a k8s-bundle also points to the volume docs.
+	slice := "config and secrets"
+	switch options.Only {
+	case emit.OnlySecrets:
+		slice = "secrets"
+	case emit.OnlyConfig:
+		slice = "config"
+	}
+	summary := fmt.Sprintf("Wrote %s %s to %s.", project, slice, outputPath)
+	if options.Target == emit.TargetKubernetesBundle {
 		summary += " Read the docs to learn how to use the file in a Kubernetes volume."
 	}
 	if err := console.LogMessage(summary); err != nil {
@@ -168,7 +177,7 @@ func outputEmit(
 	// When the file carries secret material — the values are unencrypted
 	// (plaintext, or base64 in a Secret) — add a blank line and a stderr caution
 	// not to commit it.
-	if !artifact.ContainsSecrets {
+	if !result.ContainsSecrets {
 		return nil
 	}
 	if err := console.LogBlank(); err != nil {
@@ -177,32 +186,4 @@ func outputEmit(
 	return console.LogWarning(
 		"the output carries unencrypted secret values; do not commit it",
 	)
-}
-
-// checkOutputDir reports an error when the file's parent directory does not
-// exist, so emit refuses to write into a missing path rather than creating
-// directories the user did not ask for. An empty path (stdout) always passes.
-func checkOutputDir(outputPath string) error {
-	if outputPath == "" {
-		return nil
-	}
-	dir := filepath.Dir(outputPath)
-	info, err := os.Stat(dir)
-	if err != nil || !info.IsDir() {
-		return fmt.Errorf("output directory %s does not exist", dir)
-	}
-	return nil
-}
-
-// wroteSummary is the one-line confirmation printed after a file write: which
-// project's slice was written, and to which file.
-func wroteSummary(project, outputPath, only string) string {
-	slice := "config and secrets"
-	switch only {
-	case env.OnlySecrets:
-		slice = "secrets"
-	case env.OnlyConfig:
-		slice = "config"
-	}
-	return fmt.Sprintf("Wrote %s %s to %s.", project, slice, outputPath)
 }

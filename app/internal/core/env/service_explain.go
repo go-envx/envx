@@ -24,6 +24,8 @@ type ExplainParams struct {
 
 // ExplainResult is a sorted diagnostic view of the selected winners.
 type ExplainResult struct {
+	// Project is the explained project, including when selected implicitly.
+	Project string
 	// WorkspaceDir is the workspace root that source paths are relative to.
 	WorkspaceDir string
 	// Entries holds one entry per selected key, sorted by key.
@@ -90,6 +92,7 @@ func (s *Service) Explain(params ExplainParams) (ExplainResult, error) {
 		}
 	}
 	return ExplainResult{
+		Project:      op.project,
 		WorkspaceDir: s.root,
 		Entries:      entries,
 		Summary:      summary,

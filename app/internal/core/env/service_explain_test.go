@@ -55,6 +55,9 @@ func explainEntries(
 	if result.WorkspaceDir != "/ws" {
 		t.Errorf("WorkspaceDir = %q, want /ws", result.WorkspaceDir)
 	}
+	if result.Project != "app" {
+		t.Errorf("Project = %q, want the implicitly selected app", result.Project)
+	}
 	return out
 }
 
@@ -198,6 +201,42 @@ func TestExplainHostValues(t *testing.T) {
 	})
 	if !overloaded["URL"].Secret {
 		t.Error("URL should derive from the namespace secret under overload")
+	}
+}
+
+// TestExplainSecretThroughCycle verifies secret derivation through a
+// host-broken cycle does not depend on which key is evaluated first.
+func TestExplainSecretThroughCycle(t *testing.T) {
+	t.Parallel()
+
+	opener := &fakeOpener{plaintext: map[string]string{"secret://db/password": "s3cr3t"}}
+	s := newService(t, testWorkspace(), Dependencies{
+		EnvNamespaces: newFakeNamespaces().base(t, appInclude, `
+			a: "{{B}}{{C}}"
+			b: "{{A}}"
+			c: secret://db/password
+		`),
+		HostEnv:          hostOf("A=from-host"),
+		NewValueResolver: opener.open,
+	})
+	for key, entry := range explainEntries(t, s, ExplainParams{Reveal: true}) {
+		if !entry.Secret {
+			t.Errorf("%s Secret = false, want true", key)
+		}
+	}
+}
+
+// TestExplainIdentityValidatesLists verifies a list item containing the
+// delimiter does not resolve without a resolver, as materialization fails.
+func TestExplainIdentityValidatesLists(t *testing.T) {
+	t.Parallel()
+
+	s := newService(t, testWorkspace(), Dependencies{
+		EnvNamespaces: newFakeNamespaces().base(t, appInclude, `items: ["a,b", c]`),
+	})
+	entries := explainEntries(t, s, ExplainParams{Reveal: true})
+	if entries["ITEMS"].Evaluation.Resolved {
+		t.Errorf("ITEMS = %+v, want unresolved", entries["ITEMS"].Evaluation)
 	}
 }
 

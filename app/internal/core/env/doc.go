@@ -1,6 +1,6 @@
 // Package env owns environment workflows: get, set, explain, diff,
-// materialization, run, and emit. Namespace files, value resolution, process
-// execution, and output formats are supplied by adapters.
+// materialization, and run. Namespace files, value resolution, and process
+// execution are supplied by adapters.
 //
 // # Value pipeline
 //
@@ -28,5 +28,5 @@
 //     referenced key.
 //
 // Each lazy stage pulls from the next. Get and Materialize (and so Run) call
-// substitute directly; Explain, Diff, and Emit go through evaluate.
+// substitute directly; Explain and Diff go through evaluate.
 package env

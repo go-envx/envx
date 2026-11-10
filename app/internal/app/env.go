@@ -3,7 +3,6 @@ package app
 import (
 	"github.com/go-envx/envx/app/internal/core/env"
 	envStore "github.com/go-envx/envx/app/internal/core/env/filestore"
-	"github.com/go-envx/envx/app/internal/core/env/format"
 	"github.com/go-envx/envx/app/internal/core/secrets"
 	"github.com/go-envx/envx/app/internal/core/secrets/keyring"
 	"github.com/go-envx/envx/app/internal/core/workspace"
@@ -71,6 +70,5 @@ func envService(
 		HostEnv:          hostEnv,
 		NewValueResolver: factory.newValueResolver,
 		ProcessRunner:    process.Run,
-		FormatRenderer:   format.Renderer{},
 	})
 }

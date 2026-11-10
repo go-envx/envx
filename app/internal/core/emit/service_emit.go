@@ -1,13 +1,11 @@
-package env
+package emit
 
 import (
 	"bytes"
-	"errors"
 	"fmt"
-	"maps"
-	"slices"
 	"strings"
 
+	"github.com/go-envx/envx/app/internal/core/env"
 	"github.com/go-envx/envx/app/internal/core/workspace"
 )
 
@@ -59,9 +57,9 @@ type EmitParams struct {
 	Settings workspace.Settings
 }
 
-// Artifact is a rendered emit output. Data holds materialized values and must
-// not be logged.
-type Artifact struct {
+// EmitResult is a rendered emit output. Data holds materialized values and
+// must not be logged.
+type EmitResult struct {
 	// Data is the complete rendered output.
 	Data []byte
 	// ContainsSecrets reports whether Data carries secret-derived values.
@@ -70,29 +68,21 @@ type Artifact struct {
 
 // Emit validates the options, reveals every winner, and renders the complete
 // output to memory. Any value that does not resolve fails the operation before
-// rendering, so no partial artifact is produced. Host-only keys are excluded.
-func (s *Service) Emit(params EmitParams) (Artifact, error) {
-	if s.deps.FormatRenderer == nil {
-		return Artifact{}, errors.New("renderer is required")
+// rendering, so no partial output is produced. Host-only keys are excluded.
+func (s *Service) Emit(params EmitParams) (EmitResult, error) {
+	if err := s.deps.Renderer.Validate(params.Options); err != nil {
+		return EmitResult{}, err
 	}
-	if err := s.deps.FormatRenderer.Validate(params.Options); err != nil {
-		return Artifact{}, err
-	}
-	op, err := s.begin(params.Project, params.Settings)
+	explained, err := s.deps.Env.Explain(env.ExplainParams{
+		Project: params.Project,
+		Reveal:  true,
+		Options: params.Settings,
+	})
 	if err != nil {
-		return Artifact{}, err
-	}
-	merged, err := s.load(op, false)
-	if err != nil {
-		return Artifact{}, err
-	}
-	resolver, err := s.newValueResolver(true, op.host)
-	if err != nil {
-		return Artifact{}, err
+		return EmitResult{}, err
 	}
 
-	keys := slices.Sorted(maps.Keys(merged.values))
-	entries := newEvaluator(merged, resolver, op, true).entries(keys)
+	entries := explained.Entries
 	var unresolved []string
 	containsSecrets := false
 	for i := range entries {
@@ -102,19 +92,19 @@ func (s *Service) Emit(params EmitParams) (Artifact, error) {
 		containsSecrets = containsSecrets || entries[i].Secret
 	}
 	if len(unresolved) > 0 {
-		return Artifact{}, fmt.Errorf(
+		return EmitResult{}, fmt.Errorf(
 			"cannot emit: %w: %d value(s) did not resolve: %s",
-			ErrUnresolved, len(unresolved), strings.Join(unresolved, ", "),
+			env.ErrUnresolved, len(unresolved), strings.Join(unresolved, ", "),
 		)
 	}
 
 	var buffer bytes.Buffer
-	if err := s.deps.FormatRenderer.Render(
-		&buffer, op.project, entries, params.Options,
+	if err := s.deps.Renderer.Render(
+		&buffer, explained.Project, entries, params.Options,
 	); err != nil {
-		return Artifact{}, err
+		return EmitResult{}, err
 	}
-	return Artifact{
+	return EmitResult{
 		Data:            buffer.Bytes(),
 		ContainsSecrets: containsSecrets && params.Options.Only != OnlyConfig,
 	}, nil

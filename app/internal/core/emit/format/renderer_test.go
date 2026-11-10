@@ -7,8 +7,9 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/go-envx/envx/app/internal/core/emit"
+	"github.com/go-envx/envx/app/internal/core/emit/format"
 	"github.com/go-envx/envx/app/internal/core/env"
-	"github.com/go-envx/envx/app/internal/core/env/format"
 	"github.com/go-envx/envx/app/internal/core/value"
 	"github.com/go-envx/envx/app/internal/lib/filex"
 )
@@ -33,7 +34,7 @@ func sampleEntries() []env.ExplainEntry {
 }
 
 // render renders entries for project "api", failing the test on error.
-func render(t *testing.T, entries []env.ExplainEntry, options env.EmitOptions) string {
+func render(t *testing.T, entries []env.ExplainEntry, options emit.EmitOptions) string {
 	t.Helper()
 	var buffer bytes.Buffer
 	if err := (format.Renderer{}).Render(&buffer, "api", entries, options); err != nil {
@@ -50,29 +51,29 @@ func TestRenderGolden(t *testing.T) {
 		// golden names the expected output file.
 		golden string
 		// options configures rendering.
-		options env.EmitOptions
+		options emit.EmitOptions
 	}{
-		{golden: "all.json", options: env.EmitOptions{Target: env.TargetJSON}},
-		{golden: "all.dotenv", options: env.EmitOptions{Target: env.TargetDotenv}},
+		{golden: "all.json", options: emit.EmitOptions{Target: emit.TargetJSON}},
+		{golden: "all.dotenv", options: emit.EmitOptions{Target: emit.TargetDotenv}},
 		{
 			golden:  "config.dotenv",
-			options: env.EmitOptions{Target: env.TargetDotenv, Only: env.OnlyConfig},
+			options: emit.EmitOptions{Target: emit.TargetDotenv, Only: emit.OnlyConfig},
 		},
-		{golden: "k8s.yaml", options: env.EmitOptions{Target: env.TargetKubernetes}},
+		{golden: "k8s.yaml", options: emit.EmitOptions{Target: emit.TargetKubernetes}},
 		{
 			golden: "k8s-secrets-named.yaml",
-			options: env.EmitOptions{
-				Target: env.TargetKubernetes, Only: env.OnlySecrets, Name: "web",
+			options: emit.EmitOptions{
+				Target: emit.TargetKubernetes, Only: emit.OnlySecrets, Name: "web",
 			},
 		},
 		{
 			golden:  "k8s-bundle.yaml",
-			options: env.EmitOptions{Target: env.TargetKubernetesBundle},
+			options: emit.EmitOptions{Target: emit.TargetKubernetesBundle},
 		},
 		{
 			golden: "k8s-bundle-config.yaml",
-			options: env.EmitOptions{
-				Target: env.TargetKubernetesBundle, Only: env.OnlyConfig, Key: "app.env",
+			options: emit.EmitOptions{
+				Target: emit.TargetKubernetesBundle, Only: emit.OnlyConfig, Key: "app.env",
 			},
 		},
 	}
@@ -105,7 +106,7 @@ func TestRenderDotenvQuoting(t *testing.T) {
 		entry("HTML", "<a>&", false),
 		entry("DOLLAR", "pa$word ${HOME}", false),
 		entry("DOLLAR_QUOTE", "it's $HOME", false),
-	}, env.EmitOptions{Target: env.TargetDotenv})
+	}, emit.EmitOptions{Target: emit.TargetDotenv})
 	want := "DOLLAR='pa$word ${HOME}'\n" +
 		"DOLLAR_QUOTE=\"it's \\$HOME\"\n" +
 		"EMPTY=''\n" +
@@ -124,8 +125,8 @@ func TestRenderDotenvQuoting(t *testing.T) {
 func TestRenderSecretBundleKey(t *testing.T) {
 	t.Parallel()
 
-	got := render(t, sampleEntries(), env.EmitOptions{
-		Target: env.TargetKubernetesBundle, Only: env.OnlySecrets,
+	got := render(t, sampleEntries(), emit.EmitOptions{
+		Target: emit.TargetKubernetesBundle, Only: emit.OnlySecrets,
 	})
 	body := "{\n  \"API_KEY\": \"abc123\",\n  \"DB_PASSWORD\": \"s3cr3t\"\n}\n"
 	want := "apiVersion: v1\nkind: Secret\nmetadata:\n  name: api-secrets\n" +
@@ -142,15 +143,15 @@ func TestRenderEmpty(t *testing.T) {
 
 	tests := []struct {
 		// options configures rendering.
-		options env.EmitOptions
+		options emit.EmitOptions
 		// want is the expected output.
 		want string
 	}{
-		{options: env.EmitOptions{Target: env.TargetDotenv}},
-		{options: env.EmitOptions{Target: env.TargetJSON}, want: "{}\n"},
-		{options: env.EmitOptions{Target: env.TargetKubernetes}},
+		{options: emit.EmitOptions{Target: emit.TargetDotenv}},
+		{options: emit.EmitOptions{Target: emit.TargetJSON}, want: "{}\n"},
+		{options: emit.EmitOptions{Target: emit.TargetKubernetes}},
 		{
-			options: env.EmitOptions{Target: env.TargetKubernetes, Only: env.OnlySecrets},
+			options: emit.EmitOptions{Target: emit.TargetKubernetes, Only: emit.OnlySecrets},
 			want: "apiVersion: v1\nkind: Secret\nmetadata:\n  name: api-secrets\n" +
 				"type: Opaque\ndata: {}\n",
 		},
@@ -168,28 +169,28 @@ func TestValidate(t *testing.T) {
 
 	tests := []struct {
 		// options are validated.
-		options env.EmitOptions
+		options emit.EmitOptions
 		// want is the expected error.
 		want error
 	}{
-		{options: env.EmitOptions{Target: env.TargetJSON, Only: env.OnlyAll}},
-		{options: env.EmitOptions{Target: env.TargetKubernetes, Name: "web"}},
-		{options: env.EmitOptions{Target: env.TargetKubernetesBundle, Key: "a.ENV"}},
-		{options: env.EmitOptions{Target: "toml"}, want: format.ErrUnknownTarget},
+		{options: emit.EmitOptions{Target: emit.TargetJSON, Only: emit.OnlyAll}},
+		{options: emit.EmitOptions{Target: emit.TargetKubernetes, Name: "web"}},
+		{options: emit.EmitOptions{Target: emit.TargetKubernetesBundle, Key: "a.ENV"}},
+		{options: emit.EmitOptions{Target: "toml"}, want: format.ErrUnknownTarget},
 		{
-			options: env.EmitOptions{Target: env.TargetJSON, Only: "both"},
+			options: emit.EmitOptions{Target: emit.TargetJSON, Only: "both"},
 			want:    format.ErrInvalidOption,
 		},
 		{
-			options: env.EmitOptions{Target: env.TargetDotenv, Name: "web"},
+			options: emit.EmitOptions{Target: emit.TargetDotenv, Name: "web"},
 			want:    format.ErrInvalidOption,
 		},
 		{
-			options: env.EmitOptions{Target: env.TargetKubernetes, Key: "a.json"},
+			options: emit.EmitOptions{Target: emit.TargetKubernetes, Key: "a.json"},
 			want:    format.ErrInvalidOption,
 		},
 		{
-			options: env.EmitOptions{Target: env.TargetKubernetesBundle, Key: "a.yaml"},
+			options: emit.EmitOptions{Target: emit.TargetKubernetesBundle, Key: "a.yaml"},
 			want:    format.ErrInvalidOption,
 		},
 	}
@@ -208,13 +209,13 @@ func TestRenderRequiresName(t *testing.T) {
 
 	var buffer bytes.Buffer
 	err := (format.Renderer{}).Render(
-		&buffer, "", sampleEntries(), env.EmitOptions{Target: env.TargetKubernetes},
+		&buffer, "", sampleEntries(), emit.EmitOptions{Target: emit.TargetKubernetes},
 	)
 	if !errors.Is(err, format.ErrMissingNameBase) || buffer.Len() != 0 {
 		t.Errorf("Render = %v, wrote %q", err, buffer.String())
 	}
 	err = (format.Renderer{}).Render(
-		&buffer, "api", sampleEntries(), env.EmitOptions{Target: "toml"},
+		&buffer, "api", sampleEntries(), emit.EmitOptions{Target: "toml"},
 	)
 	if !errors.Is(err, format.ErrUnknownTarget) || buffer.Len() != 0 {
 		t.Errorf("Render = %v, wrote %q", err, buffer.String())

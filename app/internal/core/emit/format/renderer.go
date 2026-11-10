@@ -7,20 +7,21 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/go-envx/envx/app/internal/core/emit"
 	"github.com/go-envx/envx/app/internal/core/env"
 )
 
-var _ env.Renderer = Renderer{}
+var _ emit.Renderer = Renderer{}
 
 // targets lists every supported target in a stable order.
-var targets = []env.Target{
-	env.TargetKubernetes,
-	env.TargetKubernetesBundle,
-	env.TargetJSON,
-	env.TargetDotenv,
+var targets = []emit.Target{
+	emit.TargetKubernetes,
+	emit.TargetKubernetesBundle,
+	emit.TargetJSON,
+	emit.TargetDotenv,
 }
 
-// Renderer implements env.Renderer. The zero value is ready to use.
+// Renderer implements emit.Renderer. The zero value is ready to use.
 type Renderer struct{}
 
 // item is one resolved value to render.
@@ -51,7 +52,7 @@ type selection struct {
 
 // Validate rejects unknown targets, unknown slices, and options that do not
 // apply to the target.
-func (Renderer) Validate(options env.EmitOptions) error {
+func (Renderer) Validate(options emit.EmitOptions) error {
 	if !slices.Contains(targets, options.Target) {
 		names := make([]string, len(targets))
 		for i, t := range targets {
@@ -72,7 +73,7 @@ func (Renderer) Validate(options env.EmitOptions) error {
 		)
 	}
 	if options.Key != "" {
-		if options.Target != env.TargetKubernetesBundle {
+		if options.Target != emit.TargetKubernetesBundle {
 			return fmt.Errorf(
 				"%w: key applies only to the k8s-bundle target, not %q",
 				ErrInvalidOption, options.Target,
@@ -88,7 +89,7 @@ func (Renderer) Validate(options env.EmitOptions) error {
 // Render writes the selected slice of entries in sorted key order. Kubernetes
 // names derive from project with a slice suffix unless options.Name is set.
 func (r Renderer) Render(
-	out io.Writer, project string, entries []env.ExplainEntry, options env.EmitOptions,
+	out io.Writer, project string, entries []env.ExplainEntry, options emit.EmitOptions,
 ) error {
 	if err := r.Validate(options); err != nil {
 		return err
@@ -107,11 +108,11 @@ func (r Renderer) Render(
 	}
 
 	switch options.Target {
-	case env.TargetJSON:
+	case emit.TargetJSON:
 		return renderJSON(out, selected.filter(items))
-	case env.TargetDotenv:
+	case emit.TargetDotenv:
 		return renderDotenv(out, selected.filter(items))
-	case env.TargetKubernetes:
+	case emit.TargetKubernetes:
 		return renderK8s(out, items, names, selected)
 	default:
 		key := options.Key
@@ -128,23 +129,23 @@ func (r Renderer) Render(
 // parseSelection maps an Only value to the selected slices.
 func parseSelection(only string) (selection, error) {
 	switch only {
-	case "", env.OnlyAll:
+	case "", emit.OnlyAll:
 		return selection{secrets: true, config: true}, nil
-	case env.OnlySecrets:
+	case emit.OnlySecrets:
 		return selection{secrets: true}, nil
-	case env.OnlyConfig:
+	case emit.OnlyConfig:
 		return selection{config: true}, nil
 	default:
 		return selection{}, fmt.Errorf(
 			"%w: only %q (want %q or %q)",
-			ErrInvalidOption, only, env.OnlySecrets, env.OnlyConfig,
+			ErrInvalidOption, only, emit.OnlySecrets, emit.OnlyConfig,
 		)
 	}
 }
 
 // kubernetes reports whether target renders a Kubernetes resource.
-func kubernetes(target env.Target) bool {
-	return target == env.TargetKubernetes || target == env.TargetKubernetesBundle
+func kubernetes(target emit.Target) bool {
+	return target == emit.TargetKubernetes || target == emit.TargetKubernetesBundle
 }
 
 // filter keeps the selected slices of items.

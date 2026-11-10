@@ -58,6 +58,9 @@ func TestConstructorsAreLazy(t *testing.T) {
 	if _, err := f.NewValidateService(workspaceDir); err != nil {
 		t.Fatalf("NewValidateService: %v", err)
 	}
+	if _, err := f.NewEmitService(workspaceDir); err != nil {
+		t.Fatalf("NewEmitService: %v", err)
+	}
 	if got := captures.Load(); got != 0 {
 		t.Errorf("environment captured %d times, want 0", got)
 	}
@@ -204,6 +207,10 @@ func TestMissingWorkspace(t *testing.T) {
 		},
 		"NewValidateService": func(path string) error {
 			_, err := f.NewValidateService(path)
+			return err
+		},
+		"NewEmitService": func(path string) error {
+			_, err := f.NewEmitService(path)
 			return err
 		},
 	}
