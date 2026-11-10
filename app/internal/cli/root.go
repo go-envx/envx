@@ -44,7 +44,7 @@ func NewRootCommand(
 			// Parsing and validation have already succeeded by the time this
 			// runs, so silence Cobra's usage dump on any later (runtime) error;
 			// usage and validation errors happen earlier and still show help.
-			// main.go reads this same flag to map the process exit code.
+			// Execute reads this same flag to map the process exit code.
 			cmd.SilenceUsage = true
 			return nil
 		},

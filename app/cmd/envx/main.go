@@ -1,17 +1,13 @@
-// Command envx is the entry point for the envx CLI. It executes the root
-// command and maps errors to exit codes.
+// Command envx is the entry point for the envx CLI. It wires the root command to
+// the process streams and exits with the code cli.Execute reports.
 package main
 
 import (
-	"errors"
-	"io"
 	"os"
 
 	"github.com/go-envx/envx/app/internal/app"
 	"github.com/go-envx/envx/app/internal/cli"
-	"github.com/go-envx/envx/app/internal/lib/printer"
 	"github.com/go-envx/envx/app/internal/lib/stdio"
-	"github.com/go-envx/envx/app/internal/shared/exitcode"
 )
 
 // Build metadata is injected at link time via -ldflags (see .goreleaser.yaml);
@@ -25,17 +21,9 @@ var (
 	date = "unknown"
 )
 
-// main delegates to run and exits with the resulting code.
+// main builds the root command and exits with its outcome. Child-process signal
+// handling lives in lib/process, so no root-level signal trapping is needed.
 func main() {
-	os.Exit(run())
-}
-
-// run executes the root command and maps the outcome to a process exit code: a
-// child process's own code is propagated verbatim via *exitcode.Error, a usage or
-// validation error (rejected before the command ran) maps to exitcode.Usage, and
-// any other failure maps to exitcode.Runtime. Child-process signal handling lives
-// in the runner, so no root-level signal trapping is required here.
-func run() int {
 	root := cli.NewRootCommand(
 		cli.BuildInfo{
 			Version: version,
@@ -45,30 +33,5 @@ func run() int {
 		app.Factory{},
 		stdio.Streams{In: os.Stdin, Out: os.Stdout, ErrOut: os.Stderr},
 	)
-
-	cmd, err := root.ExecuteC()
-	if err == nil {
-		return exitcode.OK
-	}
-
-	if exitErr, ok := errors.AsType[*exitcode.Error](err); ok {
-		return exitErr.Code
-	}
-
-	// Fatal command errors are reported at the process boundary so actions can
-	// return errors without duplicating diagnostics or owning exit handling.
-	_ = reportError(os.Stderr, err)
-
-	// The root's PersistentPreRunE flips SilenceUsage on only after parsing and
-	// validation succeed, so a command that still has it unset failed at the usage
-	// boundary.
-	if !cmd.SilenceUsage {
-		return exitcode.Usage
-	}
-	return exitcode.Runtime
-}
-
-// reportError writes a returned command error through the shared printer.
-func reportError(w io.Writer, err error) error {
-	return printer.New(printer.Options{Out: io.Discard, Err: w}).LogError(err.Error())
+	os.Exit(cli.Execute(root))
 }

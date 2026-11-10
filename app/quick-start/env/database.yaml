@@ -1,0 +1,3 @@
+database:
+  host: # set per environment
+  port: 5432
