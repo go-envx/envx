@@ -2,6 +2,7 @@ package filestore
 
 import (
 	"path/filepath"
+	"reflect"
 	"slices"
 	"strings"
 	"testing"
@@ -131,7 +132,7 @@ func TestParseDocumentAppliesDefaults(t *testing.T) {
 			if err != nil {
 				t.Fatalf("parseDocument: %v", err)
 			}
-			if ws.Secrets != tc.secrets {
+			if !reflect.DeepEqual(ws.Secrets, tc.secrets) {
 				t.Errorf("Secrets = %+v, want %+v", ws.Secrets, tc.secrets)
 			}
 			api := ws.Projects["api"]

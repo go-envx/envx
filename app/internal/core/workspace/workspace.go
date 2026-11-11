@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"slices"
+	"time"
 
 	"github.com/go-envx/envx/app/internal/core/diagnostic"
 )
@@ -56,6 +57,18 @@ type SecretsConfig struct {
 	SecretsPath string
 	KeysPath    string
 	Cipher      string
+	// Providers holds the enabled external providers keyed by scheme, such as "op".
+	Providers map[string]ProviderConfig
+}
+
+// ProviderConfig configures one enabled external secret provider.
+type ProviderConfig struct {
+	// Timeout bounds each CLI invocation or HTTP request; always positive.
+	Timeout time.Duration
+	// URL is the provider's base URL, for HTTP providers.
+	URL string
+	// APIKeyEnv names the host variable holding the provider's API key.
+	APIKeyEnv string
 }
 
 // DefaultEnvironment returns the first declared environment, or an empty string.

@@ -2,10 +2,12 @@ package filestore_test
 
 import (
 	"errors"
+	"maps"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/go-envx/envx/app/internal/core/workspace"
 	"github.com/go-envx/envx/app/internal/core/workspace/filestore"
@@ -125,6 +127,71 @@ func TestLoadValid(t *testing.T) {
 	}
 	if _, ok := ws.LookupProject("api"); !ok {
 		t.Error("expected project api to be present")
+	}
+}
+
+// TestLoadProviders verifies declared providers load with default timeouts and
+// undeclared providers stay disabled.
+func TestLoadProviders(t *testing.T) {
+	t.Parallel()
+
+	path := writeManifest(t, minimalManifest+"\n"+str.Dedent(`
+		secrets:
+		  providers:
+		    op: {}
+		    passwordstate:
+		      url: https://pw.example.com
+		      api-key-env: PW_KEY
+		      timeout: 5s
+	`))
+	ws, err := newRepository(t, path).Load()
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	want := map[string]workspace.ProviderConfig{
+		"op": {Timeout: 30 * time.Second},
+		"passwordstate": {
+			Timeout:   5 * time.Second,
+			URL:       "https://pw.example.com",
+			APIKeyEnv: "PW_KEY",
+		},
+	}
+	if !maps.Equal(ws.Secrets.Providers, want) {
+		t.Errorf("Providers = %+v, want %+v", ws.Secrets.Providers, want)
+	}
+}
+
+// TestLoadProvidersRejectsInvalid verifies unknown providers and bad timeouts
+// fail at load.
+func TestLoadProvidersRejectsInvalid(t *testing.T) {
+	t.Parallel()
+
+	tests := map[string]struct {
+		body string
+		want string
+	}{
+		"unknown provider": {
+			body: "secrets:\n  providers:\n    vault: {}\n",
+			want: `unknown secrets provider "vault"`,
+		},
+		"bad timeout": {
+			body: "secrets:\n  providers:\n    bws:\n      timeout: soon\n",
+			want: "positive duration",
+		},
+		"negative timeout": {
+			body: "secrets:\n  providers:\n    op:\n      timeout: -1s\n",
+			want: "positive duration",
+		},
+	}
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			path := writeManifest(t, minimalManifest+"\n"+tt.body)
+			_, err := newRepository(t, path).Load()
+			if err == nil || !strings.Contains(err.Error(), tt.want) {
+				t.Errorf("Load error = %v, want containing %q", err, tt.want)
+			}
+		})
 	}
 }
 

@@ -1,8 +1,7 @@
 package diagnostic
 
-import "github.com/go-envx/envx/app/internal/lib/severity"
-
 // Reportable diagnostic codes. The strings are a public contract and must not change.
+// Keep these codes consistent with the definitions in registry_def.go.
 //
 //nolint:gosec // G101: code names, not credentials.
 const (
@@ -50,67 +49,20 @@ const (
 	// PropertyNotDeclaredInBase marks an overlay key its namespace base file
 	// never declares. It is an opt-in best practice, so it is off by default.
 	PropertyNotDeclaredInBase Code = "PROPERTY_NOT_DECLARED_IN_BASE"
-)
 
-var definitions = []Definition{
-	{
-		Code:    SecretIsNotEncrypted,
-		Level:   severity.Error,
-		Summary: "a stored value left unencrypted",
-	},
-	{
-		Code:    SecretAlgorithmMismatch,
-		Level:   severity.Error,
-		Summary: "a value stored under a non-configured algorithm",
-	},
-	{
-		Code:    SecretIsNotReferenced,
-		Level:   severity.Error,
-		Summary: "a stored value no environment references",
-	},
-	{
-		Code:    PublicKeyIsMissing,
-		Level:   severity.Error,
-		Summary: "a group with stored secrets but no public key",
-	},
-	{
-		Code:    PrivateKeyIsInvalid,
-		Level:   severity.Error,
-		Summary: "a group whose private key is malformed or mismatched",
-	},
-	{
-		Code:    PrivateKeyIsUnavailable,
-		Level:   severity.Warn,
-		Summary: "a group with no private key available in this context",
-	},
-	{
-		Code:    SecretReferenceNotFound,
-		Level:   severity.Error,
-		Summary: "a reference to a value absent from the store",
-	},
-	{
-		Code:    InvalidSecretReference,
-		Level:   severity.Error,
-		Summary: "a malformed secret reference",
-	},
-	{
-		Code:    SecretReferenceIsUnresolved,
-		Level:   severity.Error,
-		Summary: "a reference that passed every store check yet failed to decrypt",
-	},
-	{
-		Code:    CircularVariableReference,
-		Level:   severity.Error,
-		Summary: "a variable substitution cycle",
-	},
-	{
-		Code:    UnresolvedVariableReference,
-		Level:   severity.Error,
-		Summary: "a substitution of an undefined variable",
-	},
-	{
-		Code:    PropertyNotDeclaredInBase,
-		Level:   severity.None,
-		Summary: "an overlay key its namespace base file never declares",
-	},
-}
+	// InvalidExternalReference marks a malformed reference for an enabled
+	// external provider.
+	InvalidExternalReference Code = "INVALID_EXTERNAL_REFERENCE"
+
+	// ExternalProviderNotEnabled marks a value using the scheme of an undeclared
+	// external provider; the value passes through unchanged.
+	ExternalProviderNotEnabled Code = "EXTERNAL_PROVIDER_NOT_ENABLED"
+
+	// ExternalProviderUnavailable marks a declared provider whose CLI or
+	// credentials are missing, or that timed out earlier in the operation.
+	ExternalProviderUnavailable Code = "EXTERNAL_PROVIDER_UNAVAILABLE"
+
+	// ExternalReferenceUnresolved marks a provider call that failed, returned no
+	// value, or matched more than one secret.
+	ExternalReferenceUnresolved Code = "EXTERNAL_REFERENCE_UNRESOLVED"
+)

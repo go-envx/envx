@@ -1,8 +1,12 @@
 package filestore
 
 import (
+	"fmt"
 	"maps"
 	"path/filepath"
+	"time"
+
+	"gopkg.in/yaml.v3"
 
 	"github.com/go-envx/envx/app/internal/core/workspace"
 	"github.com/go-envx/envx/app/internal/lib/filex"
@@ -15,6 +19,8 @@ const (
 	defaultKeysFilename = "envx.keys"
 	// defaultCipher is the algorithm used when the manifest names none.
 	defaultCipher = "age"
+	// defaultProviderTimeout bounds each external provider call when unset.
+	defaultProviderTimeout = 30 * time.Second
 	// minIndent and maxIndent bound the YAML block indentation a manifest may imply.
 	minIndent = 2
 	maxIndent = 9
@@ -95,9 +101,10 @@ func (s settingsYAML) toDomain() workspace.Settings {
 }
 
 type secretsConfigYAML struct {
-	SecretsPath string `yaml:"path"`
-	KeysPath    string `yaml:"keys-path"`
-	Cipher      string `yaml:"cipher"`
+	SecretsPath string        `yaml:"path"`
+	KeysPath    string        `yaml:"keys-path"`
+	Cipher      string        `yaml:"cipher"`
+	Providers   providersYAML `yaml:"providers"`
 }
 
 // toDomain resolves store and key paths against root; the key file defaults
@@ -123,5 +130,86 @@ func (s secretsConfigYAML) toDomain(root string) workspace.SecretsConfig {
 		SecretsPath: secretsPath,
 		KeysPath:    keysPath,
 		Cipher:      algorithm,
+		Providers:   s.Providers.toDomain(),
 	}
+}
+
+// providersYAML declares the enabled external providers; nil means disabled.
+type providersYAML struct {
+	// OnePassword enables op:// references.
+	OnePassword *cliProviderYAML `yaml:"op"`
+	// Bitwarden enables bws:// references.
+	Bitwarden *cliProviderYAML `yaml:"bws"`
+	// Passwordstate enables passwordstate:// references.
+	Passwordstate *passwordstateYAML `yaml:"passwordstate"`
+}
+
+// toDomain lists the declared providers keyed by scheme with default timeouts.
+func (p providersYAML) toDomain() map[string]workspace.ProviderConfig {
+	providers := make(map[string]workspace.ProviderConfig)
+	if p.OnePassword != nil {
+		providers["op"] = workspace.ProviderConfig{
+			Timeout: p.OnePassword.Timeout.orDefault(),
+		}
+	}
+	if p.Bitwarden != nil {
+		providers["bws"] = workspace.ProviderConfig{
+			Timeout: p.Bitwarden.Timeout.orDefault(),
+		}
+	}
+	if p.Passwordstate != nil {
+		providers["passwordstate"] = workspace.ProviderConfig{
+			Timeout:   p.Passwordstate.Timeout.orDefault(),
+			URL:       p.Passwordstate.URL,
+			APIKeyEnv: p.Passwordstate.APIKeyEnv,
+		}
+	}
+	if len(providers) == 0 {
+		return nil
+	}
+	return providers
+}
+
+// cliProviderYAML configures a CLI-backed provider.
+type cliProviderYAML struct {
+	// Timeout bounds each CLI invocation.
+	Timeout durationYAML `yaml:"timeout"`
+}
+
+// passwordstateYAML configures the Passwordstate REST provider.
+type passwordstateYAML struct {
+	// URL is the Passwordstate base URL.
+	URL string `yaml:"url"`
+	// APIKeyEnv names the host variable holding the API key.
+	APIKeyEnv string `yaml:"api-key-env"`
+	// Timeout bounds each HTTP request.
+	Timeout durationYAML `yaml:"timeout"`
+}
+
+// durationYAML decodes a positive Go duration string such as "30s".
+type durationYAML time.Duration
+
+// UnmarshalYAML parses a positive Go duration.
+func (d *durationYAML) UnmarshalYAML(node *yaml.Node) error {
+	var text string
+	if err := node.Decode(&text); err != nil {
+		return err
+	}
+	parsed, err := time.ParseDuration(text)
+	if err != nil || parsed <= 0 {
+		return fmt.Errorf(
+			"line %d: timeout %q must be a positive duration such as \"30s\"",
+			node.Line, text,
+		)
+	}
+	*d = durationYAML(parsed)
+	return nil
+}
+
+// orDefault returns the duration, or defaultProviderTimeout when unset.
+func (d durationYAML) orDefault() time.Duration {
+	if d <= 0 {
+		return defaultProviderTimeout
+	}
+	return time.Duration(d)
 }
