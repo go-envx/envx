@@ -28,6 +28,14 @@ type fakeInspector struct {
 	err error
 }
 
+// fakeProviders is an in-memory ProviderInspector.
+type fakeProviders struct {
+	// unavailable holds the reason per unavailable scheme.
+	unavailable map[string]error
+	// checked records every checked scheme.
+	checked []string
+}
+
 // Explain returns the project's entries with findings located, as env does.
 func (f *fakeExplainer) Explain(params env.ExplainParams) (env.ExplainResult, error) {
 	f.calls = append(f.calls, params)
@@ -64,4 +72,10 @@ func (f *fakeInspector) Audit(scope secrets.AuditScope) (secrets.Audit, error) {
 		out.GroupsMissingPublicKey = f.audit.GroupsMissingPublicKey
 	}
 	return out, nil
+}
+
+// CheckAvailable returns the scheme's configured reason.
+func (f *fakeProviders) CheckAvailable(scheme string) error {
+	f.checked = append(f.checked, scheme)
+	return f.unavailable[scheme]
 }

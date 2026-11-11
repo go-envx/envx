@@ -152,6 +152,35 @@ func TestFetchTitleRequiresListID(t *testing.T) {
 	}
 }
 
+func TestCheckPathOffline(t *testing.T) {
+	t.Parallel()
+
+	opts := passwordstate.Options{URL: "https://pw.local", APIKeyEnv: "PW_KEY"}
+	noList := passwordstate.New(keyHost, opts)
+	opts.ListID = 1990
+	withList := passwordstate.New(keyHost, opts)
+
+	if err := withList.CheckAvailable(); err != nil {
+		t.Errorf("CheckAvailable = %v, want nil", err)
+	}
+	for _, tt := range []struct {
+		provider *passwordstate.Provider
+		path     string
+		valid    bool
+	}{
+		{noList, "42/UserName", true},
+		{noList, "db", false},
+		{withList, "db", true},
+		{withList, "42/a/b", false},
+	} {
+		err := tt.provider.CheckPath(tt.path)
+		if tt.valid != (err == nil) ||
+			err != nil && !errors.Is(err, external.ErrInvalidReference) {
+			t.Errorf("CheckPath(%q) = %v, want valid %t", tt.path, err, tt.valid)
+		}
+	}
+}
+
 func TestFetchTitles(t *testing.T) {
 	t.Parallel()
 
@@ -249,6 +278,9 @@ func TestFetchUnavailable(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 			p := passwordstate.New(tt.host, tt.opts)
+			if err := p.CheckAvailable(); !errors.Is(err, external.ErrProviderUnavailable) {
+				t.Errorf("CheckAvailable = %v, want ErrProviderUnavailable", err)
+			}
 			_, err := p.Fetch(context.Background(), "42")
 			if !errors.Is(err, external.ErrProviderUnavailable) {
 				t.Fatalf("err = %v, want ErrProviderUnavailable", err)

@@ -16,6 +16,10 @@ type fakeProvider struct {
 	values map[string]string
 	// err is returned for every fetch when set.
 	err error
+	// pathErr is returned by CheckPath when set.
+	pathErr error
+	// availableErr is returned by CheckAvailable when set.
+	availableErr error
 	// block waits for the context to end before returning.
 	block bool
 	// calls records every fetched path in order.
@@ -43,6 +47,14 @@ func (p *fakeProvider) Fetch(ctx context.Context, path string) (string, error) {
 		return "", errors.New("not found")
 	}
 	return plaintext, nil
+}
+
+func (p *fakeProvider) CheckPath(string) error {
+	return p.pathErr
+}
+
+func (p *fakeProvider) CheckAvailable() error {
+	return p.availableErr
 }
 
 func (passthrough) Resolve(raw, _ string) (string, error) {

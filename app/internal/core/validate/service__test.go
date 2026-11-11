@@ -18,10 +18,14 @@ type fixture struct {
 	explainer *fakeExplainer
 	// inspector is the fake store inspector.
 	inspector *fakeInspector
+	// providers is the fake provider inspector.
+	providers *fakeProviders
 	// envOpens counts explainer opens.
 	envOpens int
 	// secretsOpens counts inspector opens.
 	secretsOpens int
+	// providersOpens counts provider inspector opens.
+	providersOpens int
 }
 
 // newFixture returns a workspace declaring projects in development and
@@ -38,6 +42,7 @@ func newFixture(projects ...string) *fixture {
 		ws:        ws,
 		explainer: &fakeExplainer{entries: make(map[string][]env.ExplainEntry)},
 		inspector: &fakeInspector{},
+		providers: &fakeProviders{},
 	}
 }
 
@@ -52,6 +57,10 @@ func (f *fixture) service(t *testing.T) *Service {
 		OpenSecrets: func() (Inspector, error) {
 			f.secretsOpens++
 			return f.inspector, nil
+		},
+		OpenProviders: func() (ProviderInspector, error) {
+			f.providersOpens++
+			return f.providers, nil
 		},
 	})
 	if err != nil {

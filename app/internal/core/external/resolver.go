@@ -106,7 +106,7 @@ func (r *Resolver) Resolve(raw, environment string) (string, error) {
 	if escaped {
 		return literal, nil
 	}
-	ref, err := ParseReference(literal)
+	ref, err := r.parse(literal)
 	if err != nil {
 		return "", err
 	}
@@ -122,7 +122,7 @@ func (r *Resolver) Evaluate(raw, environment string) value.Evaluation {
 	literal, escaped, enabled := r.match(raw)
 	if !enabled {
 		eval := r.next.Evaluate(raw, environment)
-		if _, ok := schemeOf(raw); ok && eval.Diagnostic.IsZero() {
+		if _, ok := SchemeOf(raw); ok && eval.Diagnostic.IsZero() {
 			eval.Diagnostic = finding(
 				diagnostic.ExternalProviderNotEnabled,
 				"the provider for this reference is not declared under secrets.providers",
@@ -133,7 +133,7 @@ func (r *Resolver) Evaluate(raw, environment string) value.Evaluation {
 	if escaped {
 		return value.Evaluation{Kind: value.Config, Value: literal, Resolved: true}
 	}
-	ref, err := ParseReference(literal)
+	ref, err := r.parse(literal)
 	if err != nil {
 		return value.Evaluation{
 			Kind:       value.Secret,
@@ -159,12 +159,27 @@ func (r *Resolver) Evaluate(raw, environment string) value.Evaluation {
 // enabled provider's scheme.
 func (r *Resolver) match(raw string) (literal string, escaped, enabled bool) {
 	literal, escaped = strings.CutPrefix(raw, `\`)
-	scheme, ok := schemeOf(literal)
+	scheme, ok := SchemeOf(literal)
 	if !ok {
 		return raw, false, false
 	}
 	_, enabled = r.providers[scheme]
 	return literal, escaped, enabled
+}
+
+// parse parses an enabled provider's reference and checks its path offline
+// when the provider supports it.
+func (r *Resolver) parse(literal string) (Reference, error) {
+	ref, err := ParseReference(literal)
+	if err != nil {
+		return Reference{}, err
+	}
+	if checker, ok := r.providers[ref.Scheme].provider.(PathChecker); ok {
+		if err := checker.CheckPath(ref.Path); err != nil {
+			return Reference{}, err
+		}
+	}
+	return ref, nil
 }
 
 // fetch returns a reference's cached outcome, fetching on a miss. After a

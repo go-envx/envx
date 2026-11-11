@@ -65,7 +65,16 @@ func (f *fakeFactory) NewValidateService(configPath string) (*validate.Service, 
 		OpenSecrets: func() (validate.Inspector, error) {
 			return f, nil
 		},
+		OpenProviders: func() (validate.ProviderInspector, error) {
+			return f, nil
+		},
 	})
+}
+
+// CheckAvailable implements validate.ProviderInspector; every provider is
+// available.
+func (f *fakeFactory) CheckAvailable(string) error {
+	return nil
 }
 
 // Explain implements validate.Explainer with no entries.

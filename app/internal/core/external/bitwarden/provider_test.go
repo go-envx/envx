@@ -200,6 +200,64 @@ func TestFetchRejectsBareKey(t *testing.T) {
 	}
 }
 
+func TestCheckPath(t *testing.T) {
+	t.Parallel()
+
+	p := bitwarden.New(hostenv.Snapshot{}, bitwarden.Options{})
+	for path, valid := range map[string]bool{
+		secretID:      true,
+		"app/KEY":     true,
+		"DB_PASSWORD": false,
+	} {
+		err := p.CheckPath(path)
+		if valid != (err == nil) ||
+			err != nil && !errors.Is(err, external.ErrInvalidReference) {
+			t.Errorf("CheckPath(%q) = %v, want valid %t", path, err, valid)
+		}
+	}
+}
+
+func TestCheckAvailable(t *testing.T) {
+	t.Parallel()
+
+	found := func(string) (string, error) { return "/bin/bws", nil }
+	missing := func(string) (string, error) { return "", exec.ErrNotFound }
+	tests := map[string]struct {
+		host     hostenv.Snapshot
+		lookPath func(string) (string, error)
+		contain  string
+	}{
+		"available": {host: tokenHost, lookPath: found},
+		"no token": {
+			host:     hostenv.From([]string{"BWS_ACCESS_TOKEN="}),
+			lookPath: found,
+			contain:  "BWS_ACCESS_TOKEN is not set",
+		},
+		"no cli": {
+			host:     tokenHost,
+			lookPath: missing,
+			contain:  "install Bitwarden Secrets Manager CLI",
+		},
+	}
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			p := bitwarden.New(tt.host, bitwarden.Options{LookPath: tt.lookPath})
+			err := p.CheckAvailable()
+			if tt.contain == "" {
+				if err != nil {
+					t.Errorf("err = %v, want nil", err)
+				}
+				return
+			}
+			if !errors.Is(err, external.ErrProviderUnavailable) ||
+				!strings.Contains(err.Error(), tt.contain) {
+				t.Errorf("err = %v, want containing %q", err, tt.contain)
+			}
+		})
+	}
+}
+
 func TestFetchRequiresToken(t *testing.T) {
 	t.Parallel()
 

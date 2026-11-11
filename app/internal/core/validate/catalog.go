@@ -9,9 +9,14 @@ import (
 const (
 	// GroupStore checks read only the store audit: offline and instant.
 	GroupStore Group = "store"
+	// GroupProvider checks the external providers the merge references, offline.
+	GroupProvider Group = "provider"
 	// GroupResolution checks read each project's merge in each environment.
 	GroupResolution Group = "resolution"
 )
+
+// groupOrder ranks groups for sorting findings.
+var groupOrder = []Group{GroupStore, GroupProvider, GroupResolution}
 
 // storeCodes are reported by the store audit; every other diagnostic code is
 // reported by the merge.
@@ -63,11 +68,14 @@ func owner(code diagnostic.Code) Group {
 	if slices.Contains(storeCodes, code) {
 		return GroupStore
 	}
+	if code == diagnostic.ExternalProviderUnavailable {
+		return GroupProvider
+	}
 	return GroupResolution
 }
 
 // requiresMerge reports whether code's check reads the merge; unreferenced
-// values need the references the merge collects.
+// values and referenced providers need the references the merge collects.
 func requiresMerge(code diagnostic.Code) bool {
-	return owner(code) == GroupResolution || code == diagnostic.SecretIsNotReferenced
+	return owner(code) != GroupStore || code == diagnostic.SecretIsNotReferenced
 }

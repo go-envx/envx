@@ -35,7 +35,7 @@ type Reference struct {
 // a supported scheme return ErrNotReference; malformed paths wrap
 // ErrInvalidReference.
 func ParseReference(raw string) (Reference, error) {
-	scheme, ok := schemeOf(raw)
+	scheme, ok := SchemeOf(raw)
 	if !ok {
 		return Reference{}, ErrNotReference
 	}
@@ -59,8 +59,9 @@ func (r Reference) String() string {
 	return r.Scheme + schemeSeparator + r.Path
 }
 
-// schemeOf returns raw's supported scheme, if any.
-func schemeOf(raw string) (string, bool) {
+// SchemeOf returns raw's supported scheme, if any, without checking its path.
+// An escaped value has no scheme.
+func SchemeOf(raw string) (string, bool) {
 	scheme, _, ok := strings.Cut(raw, schemeSeparator)
 	if !ok || !slices.Contains(schemes, scheme) {
 		return "", false

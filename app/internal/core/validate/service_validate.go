@@ -3,10 +3,12 @@ package validate
 import (
 	"cmp"
 	"fmt"
+	"maps"
 	"slices"
 
 	"github.com/go-envx/envx/app/internal/core/diagnostic"
 	"github.com/go-envx/envx/app/internal/core/env"
+	"github.com/go-envx/envx/app/internal/core/external"
 	"github.com/go-envx/envx/app/internal/core/secrets"
 	"github.com/go-envx/envx/app/internal/core/workspace"
 	"github.com/go-envx/envx/app/internal/lib/severity"
@@ -44,6 +46,8 @@ type run struct {
 	seen map[diagnostic.Finding]bool
 	// referenced records every stored value some environment references.
 	referenced map[secrets.Reference]bool
+	// schemes records every external scheme some environment's winner uses.
+	schemes map[string]bool
 }
 
 // Validate diagnoses every project in every declared environment, then audits
@@ -58,6 +62,7 @@ func (s *Service) Validate(params ValidateParams) (Report, error) {
 		params:     params,
 		seen:       make(map[diagnostic.Finding]bool),
 		referenced: make(map[secrets.Reference]bool),
+		schemes:    make(map[string]bool),
 	}
 	merge := slices.ContainsFunc(Checks(), func(c Check) bool {
 		return c.RequiresMerge && params.runs(c.Code)
@@ -67,21 +72,20 @@ func (s *Service) Validate(params ValidateParams) (Report, error) {
 			return Report{}, err
 		}
 	}
+	if err := s.checkProviders(r); err != nil {
+		return Report{}, err
+	}
 	if err := s.audit(r); err != nil {
 		return Report{}, err
 	}
-	// Errors first, then store before resolution, code, project, environment,
-	// and key.
-	storeFirst := func(f diagnostic.Finding) int {
-		if owner(f.Code) == GroupStore {
-			return 0
-		}
-		return 1
+	// Errors first, then by group, code, project, environment, and key.
+	groupRank := func(f diagnostic.Finding) int {
+		return slices.Index(groupOrder, owner(f.Code))
 	}
 	slices.SortStableFunc(r.report.Findings, func(a, b diagnostic.Finding) int {
 		return cmp.Or(
 			cmp.Compare(b.Level.Rank(), a.Level.Rank()),
-			cmp.Compare(storeFirst(a), storeFirst(b)),
+			cmp.Compare(groupRank(a), groupRank(b)),
 			cmp.Compare(a.Code, b.Code),
 			cmp.Compare(a.Project, b.Project),
 			cmp.Compare(a.Environment, b.Environment),
@@ -109,9 +113,9 @@ func (p ValidateParams) runs(code diagnostic.Code) bool {
 }
 
 // diagnose explains each project in each environment, recording resolution
-// findings and the stored values the environments reference. Store-owned codes
-// are left to the audit, which reports them once per stored value or group
-// instead of once per reference.
+// findings, the stored values the environments reference, and the external
+// schemes their winners use. Store-owned codes are left to the audit, which
+// reports them once per stored value or group instead of once per reference.
 func (s *Service) diagnose(r *run) error {
 	explainer, err := s.deps.OpenEnv()
 	if err != nil {
@@ -136,6 +140,11 @@ func (s *Service) diagnose(r *run) error {
 					if ref, err := secrets.ParseReference(item, environment); err == nil {
 						r.referenced[ref] = true
 					}
+					// A host winner's items were replaced, so it calls no provider.
+					scheme, ok := external.SchemeOf(item)
+					if ok && !entry.Origin.Winner.Host {
+						r.schemes[scheme] = true
+					}
 				}
 				if !entry.DeclaredInBase {
 					s.record(r, diagnostic.Finding{
@@ -152,6 +161,29 @@ func (s *Service) diagnose(r *run) error {
 					}
 				}
 			}
+		}
+	}
+	return nil
+}
+
+// checkProviders records each referenced provider that cannot be called, once
+// per provider, opening the inspector only when the check runs and some
+// winner references an external provider.
+func (s *Service) checkProviders(r *run) error {
+	if !r.params.runs(diagnostic.ExternalProviderUnavailable) || len(r.schemes) == 0 {
+		return nil
+	}
+	inspector, err := s.deps.OpenProviders()
+	if err != nil {
+		return err
+	}
+	for _, scheme := range slices.Sorted(maps.Keys(r.schemes)) {
+		if err := inspector.CheckAvailable(scheme); err != nil {
+			s.record(r, diagnostic.Finding{
+				Code:    diagnostic.ExternalProviderUnavailable,
+				Key:     scheme,
+				Message: err.Error(),
+			})
 		}
 	}
 	return nil

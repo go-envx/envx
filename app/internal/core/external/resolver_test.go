@@ -169,6 +169,32 @@ func TestResolveInvalidReference(t *testing.T) {
 	}
 }
 
+func TestResolveChecksPathWithoutFetching(t *testing.T) {
+	t.Parallel()
+
+	for _, reveal := range []bool{false, true} {
+		op := &fakeProvider{
+			scheme:  "op",
+			values:  map[string]string{"v/f": "pw"},
+			pathErr: fmt.Errorf("%w: too short", external.ErrInvalidReference),
+		}
+		r := newResolver(t, reveal, op)
+
+		if _, err := r.Resolve("op://v/f", "dev"); !errors.Is(
+			err, external.ErrInvalidReference,
+		) {
+			t.Errorf("reveal %t: err = %v, want ErrInvalidReference", reveal, err)
+		}
+		eval := r.Evaluate("op://v/f", "dev")
+		if eval.Diagnostic.Code != diagnostic.InvalidExternalReference || eval.Resolved {
+			t.Errorf("reveal %t: Evaluate = %+v, want invalid finding", reveal, eval)
+		}
+		if len(op.calls) != 0 {
+			t.Errorf("reveal %t: provider called %v", reveal, op.calls)
+		}
+	}
+}
+
 func TestEvaluateProviderRejectedReference(t *testing.T) {
 	t.Parallel()
 

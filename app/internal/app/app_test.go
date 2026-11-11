@@ -4,6 +4,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -147,7 +148,7 @@ func TestNewEnvServiceRegistersDeclaredProviders(t *testing.T) {
 	}, "\n"))
 	writeFile(t, filepath.Join(workspaceDir, "env", "app.yaml"), strings.Join([]string{
 		"one: op://vault/item/field",
-		"two: bws://0b5c6f9e",
+		"two: bws://project/key",
 		"three: passwordstate://42",
 		"",
 	}, "\n"))
@@ -170,7 +171,7 @@ func TestNewEnvServiceRegistersDeclaredProviders(t *testing.T) {
 		t.Errorf("op evaluation = %+v, want masked secret", op)
 	}
 	bws := entries["TWO"].Evaluation
-	if bws.Kind != value.Secret || bws.Value != "bws://0b5c6f9e" ||
+	if bws.Kind != value.Secret || bws.Value != "bws://project/key" ||
 		!bws.Diagnostic.IsZero() {
 		t.Errorf("bws evaluation = %+v, want masked secret", bws)
 	}
@@ -202,6 +203,59 @@ func TestNewValidateServiceOpensEnvOnlyForMergeChecks(t *testing.T) {
 	}
 	if _, err := service.Validate(validate.ValidateParams{}); err == nil {
 		t.Error("Validate of all checks succeeded over a malformed namespace")
+	}
+}
+
+// TestNewValidateServiceChecksProvidersOffline verifies validate reports each
+// referenced, unavailable provider once and malformed references per entry.
+func TestNewValidateServiceChecksProvidersOffline(t *testing.T) {
+	t.Parallel()
+
+	workspaceDir := testutil.CopyDir(t, minimalWorkspace)
+	writeFile(t, filepath.Join(workspaceDir, "envx.yaml"), strings.Join([]string{
+		"environments: [dev, prod]",
+		"secrets:",
+		"  providers:",
+		"    bws: {}",
+		"    passwordstate: {}",
+		"projects:",
+		"  app:",
+		"    includes: [env/app]",
+		"",
+	}, "\n"))
+	writeFile(t, filepath.Join(workspaceDir, "env", "app.yaml"), strings.Join([]string{
+		"one: bws://project/key",
+		"two: bws://BARE_KEY",
+		"three: passwordstate://42",
+		"",
+	}, "\n"))
+	f, _ := countingFactory()
+	service, err := f.NewValidateService(workspaceDir)
+	if err != nil {
+		t.Fatalf("NewValidateService: %v", err)
+	}
+
+	report, err := service.Validate(validate.ValidateParams{
+		Selected: []diagnostic.Code{
+			diagnostic.ExternalProviderUnavailable,
+			diagnostic.InvalidExternalReference,
+		},
+	})
+	if err != nil {
+		t.Fatalf("Validate: %v", err)
+	}
+	var got []string
+	for _, found := range report.Findings {
+		got = append(got, string(found.Code)+" "+found.Environment+" "+found.Key)
+	}
+	want := []string{
+		"EXTERNAL_PROVIDER_UNAVAILABLE  bws",
+		"EXTERNAL_PROVIDER_UNAVAILABLE  passwordstate",
+		"INVALID_EXTERNAL_REFERENCE dev TWO",
+		"INVALID_EXTERNAL_REFERENCE prod TWO",
+	}
+	if !slices.Equal(got, want) {
+		t.Errorf("findings = %q, want %q", got, want)
 	}
 }
 

@@ -71,6 +71,41 @@ func TestFetchReadsReference(t *testing.T) {
 	}
 }
 
+func TestCheckPath(t *testing.T) {
+	t.Parallel()
+
+	p := onepassword.New(hostenv.Snapshot{}, onepassword.Options{})
+	for path, valid := range map[string]bool{
+		"vault/item":           false,
+		"vault/item/field":     true,
+		"vault/item/sec/field": true,
+		"vault/item/a/b/field": false,
+	} {
+		err := p.CheckPath(path)
+		if valid != (err == nil) ||
+			err != nil && !errors.Is(err, external.ErrInvalidReference) {
+			t.Errorf("CheckPath(%q) = %v, want valid %t", path, err, valid)
+		}
+	}
+}
+
+func TestCheckAvailable(t *testing.T) {
+	t.Parallel()
+
+	found := func(string) (string, error) { return "/bin/op", nil }
+	missing := func(string) (string, error) { return "", exec.ErrNotFound }
+
+	p := onepassword.New(hostenv.Snapshot{}, onepassword.Options{LookPath: found})
+	if err := p.CheckAvailable(); err != nil {
+		t.Errorf("found: err = %v, want nil", err)
+	}
+	p = onepassword.New(hostenv.Snapshot{}, onepassword.Options{LookPath: missing})
+	if err := p.CheckAvailable(); !errors.Is(err, external.ErrProviderUnavailable) ||
+		!strings.Contains(err.Error(), "install 1Password CLI") {
+		t.Errorf("missing: err = %v, want install hint", err)
+	}
+}
+
 func TestFetchErrors(t *testing.T) {
 	t.Parallel()
 

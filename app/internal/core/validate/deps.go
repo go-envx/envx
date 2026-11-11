@@ -17,11 +17,21 @@ type Inspector interface {
 	Audit(scope secrets.AuditScope) (secrets.Audit, error)
 }
 
-// Dependencies open the inspection adapters lazily; both are required.
+// ProviderInspector checks declared external providers without contacting them.
+type ProviderInspector interface {
+	// CheckAvailable returns why the declared provider for scheme cannot be
+	// called; nil when it can or is not declared.
+	CheckAvailable(scheme string) error
+}
+
+// Dependencies open the inspection adapters lazily; all are required.
 type Dependencies struct {
 	// OpenEnv opens the explainer when a selected check reads the merge.
 	OpenEnv func() (Explainer, error)
 	// OpenSecrets opens the inspector when a selected check reads the store. It
 	// must resolve private keys as the explainer's resolver does.
 	OpenSecrets func() (Inspector, error)
+	// OpenProviders opens the provider inspector when the provider check runs
+	// and some value references an external provider.
+	OpenProviders func() (ProviderInspector, error)
 }

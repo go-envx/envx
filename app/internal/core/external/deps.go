@@ -16,6 +16,21 @@ type Provider interface {
 	Fetch(ctx context.Context, path string) (string, error)
 }
 
+// PathChecker is an optional Provider extension that checks a reference path
+// against the provider's syntax and configuration without fetching.
+type PathChecker interface {
+	// CheckPath returns an error wrapping ErrInvalidReference for a bad path.
+	CheckPath(path string) error
+}
+
+// AvailabilityChecker is an optional Provider extension that reports, without
+// contacting the provider, whether it can be called.
+type AvailabilityChecker interface {
+	// CheckAvailable returns an error wrapping ErrProviderUnavailable when the
+	// provider's configuration, credentials, or CLI are missing.
+	CheckAvailable() error
+}
+
 // ValueResolver dereferences and diagnoses values that are not external
 // references.
 type ValueResolver interface {

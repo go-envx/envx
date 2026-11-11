@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os/exec"
 	"regexp"
+	"strings"
 
 	"github.com/go-envx/envx/app/internal/core/external"
 	"github.com/go-envx/envx/app/internal/lib/hostenv"
@@ -23,12 +24,16 @@ var cliEnv = regexp.MustCompile(`(?i)^OP_`)
 type Options struct {
 	// Run executes the CLI and returns its stdout; nil uses process.Output.
 	Run external.CommandRunner
+	// LookPath locates the CLI offline; nil uses exec.LookPath.
+	LookPath func(file string) (string, error)
 }
 
 // Provider fetches op:// references with `op read`.
 type Provider struct {
 	// run executes the CLI and returns its stdout.
 	run external.CommandRunner
+	// lookPath locates the CLI offline.
+	lookPath func(file string) (string, error)
 	// env is the minimal child environment.
 	env map[string]string
 }
@@ -40,7 +45,15 @@ func New(host hostenv.Snapshot, opts Options) *Provider {
 	if run == nil {
 		run = process.Output
 	}
-	return &Provider{run: run, env: process.MinimalEnv(host.All(), cliEnv)}
+	lookPath := opts.LookPath
+	if lookPath == nil {
+		lookPath = exec.LookPath
+	}
+	return &Provider{
+		run:      run,
+		lookPath: lookPath,
+		env:      process.MinimalEnv(host.All(), cliEnv),
+	}
 }
 
 // Scheme returns "op".
@@ -48,8 +61,31 @@ func (p *Provider) Scheme() string {
 	return external.SchemeOnePassword
 }
 
+// CheckPath accepts "vault/item/field" and "vault/item/section/field".
+func (p *Provider) CheckPath(path string) error {
+	if segments := strings.Count(path, "/") + 1; segments < 3 || segments > 4 {
+		return fmt.Errorf(
+			"%w: want op://<vault>/<item>/[<section>/]<field>",
+			external.ErrInvalidReference,
+		)
+	}
+	return nil
+}
+
+// CheckAvailable reports a missing CLI. Sessions are not checked, since the
+// desktop app can authorize the CLI on first use.
+func (p *Provider) CheckAvailable() error {
+	if _, err := p.lookPath(program); err != nil {
+		return notFoundError()
+	}
+	return nil
+}
+
 // Fetch reads one secret reference path, such as "vault/item/field".
 func (p *Provider) Fetch(ctx context.Context, path string) (string, error) {
+	if err := p.CheckPath(path); err != nil {
+		return "", err
+	}
 	ref := external.Reference{Scheme: external.SchemeOnePassword, Path: path}
 	out, err := p.run(ctx, process.OutputCommand{
 		Args: []string{program, "read", "--no-newline", ref.String()},
@@ -59,10 +95,7 @@ func (p *Provider) Fetch(ctx context.Context, path string) (string, error) {
 		return string(out), nil
 	}
 	if errors.Is(err, exec.ErrNotFound) {
-		return "", fmt.Errorf(
-			"%w: %s CLI not found on PATH; install 1Password CLI",
-			external.ErrProviderUnavailable, program,
-		)
+		return "", notFoundError()
 	}
 	if exitErr, ok := errors.AsType[*process.ExitError](err); ok {
 		return "", fmt.Errorf(
@@ -72,4 +105,12 @@ func (p *Provider) Fetch(ctx context.Context, path string) (string, error) {
 		)
 	}
 	return "", err
+}
+
+// notFoundError reports the CLI missing from PATH.
+func notFoundError() error {
+	return fmt.Errorf(
+		"%w: %s CLI not found on PATH; install 1Password CLI",
+		external.ErrProviderUnavailable, program,
+	)
 }

@@ -306,6 +306,83 @@ func TestValidateCountsOverriddenReferences(t *testing.T) {
 	}
 }
 
+// TestValidateReportsUnavailableProvidersOnce verifies an unavailable provider
+// is reported once however many winners reference it, while escaped values and
+// host winners do not count as references.
+func TestValidateReportsUnavailableProvidersOnce(t *testing.T) {
+	t.Parallel()
+	f := newFixture("api", "web")
+	hostWinner := entry("PS", "passwordstate://13138")
+	hostWinner.Origin.Winner.Host = true
+	for _, project := range []string{"api", "web"} {
+		f.explainer.entries[project] = []env.ExplainEntry{
+			entry("A", "op://vault/item/a"),
+			entry("B", "op://vault/item/b", "bws://project/key"),
+			entry("ESCAPED", `\op://vault/item/c`),
+			hostWinner,
+		}
+	}
+	f.providers.unavailable = map[string]error{
+		"op":            errors.New("op CLI not found"),
+		"passwordstate": errors.New("key not set"),
+	}
+
+	report := f.validate(t, ValidateParams{})
+
+	if !slices.Equal(f.providers.checked, []string{"bws", "op"}) {
+		t.Errorf("checked = %v, want [bws op]", f.providers.checked)
+	}
+	if len(report.Findings) != 1 {
+		t.Fatalf("findings = %v, want one", codes(report.Findings))
+	}
+	found := report.Findings[0]
+	if found.Code != diagnostic.ExternalProviderUnavailable || found.Key != "op" ||
+		found.Project != "" || found.Message != "op CLI not found" ||
+		found.Level != severity.Error {
+		t.Errorf("finding = %+v, want an op provider error", found)
+	}
+}
+
+// TestValidateOpensProvidersOnlyWhenNeeded verifies the provider inspector is
+// opened only when its check runs and a winner references a provider.
+func TestValidateOpensProvidersOnlyWhenNeeded(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name     string
+		items    []string
+		selected []diagnostic.Code
+		opens    int
+	}{
+		{"referenced", []string{"op://v/i/f"}, nil, 1},
+		{
+			"provider check only",
+			[]string{"op://v/i/f"},
+			[]diagnostic.Code{diagnostic.ExternalProviderUnavailable},
+			1,
+		},
+		{"no references", []string{"plain"}, nil, 0},
+		{
+			"not selected",
+			[]string{"op://v/i/f"},
+			[]diagnostic.Code{diagnostic.SecretReferenceNotFound},
+			0,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			f := newFixture("api")
+			f.explainer.entries["api"] = []env.ExplainEntry{entry("V", tt.items...)}
+
+			f.validate(t, ValidateParams{Selected: tt.selected})
+
+			if f.providersOpens != tt.opens {
+				t.Errorf("providers opened %d times, want %d", f.providersOpens, tt.opens)
+			}
+		})
+	}
+}
+
 // TestValidateSelectsChecks verifies a selection runs only its checks, opens
 // only the inspectors they need, and audits only their sections.
 func TestValidateSelectsChecks(t *testing.T) {
@@ -385,7 +462,8 @@ func TestValidateSelectsChecks(t *testing.T) {
 }
 
 // TestValidateSortsFindings verifies errors precede warnings, then store
-// findings precede resolution findings, then code, project, and key order.
+// findings precede provider and resolution findings, then code, project, and
+// key order.
 func TestValidateSortsFindings(t *testing.T) {
 	t.Parallel()
 	f := newFixture("web", "api")
@@ -395,7 +473,9 @@ func TestValidateSortsFindings(t *testing.T) {
 	}
 	f.explainer.entries["api"] = []env.ExplainEntry{
 		failing("PASSWORD", diagnostic.SecretReferenceNotFound, "secret://shared/pw"),
+		entry("OP", "op://vault/item/field"),
 	}
+	f.providers.unavailable = map[string]error{"op": errors.New("no op")}
 	f.inspector.audit = secrets.Audit{
 		Secrets: []secrets.StoredSecret{stored("shared", "leaked", false, false)},
 		Keypairs: []secrets.KeypairMetadata{
@@ -412,6 +492,7 @@ func TestValidateSortsFindings(t *testing.T) {
 	}
 	want := []string{
 		"SECRET_IS_NOT_ENCRYPTED  shared/leaked",
+		"EXTERNAL_PROVIDER_UNAVAILABLE  op",
 		"SECRET_REFERENCE_NOT_FOUND api PASSWORD",
 		"SECRET_REFERENCE_NOT_FOUND web TOKEN",
 		"PRIVATE_KEY_IS_UNAVAILABLE  shared",
@@ -465,17 +546,29 @@ func TestValidateOpenerFailures(t *testing.T) {
 	t.Parallel()
 	boom := errors.New("boom")
 	ok := func() (Explainer, error) { return &fakeExplainer{}, nil }
+	openProviders := func() (ProviderInspector, error) { return &fakeProviders{}, nil }
 	tests := []struct {
 		name string
 		deps Dependencies
 	}{
 		{"env", Dependencies{
-			OpenEnv:     func() (Explainer, error) { return nil, boom },
-			OpenSecrets: func() (Inspector, error) { return &fakeInspector{}, nil },
+			OpenEnv:       func() (Explainer, error) { return nil, boom },
+			OpenSecrets:   func() (Inspector, error) { return &fakeInspector{}, nil },
+			OpenProviders: openProviders,
 		}},
 		{"secrets", Dependencies{
-			OpenEnv:     ok,
-			OpenSecrets: func() (Inspector, error) { return nil, boom },
+			OpenEnv:       ok,
+			OpenSecrets:   func() (Inspector, error) { return nil, boom },
+			OpenProviders: openProviders,
+		}},
+		{"providers", Dependencies{
+			OpenEnv: func() (Explainer, error) {
+				return &fakeExplainer{entries: map[string][]env.ExplainEntry{
+					"api": {entry("OP", "op://vault/item/field")},
+				}}, nil
+			},
+			OpenSecrets:   func() (Inspector, error) { return &fakeInspector{}, nil },
+			OpenProviders: func() (ProviderInspector, error) { return nil, boom },
 		}},
 	}
 	for _, tt := range tests {
@@ -492,25 +585,35 @@ func TestValidateOpenerFailures(t *testing.T) {
 	}
 }
 
-// TestNewRejectsInvalidConfiguration verifies construction requires both
-// openers and valid severity overrides.
+// TestNewRejectsInvalidConfiguration verifies construction requires every
+// opener and valid severity overrides.
 func TestNewRejectsInvalidConfiguration(t *testing.T) {
 	t.Parallel()
 	openEnv := func() (Explainer, error) { return &fakeExplainer{}, nil }
 	openSecrets := func() (Inspector, error) { return &fakeInspector{}, nil }
+	openProviders := func() (ProviderInspector, error) { return &fakeProviders{}, nil }
 	tests := []struct {
 		name string
 		ws   workspace.Workspace
 		deps Dependencies
 	}{
-		{"no env opener", workspace.Workspace{}, Dependencies{OpenSecrets: openSecrets}},
-		{"no secrets opener", workspace.Workspace{}, Dependencies{OpenEnv: openEnv}},
+		{"no env opener", workspace.Workspace{}, Dependencies{
+			OpenSecrets: openSecrets, OpenProviders: openProviders,
+		}},
+		{"no secrets opener", workspace.Workspace{}, Dependencies{
+			OpenEnv: openEnv, OpenProviders: openProviders,
+		}},
+		{"no providers opener", workspace.Workspace{}, Dependencies{
+			OpenEnv: openEnv, OpenSecrets: openSecrets,
+		}},
 		{
 			"invalid severity",
 			workspace.Workspace{
 				ValidateSeverities: map[string]string{"secret_is_not_encrypted": "loud"},
 			},
-			Dependencies{OpenEnv: openEnv, OpenSecrets: openSecrets},
+			Dependencies{
+				OpenEnv: openEnv, OpenSecrets: openSecrets, OpenProviders: openProviders,
+			},
 		},
 	}
 	for _, tt := range tests {

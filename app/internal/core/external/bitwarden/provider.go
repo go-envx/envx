@@ -34,6 +34,8 @@ var uuidPattern = regexp.MustCompile(
 type Options struct {
 	// Run executes the CLI and returns its stdout; nil uses process.Output.
 	Run external.CommandRunner
+	// LookPath locates the CLI offline; nil uses exec.LookPath.
+	LookPath func(file string) (string, error)
 }
 
 // Provider fetches bws:// references by secret ID or by project and key. It
@@ -41,6 +43,8 @@ type Options struct {
 type Provider struct {
 	// run executes the CLI and returns its stdout.
 	run external.CommandRunner
+	// lookPath locates the CLI offline.
+	lookPath func(file string) (string, error)
 	// env is the minimal child environment.
 	env map[string]string
 	// hasToken reports whether env holds a non-empty access token.
@@ -76,6 +80,10 @@ func New(host hostenv.Snapshot, opts Options) *Provider {
 	if run == nil {
 		run = process.Output
 	}
+	lookPath := opts.LookPath
+	if lookPath == nil {
+		lookPath = exec.LookPath
+	}
 	env := process.MinimalEnv(host.All(), cliEnv)
 	hasToken := false
 	for name, val := range env {
@@ -85,6 +93,7 @@ func New(host hostenv.Snapshot, opts Options) *Provider {
 	}
 	return &Provider{
 		run:      run,
+		lookPath: lookPath,
 		env:      env,
 		hasToken: hasToken,
 		secrets:  make(map[string][]secret),
@@ -96,21 +105,38 @@ func (p *Provider) Scheme() string {
 	return external.SchemeBitwarden
 }
 
-// Fetch reads one reference path: a secret ID, or "<project>/<key>" where the
-// project is a name or ID and the key may contain slashes.
-func (p *Provider) Fetch(ctx context.Context, path string) (string, error) {
-	projectRef, key, byKey := strings.Cut(path, "/")
-	if !byKey && !uuidPattern.MatchString(path) {
-		return "", fmt.Errorf(
+// CheckPath accepts a secret ID or "<project>/<key>".
+func (p *Provider) CheckPath(path string) error {
+	if !strings.Contains(path, "/") && !uuidPattern.MatchString(path) {
+		return fmt.Errorf(
 			"%w: want bws://<secret-id> or bws://<project>/<key>",
 			external.ErrInvalidReference,
 		)
 	}
+	return nil
+}
+
+// CheckAvailable reports a missing access token or CLI.
+func (p *Provider) CheckAvailable() error {
 	if !p.hasToken {
-		return "", fmt.Errorf(
-			"%w: %s is not set", external.ErrProviderUnavailable, tokenVar,
-		)
+		return tokenError()
 	}
+	if _, err := p.lookPath(program); err != nil {
+		return notFoundError()
+	}
+	return nil
+}
+
+// Fetch reads one reference path: a secret ID, or "<project>/<key>" where the
+// project is a name or ID and the key may contain slashes.
+func (p *Provider) Fetch(ctx context.Context, path string) (string, error) {
+	if err := p.CheckPath(path); err != nil {
+		return "", err
+	}
+	if !p.hasToken {
+		return "", tokenError()
+	}
+	projectRef, key, byKey := strings.Cut(path, "/")
 	if !byKey {
 		return p.secretByID(ctx, path)
 	}
@@ -229,10 +255,7 @@ func (p *Provider) query(ctx context.Context, dst any, args ...string) error {
 // commandError maps a CLI failure onto the external sentinels.
 func commandError(command string, err error) error {
 	if errors.Is(err, exec.ErrNotFound) {
-		return fmt.Errorf(
-			"%w: %s CLI not found on PATH; install Bitwarden Secrets Manager CLI",
-			external.ErrProviderUnavailable, program,
-		)
+		return notFoundError()
 	}
 	if exitErr, ok := errors.AsType[*process.ExitError](err); ok {
 		return fmt.Errorf(
@@ -242,4 +265,17 @@ func commandError(command string, err error) error {
 		)
 	}
 	return err
+}
+
+// notFoundError reports the CLI missing from PATH.
+func notFoundError() error {
+	return fmt.Errorf(
+		"%w: %s CLI not found on PATH; install Bitwarden Secrets Manager CLI",
+		external.ErrProviderUnavailable, program,
+	)
+}
+
+// tokenError reports a missing access token.
+func tokenError() error {
+	return fmt.Errorf("%w: %s is not set", external.ErrProviderUnavailable, tokenVar)
 }

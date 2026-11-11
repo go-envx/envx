@@ -23,6 +23,8 @@
 //   - store: SECRET_IS_NOT_ENCRYPTED, SECRET_ALGORITHM_MISMATCH,
 //     SECRET_IS_NOT_REFERENCED, PUBLIC_KEY_IS_MISSING, PRIVATE_KEY_IS_INVALID,
 //     and PRIVATE_KEY_IS_UNAVAILABLE come only from the audit.
+//   - provider: EXTERNAL_PROVIDER_UNAVAILABLE comes only from the offline
+//     provider check, once per declared provider some winner references.
 //   - resolution: reference and substitution codes, plus
 //     PROPERTY_NOT_DECLARED_IN_BASE, come only from the explanation.
 //

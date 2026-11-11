@@ -64,6 +64,16 @@ type Provider struct {
 // record is one password record keyed by API field name.
 type record map[string]json.RawMessage
 
+// reference is one parsed reference path.
+type reference struct {
+	// id is the password ID; empty for a title reference.
+	id string
+	// title is the decoded title; empty for an ID reference.
+	title string
+	// field is the record field to read.
+	field string
+}
+
 // apiError is one entry of a Passwordstate error response.
 type apiError struct {
 	// Errors lists the reported problems.
@@ -120,43 +130,66 @@ func (p *Provider) Scheme() string {
 	return external.SchemePasswordstate
 }
 
+// CheckPath accepts a password ID, or a title when list-id is configured,
+// optionally followed by a field name.
+func (p *Provider) CheckPath(path string) error {
+	_, err := p.parse(path)
+	return err
+}
+
+// CheckAvailable reports invalid configuration or a missing API key.
+func (p *Provider) CheckAvailable() error {
+	return p.configErr
+}
+
 // Fetch reads one reference path: a password ID or a title within the
 // configured list, optionally followed by a field name such as "UserName". A
 // title is percent-decoded once, so "%2F" stands for a slash.
 func (p *Provider) Fetch(ctx context.Context, path string) (string, error) {
+	ref, err := p.parse(path)
+	if err != nil {
+		return "", err
+	}
+	if p.configErr != nil {
+		return "", p.configErr
+	}
+	if ref.id != "" {
+		found, err := p.password(ctx, ref.id)
+		if err != nil {
+			return "", err
+		}
+		return found.text(ref.field, "password "+ref.id)
+	}
+	found, err := p.passwordByTitle(ctx, ref.title)
+	if err != nil {
+		return "", err
+	}
+	return found.text(ref.field, fmt.Sprintf("password %q", ref.title))
+}
+
+// parse splits path into its target and field, applying the default field.
+func (p *Provider) parse(path string) (reference, error) {
 	target, field, hasField := strings.Cut(path, "/")
 	title, titleErr := url.PathUnescape(target)
 	if titleErr != nil || title == "" ||
 		(hasField && (field == "" || strings.Contains(field, "/"))) {
-		return "", fmt.Errorf(
+		return reference{}, fmt.Errorf(
 			"%w: want passwordstate://<password-id-or-title>[/<field>]",
 			external.ErrInvalidReference,
-		)
-	}
-	byID := passwordID.MatchString(target)
-	if !byID && p.listID == 0 {
-		return "", fmt.Errorf(
-			"%w: title references require list-id", external.ErrInvalidReference,
 		)
 	}
 	if !hasField {
 		field = p.field
 	}
-	if p.configErr != nil {
-		return "", p.configErr
+	if passwordID.MatchString(target) {
+		return reference{id: target, field: field}, nil
 	}
-	if byID {
-		found, err := p.password(ctx, target)
-		if err != nil {
-			return "", err
-		}
-		return found.text(field, "password "+target)
+	if p.listID == 0 {
+		return reference{}, fmt.Errorf(
+			"%w: title references require list-id", external.ErrInvalidReference,
+		)
 	}
-	found, err := p.passwordByTitle(ctx, title)
-	if err != nil {
-		return "", err
-	}
-	return found.text(field, fmt.Sprintf("password %q", title))
+	return reference{title: title, field: field}, nil
 }
 
 // password requests one password record by ID.

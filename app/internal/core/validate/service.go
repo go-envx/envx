@@ -30,6 +30,9 @@ func New(ws workspace.Workspace, deps Dependencies) (*Service, error) {
 	if deps.OpenSecrets == nil {
 		return nil, errors.New("secrets opener is required")
 	}
+	if deps.OpenProviders == nil {
+		return nil, errors.New("providers opener is required")
+	}
 	levels, err := diagnostic.Resolve(ws.ValidateSeverities)
 	if err != nil {
 		return nil, err
