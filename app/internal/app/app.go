@@ -6,6 +6,7 @@ import (
 	"github.com/go-envx/envx/app/internal/core/external"
 	"github.com/go-envx/envx/app/internal/core/external/bitwarden"
 	"github.com/go-envx/envx/app/internal/core/external/onepassword"
+	"github.com/go-envx/envx/app/internal/core/external/passwordstate"
 	"github.com/go-envx/envx/app/internal/core/secrets"
 	secretsStore "github.com/go-envx/envx/app/internal/core/secrets/filestore"
 	"github.com/go-envx/envx/app/internal/core/workspace"
@@ -72,6 +73,11 @@ func newProviders(
 			provider = onepassword.New(process.Output, host)
 		case external.SchemeBitwarden:
 			provider = bitwarden.New(process.Output, host)
+		case external.SchemePasswordstate:
+			provider = passwordstate.New(host, passwordstate.Options{
+				URL:       config.URL,
+				APIKeyEnv: config.APIKeyEnv,
+			})
 		default:
 			continue
 		}

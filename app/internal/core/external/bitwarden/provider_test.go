@@ -110,14 +110,19 @@ func TestFetchByProjectNameListsOnce(t *testing.T) {
 	}}
 	p := bitwarden.New(runner.run, tokenHost)
 
-	for path, want := range map[string]string{
-		"app/DB_PASSWORD":          "pw",
-		"app/api/token":            "tok",
-		projectID + "/DB_PASSWORD": "pw",
+	for _, tc := range []struct {
+		// path is the reference path to fetch.
+		path string
+		// want is the expected plaintext.
+		want string
+	}{
+		{path: "app/DB_PASSWORD", want: "pw"},
+		{path: "app/api/token", want: "tok"},
+		{path: projectID + "/DB_PASSWORD", want: "pw"},
 	} {
-		got, err := p.Fetch(context.Background(), path)
-		if err != nil || got != want {
-			t.Errorf("Fetch(%q) = %q, %v; want %q", path, got, err, want)
+		got, err := p.Fetch(context.Background(), tc.path)
+		if err != nil || got != tc.want {
+			t.Errorf("Fetch(%q) = %q, %v; want %q", tc.path, got, err, tc.want)
 		}
 	}
 	want := []string{"project list", "secret list " + projectID}

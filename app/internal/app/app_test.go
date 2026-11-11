@@ -127,10 +127,9 @@ func TestNewEnvServiceBindsOperationSnapshot(t *testing.T) {
 	}
 }
 
-// TestNewEnvServiceRegistersImplementedProviders verifies a declared provider
-// with an adapter masks its references, while a declared provider without one
-// passes through with a not-enabled warning.
-func TestNewEnvServiceRegistersImplementedProviders(t *testing.T) {
+// TestNewEnvServiceRegistersDeclaredProviders verifies every declared provider
+// masks its references without contacting the provider.
+func TestNewEnvServiceRegistersDeclaredProviders(t *testing.T) {
 	t.Parallel()
 
 	workspaceDir := testutil.CopyDir(t, minimalWorkspace)
@@ -176,9 +175,9 @@ func TestNewEnvServiceRegistersImplementedProviders(t *testing.T) {
 		t.Errorf("bws evaluation = %+v, want masked secret", bws)
 	}
 	pws := entries["THREE"].Evaluation
-	if pws.Value != "passwordstate://42" ||
-		pws.Diagnostic.Code != diagnostic.ExternalProviderNotEnabled {
-		t.Errorf("passwordstate evaluation = %+v, want not-enabled warning", pws)
+	if pws.Kind != value.Secret || pws.Value != "passwordstate://42" ||
+		!pws.Diagnostic.IsZero() {
+		t.Errorf("passwordstate evaluation = %+v, want masked secret", pws)
 	}
 }
 
