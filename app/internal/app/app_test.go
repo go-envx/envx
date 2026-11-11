@@ -13,6 +13,7 @@ import (
 	"github.com/go-envx/envx/app/internal/core/scaffold"
 	"github.com/go-envx/envx/app/internal/core/secrets"
 	"github.com/go-envx/envx/app/internal/core/validate"
+	"github.com/go-envx/envx/app/internal/core/value"
 	"github.com/go-envx/envx/app/internal/core/workspace"
 	"github.com/go-envx/envx/app/internal/lib/hostenv"
 	"github.com/go-envx/envx/app/internal/testutil"
@@ -123,6 +124,54 @@ func TestNewEnvServiceBindsOperationSnapshot(t *testing.T) {
 	got, err = service.Get(getParams)
 	if err != nil || got.Value != "secret://app/token" {
 		t.Errorf("masked Get = %q, %v; want secret://app/token", got.Value, err)
+	}
+}
+
+// TestNewEnvServiceRegistersImplementedProviders verifies a declared provider
+// with an adapter masks its references, while a declared provider without one
+// passes through with a not-enabled warning.
+func TestNewEnvServiceRegistersImplementedProviders(t *testing.T) {
+	t.Parallel()
+
+	workspaceDir := testutil.CopyDir(t, minimalWorkspace)
+	writeFile(t, filepath.Join(workspaceDir, "envx.yaml"), strings.Join([]string{
+		"environments: [dev]",
+		"secrets:",
+		"  providers:",
+		"    op: {}",
+		"    bws: {}",
+		"projects:",
+		"  app:",
+		"    includes: [env/app]",
+		"",
+	}, "\n"))
+	writeFile(t, filepath.Join(workspaceDir, "env", "app.yaml"), strings.Join([]string{
+		"one: op://vault/item/field",
+		"two: bws://0b5c6f9e",
+		"",
+	}, "\n"))
+	f, _ := countingFactory()
+	service, err := f.NewEnvService(workspaceDir)
+	if err != nil {
+		t.Fatalf("NewEnvService: %v", err)
+	}
+	result, err := service.Explain(env.ExplainParams{Project: "app"})
+	if err != nil {
+		t.Fatalf("Explain: %v", err)
+	}
+	entries := make(map[string]env.ExplainEntry)
+	for _, entry := range result.Entries {
+		entries[entry.Key] = entry
+	}
+	op := entries["ONE"].Evaluation
+	if op.Kind != value.Secret || op.Value != "op://vault/item/field" ||
+		!op.Diagnostic.IsZero() {
+		t.Errorf("op evaluation = %+v, want masked secret", op)
+	}
+	bws := entries["TWO"].Evaluation
+	if bws.Value != "bws://0b5c6f9e" ||
+		bws.Diagnostic.Code != diagnostic.ExternalProviderNotEnabled {
+		t.Errorf("bws evaluation = %+v, want not-enabled warning", bws)
 	}
 }
 
