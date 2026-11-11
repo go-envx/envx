@@ -53,7 +53,10 @@ func (s *Service) Materialize(params MaterializeParams) (MaterializeResult, erro
 	if err != nil {
 		return MaterializeResult{}, err
 	}
-	resolver, err := s.newValueResolver(true, op.host)
+	resolver, err := s.newValueResolver(ResolverParams{
+		Reveal: true,
+		Host:   op.host,
+	})
 	if err != nil {
 		return MaterializeResult{}, err
 	}

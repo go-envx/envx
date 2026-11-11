@@ -189,15 +189,13 @@ func (s *Service) host() hostenv.Snapshot {
 	return s.deps.HostEnv()
 }
 
-// newValueResolver creates an operation-scoped resolver bound to host. A nil
-// factory yields a nil resolver, which resolution treats as identity.
-func (s *Service) newValueResolver(
-	reveal bool, host hostenv.Snapshot,
-) (ValueResolver, error) {
+// newValueResolver creates an operation-scoped resolver. A nil factory yields
+// a nil resolver, which resolution treats as identity.
+func (s *Service) newValueResolver(params ResolverParams) (ValueResolver, error) {
 	if s.deps.NewValueResolver == nil {
 		return nil, nil
 	}
-	return s.deps.NewValueResolver(reveal, host)
+	return s.deps.NewValueResolver(params)
 }
 
 // resolveSettings applies precedence: overrides, project, then workspace.

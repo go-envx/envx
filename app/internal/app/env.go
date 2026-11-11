@@ -23,13 +23,15 @@ type valueResolverFactory struct {
 // newValueResolver builds a resolver whose keyring reads private-key overrides
 // from the operation's host snapshot.
 func (f valueResolverFactory) newValueResolver(
-	reveal bool, host hostenv.Snapshot,
+	params env.ResolverParams,
 ) (env.ValueResolver, error) {
-	keys, err := keyring.New(f.keysPath, host.Get)
+	keys, err := keyring.New(f.keysPath, params.Host.Get)
 	if err != nil {
 		return nil, err
 	}
-	resolver, err := secrets.NewResolver(f.secretsReader, keys, f.cipher, reveal)
+	resolver, err := secrets.NewResolver(
+		f.secretsReader, keys, f.cipher, params.Reveal,
+	)
 	if err != nil {
 		return nil, err
 	}

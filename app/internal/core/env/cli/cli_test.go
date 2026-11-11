@@ -114,9 +114,9 @@ func (f *fakeFactory) NewEnvService(configPath string) (*env.Service, error) {
 			return hostenv.From(f.host)
 		},
 		NewValueResolver: func(
-			reveal bool, _ hostenv.Snapshot,
+			params env.ResolverParams,
 		) (env.ValueResolver, error) {
-			f.reveals = append(f.reveals, reveal)
+			f.reveals = append(f.reveals, params.Reveal)
 			// A nil resolver is identity resolution.
 			return nil, nil
 		},

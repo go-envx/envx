@@ -37,6 +37,14 @@ type ValueResolver interface {
 	Evaluate(raw, environment string) value.Evaluation
 }
 
+// ResolverParams configures one operation-scoped value resolver.
+type ResolverParams struct {
+	// Reveal decrypts or fetches values instead of masking them.
+	Reveal bool
+	// Host is the operation's captured host snapshot.
+	Host hostenv.Snapshot
+}
+
 // Executor runs a child process.
 type Executor func(process.Command) error
 
@@ -49,9 +57,9 @@ type Dependencies struct {
 	EnvOverlays OverlayWriter
 	// HostEnv captures the host environment once per operation; nil is empty.
 	HostEnv func() hostenv.Snapshot
-	// NewValueResolver creates an operation-scoped resolver bound to the
-	// captured host snapshot; nil is identity resolution.
-	NewValueResolver func(reveal bool, host hostenv.Snapshot) (ValueResolver, error)
+	// NewValueResolver creates an operation-scoped resolver; nil is identity
+	// resolution.
+	NewValueResolver func(params ResolverParams) (ValueResolver, error)
 	// ProcessRunner runs child processes; required by Run.
 	ProcessRunner Executor
 }

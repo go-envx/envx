@@ -170,11 +170,15 @@ func (r fakeResolver) Evaluate(raw, _ string) value.Evaluation {
 	return eval
 }
 
-// open implements Dependencies.OpenResolver.
-func (o *fakeOpener) open(reveal bool, host hostenv.Snapshot) (ValueResolver, error) {
+// open implements Dependencies.NewValueResolver.
+func (o *fakeOpener) open(params ResolverParams) (ValueResolver, error) {
 	o.calls++
-	o.reveal, o.host = reveal, host
-	return fakeResolver{reveal: reveal, plaintext: o.plaintext, codes: o.codes}, nil
+	o.reveal, o.host = params.Reveal, params.Host
+	return fakeResolver{
+		reveal:    params.Reveal,
+		plaintext: o.plaintext,
+		codes:     o.codes,
+	}, nil
 }
 
 // run implements Executor.

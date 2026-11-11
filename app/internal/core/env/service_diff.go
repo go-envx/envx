@@ -68,7 +68,10 @@ func (s *Service) Diff(params DiffParams) (DiffResult, error) {
 	if err != nil {
 		return DiffResult{}, err
 	}
-	resolver, err := s.newValueResolver(params.Reveal, op.host)
+	resolver, err := s.newValueResolver(ResolverParams{
+		Reveal: params.Reveal,
+		Host:   op.host,
+	})
 	if err != nil {
 		return DiffResult{}, err
 	}

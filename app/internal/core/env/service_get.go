@@ -50,7 +50,10 @@ func (s *Service) Get(params GetParams) (GetResult, error) {
 	}
 	origin := merged.origins[key]
 
-	resolver, err := s.newValueResolver(params.Reveal, op.host)
+	resolver, err := s.newValueResolver(ResolverParams{
+		Reveal: params.Reveal,
+		Host:   op.host,
+	})
 	if err != nil {
 		return GetResult{}, err
 	}
