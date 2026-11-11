@@ -15,7 +15,7 @@ minimum_release_age = "24h"
 [tools]
 
 # Go
-go = "1.27.3"                     # https://go.dev/ref/spec
+go = "1.27.4"                     # https://go.dev/ref/spec
 golangci-lint = "2.15.0"          # https://golangci-lint.run/
 goreleaser = "2.20.0"             # https://goreleaser.com/
 
