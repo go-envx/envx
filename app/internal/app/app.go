@@ -3,6 +3,9 @@ package app
 import (
 	"fmt"
 
+	"github.com/go-envx/envx/app/internal/core/external"
+	"github.com/go-envx/envx/app/internal/core/external/bitwarden"
+	"github.com/go-envx/envx/app/internal/core/external/onepassword"
 	"github.com/go-envx/envx/app/internal/core/secrets"
 	secretsStore "github.com/go-envx/envx/app/internal/core/secrets/filestore"
 	"github.com/go-envx/envx/app/internal/core/workspace"
@@ -10,6 +13,7 @@ import (
 	"github.com/go-envx/envx/app/internal/lib/crypt/age"
 	"github.com/go-envx/envx/app/internal/lib/crypt/naclbox"
 	"github.com/go-envx/envx/app/internal/lib/hostenv"
+	"github.com/go-envx/envx/app/internal/lib/process"
 )
 
 // Factory assembles feature services on demand. The zero value captures the
@@ -53,6 +57,30 @@ func newCipher(algorithm string) (secrets.Cipher, error) {
 	default:
 		return nil, fmt.Errorf("unsupported cipher algorithm: %q", algorithm)
 	}
+}
+
+// newProviders selects the adapter for each declared provider. Providers
+// without an adapter stay unregistered, so their references pass through.
+func newProviders(
+	configs map[string]workspace.ProviderConfig, host hostenv.Snapshot,
+) []external.Registration {
+	var registrations []external.Registration
+	for scheme, config := range configs {
+		var provider external.Provider
+		switch scheme {
+		case external.SchemeOnePassword:
+			provider = onepassword.New(process.Output, host)
+		case external.SchemeBitwarden:
+			provider = bitwarden.New(process.Output, host)
+		default:
+			continue
+		}
+		registrations = append(registrations, external.Registration{
+			Provider: provider,
+			Timeout:  config.Timeout,
+		})
+	}
+	return registrations
 }
 
 // newSecretsStore constructs the workspace secrets document adapter.

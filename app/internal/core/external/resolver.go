@@ -214,10 +214,14 @@ func (s *providerState) timeoutError() error {
 
 // fetchFinding maps a fetch failure onto a finding.
 func fetchFinding(err error) diagnostic.Finding {
-	if errors.Is(err, ErrProviderUnavailable) {
+	switch {
+	case errors.Is(err, ErrProviderUnavailable):
 		return finding(diagnostic.ExternalProviderUnavailable, err.Error())
+	case errors.Is(err, ErrInvalidReference):
+		return finding(diagnostic.InvalidExternalReference, err.Error())
+	default:
+		return finding(diagnostic.ExternalReferenceUnresolved, err.Error())
 	}
-	return finding(diagnostic.ExternalReferenceUnresolved, err.Error())
 }
 
 // finding builds a finding at the code's default severity.

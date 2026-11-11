@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"os/exec"
 	"regexp"
-	"strings"
 
 	"github.com/go-envx/envx/app/internal/core/external"
 	"github.com/go-envx/envx/app/internal/lib/hostenv"
@@ -16,9 +15,6 @@ import (
 
 // program is the 1Password CLI executable.
 const program = "op"
-
-// maxStderr bounds the CLI diagnostic quoted in errors.
-const maxStderr = 200
 
 // cliEnv selects the CLI's own variables, such as OP_SERVICE_ACCOUNT_TOKEN.
 var cliEnv = regexp.MustCompile(`(?i)^OP_`)
@@ -62,21 +58,8 @@ func (p *Provider) Fetch(ctx context.Context, path string) (string, error) {
 		return "", fmt.Errorf(
 			"%w: %s read: exit status %d: %s",
 			external.ErrReferenceUnresolved, program, exitErr.Code,
-			summarize(exitErr.Stderr),
+			external.SummarizeStderr(exitErr.Stderr),
 		)
 	}
 	return "", err
-}
-
-// summarize returns the first line of stderr, truncated.
-func summarize(stderr string) string {
-	line, _, _ := strings.Cut(strings.TrimSpace(stderr), "\n")
-	line = strings.TrimSpace(line)
-	if runes := []rune(line); len(runes) > maxStderr {
-		return string(runes[:maxStderr]) + "..."
-	}
-	if line == "" {
-		return "no diagnostic output"
-	}
-	return line
 }

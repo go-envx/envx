@@ -2,6 +2,7 @@ package external_test
 
 import (
 	"errors"
+	"fmt"
 	"slices"
 	"testing"
 
@@ -164,6 +165,18 @@ func TestResolveInvalidReference(t *testing.T) {
 	eval := r.Evaluate("op://v//f", "dev")
 	if eval.Diagnostic.Code != diagnostic.InvalidExternalReference ||
 		eval.Kind != value.Secret {
+		t.Errorf("Evaluate = %+v, want invalid finding", eval)
+	}
+}
+
+func TestEvaluateProviderRejectedReference(t *testing.T) {
+	t.Parallel()
+
+	r := newResolver(t, true, &fakeProvider{
+		scheme: "bws", err: fmt.Errorf("%w: bare key", external.ErrInvalidReference),
+	})
+	eval := r.Evaluate("bws://KEY", "dev")
+	if eval.Diagnostic.Code != diagnostic.InvalidExternalReference {
 		t.Errorf("Evaluate = %+v, want invalid finding", eval)
 	}
 }

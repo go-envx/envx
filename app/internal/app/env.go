@@ -4,7 +4,6 @@ import (
 	"github.com/go-envx/envx/app/internal/core/env"
 	envStore "github.com/go-envx/envx/app/internal/core/env/filestore"
 	"github.com/go-envx/envx/app/internal/core/external"
-	"github.com/go-envx/envx/app/internal/core/external/onepassword"
 	"github.com/go-envx/envx/app/internal/core/secrets"
 	"github.com/go-envx/envx/app/internal/core/secrets/keyring"
 	"github.com/go-envx/envx/app/internal/core/workspace"
@@ -86,26 +85,4 @@ func envService(
 		NewValueResolver: factory.newValueResolver,
 		ProcessRunner:    process.Run,
 	})
-}
-
-// newProviders selects the adapter for each declared provider. Providers
-// without an adapter stay unregistered, so their references pass through.
-func newProviders(
-	configs map[string]workspace.ProviderConfig, host hostenv.Snapshot,
-) []external.Registration {
-	var registrations []external.Registration
-	for scheme, config := range configs {
-		var provider external.Provider
-		switch scheme {
-		case external.SchemeOnePassword:
-			provider = onepassword.New(process.Output, host)
-		default:
-			continue
-		}
-		registrations = append(registrations, external.Registration{
-			Provider: provider,
-			Timeout:  config.Timeout,
-		})
-	}
-	return registrations
 }

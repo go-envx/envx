@@ -140,6 +140,7 @@ func TestNewEnvServiceRegistersImplementedProviders(t *testing.T) {
 		"  providers:",
 		"    op: {}",
 		"    bws: {}",
+		"    passwordstate: {}",
 		"projects:",
 		"  app:",
 		"    includes: [env/app]",
@@ -148,6 +149,7 @@ func TestNewEnvServiceRegistersImplementedProviders(t *testing.T) {
 	writeFile(t, filepath.Join(workspaceDir, "env", "app.yaml"), strings.Join([]string{
 		"one: op://vault/item/field",
 		"two: bws://0b5c6f9e",
+		"three: passwordstate://42",
 		"",
 	}, "\n"))
 	f, _ := countingFactory()
@@ -169,9 +171,14 @@ func TestNewEnvServiceRegistersImplementedProviders(t *testing.T) {
 		t.Errorf("op evaluation = %+v, want masked secret", op)
 	}
 	bws := entries["TWO"].Evaluation
-	if bws.Value != "bws://0b5c6f9e" ||
-		bws.Diagnostic.Code != diagnostic.ExternalProviderNotEnabled {
-		t.Errorf("bws evaluation = %+v, want not-enabled warning", bws)
+	if bws.Kind != value.Secret || bws.Value != "bws://0b5c6f9e" ||
+		!bws.Diagnostic.IsZero() {
+		t.Errorf("bws evaluation = %+v, want masked secret", bws)
+	}
+	pws := entries["THREE"].Evaluation
+	if pws.Value != "passwordstate://42" ||
+		pws.Diagnostic.Code != diagnostic.ExternalProviderNotEnabled {
+		t.Errorf("passwordstate evaluation = %+v, want not-enabled warning", pws)
 	}
 }
 
