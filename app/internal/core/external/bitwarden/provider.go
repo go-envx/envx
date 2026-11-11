@@ -30,6 +30,12 @@ var uuidPattern = regexp.MustCompile(
 	`^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$`,
 )
 
+// Options configures the provider.
+type Options struct {
+	// Run executes the CLI and returns its stdout; nil uses process.Output.
+	Run external.CommandRunner
+}
+
 // Provider fetches bws:// references by secret ID or by project and key. It
 // caches listings for its lifetime, which is one operation.
 type Provider struct {
@@ -65,7 +71,11 @@ type secret struct {
 
 // New constructs a provider whose CLI runs with the host's base and BWS_*
 // variables only.
-func New(run external.CommandRunner, host hostenv.Snapshot) *Provider {
+func New(host hostenv.Snapshot, opts Options) *Provider {
+	run := opts.Run
+	if run == nil {
+		run = process.Output
+	}
 	env := process.MinimalEnv(host.All(), cliEnv)
 	hasToken := false
 	for name, val := range env {

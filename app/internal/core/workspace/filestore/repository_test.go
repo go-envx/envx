@@ -2,9 +2,9 @@ package filestore_test
 
 import (
 	"errors"
-	"maps"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 	"time"
@@ -142,27 +142,31 @@ func TestLoadProviders(t *testing.T) {
 		    passwordstate:
 		      url: https://pw.example.com
 		      api-key-env: PW_KEY
+		      list-id: 1990
+		      field: GenericField1
 		      timeout: 5s
 	`))
 	ws, err := newRepository(t, path).Load()
 	if err != nil {
 		t.Fatalf("Load: %v", err)
 	}
-	want := map[string]workspace.ProviderConfig{
-		"op": {Timeout: 30 * time.Second},
-		"passwordstate": {
+	want := workspace.ProvidersConfig{
+		OnePassword: &workspace.CLIProviderConfig{Timeout: 30 * time.Second},
+		Passwordstate: &workspace.PasswordstateConfig{
 			Timeout:   5 * time.Second,
 			URL:       "https://pw.example.com",
 			APIKeyEnv: "PW_KEY",
+			ListID:    1990,
+			Field:     "GenericField1",
 		},
 	}
-	if !maps.Equal(ws.Secrets.Providers, want) {
+	if !reflect.DeepEqual(ws.Secrets.Providers, want) {
 		t.Errorf("Providers = %+v, want %+v", ws.Secrets.Providers, want)
 	}
 }
 
-// TestLoadProvidersRejectsInvalid verifies unknown providers and bad timeouts
-// fail at load.
+// TestLoadProvidersRejectsInvalid verifies unknown providers and invalid
+// provider settings fail at load.
 func TestLoadProvidersRejectsInvalid(t *testing.T) {
 	t.Parallel()
 
@@ -181,6 +185,18 @@ func TestLoadProvidersRejectsInvalid(t *testing.T) {
 		"negative timeout": {
 			body: "secrets:\n  providers:\n    op:\n      timeout: -1s\n",
 			want: "positive duration",
+		},
+		"zero list-id": {
+			body: "secrets:\n  providers:\n    passwordstate:\n      list-id: 0\n",
+			want: `list-id "0" must be a positive integer`,
+		},
+		"non-numeric list-id": {
+			body: "secrets:\n  providers:\n    passwordstate:\n      list-id: web\n",
+			want: `list-id "web" must be a positive integer`,
+		},
+		"empty field": {
+			body: "secrets:\n  providers:\n    passwordstate:\n      field: \"\"\n",
+			want: "field must be a non-empty string",
 		},
 	}
 	for name, tt := range tests {

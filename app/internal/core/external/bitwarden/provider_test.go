@@ -75,7 +75,7 @@ func TestFetchBySecretID(t *testing.T) {
 		"bws_server_url=https://vault.bitwarden.eu",
 		"OP_SERVICE_ACCOUNT_TOKEN=leak",
 	})
-	p := bitwarden.New(runner.run, host)
+	p := bitwarden.New(host, bitwarden.Options{Run: runner.run})
 
 	got, err := p.Fetch(context.Background(), secretID)
 	if err != nil || got != "pw" {
@@ -108,7 +108,7 @@ func TestFetchByProjectNameListsOnce(t *testing.T) {
 			{"id":"x","key":"api/token","value":"tok"}
 		]`,
 	}}
-	p := bitwarden.New(runner.run, tokenHost)
+	p := bitwarden.New(tokenHost, bitwarden.Options{Run: runner.run})
 
 	for _, tc := range []struct {
 		// path is the reference path to fetch.
@@ -137,7 +137,7 @@ func TestFetchByProjectIDSkipsProjectList(t *testing.T) {
 	runner := &fakeRunner{outputs: map[string]string{
 		"secret list " + projectID: `[{"id":"` + secretID + `","key":"K","value":"v"}]`,
 	}}
-	p := bitwarden.New(runner.run, tokenHost)
+	p := bitwarden.New(tokenHost, bitwarden.Options{Run: runner.run})
 
 	got, err := p.Fetch(context.Background(), projectID+"/K")
 	if err != nil || got != "v" {
@@ -169,7 +169,7 @@ func TestFetchLookupFailures(t *testing.T) {
 		"app/MISSING": `no secret with key "MISSING" in project "app"`,
 		"app/TWICE":   "such as bws://s1 (IDs: s1, s2)",
 	}
-	p := bitwarden.New(runner.run, tokenHost)
+	p := bitwarden.New(tokenHost, bitwarden.Options{Run: runner.run})
 	for path, contain := range tests {
 		_, err := p.Fetch(context.Background(), path)
 		if !errors.Is(err, external.ErrReferenceUnresolved) {
@@ -189,7 +189,7 @@ func TestFetchRejectsBareKey(t *testing.T) {
 	t.Parallel()
 
 	runner := &fakeRunner{}
-	p := bitwarden.New(runner.run, tokenHost)
+	p := bitwarden.New(tokenHost, bitwarden.Options{Run: runner.run})
 
 	_, err := p.Fetch(context.Background(), "DB_PASSWORD")
 	if !errors.Is(err, external.ErrInvalidReference) {
@@ -205,7 +205,7 @@ func TestFetchRequiresToken(t *testing.T) {
 
 	runner := &fakeRunner{}
 	host := hostenv.From([]string{"BWS_ACCESS_TOKEN="})
-	p := bitwarden.New(runner.run, host)
+	p := bitwarden.New(host, bitwarden.Options{Run: runner.run})
 
 	_, err := p.Fetch(context.Background(), secretID)
 	if !errors.Is(err, external.ErrProviderUnavailable) {
@@ -255,7 +255,7 @@ func TestFetchCommandErrors(t *testing.T) {
 				err:     tt.err,
 				outputs: map[string]string{"secret get " + secretID: tt.out},
 			}
-			p := bitwarden.New(runner.run, tokenHost)
+			p := bitwarden.New(tokenHost, bitwarden.Options{Run: runner.run})
 			_, err := p.Fetch(context.Background(), secretID)
 			if !errors.Is(err, tt.want) {
 				t.Fatalf("err = %v, want %v", err, tt.want)

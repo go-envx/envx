@@ -19,8 +19,8 @@ type valueResolverFactory struct {
 	keysPath string
 	// cipher decrypts stored values.
 	cipher secrets.Decrypter
-	// providers configures the declared external providers by scheme.
-	providers map[string]workspace.ProviderConfig
+	// providers declares the enabled external providers.
+	providers workspace.ProvidersConfig
 }
 
 // newValueResolver builds a resolver whose keyring and external providers read

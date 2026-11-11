@@ -5,6 +5,7 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"slices"
 	"strings"
 	"sync"
 	"testing"
@@ -20,6 +21,13 @@ const apiKey = "test-key" //nolint:gosec // test credential
 // record is the fake API's password 42.
 const record = `[{"PasswordID":42,"Title":"db","UserName":"admin",` +
 	`"Password":"s3cret","GenericField1":"","Notes":null}]`
+
+// listing is the fake API's password list 1990.
+const listing = `[{"PasswordID":42,"Title":"db","UserName":"admin",` +
+	`"Password":"s3cret"},` +
+	`{"PasswordID":43,"Title":"a/b","Password":"slash"},` +
+	`{"PasswordID":44,"Title":"dup","Password":"one"},` +
+	`{"PasswordID":45,"Title":"dup","Password":"two"}]`
 
 // keyHost carries the API key.
 var keyHost = hostenv.From([]string{"PW_KEY=" + apiKey})
@@ -44,16 +52,19 @@ func (r *requests) all() []string {
 	return append([]string(nil), r.paths...)
 }
 
-// newServer serves password 42 under /pws and records each request path.
+// newServer serves password 42 and list 1990 under /pws and records each
+// request URI.
 func newServer(t *testing.T, seen *requests) *httptest.Server {
 	t.Helper()
 	server := httptest.NewTLSServer(http.HandlerFunc(
 		func(w http.ResponseWriter, r *http.Request) {
-			seen.add(r.URL.Path)
+			seen.add(r.URL.RequestURI())
 			switch {
 			case r.Header.Get("APIKey") != apiKey:
 				w.WriteHeader(http.StatusUnauthorized)
 				_, _ = w.Write([]byte(`[{"errors":[{"message":"Invalid API key"}]}]`))
+			case r.URL.RequestURI() == "/pws/api/passwords/1990?QueryAll":
+				_, _ = w.Write([]byte(listing))
 			case r.URL.Path == "/pws/api/passwords/42":
 				_, _ = w.Write([]byte(record))
 			case r.URL.Path == "/pws/api/passwords/7":
@@ -74,9 +85,19 @@ func newServer(t *testing.T, seen *requests) *httptest.Server {
 func newProvider(
 	server *httptest.Server, host hostenv.Snapshot,
 ) *passwordstate.Provider {
+	return newListProvider(server, host, 0, "")
+}
+
+// newListProvider builds a provider against server that searches listID by
+// title and reads field by default.
+func newListProvider(
+	server *httptest.Server, host hostenv.Snapshot, listID int, field string,
+) *passwordstate.Provider {
 	return passwordstate.New(host, passwordstate.Options{
 		URL:       server.URL + "/pws/",
 		APIKeyEnv: "PW_KEY",
+		ListID:    listID,
+		Field:     field,
 		Client:    server.Client(),
 	})
 }
@@ -108,7 +129,7 @@ func TestFetchRejectsInvalidReference(t *testing.T) {
 	var seen requests
 	p := newProvider(newServer(t, &seen), keyHost)
 
-	for _, path := range []string{"abc", "42/", "42/a/b", "../42"} {
+	for _, path := range []string{"abc", "42/", "42/a/b", "../42", "bad%zz"} {
 		_, err := p.Fetch(context.Background(), path)
 		if !errors.Is(err, external.ErrInvalidReference) {
 			t.Errorf("Fetch(%q) err = %v, want ErrInvalidReference", path, err)
@@ -116,6 +137,82 @@ func TestFetchRejectsInvalidReference(t *testing.T) {
 	}
 	if paths := seen.all(); len(paths) != 0 {
 		t.Errorf("requests = %q, want none", paths)
+	}
+}
+
+func TestFetchTitleRequiresListID(t *testing.T) {
+	t.Parallel()
+
+	var seen requests
+	_, err := newProvider(newServer(t, &seen), keyHost).
+		Fetch(context.Background(), "db")
+	if !errors.Is(err, external.ErrInvalidReference) ||
+		!strings.Contains(err.Error(), "title references require list-id") {
+		t.Errorf("err = %v, want list-id requirement", err)
+	}
+}
+
+func TestFetchTitles(t *testing.T) {
+	t.Parallel()
+
+	var seen requests
+	p := newListProvider(newServer(t, &seen), keyHost, 1990, "")
+
+	for _, tt := range []struct {
+		path string
+		want string
+	}{
+		{path: "db", want: "s3cret"},
+		{path: "db/username", want: "admin"},
+		{path: "a%2Fb", want: "slash"},
+		{path: "42/UserName", want: "admin"},
+	} {
+		got, err := p.Fetch(context.Background(), tt.path)
+		if err != nil || got != tt.want {
+			t.Errorf("Fetch(%q) = %q, %v; want %q", tt.path, got, err, tt.want)
+		}
+	}
+	want := []string{"/pws/api/passwords/1990?QueryAll", "/pws/api/passwords/42"}
+	if paths := seen.all(); !slices.Equal(paths, want) {
+		t.Errorf("requests = %q, want %q", paths, want)
+	}
+}
+
+func TestFetchTitleErrors(t *testing.T) {
+	t.Parallel()
+
+	var seen requests
+	p := newListProvider(newServer(t, &seen), keyHost, 1990, "")
+
+	for path, contain := range map[string]string{
+		"missing": `no password titled "missing" in list 1990`,
+		"DB":      `no password titled "DB" in list 1990`,
+		"dup": `2 passwords titled "dup" in list 1990; ` +
+			"reference one by ID, such as passwordstate://44 (IDs: 44, 45)",
+		"db/Missing": `password "db" has no field "Missing"`,
+	} {
+		_, err := p.Fetch(context.Background(), path)
+		if !errors.Is(err, external.ErrReferenceUnresolved) ||
+			!strings.Contains(err.Error(), contain) {
+			t.Errorf("Fetch(%q) err = %v, want containing %q", path, err, contain)
+		}
+		if strings.Contains(err.Error(), "s3cret") {
+			t.Errorf("Fetch(%q) err = %q, want values hidden", path, err)
+		}
+	}
+}
+
+func TestFetchDefaultField(t *testing.T) {
+	t.Parallel()
+
+	var seen requests
+	p := newListProvider(newServer(t, &seen), keyHost, 1990, "UserName")
+
+	for _, path := range []string{"42", "db"} {
+		got, err := p.Fetch(context.Background(), path)
+		if err != nil || got != "admin" {
+			t.Errorf("Fetch(%q) = %q, %v; want admin", path, got, err)
+		}
 	}
 }
 

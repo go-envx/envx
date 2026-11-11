@@ -14,7 +14,6 @@ import (
 	"github.com/go-envx/envx/app/internal/lib/crypt/age"
 	"github.com/go-envx/envx/app/internal/lib/crypt/naclbox"
 	"github.com/go-envx/envx/app/internal/lib/hostenv"
-	"github.com/go-envx/envx/app/internal/lib/process"
 )
 
 // Factory assembles feature services on demand. The zero value captures the
@@ -60,30 +59,32 @@ func newCipher(algorithm string) (secrets.Cipher, error) {
 	}
 }
 
-// newProviders selects the adapter for each declared provider. Providers
-// without an adapter stay unregistered, so their references pass through.
+// newProviders registers an adapter for each declared provider.
 func newProviders(
-	configs map[string]workspace.ProviderConfig, host hostenv.Snapshot,
+	configs workspace.ProvidersConfig, host hostenv.Snapshot,
 ) []external.Registration {
 	var registrations []external.Registration
-	for scheme, config := range configs {
-		var provider external.Provider
-		switch scheme {
-		case external.SchemeOnePassword:
-			provider = onepassword.New(process.Output, host)
-		case external.SchemeBitwarden:
-			provider = bitwarden.New(process.Output, host)
-		case external.SchemePasswordstate:
-			provider = passwordstate.New(host, passwordstate.Options{
+	if config := configs.OnePassword; config != nil {
+		registrations = append(registrations, external.Registration{
+			Provider: onepassword.New(host, onepassword.Options{}),
+			Timeout:  config.Timeout,
+		})
+	}
+	if config := configs.Bitwarden; config != nil {
+		registrations = append(registrations, external.Registration{
+			Provider: bitwarden.New(host, bitwarden.Options{}),
+			Timeout:  config.Timeout,
+		})
+	}
+	if config := configs.Passwordstate; config != nil {
+		registrations = append(registrations, external.Registration{
+			Provider: passwordstate.New(host, passwordstate.Options{
 				URL:       config.URL,
 				APIKeyEnv: config.APIKeyEnv,
-			})
-		default:
-			continue
-		}
-		registrations = append(registrations, external.Registration{
-			Provider: provider,
-			Timeout:  config.Timeout,
+				ListID:    config.ListID,
+				Field:     config.Field,
+			}),
+			Timeout: config.Timeout,
 		})
 	}
 	return registrations

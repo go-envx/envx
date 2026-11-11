@@ -49,7 +49,7 @@ func TestFetchReadsReference(t *testing.T) {
 		"AWS_SECRET_ACCESS_KEY=leak",
 		"BWS_ACCESS_TOKEN=other",
 	})
-	p := onepassword.New(runner.run, host)
+	p := onepassword.New(host, onepassword.Options{Run: runner.run})
 
 	got, err := p.Fetch(context.Background(), "vault/item name/field")
 	if err != nil || got != "pw" {
@@ -105,7 +105,8 @@ func TestFetchErrors(t *testing.T) {
 	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
-			p := onepassword.New((&fakeRunner{err: tt.err}).run, hostenv.Snapshot{})
+			runner := &fakeRunner{err: tt.err}
+			p := onepassword.New(hostenv.Snapshot{}, onepassword.Options{Run: runner.run})
 			_, err := p.Fetch(context.Background(), "v/i/f")
 			if !errors.Is(err, tt.want) {
 				t.Fatalf("err = %v, want %v", err, tt.want)

@@ -19,6 +19,12 @@ const program = "op"
 // cliEnv selects the CLI's own variables, such as OP_SERVICE_ACCOUNT_TOKEN.
 var cliEnv = regexp.MustCompile(`(?i)^OP_`)
 
+// Options configures the provider.
+type Options struct {
+	// Run executes the CLI and returns its stdout; nil uses process.Output.
+	Run external.CommandRunner
+}
+
 // Provider fetches op:// references with `op read`.
 type Provider struct {
 	// run executes the CLI and returns its stdout.
@@ -29,7 +35,11 @@ type Provider struct {
 
 // New constructs a provider whose CLI runs with the host's base and OP_*
 // variables only.
-func New(run external.CommandRunner, host hostenv.Snapshot) *Provider {
+func New(host hostenv.Snapshot, opts Options) *Provider {
+	run := opts.Run
+	if run == nil {
+		run = process.Output
+	}
 	return &Provider{run: run, env: process.MinimalEnv(host.All(), cliEnv)}
 }
 

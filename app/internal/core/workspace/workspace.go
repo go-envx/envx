@@ -57,18 +57,39 @@ type SecretsConfig struct {
 	SecretsPath string
 	KeysPath    string
 	Cipher      string
-	// Providers holds the enabled external providers keyed by scheme, such as "op".
-	Providers map[string]ProviderConfig
+	// Providers declares the enabled external providers.
+	Providers ProvidersConfig
 }
 
-// ProviderConfig configures one enabled external secret provider.
-type ProviderConfig struct {
-	// Timeout bounds each CLI invocation or HTTP request; always positive.
+// ProvidersConfig declares the enabled external secret providers; nil disables
+// one.
+type ProvidersConfig struct {
+	// OnePassword enables op:// references.
+	OnePassword *CLIProviderConfig
+	// Bitwarden enables bws:// references.
+	Bitwarden *CLIProviderConfig
+	// Passwordstate enables passwordstate:// references.
+	Passwordstate *PasswordstateConfig
+}
+
+// CLIProviderConfig configures a CLI-backed provider.
+type CLIProviderConfig struct {
+	// Timeout bounds each CLI invocation; always positive.
 	Timeout time.Duration
-	// URL is the provider's base URL, for HTTP providers.
+}
+
+// PasswordstateConfig configures the Passwordstate REST provider.
+type PasswordstateConfig struct {
+	// Timeout bounds each HTTP request; always positive.
+	Timeout time.Duration
+	// URL is the Passwordstate base URL.
 	URL string
-	// APIKeyEnv names the host variable holding the provider's API key.
+	// APIKeyEnv names the host variable holding the API key.
 	APIKeyEnv string
+	// ListID is the password list searched by title references; zero when unset.
+	ListID int
+	// Field is the field read when a reference names none; empty when unset.
+	Field string
 }
 
 // DefaultEnvironment returns the first declared environment, or an empty string.

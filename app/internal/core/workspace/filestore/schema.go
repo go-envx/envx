@@ -144,28 +144,23 @@ type providersYAML struct {
 	Passwordstate *passwordstateYAML `yaml:"passwordstate"`
 }
 
-// toDomain lists the declared providers keyed by scheme with default timeouts.
-func (p providersYAML) toDomain() map[string]workspace.ProviderConfig {
-	providers := make(map[string]workspace.ProviderConfig)
+// toDomain applies default timeouts to the declared providers.
+func (p providersYAML) toDomain() workspace.ProvidersConfig {
+	var providers workspace.ProvidersConfig
 	if p.OnePassword != nil {
-		providers["op"] = workspace.ProviderConfig{
-			Timeout: p.OnePassword.Timeout.orDefault(),
-		}
+		providers.OnePassword = p.OnePassword.toDomain()
 	}
 	if p.Bitwarden != nil {
-		providers["bws"] = workspace.ProviderConfig{
-			Timeout: p.Bitwarden.Timeout.orDefault(),
-		}
+		providers.Bitwarden = p.Bitwarden.toDomain()
 	}
 	if p.Passwordstate != nil {
-		providers["passwordstate"] = workspace.ProviderConfig{
+		providers.Passwordstate = &workspace.PasswordstateConfig{
 			Timeout:   p.Passwordstate.Timeout.orDefault(),
 			URL:       p.Passwordstate.URL,
 			APIKeyEnv: p.Passwordstate.APIKeyEnv,
+			ListID:    int(p.Passwordstate.ListID),
+			Field:     string(p.Passwordstate.Field),
 		}
-	}
-	if len(providers) == 0 {
-		return nil
 	}
 	return providers
 }
@@ -176,14 +171,51 @@ type cliProviderYAML struct {
 	Timeout durationYAML `yaml:"timeout"`
 }
 
+// toDomain applies the default timeout.
+func (c cliProviderYAML) toDomain() *workspace.CLIProviderConfig {
+	return &workspace.CLIProviderConfig{Timeout: c.Timeout.orDefault()}
+}
+
 // passwordstateYAML configures the Passwordstate REST provider.
 type passwordstateYAML struct {
 	// URL is the Passwordstate base URL.
 	URL string `yaml:"url"`
 	// APIKeyEnv names the host variable holding the API key.
 	APIKeyEnv string `yaml:"api-key-env"`
+	// ListID is the password list searched by title references.
+	ListID listIDYAML `yaml:"list-id"`
+	// Field is the field read when a reference names none.
+	Field fieldYAML `yaml:"field"`
 	// Timeout bounds each HTTP request.
 	Timeout durationYAML `yaml:"timeout"`
+}
+
+// listIDYAML decodes a positive Passwordstate password list ID.
+type listIDYAML int
+
+// UnmarshalYAML parses a positive integer.
+func (l *listIDYAML) UnmarshalYAML(node *yaml.Node) error {
+	var id int
+	if err := node.Decode(&id); err != nil || id <= 0 {
+		return fmt.Errorf(
+			"line %d: list-id %q must be a positive integer", node.Line, node.Value,
+		)
+	}
+	*l = listIDYAML(id)
+	return nil
+}
+
+// fieldYAML decodes a non-empty Passwordstate field name.
+type fieldYAML string
+
+// UnmarshalYAML parses a non-empty string.
+func (f *fieldYAML) UnmarshalYAML(node *yaml.Node) error {
+	var name string
+	if err := node.Decode(&name); err != nil || name == "" {
+		return fmt.Errorf("line %d: field must be a non-empty string", node.Line)
+	}
+	*f = fieldYAML(name)
+	return nil
 }
 
 // durationYAML decodes a positive Go duration string such as "30s".
