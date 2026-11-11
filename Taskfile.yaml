@@ -15,6 +15,12 @@ tasks:
       - mise install
       - pnpm install
 
+  setup-deps:
+    desc: Setup required dependencies (1Password CLI and Bitwarden Secrets Manager)
+    cmds:
+      - mise use --global 1password-cli@latest
+      - mise use --global bitwarden-secrets-manager@latest
+
   clean-git:
     desc: Remove local branches whose remote was deleted (interactive)
     cmds:
