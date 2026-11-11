@@ -12,6 +12,7 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/go-envx/envx/app/internal/lib/exitcode"
 	"github.com/go-envx/envx/app/internal/lib/stdio"
@@ -29,12 +30,19 @@ func TestMain(m *testing.M) {
 }
 
 // runHelper implements the child commands: exit CODE, copy (stdin to stdout,
-// then "err" to stderr), and getenv NAME... (space-joined values).
+// then "err" to stderr), getenv NAME... (space-joined values), fail N
+// (N bytes of "x" to stderr, exit 3), and sleep.
 func runHelper(name string, args []string) int {
 	switch name {
 	case "exit":
 		code, _ := strconv.Atoi(args[0])
 		return code
+	case "fail":
+		n, _ := strconv.Atoi(args[0])
+		fmt.Fprint(os.Stderr, strings.Repeat("x", n))
+		return 3
+	case "sleep":
+		time.Sleep(time.Minute)
 	case "copy":
 		_, _ = io.Copy(os.Stdout, os.Stdin)
 		fmt.Fprintln(os.Stderr, "err")
