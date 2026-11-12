@@ -259,7 +259,7 @@ func TestCommandsMapReveal(t *testing.T) {
 	t.Parallel()
 
 	for _, tt := range commandCases() {
-		if tt.name == "set" || tt.name == "run" {
+		if tt.name == "set" || tt.name == "run" || tt.name == "diff" {
 			continue
 		}
 		t.Run(tt.name, func(t *testing.T) {

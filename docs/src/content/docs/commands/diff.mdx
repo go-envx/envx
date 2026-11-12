@@ -1,6 +1,6 @@
 ---
 title: diff
-description: Compare a project's resolved environment across two environments.
+description: Compare a project's declared values across two environments.
 sidebar:
   order: 7
 ---
@@ -11,7 +11,9 @@ import ExampleBox from '#components/ExampleBox.astro';
 envx diff <project> <env-a> <env-b>
 ```
 
-`diff` resolves the same project under two environments and reports the differences: keys added, removed, or changed between `env-a` and `env-b`.
+`diff` merges the same project under two environments and reports the differences: keys added, removed, or changed between `env-a` and `env-b`.
+
+`diff` compares declared values and never resolves secrets: references and `{{VAR}}` substitutions are compared as written.
 
 Use `--output json` for machine-readable output.
 

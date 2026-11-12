@@ -1,8 +1,6 @@
 package env
 
 import (
-	"errors"
-	"fmt"
 	"maps"
 	"slices"
 
@@ -17,15 +15,12 @@ type DiffParams struct {
 	EnvironmentA string
 	// EnvironmentB is the "after" environment; empty uses the default.
 	EnvironmentB string
-	// Reveal compares resolved values instead of declared literals.
-	Reveal bool
 	// Options are setting overrides that win over the manifest; their
 	// environment is the default for an empty side.
 	Options workspace.Settings
 }
 
-// Change is one differing key and the text each side compared by: the
-// declared literal, or the resolved value when revealing.
+// Change is one differing key and the declared literal of each side.
 type Change struct {
 	// Key is the variable name.
 	Key string
@@ -45,11 +40,9 @@ type DiffResult struct {
 	Changed []Change
 }
 
-// Diff compares two environments over one read of the base namespaces. Masked,
-// it compares declared literals, so a changed reference is visible even when
-// both decrypt to the same plaintext. Revealed, it compares resolved values and
-// any value that does not resolve on either side is fatal. Host-only keys are
-// not compared.
+// Diff compares the declared literals of two environments over one read of the
+// base namespaces. It never resolves secrets, so a changed reference is visible
+// even when both decrypt to the same plaintext. Host-only keys are not compared.
 func (s *Service) Diff(params DiffParams) (DiffResult, error) {
 	op, err := s.begin(params.Project, params.Options)
 	if err != nil {
@@ -68,19 +61,11 @@ func (s *Service) Diff(params DiffParams) (DiffResult, error) {
 	if err != nil {
 		return DiffResult{}, err
 	}
-	resolver, err := s.newValueResolver(ResolverParams{
-		Reveal: params.Reveal,
-		Host:   op.host,
-	})
+	before, err := s.diffSide(namespaces, from)
 	if err != nil {
 		return DiffResult{}, err
 	}
-
-	before, err := s.diffSide(namespaces, resolver, from, params.Reveal)
-	if err != nil {
-		return DiffResult{}, err
-	}
-	after, err := s.diffSide(namespaces, resolver, to, params.Reveal)
+	after, err := s.diffSide(namespaces, to)
 	if err != nil {
 		return DiffResult{}, err
 	}
@@ -123,11 +108,10 @@ func (s *Service) diffEnvironment(op operation, environment string) (operation, 
 	return op, nil
 }
 
-// diffSide merges and evaluates one side, returning each key's compared text.
-// Masked, list rendering is still validated; revealed, every value must
-// resolve.
+// diffSide merges one side and renders each key's declared literal, which
+// still validates list rendering.
 func (s *Service) diffSide(
-	namespaces []namespace, resolver ValueResolver, op operation, reveal bool,
+	namespaces []namespace, op operation,
 ) (map[string]string, error) {
 	merged, err := s.merge(namespaces, op)
 	if err != nil {
@@ -135,37 +119,14 @@ func (s *Service) diffSide(
 	}
 	merged.applyHost(op, false)
 
-	keys := slices.Sorted(maps.Keys(merged.values))
-	entries := newEvaluator(merged, resolver, op, reveal).entries(keys)
-	out := make(map[string]string, len(entries))
-	var unresolved []error
-	for i := range entries {
-		entry := &entries[i]
-		compared := entry.Evaluation.Value
-		if !reveal {
-			leaf := merged.values[entry.Key]
-			path := merged.origins[entry.Key].Winner.Key
-			if compared, err = renderLeaf(leaf, path, op.settings.delimiter); err != nil {
-				return nil, err
-			}
-		} else if !entry.Evaluation.Resolved {
-			unresolved = append(unresolved, s.unresolvedError(entry))
+	out := make(map[string]string, len(merged.values))
+	for _, key := range slices.Sorted(maps.Keys(merged.values)) {
+		path := merged.origins[key].Winner.Key
+		literal, err := renderLeaf(merged.values[key], path, op.settings.delimiter)
+		if err != nil {
+			return nil, err
 		}
-		out[entry.Key] = compared
-	}
-	if len(unresolved) > 0 {
-		return nil, fmt.Errorf(
-			"environment %q: %w", op.environment, errors.Join(unresolved...),
-		)
+		out[key] = literal
 	}
 	return out, nil
-}
-
-// unresolvedError describes an unresolved entry without its value.
-func (s *Service) unresolvedError(entry *ExplainEntry) error {
-	message := "did not resolve"
-	if !entry.Evaluation.Diagnostic.IsZero() {
-		message = entry.Evaluation.Diagnostic.Message
-	}
-	return fmt.Errorf("resolving %s: %w: %s", entry.Key, ErrUnresolved, message)
 }

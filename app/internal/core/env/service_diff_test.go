@@ -7,8 +7,9 @@ import (
 	"testing"
 )
 
-// diffFixture serves two environments whose secrets share a plaintext.
-func diffFixture(t *testing.T, host ...string) *Service {
+// diffFixture serves two environments whose secrets share a plaintext; opener
+// records any resolver opened.
+func diffFixture(t *testing.T, host ...string) (*Service, *fakeOpener) {
 	t.Helper()
 	namespaces := newFakeNamespaces().
 		base(t, appInclude, `
@@ -30,7 +31,7 @@ func diffFixture(t *testing.T, host ...string) *Service {
 		EnvNamespaces:    namespaces,
 		HostEnv:          hostOf(host...),
 		NewValueResolver: opener.open,
-	})
+	}), opener
 }
 
 // changeKeys summarizes a diff as sorted key:kind strings.
@@ -49,39 +50,32 @@ func changeKeys(result DiffResult) string {
 	return strings.Join(out, " ")
 }
 
-// TestDiff verifies masked diffs compare declarations and revealed diffs
-// compare resolved values.
+// TestDiff verifies diffs compare declarations without opening a resolver.
 func TestDiff(t *testing.T) {
 	t.Parallel()
 
-	tests := []struct {
-		// reveal compares resolved values.
-		reveal bool
-		// want lists expected changes.
-		want string
-	}{
-		{want: "ADDED:added HOST:changed REMOVED:changed TOKEN:changed"},
-		{reveal: true, want: "ADDED:added HOST:changed REMOVED:changed"},
+	s, opener := diffFixture(t)
+	result, err := s.Diff(DiffParams{
+		EnvironmentA: "development", EnvironmentB: "production",
+	})
+	if err != nil {
+		t.Fatalf("Diff: %v", err)
 	}
-	for _, tt := range tests {
-		result, err := diffFixture(t).Diff(DiffParams{
-			EnvironmentA: "development", EnvironmentB: "production", Reveal: tt.reveal,
-		})
-		if err != nil {
-			t.Fatalf("Diff(reveal=%v): %v", tt.reveal, err)
-		}
-		if got := changeKeys(result); got != tt.want {
-			t.Errorf("Diff(reveal=%v) = %s, want %s", tt.reveal, got, tt.want)
-		}
+	want := "ADDED:added HOST:changed REMOVED:changed TOKEN:changed"
+	if got := changeKeys(result); got != want {
+		t.Errorf("Diff = %s, want %s", got, want)
+	}
+	if opener.calls != 0 {
+		t.Errorf("resolver opened %d times, want 0", opener.calls)
 	}
 }
 
-// TestDiffValues verifies changes carry each side's compared text: declared
-// literals when masked.
+// TestDiffValues verifies changes carry each side's declared literal.
 func TestDiffValues(t *testing.T) {
 	t.Parallel()
 
-	result, err := diffFixture(t).Diff(DiffParams{EnvironmentB: "production"})
+	s, _ := diffFixture(t)
+	result, err := s.Diff(DiffParams{EnvironmentB: "production"})
 	if err != nil {
 		t.Fatalf("Diff: %v", err)
 	}
@@ -106,9 +100,8 @@ func TestDiffValues(t *testing.T) {
 func TestDiffHostPinned(t *testing.T) {
 	t.Parallel()
 
-	result, err := diffFixture(t, "HOST=pinned").Diff(
-		DiffParams{EnvironmentB: "production"},
-	)
+	s, _ := diffFixture(t, "HOST=pinned")
+	result, err := s.Diff(DiffParams{EnvironmentB: "production"})
 	if err != nil {
 		t.Fatalf("Diff: %v", err)
 	}
@@ -119,12 +112,12 @@ func TestDiffHostPinned(t *testing.T) {
 	}
 }
 
-// TestDiffFailures verifies undeclared environments and unresolved revealed
-// values are fatal.
+// TestDiffFailures verifies undeclared environments are fatal and dangling
+// secrets are not.
 func TestDiffFailures(t *testing.T) {
 	t.Parallel()
 
-	s := diffFixture(t)
+	s, _ := diffFixture(t)
 	_, err := s.Diff(DiffParams{EnvironmentA: "staging", EnvironmentB: "production"})
 	if !errors.Is(err, ErrEnvironmentNotDeclared) {
 		t.Errorf("undeclared error = %v", err)
@@ -135,10 +128,6 @@ func TestDiffFailures(t *testing.T) {
 		NewValueResolver: (&fakeOpener{}).open,
 	})
 	if _, err := broken.Diff(DiffParams{EnvironmentB: "production"}); err != nil {
-		t.Errorf("masked diff with dangling secret: %v", err)
-	}
-	_, err = broken.Diff(DiffParams{EnvironmentB: "production", Reveal: true})
-	if !errors.Is(err, ErrUnresolved) || !strings.Contains(err.Error(), "TOKEN") {
-		t.Errorf("revealed dangling error = %v, want ErrUnresolved naming TOKEN", err)
+		t.Errorf("diff with dangling secret: %v", err)
 	}
 }

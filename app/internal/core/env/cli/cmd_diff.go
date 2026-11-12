@@ -12,20 +12,18 @@ import (
 
 const (
 	diffUsage = "diff <project> <env-a> <env-b>"
-	diffShort = "Compare a project's resolved environment across two environments"
+	diffShort = "Compare a project's declared values across two environments"
 	diffLong  = `
-		Diff resolves the same project under two environments and reports the
+		Diff merges the same project under two environments and reports the
 		differences: keys added, removed, or changed between env-a and env-b.
 
-		Secret references and {{VAR}} substitutions are compared as declarations
-		(e.g. "secret://group/key") without resolution, so changing a reference is
-		visible even when both references currently resolve to the same value. Pass
-		--reveal to resolve and substitute each side and compare the resulting
-		values instead. Use --output=json for machine-readable output.
+		Values are compared as declared. Secret references and {{VAR}}
+		substitutions are never resolved, so changing a reference is visible even
+		when both references resolve to the same value, and no secret is decrypted
+		or fetched. Use --output=json for machine-readable output.
 	`
 	diffExample = `
 		envx diff api-service development production
-		envx diff api-service development production --reveal
 		envx diff api-service development production --output=json
 	`
 )
@@ -46,7 +44,6 @@ func NewDiffCommand(f Factory) *cobra.Command {
 
 			// Extract command-line flag values.
 			configPath := workspacecli.ConfigPath(cmd)
-			reveal := revealFlag.Value(cmd)
 			output := outputFlag.Value(cmd)
 			settings := workspacecli.Settings(cmd)
 
@@ -61,7 +58,6 @@ func NewDiffCommand(f Factory) *cobra.Command {
 				Project:      project,
 				EnvironmentA: envA,
 				EnvironmentB: envB,
-				Reveal:       reveal,
 				Options:      settings,
 			})
 			if err != nil {
@@ -81,7 +77,6 @@ func NewDiffCommand(f Factory) *cobra.Command {
 
 	// Bind the command-line flags.
 	outputFlag.Bind(cmd)
-	revealFlag.Bind(cmd)
 	workspacecli.BindSettings(cmd, "env")
 
 	return cmd
