@@ -5,6 +5,7 @@ import (
 	"errors"
 	"time"
 
+	"github.com/go-envx/envx/app/internal/core/external"
 	"github.com/go-envx/envx/app/internal/core/value"
 )
 
@@ -16,13 +17,15 @@ type fakeProvider struct {
 	values map[string]string
 	// err is returned for every fetch when set.
 	err error
-	// pathErr is returned by CheckPath when set.
-	pathErr error
+	// qualifyErr is returned by Qualify when set.
+	qualifyErr error
+	// scoped makes Qualify prefix the path with the environment.
+	scoped bool
 	// availableErr is returned by CheckAvailable when set.
 	availableErr error
 	// block waits for the context to end before returning.
 	block bool
-	// calls records every fetched path in order.
+	// calls records every fetched qualified path in order.
 	calls []string
 }
 
@@ -33,8 +36,10 @@ func (p *fakeProvider) Scheme() string {
 	return p.scheme
 }
 
-func (p *fakeProvider) Fetch(ctx context.Context, path string) (string, error) {
-	p.calls = append(p.calls, path)
+func (p *fakeProvider) Fetch(
+	ctx context.Context, ref external.Reference,
+) (string, error) {
+	p.calls = append(p.calls, ref.Path)
 	if p.block {
 		<-ctx.Done()
 		return "", ctx.Err()
@@ -42,15 +47,23 @@ func (p *fakeProvider) Fetch(ctx context.Context, path string) (string, error) {
 	if p.err != nil {
 		return "", p.err
 	}
-	plaintext, ok := p.values[path]
+	plaintext, ok := p.values[ref.Path]
 	if !ok {
 		return "", errors.New("not found")
 	}
 	return plaintext, nil
 }
 
-func (p *fakeProvider) CheckPath(string) error {
-	return p.pathErr
+func (p *fakeProvider) Qualify(
+	ref external.Reference, environment string,
+) (external.Reference, error) {
+	if p.qualifyErr != nil {
+		return external.Reference{}, p.qualifyErr
+	}
+	if p.scoped {
+		ref.Path = environment + "/" + ref.Path
+	}
+	return ref, nil
 }
 
 func (p *fakeProvider) CheckAvailable() error {

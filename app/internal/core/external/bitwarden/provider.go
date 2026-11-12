@@ -108,15 +108,24 @@ func (p *Provider) Scheme() string {
 	return external.SchemeBitwarden
 }
 
-// CheckPath accepts a secret ID or "<project>/<key>".
-func (p *Provider) CheckPath(path string) error {
-	if !strings.Contains(path, "/") && !uuidPattern.MatchString(path) {
-		return fmt.Errorf(
+// Qualify accepts a secret ID or "<project>/<key>" without a "#field"
+// fragment; references need no qualification.
+func (p *Provider) Qualify(
+	ref external.Reference, _ string,
+) (external.Reference, error) {
+	if ref.Field != "" {
+		return external.Reference{}, fmt.Errorf(
+			"%w: bws references do not support #<field>",
+			external.ErrInvalidReference,
+		)
+	}
+	if !strings.Contains(ref.Path, "/") && !uuidPattern.MatchString(ref.Path) {
+		return external.Reference{}, fmt.Errorf(
 			"%w: want bws://<secret-id> or bws://<project>/<key>",
 			external.ErrInvalidReference,
 		)
 	}
-	return nil
+	return ref, nil
 }
 
 // CheckAvailable reports a missing access token or CLI.
@@ -130,18 +139,18 @@ func (p *Provider) CheckAvailable() error {
 	return nil
 }
 
-// Fetch reads one reference path: a secret ID, or "<project>/<key>" where the
+// Fetch reads one reference: a secret ID, or "<project>/<key>" where the
 // project is a name or ID and the key may contain slashes.
-func (p *Provider) Fetch(ctx context.Context, path string) (string, error) {
-	if err := p.CheckPath(path); err != nil {
+func (p *Provider) Fetch(ctx context.Context, ref external.Reference) (string, error) {
+	if _, err := p.Qualify(ref, ""); err != nil {
 		return "", err
 	}
 	if !p.hasToken {
 		return "", tokenError()
 	}
-	projectRef, key, byKey := strings.Cut(path, "/")
+	projectRef, key, byKey := strings.Cut(ref.Path, "/")
 	if !byKey {
-		return p.secretByID(ctx, path)
+		return p.secretByID(ctx, ref.Path)
 	}
 	projectID, err := p.projectID(ctx, projectRef)
 	if err != nil {

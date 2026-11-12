@@ -12,15 +12,17 @@ import (
 type Provider interface {
 	// Scheme returns the reference prefix without "://", such as "op".
 	Scheme() string
-	// Fetch returns the plaintext for one reference path.
-	Fetch(ctx context.Context, path string) (string, error)
+	// Fetch returns the plaintext for one qualified reference.
+	Fetch(ctx context.Context, ref Reference) (string, error)
 }
 
-// PathChecker is an optional Provider extension that checks a reference path
-// against the provider's syntax and configuration without fetching.
-type PathChecker interface {
-	// CheckPath returns an error wrapping ErrInvalidReference for a bad path.
-	CheckPath(path string) error
+// Qualifier is an optional Provider extension that checks a reference against
+// the provider's syntax and configuration and qualifies it for an environment
+// without fetching.
+type Qualifier interface {
+	// Qualify returns ref in the fully qualified form Fetch receives, or an
+	// error wrapping ErrInvalidReference.
+	Qualify(ref Reference, environment string) (Reference, error)
 }
 
 // AvailabilityChecker is an optional Provider extension that reports, without

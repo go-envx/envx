@@ -36,6 +36,11 @@ func (r *fakeRunner) run(
 	return []byte(r.out), nil
 }
 
+// ref builds an op reference to path.
+func ref(path string) external.Reference {
+	return external.Reference{Scheme: external.SchemeOnePassword, Path: path}
+}
+
 func TestFetchReadsReference(t *testing.T) {
 	t.Parallel()
 
@@ -51,7 +56,7 @@ func TestFetchReadsReference(t *testing.T) {
 	})
 	p := onepassword.New(host, onepassword.Options{Run: runner.run})
 
-	got, err := p.Fetch(context.Background(), "vault/item name/field")
+	got, err := p.Fetch(context.Background(), ref("vault/item name/field"))
 	if err != nil || got != "pw" {
 		t.Fatalf("Fetch = %q, %v; want pw", got, err)
 	}
@@ -71,21 +76,45 @@ func TestFetchReadsReference(t *testing.T) {
 	}
 }
 
-func TestCheckPath(t *testing.T) {
+func TestQualify(t *testing.T) {
 	t.Parallel()
 
 	p := onepassword.New(hostenv.Snapshot{}, onepassword.Options{})
-	for path, valid := range map[string]bool{
-		"vault/item":           false,
-		"vault/item/field":     true,
-		"vault/item/sec/field": true,
-		"vault/item/a/b/field": false,
+	field := ref("vault/item/field")
+	field.Field = "x"
+	for _, tt := range []struct {
+		ref   external.Reference
+		valid bool
+	}{
+		{ref("vault/item"), false},
+		{ref("vault/item/field"), true},
+		{ref("vault/item/sec/field"), true},
+		{ref("vault/item/a/b/field"), false},
+		{field, false},
 	} {
-		err := p.CheckPath(path)
-		if valid != (err == nil) ||
+		got, err := p.Qualify(tt.ref, "dev")
+		if valid := err == nil; valid != tt.valid || valid && got != tt.ref ||
 			err != nil && !errors.Is(err, external.ErrInvalidReference) {
-			t.Errorf("CheckPath(%q) = %v, want valid %t", path, err, valid)
+			t.Errorf("Qualify(%s) = %v, %v; want valid %t", tt.ref, got, err, tt.valid)
 		}
+	}
+}
+
+func TestFetchRejectsField(t *testing.T) {
+	t.Parallel()
+
+	runner := &fakeRunner{out: "pw"}
+	p := onepassword.New(hostenv.Snapshot{}, onepassword.Options{Run: runner.run})
+	field := ref("vault/item/field")
+	field.Field = "x"
+
+	if _, err := p.Fetch(context.Background(), field); !errors.Is(
+		err, external.ErrInvalidReference,
+	) {
+		t.Errorf("err = %v, want ErrInvalidReference", err)
+	}
+	if runner.got.Args != nil {
+		t.Errorf("ran %q, want no command", runner.got.Args)
 	}
 }
 
@@ -142,7 +171,7 @@ func TestFetchErrors(t *testing.T) {
 			t.Parallel()
 			runner := &fakeRunner{err: tt.err}
 			p := onepassword.New(hostenv.Snapshot{}, onepassword.Options{Run: runner.run})
-			_, err := p.Fetch(context.Background(), "v/i/f")
+			_, err := p.Fetch(context.Background(), ref("v/i/f"))
 			if !errors.Is(err, tt.want) {
 				t.Fatalf("err = %v, want %v", err, tt.want)
 			}

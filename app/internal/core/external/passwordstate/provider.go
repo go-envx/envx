@@ -41,7 +41,7 @@ type Options struct {
 	Client external.HTTPClient
 }
 
-// Provider fetches passwordstate://<password-id-or-title>[/<field>]
+// Provider fetches passwordstate://<password-id-or-title>[/<field>|#<field>]
 // references. It caches the list listing for its lifetime, which is one
 // operation.
 type Provider struct {
@@ -130,11 +130,16 @@ func (p *Provider) Scheme() string {
 	return external.SchemePasswordstate
 }
 
-// CheckPath accepts a password ID, or a title when list-id is configured,
-// optionally followed by a field name.
-func (p *Provider) CheckPath(path string) error {
-	_, err := p.parse(path)
-	return err
+// Qualify accepts a password ID, or a title when list-id is configured,
+// optionally naming a field by "/<field>" or "#<field>"; references need no
+// qualification.
+func (p *Provider) Qualify(
+	ref external.Reference, _ string,
+) (external.Reference, error) {
+	if _, err := p.parse(ref); err != nil {
+		return external.Reference{}, err
+	}
+	return ref, nil
 }
 
 // CheckAvailable reports invalid configuration or a missing API key.
@@ -142,34 +147,35 @@ func (p *Provider) CheckAvailable() error {
 	return p.configErr
 }
 
-// Fetch reads one reference path: a password ID or a title within the
-// configured list, optionally followed by a field name such as "UserName". A
-// title is percent-decoded once, so "%2F" stands for a slash.
-func (p *Provider) Fetch(ctx context.Context, path string) (string, error) {
-	ref, err := p.parse(path)
+// Fetch reads one reference: a password ID or a title within the configured
+// list, optionally naming a field such as "UserName". A title is
+// percent-decoded once, so "%2F" stands for a slash.
+func (p *Provider) Fetch(ctx context.Context, ref external.Reference) (string, error) {
+	target, err := p.parse(ref)
 	if err != nil {
 		return "", err
 	}
 	if p.configErr != nil {
 		return "", p.configErr
 	}
-	if ref.id != "" {
-		found, err := p.password(ctx, ref.id)
+	if target.id != "" {
+		found, err := p.password(ctx, target.id)
 		if err != nil {
 			return "", err
 		}
-		return found.text(ref.field, "password "+ref.id)
+		return found.text(target.field, "password "+target.id)
 	}
-	found, err := p.passwordByTitle(ctx, ref.title)
+	found, err := p.passwordByTitle(ctx, target.title)
 	if err != nil {
 		return "", err
 	}
-	return found.text(ref.field, fmt.Sprintf("password %q", ref.title))
+	return found.text(target.field, fmt.Sprintf("password %q", target.title))
 }
 
-// parse splits path into its target and field, applying the default field.
-func (p *Provider) parse(path string) (reference, error) {
-	target, field, hasField := strings.Cut(path, "/")
+// parse splits ref's path into its target and field, applying the default
+// field. The field comes from the fragment or a trailing path segment, not both.
+func (p *Provider) parse(ref external.Reference) (reference, error) {
+	target, field, hasField := strings.Cut(ref.Path, "/")
 	title, titleErr := url.PathUnescape(target)
 	if titleErr != nil || title == "" ||
 		(hasField && (field == "" || strings.Contains(field, "/"))) {
@@ -178,7 +184,15 @@ func (p *Provider) parse(path string) (reference, error) {
 			external.ErrInvalidReference,
 		)
 	}
-	if !hasField {
+	switch {
+	case hasField && ref.Field != "":
+		return reference{}, fmt.Errorf(
+			"%w: name the field by /<field> or #<field>, not both",
+			external.ErrInvalidReference,
+		)
+	case ref.Field != "":
+		field = ref.Field
+	case !hasField:
 		field = p.field
 	}
 	if passwordID.MatchString(target) {

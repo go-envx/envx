@@ -20,6 +20,9 @@ const (
 // schemeSeparator joins a scheme to its path.
 const schemeSeparator = "://"
 
+// fieldSeparator joins a path to its field fragment.
+const fieldSeparator = "#"
+
 // schemes lists every supported scheme.
 var schemes = []string{SchemeOnePassword, SchemeBitwarden, SchemePasswordstate}
 
@@ -27,8 +30,10 @@ var schemes = []string{SchemeOnePassword, SchemeBitwarden, SchemePasswordstate}
 type Reference struct {
 	// Scheme names the provider, such as "op".
 	Scheme string
-	// Path is the provider-specific remainder after "://".
+	// Path is the provider-specific remainder after "://", without the field.
 	Path string
+	// Field is the "#" fragment naming a record field; empty when absent.
+	Field string
 }
 
 // ParseReference parses a whole value as an external reference. Values without
@@ -39,24 +44,35 @@ func ParseReference(raw string) (Reference, error) {
 	if !ok {
 		return Reference{}, ErrNotReference
 	}
-	path := raw[len(scheme)+len(schemeSeparator):]
-	if path == "" {
-		return Reference{}, fmt.Errorf("%w: empty path", ErrInvalidReference)
-	}
-	if strings.ContainsFunc(path, unicode.IsControl) {
+	rest := raw[len(scheme)+len(schemeSeparator):]
+	if strings.ContainsFunc(rest, unicode.IsControl) {
 		return Reference{}, fmt.Errorf(
 			"%w: path contains control characters", ErrInvalidReference,
 		)
 	}
-	if slices.Contains(strings.Split(path, "/"), "") {
+	path, field, hasField := strings.Cut(rest, fieldSeparator)
+	switch {
+	case path == "":
+		return Reference{}, fmt.Errorf("%w: empty path", ErrInvalidReference)
+	case slices.Contains(strings.Split(path, "/"), ""):
 		return Reference{}, fmt.Errorf("%w: empty path segment", ErrInvalidReference)
+	case hasField && field == "":
+		return Reference{}, fmt.Errorf("%w: empty field", ErrInvalidReference)
+	case strings.Contains(field, fieldSeparator):
+		return Reference{}, fmt.Errorf(
+			"%w: more than one %q; percent-encode a literal one as %%23",
+			ErrInvalidReference, fieldSeparator,
+		)
 	}
-	return Reference{Scheme: scheme, Path: path}, nil
+	return Reference{Scheme: scheme, Path: path, Field: field}, nil
 }
 
-// String returns the canonical "scheme://path" form.
+// String returns the canonical "scheme://path[#field]" form.
 func (r Reference) String() string {
-	return r.Scheme + schemeSeparator + r.Path
+	if r.Field == "" {
+		return r.Scheme + schemeSeparator + r.Path
+	}
+	return r.Scheme + schemeSeparator + r.Path + fieldSeparator + r.Field
 }
 
 // SchemeOf returns raw's supported scheme, if any, without checking its path.

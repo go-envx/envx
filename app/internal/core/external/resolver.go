@@ -43,7 +43,7 @@ type Resolver struct {
 	reveal bool
 	// providers holds the enabled providers by scheme.
 	providers map[string]*providerState
-	// cache holds fetch outcomes, including failures, by reference.
+	// cache holds fetch outcomes, including failures, by qualified reference.
 	cache map[Reference]fetchResult
 }
 
@@ -97,7 +97,8 @@ func NewResolver(params ResolverParams) (*Resolver, error) {
 }
 
 // Resolve masks an enabled provider's reference to its canonical form or, when
-// revealing, fetches it. A leading backslash escapes a literal reference.
+// revealing, fetches it for environment. A leading backslash escapes a literal
+// reference.
 func (r *Resolver) Resolve(raw, environment string) (string, error) {
 	literal, escaped, enabled := r.match(raw)
 	if !enabled {
@@ -106,14 +107,14 @@ func (r *Resolver) Resolve(raw, environment string) (string, error) {
 	if escaped {
 		return literal, nil
 	}
-	ref, err := r.parse(literal)
+	written, qualified, err := r.parse(literal, environment)
 	if err != nil {
 		return "", err
 	}
 	if !r.reveal {
-		return ref.String(), nil
+		return written.String(), nil
 	}
-	return r.fetch(ref)
+	return r.fetch(qualified)
 }
 
 // Evaluate classifies and diagnoses a value without returning an error. A
@@ -133,7 +134,7 @@ func (r *Resolver) Evaluate(raw, environment string) value.Evaluation {
 	if escaped {
 		return value.Evaluation{Kind: value.Config, Value: literal, Resolved: true}
 	}
-	ref, err := r.parse(literal)
+	written, qualified, err := r.parse(literal, environment)
 	if err != nil {
 		return value.Evaluation{
 			Kind:       value.Secret,
@@ -141,11 +142,11 @@ func (r *Resolver) Evaluate(raw, environment string) value.Evaluation {
 			Diagnostic: finding(diagnostic.InvalidExternalReference, err.Error()),
 		}
 	}
-	eval := value.Evaluation{Kind: value.Secret, Value: ref.String()}
+	eval := value.Evaluation{Kind: value.Secret, Value: written.String()}
 	if !r.reveal {
 		return eval
 	}
-	plaintext, err := r.fetch(ref)
+	plaintext, err := r.fetch(qualified)
 	if err != nil {
 		eval.Diagnostic = fetchFinding(err)
 		return eval
@@ -167,19 +168,24 @@ func (r *Resolver) match(raw string) (literal string, escaped, enabled bool) {
 	return literal, escaped, enabled
 }
 
-// parse parses an enabled provider's reference and checks its path offline
-// when the provider supports it.
-func (r *Resolver) parse(literal string) (Reference, error) {
-	ref, err := ParseReference(literal)
+// parse parses an enabled provider's reference as written and, when the
+// provider supports it, qualifies it offline for environment.
+func (r *Resolver) parse(
+	literal, environment string,
+) (written, qualified Reference, err error) {
+	written, err = ParseReference(literal)
 	if err != nil {
-		return Reference{}, err
+		return Reference{}, Reference{}, err
 	}
-	if checker, ok := r.providers[ref.Scheme].provider.(PathChecker); ok {
-		if err := checker.CheckPath(ref.Path); err != nil {
-			return Reference{}, err
-		}
+	qualifier, ok := r.providers[written.Scheme].provider.(Qualifier)
+	if !ok {
+		return written, written, nil
 	}
-	return ref, nil
+	qualified, err = qualifier.Qualify(written, environment)
+	if err != nil {
+		return Reference{}, Reference{}, err
+	}
+	return written, qualified, nil
 }
 
 // fetch returns a reference's cached outcome, fetching on a miss. After a
@@ -204,7 +210,7 @@ func (r *Resolver) fetch(ref Reference) (string, error) {
 func (s *providerState) fetch(ref Reference) fetchResult {
 	ctx, cancel := context.WithTimeout(context.Background(), s.timeout)
 	defer cancel()
-	plaintext, err := s.provider.Fetch(ctx, ref.Path)
+	plaintext, err := s.provider.Fetch(ctx, ref)
 	switch {
 	case errors.Is(ctx.Err(), context.DeadlineExceeded):
 		s.timedOut = true

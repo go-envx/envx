@@ -61,15 +61,25 @@ func (p *Provider) Scheme() string {
 	return external.SchemeOnePassword
 }
 
-// CheckPath accepts "vault/item/field" and "vault/item/section/field".
-func (p *Provider) CheckPath(path string) error {
-	if segments := strings.Count(path, "/") + 1; segments < 3 || segments > 4 {
-		return fmt.Errorf(
+// Qualify accepts "vault/item/field" and "vault/item/section/field" without a
+// "#field" fragment; references need no qualification.
+func (p *Provider) Qualify(
+	ref external.Reference, _ string,
+) (external.Reference, error) {
+	if ref.Field != "" {
+		return external.Reference{}, fmt.Errorf(
+			"%w: op references do not support #<field>; "+
+				"name the field in the path",
+			external.ErrInvalidReference,
+		)
+	}
+	if segments := strings.Count(ref.Path, "/") + 1; segments < 3 || segments > 4 {
+		return external.Reference{}, fmt.Errorf(
 			"%w: want op://<vault>/<item>/[<section>/]<field>",
 			external.ErrInvalidReference,
 		)
 	}
-	return nil
+	return ref, nil
 }
 
 // CheckAvailable reports a missing CLI. Sessions are not checked, since the
@@ -81,14 +91,14 @@ func (p *Provider) CheckAvailable() error {
 	return nil
 }
 
-// Fetch reads one secret reference path, such as "vault/item/field".
-func (p *Provider) Fetch(ctx context.Context, path string) (string, error) {
-	if err := p.CheckPath(path); err != nil {
+// Fetch reads one secret reference, such as "op://vault/item/field".
+func (p *Provider) Fetch(ctx context.Context, ref external.Reference) (string, error) {
+	if _, err := p.Qualify(ref, ""); err != nil {
 		return "", err
 	}
-	ref := external.Reference{Scheme: external.SchemeOnePassword, Path: path}
+	read := external.Reference{Scheme: external.SchemeOnePassword, Path: ref.Path}
 	out, err := p.run(ctx, process.OutputCommand{
-		Args: []string{program, "read", "--no-newline", ref.String()},
+		Args: []string{program, "read", "--no-newline", read.String()},
 		Env:  p.env,
 	})
 	if err == nil {

@@ -169,14 +169,14 @@ func TestResolveInvalidReference(t *testing.T) {
 	}
 }
 
-func TestResolveChecksPathWithoutFetching(t *testing.T) {
+func TestResolveQualifiesWithoutFetching(t *testing.T) {
 	t.Parallel()
 
 	for _, reveal := range []bool{false, true} {
 		op := &fakeProvider{
-			scheme:  "op",
-			values:  map[string]string{"v/f": "pw"},
-			pathErr: fmt.Errorf("%w: too short", external.ErrInvalidReference),
+			scheme:     "op",
+			values:     map[string]string{"v/f": "pw"},
+			qualifyErr: fmt.Errorf("%w: too short", external.ErrInvalidReference),
 		}
 		r := newResolver(t, reveal, op)
 
@@ -192,6 +192,41 @@ func TestResolveChecksPathWithoutFetching(t *testing.T) {
 		if len(op.calls) != 0 {
 			t.Errorf("reveal %t: provider called %v", reveal, op.calls)
 		}
+	}
+}
+
+func TestResolveCachesByQualifiedReference(t *testing.T) {
+	t.Parallel()
+
+	bws := &fakeProvider{scheme: "bws", scoped: true, values: map[string]string{
+		"dev/KEY":  "dev-value",
+		"prod/KEY": "prod-value",
+	}}
+	r := newResolver(t, true, bws)
+
+	for _, env := range []string{"dev", "prod", "dev"} {
+		got, err := r.Resolve("bws://KEY", env)
+		if err != nil || got != env+"-value" {
+			t.Errorf("Resolve(%s) = %q, %v; want %s-value", env, got, err, env)
+		}
+	}
+	if want := []string{"dev/KEY", "prod/KEY"}; !slices.Equal(bws.calls, want) {
+		t.Errorf("calls = %v, want %v", bws.calls, want)
+	}
+}
+
+func TestResolveMasksReferenceAsWritten(t *testing.T) {
+	t.Parallel()
+
+	bws := &fakeProvider{scheme: "bws", scoped: true}
+	r := newResolver(t, false, bws)
+
+	got, err := r.Resolve("bws://KEY#field", "dev")
+	if err != nil || got != "bws://KEY#field" {
+		t.Errorf("Resolve = %q, %v; want reference as written", got, err)
+	}
+	if eval := r.Evaluate("bws://KEY#field", "dev"); eval.Value != "bws://KEY#field" {
+		t.Errorf("Evaluate = %+v, want reference as written", eval)
 	}
 }
 

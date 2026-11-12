@@ -52,6 +52,17 @@ func (r *requests) all() []string {
 	return append([]string(nil), r.paths...)
 }
 
+// ref builds a passwordstate reference from "path[#field]" without validating
+// it.
+func ref(raw string) external.Reference {
+	path, field, _ := strings.Cut(raw, "#")
+	return external.Reference{
+		Scheme: external.SchemePasswordstate,
+		Path:   path,
+		Field:  field,
+	}
+}
+
 // newServer serves password 42 and list 1990 under /pws and records each
 // request URI.
 func newServer(t *testing.T, seen *requests) *httptest.Server {
@@ -112,8 +123,10 @@ func TestFetchFields(t *testing.T) {
 		"42":          "s3cret",
 		"42/UserName": "admin",
 		"42/username": "admin",
+		"42#UserName": "admin",
+		"42#username": "admin",
 	} {
-		got, err := p.Fetch(context.Background(), path)
+		got, err := p.Fetch(context.Background(), ref(path))
 		if err != nil || got != want {
 			t.Errorf("Fetch(%q) = %q, %v; want %q", path, got, err, want)
 		}
@@ -129,8 +142,10 @@ func TestFetchRejectsInvalidReference(t *testing.T) {
 	var seen requests
 	p := newProvider(newServer(t, &seen), keyHost)
 
-	for _, path := range []string{"abc", "42/", "42/a/b", "../42", "bad%zz"} {
-		_, err := p.Fetch(context.Background(), path)
+	for _, path := range []string{
+		"abc", "42/", "42/a/b", "../42", "bad%zz", "42/UserName#Password",
+	} {
+		_, err := p.Fetch(context.Background(), ref(path))
 		if !errors.Is(err, external.ErrInvalidReference) {
 			t.Errorf("Fetch(%q) err = %v, want ErrInvalidReference", path, err)
 		}
@@ -145,14 +160,14 @@ func TestFetchTitleRequiresListID(t *testing.T) {
 
 	var seen requests
 	_, err := newProvider(newServer(t, &seen), keyHost).
-		Fetch(context.Background(), "db")
+		Fetch(context.Background(), ref("db"))
 	if !errors.Is(err, external.ErrInvalidReference) ||
 		!strings.Contains(err.Error(), "title references require list-id") {
 		t.Errorf("err = %v, want list-id requirement", err)
 	}
 }
 
-func TestCheckPathOffline(t *testing.T) {
+func TestQualifyOffline(t *testing.T) {
 	t.Parallel()
 
 	opts := passwordstate.Options{URL: "https://pw.local", APIKeyEnv: "PW_KEY"}
@@ -169,14 +184,17 @@ func TestCheckPathOffline(t *testing.T) {
 		valid    bool
 	}{
 		{noList, "42/UserName", true},
+		{noList, "42#UserName", true},
 		{noList, "db", false},
 		{withList, "db", true},
+		{withList, "db#UserName", true},
 		{withList, "42/a/b", false},
+		{withList, "db/UserName#Password", false},
 	} {
-		err := tt.provider.CheckPath(tt.path)
-		if tt.valid != (err == nil) ||
+		got, err := tt.provider.Qualify(ref(tt.path), "dev")
+		if valid := err == nil; valid != tt.valid || valid && got != ref(tt.path) ||
 			err != nil && !errors.Is(err, external.ErrInvalidReference) {
-			t.Errorf("CheckPath(%q) = %v, want valid %t", tt.path, err, tt.valid)
+			t.Errorf("Qualify(%q) = %v, %v; want valid %t", tt.path, got, err, tt.valid)
 		}
 	}
 }
@@ -193,10 +211,11 @@ func TestFetchTitles(t *testing.T) {
 	}{
 		{path: "db", want: "s3cret"},
 		{path: "db/username", want: "admin"},
+		{path: "db#username", want: "admin"},
 		{path: "a%2Fb", want: "slash"},
 		{path: "42/UserName", want: "admin"},
 	} {
-		got, err := p.Fetch(context.Background(), tt.path)
+		got, err := p.Fetch(context.Background(), ref(tt.path))
 		if err != nil || got != tt.want {
 			t.Errorf("Fetch(%q) = %q, %v; want %q", tt.path, got, err, tt.want)
 		}
@@ -220,7 +239,7 @@ func TestFetchTitleErrors(t *testing.T) {
 			"reference one by ID, such as passwordstate://44 (IDs: 44, 45)",
 		"db/Missing": `password "db" has no field "Missing"`,
 	} {
-		_, err := p.Fetch(context.Background(), path)
+		_, err := p.Fetch(context.Background(), ref(path))
 		if !errors.Is(err, external.ErrReferenceUnresolved) ||
 			!strings.Contains(err.Error(), contain) {
 			t.Errorf("Fetch(%q) err = %v, want containing %q", path, err, contain)
@@ -238,7 +257,7 @@ func TestFetchDefaultField(t *testing.T) {
 	p := newListProvider(newServer(t, &seen), keyHost, 1990, "UserName")
 
 	for _, path := range []string{"42", "db"} {
-		got, err := p.Fetch(context.Background(), path)
+		got, err := p.Fetch(context.Background(), ref(path))
 		if err != nil || got != "admin" {
 			t.Errorf("Fetch(%q) = %q, %v; want admin", path, got, err)
 		}
@@ -281,7 +300,7 @@ func TestFetchUnavailable(t *testing.T) {
 			if err := p.CheckAvailable(); !errors.Is(err, external.ErrProviderUnavailable) {
 				t.Errorf("CheckAvailable = %v, want ErrProviderUnavailable", err)
 			}
-			_, err := p.Fetch(context.Background(), "42")
+			_, err := p.Fetch(context.Background(), ref("42"))
 			if !errors.Is(err, external.ErrProviderUnavailable) {
 				t.Fatalf("err = %v, want ErrProviderUnavailable", err)
 			}
@@ -337,7 +356,7 @@ func TestFetchResponseErrors(t *testing.T) {
 	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
-			_, err := newProvider(server, tt.host).Fetch(context.Background(), tt.path)
+			_, err := newProvider(server, tt.host).Fetch(context.Background(), ref(tt.path))
 			if !errors.Is(err, external.ErrReferenceUnresolved) {
 				t.Fatalf("err = %v, want ErrReferenceUnresolved", err)
 			}
@@ -363,7 +382,7 @@ func TestFetchRequestFailure(t *testing.T) {
 		APIKeyEnv: "PW_KEY",
 	})
 
-	_, err := p.Fetch(context.Background(), "42")
+	_, err := p.Fetch(context.Background(), ref("42"))
 	if !errors.Is(err, external.ErrProviderUnavailable) {
 		t.Errorf("err = %v, want ErrProviderUnavailable", err)
 	}
