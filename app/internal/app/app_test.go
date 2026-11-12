@@ -216,7 +216,7 @@ func TestNewValidateServiceChecksProvidersOffline(t *testing.T) {
 		"environments: [dev, prod]",
 		"secrets:",
 		"  providers:",
-		"    bws: {}",
+		"    bws: {project: {dev: app}}",
 		"    passwordstate: {}",
 		"projects:",
 		"  app:",
@@ -251,7 +251,6 @@ func TestNewValidateServiceChecksProvidersOffline(t *testing.T) {
 	want := []string{
 		"EXTERNAL_PROVIDER_UNAVAILABLE  bws",
 		"EXTERNAL_PROVIDER_UNAVAILABLE  passwordstate",
-		"INVALID_EXTERNAL_REFERENCE dev TWO",
 		"INVALID_EXTERNAL_REFERENCE prod TWO",
 	}
 	if !slices.Equal(got, want) {

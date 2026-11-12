@@ -3,6 +3,7 @@ package workspace
 import (
 	"errors"
 	"fmt"
+	"maps"
 	"slices"
 	"time"
 
@@ -67,7 +68,7 @@ type ProvidersConfig struct {
 	// OnePassword enables op:// references.
 	OnePassword *CLIProviderConfig
 	// Bitwarden enables bws:// references.
-	Bitwarden *CLIProviderConfig
+	Bitwarden *BitwardenConfig
 	// Passwordstate enables passwordstate:// references.
 	Passwordstate *PasswordstateConfig
 }
@@ -78,6 +79,14 @@ type CLIProviderConfig struct {
 	Timeout time.Duration
 }
 
+// BitwardenConfig configures the Bitwarden Secrets Manager provider.
+type BitwardenConfig struct {
+	// Timeout bounds each CLI invocation; always positive.
+	Timeout time.Duration
+	// Projects maps an environment to the project of its short references.
+	Projects map[string]string
+}
+
 // PasswordstateConfig configures the Passwordstate REST provider.
 type PasswordstateConfig struct {
 	// Timeout bounds each HTTP request; always positive.
@@ -86,8 +95,8 @@ type PasswordstateConfig struct {
 	URL string
 	// APIKeyEnv names the host variable holding the API key.
 	APIKeyEnv string
-	// ListID is the password list searched by title references; zero when unset.
-	ListID int
+	// ListIDs maps an environment to the list of its short references.
+	ListIDs map[string]int
 	// Field is the field read when a reference names none; empty when unset.
 	Field string
 }
@@ -158,5 +167,37 @@ func (w *Workspace) Validate() error {
 		return fmt.Errorf("manifest: validate: %w", err)
 	}
 
+	providers := w.Secrets.Providers
+	if providers.Bitwarden != nil {
+		err := checkEnvironmentKeys(w, "bws.project", providers.Bitwarden.Projects)
+		if err != nil {
+			return err
+		}
+	}
+	if providers.Passwordstate != nil {
+		err := checkEnvironmentKeys(
+			w, "passwordstate.list-id", providers.Passwordstate.ListIDs,
+		)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+// checkEnvironmentKeys rejects a per-environment provider setting keyed by an
+// undeclared environment.
+func checkEnvironmentKeys[V any](
+	w *Workspace, setting string, byEnv map[string]V,
+) error {
+	for _, env := range slices.Sorted(maps.Keys(byEnv)) {
+		if !w.HasEnvironment(env) {
+			return fmt.Errorf(
+				"manifest: secrets.providers.%s: environment %q is not declared",
+				setting, env,
+			)
+		}
+	}
 	return nil
 }

@@ -72,8 +72,10 @@ func newProviders(
 	}
 	if config := configs.Bitwarden; config != nil {
 		registrations = append(registrations, external.Registration{
-			Provider: bitwarden.New(host, bitwarden.Options{}),
-			Timeout:  config.Timeout,
+			Provider: bitwarden.New(host, bitwarden.Options{
+				Projects: config.Projects,
+			}),
+			Timeout: config.Timeout,
 		})
 	}
 	if config := configs.Passwordstate; config != nil {
@@ -81,7 +83,7 @@ func newProviders(
 			Provider: passwordstate.New(host, passwordstate.Options{
 				URL:       config.URL,
 				APIKeyEnv: config.APIKeyEnv,
-				ListID:    config.ListID,
+				ListIDs:   config.ListIDs,
 				Field:     config.Field,
 			}),
 			Timeout: config.Timeout,

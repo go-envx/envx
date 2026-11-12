@@ -135,14 +135,24 @@ func TestLoadValid(t *testing.T) {
 func TestLoadProviders(t *testing.T) {
 	t.Parallel()
 
-	path := writeManifest(t, minimalManifest+"\n"+str.Dedent(`
+	path := writeManifest(t, str.Dedent(`
+		environments: [development, production]
+		projects:
+		  app:
+		    includes: [env/app]
 		secrets:
 		  providers:
 		    op: {}
+		    bws:
+		      project:
+		        development: web-app-dev
+		        production: 3f2a0c1e-0000-0000-0000-000000000000
 		    passwordstate:
 		      url: https://pw.example.com
 		      api-key-env: PW_KEY
-		      list-id: 1990
+		      list-id:
+		        development: 1988
+		        production: 1990
 		      field: GenericField1
 		      timeout: 5s
 	`))
@@ -152,11 +162,18 @@ func TestLoadProviders(t *testing.T) {
 	}
 	want := workspace.ProvidersConfig{
 		OnePassword: &workspace.CLIProviderConfig{Timeout: 30 * time.Second},
+		Bitwarden: &workspace.BitwardenConfig{
+			Timeout: 30 * time.Second,
+			Projects: map[string]string{
+				"development": "web-app-dev",
+				"production":  "3f2a0c1e-0000-0000-0000-000000000000",
+			},
+		},
 		Passwordstate: &workspace.PasswordstateConfig{
 			Timeout:   5 * time.Second,
 			URL:       "https://pw.example.com",
 			APIKeyEnv: "PW_KEY",
-			ListID:    1990,
+			ListIDs:   map[string]int{"development": 1988, "production": 1990},
 			Field:     "GenericField1",
 		},
 	}
@@ -187,12 +204,38 @@ func TestLoadProvidersRejectsInvalid(t *testing.T) {
 			want: "positive duration",
 		},
 		"zero list-id": {
-			body: "secrets:\n  providers:\n    passwordstate:\n      list-id: 0\n",
-			want: `list-id "0" must be a positive integer`,
+			body: "secrets:\n  providers:\n    passwordstate:\n      list-id: {dev: 0}\n",
+			want: `list-id for environment "dev" must be a positive integer`,
 		},
 		"non-numeric list-id": {
-			body: "secrets:\n  providers:\n    passwordstate:\n      list-id: web\n",
-			want: `list-id "web" must be a positive integer`,
+			body: "secrets:\n  providers:\n    passwordstate:\n      list-id: {dev: web}\n",
+			want: `list-id for environment "dev" must be a positive integer`,
+		},
+		"scalar list-id": {
+			body: "secrets:\n  providers:\n    passwordstate:\n      list-id: 1990\n",
+			want: `list-id must map each environment to a value, ` +
+				`such as "list-id: {development: 1988}"`,
+		},
+		"undeclared list-id environment": {
+			body: "secrets:\n  providers:\n    passwordstate:\n      list-id: {qa: 1}\n",
+			want: `passwordstate.list-id: environment "qa" is not declared`,
+		},
+		"scalar project": {
+			body: "secrets:\n  providers:\n    bws:\n      project: web-app\n",
+			want: `project must map each environment to a value, ` +
+				`such as "project: {development: web-app-dev}"`,
+		},
+		"empty project": {
+			body: "secrets:\n  providers:\n    bws:\n      project: {dev: \"\"}\n",
+			want: `project for environment "dev" must be a non-empty project name or ID`,
+		},
+		"nested project": {
+			body: "secrets:\n  providers:\n    bws:\n      project: {dev: [a]}\n",
+			want: `project for environment "dev" must be a non-empty project name or ID`,
+		},
+		"undeclared project environment": {
+			body: "secrets:\n  providers:\n    bws:\n      project: {qa: app}\n",
+			want: `bws.project: environment "qa" is not declared`,
 		},
 		"empty field": {
 			body: "secrets:\n  providers:\n    passwordstate:\n      field: \"\"\n",

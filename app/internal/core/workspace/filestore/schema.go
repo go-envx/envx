@@ -139,7 +139,7 @@ type providersYAML struct {
 	// OnePassword enables op:// references.
 	OnePassword *cliProviderYAML `yaml:"op"`
 	// Bitwarden enables bws:// references.
-	Bitwarden *cliProviderYAML `yaml:"bws"`
+	Bitwarden *bitwardenYAML `yaml:"bws"`
 	// Passwordstate enables passwordstate:// references.
 	Passwordstate *passwordstateYAML `yaml:"passwordstate"`
 }
@@ -151,14 +151,17 @@ func (p providersYAML) toDomain() workspace.ProvidersConfig {
 		providers.OnePassword = p.OnePassword.toDomain()
 	}
 	if p.Bitwarden != nil {
-		providers.Bitwarden = p.Bitwarden.toDomain()
+		providers.Bitwarden = &workspace.BitwardenConfig{
+			Timeout:  p.Bitwarden.Timeout.orDefault(),
+			Projects: p.Bitwarden.Projects,
+		}
 	}
 	if p.Passwordstate != nil {
 		providers.Passwordstate = &workspace.PasswordstateConfig{
 			Timeout:   p.Passwordstate.Timeout.orDefault(),
 			URL:       p.Passwordstate.URL,
 			APIKeyEnv: p.Passwordstate.APIKeyEnv,
-			ListID:    int(p.Passwordstate.ListID),
+			ListIDs:   p.Passwordstate.ListIDs,
 			Field:     string(p.Passwordstate.Field),
 		}
 	}
@@ -176,33 +179,90 @@ func (c cliProviderYAML) toDomain() *workspace.CLIProviderConfig {
 	return &workspace.CLIProviderConfig{Timeout: c.Timeout.orDefault()}
 }
 
+// bitwardenYAML configures the Bitwarden Secrets Manager provider.
+type bitwardenYAML struct {
+	// Timeout bounds each CLI invocation.
+	Timeout durationYAML `yaml:"timeout"`
+	// Projects maps an environment to the project of its short references.
+	Projects projectsYAML `yaml:"project"`
+}
+
+// projectsYAML decodes a map of environments to non-empty Bitwarden projects.
+type projectsYAML map[string]string
+
+// UnmarshalYAML parses a mapping of non-empty strings.
+func (p *projectsYAML) UnmarshalYAML(node *yaml.Node) error {
+	projects, err := decodeByEnvironment(
+		node, "project", "development: web-app-dev",
+		func(value *yaml.Node) (string, bool) {
+			var name string
+			err := value.Decode(&name)
+			return name, err == nil && name != ""
+		},
+		"a non-empty project name or ID",
+	)
+	*p = projects
+	return err
+}
+
 // passwordstateYAML configures the Passwordstate REST provider.
 type passwordstateYAML struct {
 	// URL is the Passwordstate base URL.
 	URL string `yaml:"url"`
 	// APIKeyEnv names the host variable holding the API key.
 	APIKeyEnv string `yaml:"api-key-env"`
-	// ListID is the password list searched by title references.
-	ListID listIDYAML `yaml:"list-id"`
+	// ListIDs maps an environment to the list of its short references.
+	ListIDs listIDsYAML `yaml:"list-id"`
 	// Field is the field read when a reference names none.
 	Field fieldYAML `yaml:"field"`
 	// Timeout bounds each HTTP request.
 	Timeout durationYAML `yaml:"timeout"`
 }
 
-// listIDYAML decodes a positive Passwordstate password list ID.
-type listIDYAML int
+// listIDsYAML decodes a map of environments to positive Passwordstate list IDs.
+type listIDsYAML map[string]int
 
-// UnmarshalYAML parses a positive integer.
-func (l *listIDYAML) UnmarshalYAML(node *yaml.Node) error {
-	var id int
-	if err := node.Decode(&id); err != nil || id <= 0 {
-		return fmt.Errorf(
-			"line %d: list-id %q must be a positive integer", node.Line, node.Value,
+// UnmarshalYAML parses a mapping of positive integers.
+func (l *listIDsYAML) UnmarshalYAML(node *yaml.Node) error {
+	ids, err := decodeByEnvironment(
+		node, "list-id", "development: 1988",
+		func(value *yaml.Node) (int, bool) {
+			var id int
+			err := value.Decode(&id)
+			return id, err == nil && id > 0
+		},
+		"a positive integer",
+	)
+	*l = ids
+	return err
+}
+
+// decodeByEnvironment decodes a mapping of environment names to values that
+// parse accepts; example shows one entry of the map form for a scalar.
+func decodeByEnvironment[V any](
+	node *yaml.Node, key, example string,
+	parse func(value *yaml.Node) (V, bool), want string,
+) (map[string]V, error) {
+	if node.Kind != yaml.MappingNode {
+		return nil, fmt.Errorf(
+			"line %d: %s must map each environment to a value, such as "+
+				"\"%s: {%s}\"",
+			node.Line, key, key, example,
 		)
 	}
-	*l = listIDYAML(id)
-	return nil
+	byEnv := make(map[string]V, len(node.Content)/2)
+	for i := 0; i+1 < len(node.Content); i += 2 {
+		env, value := node.Content[i], node.Content[i+1]
+		parsed, ok := parse(value)
+		if value.Kind != yaml.ScalarNode || !ok {
+			return nil, fmt.Errorf(
+				"line %d: %s for environment %q must be %s",
+				value.Line, key, env.Value, want,
+			)
+		}
+		byEnv[env.Value] = parsed
+	}
+	return byEnv, nil
 }
 
 // fieldYAML decodes a non-empty Passwordstate field name.

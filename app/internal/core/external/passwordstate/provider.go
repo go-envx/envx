@@ -24,8 +24,8 @@ const defaultField = "Password"
 // maxResponseBytes bounds the response body read from the API.
 const maxResponseBytes = 1 << 20
 
-// passwordID matches a numeric password ID; any other first segment is a title.
-var passwordID = regexp.MustCompile(`^\d+$`)
+// numeric matches a password or list ID.
+var numeric = regexp.MustCompile(`^\d+$`)
 
 // Options locates the Passwordstate API and its credentials.
 type Options struct {
@@ -33,17 +33,17 @@ type Options struct {
 	URL string
 	// APIKeyEnv names the host variable holding the API key.
 	APIKeyEnv string
-	// ListID is the password list searched by title; zero disables titles.
-	ListID int
+	// ListIDs maps an environment to the list of its short references.
+	ListIDs map[string]int
 	// Field is read when a reference names none; empty means "Password".
 	Field string
 	// Client sends API requests; nil uses a client that refuses redirects.
 	Client external.HTTPClient
 }
 
-// Provider fetches passwordstate://<password-id-or-title>[/<field>|#<field>]
-// references. It caches the list listing for its lifetime, which is one
-// operation.
+// Provider fetches passwordstate://<password-id>, <list-id>/<title>, or
+// <title> references with an optional #<field>. It caches list listings for
+// its lifetime, which is one operation.
 type Provider struct {
 	// client sends API requests.
 	client external.HTTPClient
@@ -51,12 +51,12 @@ type Provider struct {
 	baseURL string
 	// apiKey authenticates requests.
 	apiKey string
-	// listID is the password list searched by title; zero disables titles.
-	listID int
+	// listIDs maps an environment to the list of its short references.
+	listIDs map[string]int
 	// field is read when a reference names none.
 	field string
-	// listing caches the records of the list once listed.
-	listing []record
+	// listings caches each listed list's records by list ID.
+	listings map[string][]record
 	// configErr reports invalid configuration or missing credentials on fetch.
 	configErr error
 }
@@ -64,10 +64,12 @@ type Provider struct {
 // record is one password record keyed by API field name.
 type record map[string]json.RawMessage
 
-// reference is one parsed reference path.
+// reference is one parsed qualified reference.
 type reference struct {
 	// id is the password ID; empty for a title reference.
 	id string
+	// list is the list searched by title; empty for an ID reference.
+	list string
 	// title is the decoded title; empty for an ID reference.
 	title string
 	// field is the record field to read.
@@ -96,10 +98,11 @@ func New(host hostenv.Snapshot, opts Options) *Provider {
 		}
 	}
 	p := &Provider{
-		client:  client,
-		baseURL: opts.URL,
-		listID:  opts.ListID,
-		field:   opts.Field,
+		client:   client,
+		baseURL:  opts.URL,
+		listIDs:  opts.ListIDs,
+		field:    opts.Field,
+		listings: make(map[string][]record),
 	}
 	if p.field == "" {
 		p.field = defaultField
@@ -130,12 +133,21 @@ func (p *Provider) Scheme() string {
 	return external.SchemePasswordstate
 }
 
-// Qualify accepts a password ID, or a title when list-id is configured,
-// optionally naming a field by "/<field>" or "#<field>"; references need no
-// qualification.
+// Qualify accepts a password ID, "<list-id>/<title>", or a short "<title>" in
+// the environment's configured list, each with an optional "#<field>".
 func (p *Provider) Qualify(
-	ref external.Reference, _ string,
+	ref external.Reference, environment string,
 ) (external.Reference, error) {
+	if !strings.Contains(ref.Path, "/") && !numeric.MatchString(ref.Path) {
+		list, ok := p.listIDs[environment]
+		if !ok {
+			return external.Reference{}, fmt.Errorf(
+				"%w: no passwordstate list-id configured for environment %q",
+				external.ErrInvalidReference, environment,
+			)
+		}
+		ref.Path = strconv.Itoa(list) + "/" + ref.Path
+	}
 	if _, err := p.parse(ref); err != nil {
 		return external.Reference{}, err
 	}
@@ -147,9 +159,8 @@ func (p *Provider) CheckAvailable() error {
 	return p.configErr
 }
 
-// Fetch reads one reference: a password ID or a title within the configured
-// list, optionally naming a field such as "UserName". A title is
-// percent-decoded once, so "%2F" stands for a slash.
+// Fetch reads one qualified reference: a password ID or a title within a list.
+// A title is percent-decoded once, so "%2F" stands for a slash.
 func (p *Provider) Fetch(ctx context.Context, ref external.Reference) (string, error) {
 	target, err := p.parse(ref)
 	if err != nil {
@@ -165,45 +176,39 @@ func (p *Provider) Fetch(ctx context.Context, ref external.Reference) (string, e
 		}
 		return found.text(target.field, "password "+target.id)
 	}
-	found, err := p.passwordByTitle(ctx, target.title)
+	found, err := p.passwordByTitle(ctx, target.list, target.title)
 	if err != nil {
 		return "", err
 	}
 	return found.text(target.field, fmt.Sprintf("password %q", target.title))
 }
 
-// parse splits ref's path into its target and field, applying the default
-// field. The field comes from the fragment or a trailing path segment, not both.
+// parse splits a qualified reference into a password ID, or a list and decoded
+// title, applying the default field.
 func (p *Provider) parse(ref external.Reference) (reference, error) {
-	target, field, hasField := strings.Cut(ref.Path, "/")
-	title, titleErr := url.PathUnescape(target)
-	if titleErr != nil || title == "" ||
-		(hasField && (field == "" || strings.Contains(field, "/"))) {
-		return reference{}, fmt.Errorf(
-			"%w: want passwordstate://<password-id-or-title>[/<field>]",
-			external.ErrInvalidReference,
-		)
-	}
-	switch {
-	case hasField && ref.Field != "":
-		return reference{}, fmt.Errorf(
-			"%w: name the field by /<field> or #<field>, not both",
-			external.ErrInvalidReference,
-		)
-	case ref.Field != "":
-		field = ref.Field
-	case !hasField:
+	field := ref.Field
+	if field == "" {
 		field = p.field
 	}
-	if passwordID.MatchString(target) {
-		return reference{id: target, field: field}, nil
+	list, rawTitle, byTitle := strings.Cut(ref.Path, "/")
+	if !byTitle && numeric.MatchString(ref.Path) {
+		return reference{id: ref.Path, field: field}, nil
 	}
-	if p.listID == 0 {
+	if !byTitle || !numeric.MatchString(list) {
 		return reference{}, fmt.Errorf(
-			"%w: title references require list-id", external.ErrInvalidReference,
+			"%w: want passwordstate://<password-id>, "+
+				"passwordstate://<list-id>/<title>, or passwordstate://<title>",
+			external.ErrInvalidReference,
 		)
 	}
-	return reference{title: title, field: field}, nil
+	title, err := url.PathUnescape(rawTitle)
+	if err != nil {
+		return reference{}, fmt.Errorf(
+			"%w: invalid percent-encoding; write a literal %% as %%25",
+			external.ErrInvalidReference,
+		)
+	}
+	return reference{list: list, title: title, field: field}, nil
 }
 
 // password requests one password record by ID.
@@ -225,23 +230,25 @@ func (p *Provider) password(ctx context.Context, id string) (record, error) {
 	return records[0], nil
 }
 
-// passwordByTitle selects the single record titled title in the configured
-// list, listing the list once. Titles match exactly.
-func (p *Provider) passwordByTitle(ctx context.Context, title string) (record, error) {
-	list := strconv.Itoa(p.listID)
-	if p.listing == nil {
+// passwordByTitle selects the single record titled title in list, listing each
+// list once. Titles match exactly.
+func (p *Provider) passwordByTitle(
+	ctx context.Context, list, title string,
+) (record, error) {
+	listing, ok := p.listings[list]
+	if !ok {
 		endpoint, err := url.JoinPath(p.baseURL, "api", "passwords", list)
 		if err != nil {
 			return nil, fmt.Errorf("%w: %w", external.ErrProviderUnavailable, err)
 		}
-		listed, err := p.get(ctx, endpoint+"?QueryAll", "password list "+list)
+		listing, err = p.get(ctx, endpoint+"?QueryAll", "password list "+list)
 		if err != nil {
 			return nil, err
 		}
-		p.listing = listed
+		p.listings[list] = listing
 	}
 	var matches []record
-	for _, r := range p.listing {
+	for _, r := range listing {
 		var got string
 		if json.Unmarshal(r["Title"], &got) == nil && got == title {
 			matches = append(matches, r)

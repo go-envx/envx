@@ -29,6 +29,12 @@ const listing = `[{"PasswordID":42,"Title":"db","UserName":"admin",` +
 	`{"PasswordID":44,"Title":"dup","Password":"one"},` +
 	`{"PasswordID":45,"Title":"dup","Password":"two"}]`
 
+// prodListing is the fake API's password list 1988.
+const prodListing = `[{"PasswordID":50,"Title":"db","Password":"prod"}]`
+
+// listIDs maps the test environments to the fake API's lists.
+var listIDs = map[string]int{"dev": 1990, "prod": 1988}
+
 // keyHost carries the API key.
 var keyHost = hostenv.From([]string{"PW_KEY=" + apiKey})
 
@@ -63,8 +69,8 @@ func ref(raw string) external.Reference {
 	}
 }
 
-// newServer serves password 42 and list 1990 under /pws and records each
-// request URI.
+// newServer serves password 42 and lists 1990 and 1988 under /pws and records
+// each request URI.
 func newServer(t *testing.T, seen *requests) *httptest.Server {
 	t.Helper()
 	server := httptest.NewTLSServer(http.HandlerFunc(
@@ -76,6 +82,8 @@ func newServer(t *testing.T, seen *requests) *httptest.Server {
 				_, _ = w.Write([]byte(`[{"errors":[{"message":"Invalid API key"}]}]`))
 			case r.URL.RequestURI() == "/pws/api/passwords/1990?QueryAll":
 				_, _ = w.Write([]byte(listing))
+			case r.URL.RequestURI() == "/pws/api/passwords/1988?QueryAll":
+				_, _ = w.Write([]byte(prodListing))
 			case r.URL.Path == "/pws/api/passwords/42":
 				_, _ = w.Write([]byte(record))
 			case r.URL.Path == "/pws/api/passwords/7":
@@ -96,21 +104,30 @@ func newServer(t *testing.T, seen *requests) *httptest.Server {
 func newProvider(
 	server *httptest.Server, host hostenv.Snapshot,
 ) *passwordstate.Provider {
-	return newListProvider(server, host, 0, "")
+	return newFieldProvider(server, host, "")
 }
 
-// newListProvider builds a provider against server that searches listID by
-// title and reads field by default.
-func newListProvider(
-	server *httptest.Server, host hostenv.Snapshot, listID int, field string,
+// newFieldProvider builds a provider against server that reads field by
+// default.
+func newFieldProvider(
+	server *httptest.Server, host hostenv.Snapshot, field string,
 ) *passwordstate.Provider {
 	return passwordstate.New(host, passwordstate.Options{
 		URL:       server.URL + "/pws/",
 		APIKeyEnv: "PW_KEY",
-		ListID:    listID,
+		ListIDs:   listIDs,
 		Field:     field,
 		Client:    server.Client(),
 	})
+}
+
+// fetch qualifies raw for environment and fetches it.
+func fetch(p *passwordstate.Provider, raw, environment string) (string, error) {
+	qualified, err := p.Qualify(ref(raw), environment)
+	if err != nil {
+		return "", err
+	}
+	return p.Fetch(context.Background(), qualified)
 }
 
 func TestFetchFields(t *testing.T) {
@@ -121,14 +138,12 @@ func TestFetchFields(t *testing.T) {
 
 	for path, want := range map[string]string{
 		"42":          "s3cret",
-		"42/UserName": "admin",
-		"42/username": "admin",
 		"42#UserName": "admin",
 		"42#username": "admin",
 	} {
-		got, err := p.Fetch(context.Background(), ref(path))
+		got, err := fetch(p, path, "dev")
 		if err != nil || got != want {
-			t.Errorf("Fetch(%q) = %q, %v; want %q", path, got, err, want)
+			t.Errorf("fetch(%q) = %q, %v; want %q", path, got, err, want)
 		}
 	}
 	if paths := seen.all(); paths[0] != "/pws/api/passwords/42" {
@@ -136,66 +151,62 @@ func TestFetchFields(t *testing.T) {
 	}
 }
 
-func TestFetchRejectsInvalidReference(t *testing.T) {
+func TestRejectsInvalidReference(t *testing.T) {
 	t.Parallel()
 
 	var seen requests
 	p := newProvider(newServer(t, &seen), keyHost)
 
-	for _, path := range []string{
-		"abc", "42/", "42/a/b", "../42", "bad%zz", "42/UserName#Password",
-	} {
-		_, err := p.Fetch(context.Background(), ref(path))
+	for _, path := range []string{"db/x", "x/1990", "bad%zz", "1990/bad%zz"} {
+		_, err := fetch(p, path, "dev")
 		if !errors.Is(err, external.ErrInvalidReference) {
-			t.Errorf("Fetch(%q) err = %v, want ErrInvalidReference", path, err)
+			t.Errorf("fetch(%q) err = %v, want ErrInvalidReference", path, err)
 		}
+	}
+	// Fetch accepts only qualified references.
+	_, err := p.Fetch(context.Background(), ref("db"))
+	if !errors.Is(err, external.ErrInvalidReference) {
+		t.Errorf("Fetch(db) err = %v, want ErrInvalidReference", err)
 	}
 	if paths := seen.all(); len(paths) != 0 {
 		t.Errorf("requests = %q, want none", paths)
 	}
 }
 
-func TestFetchTitleRequiresListID(t *testing.T) {
-	t.Parallel()
-
-	var seen requests
-	_, err := newProvider(newServer(t, &seen), keyHost).
-		Fetch(context.Background(), ref("db"))
-	if !errors.Is(err, external.ErrInvalidReference) ||
-		!strings.Contains(err.Error(), "title references require list-id") {
-		t.Errorf("err = %v, want list-id requirement", err)
-	}
-}
-
 func TestQualifyOffline(t *testing.T) {
 	t.Parallel()
 
-	opts := passwordstate.Options{URL: "https://pw.local", APIKeyEnv: "PW_KEY"}
-	noList := passwordstate.New(keyHost, opts)
-	opts.ListID = 1990
-	withList := passwordstate.New(keyHost, opts)
-
-	if err := withList.CheckAvailable(); err != nil {
+	p := passwordstate.New(keyHost, passwordstate.Options{
+		URL:       "https://pw.local",
+		APIKeyEnv: "PW_KEY",
+		ListIDs:   listIDs,
+	})
+	if err := p.CheckAvailable(); err != nil {
 		t.Errorf("CheckAvailable = %v, want nil", err)
 	}
 	for _, tt := range []struct {
-		provider *passwordstate.Provider
-		path     string
-		valid    bool
+		raw  string
+		env  string
+		want string
 	}{
-		{noList, "42/UserName", true},
-		{noList, "42#UserName", true},
-		{noList, "db", false},
-		{withList, "db", true},
-		{withList, "db#UserName", true},
-		{withList, "42/a/b", false},
-		{withList, "db/UserName#Password", false},
+		{raw: "42", env: "qa", want: "42"},
+		{raw: "42#UserName", env: "qa", want: "42#UserName"},
+		{raw: "7/db", env: "qa", want: "7/db"},
+		{raw: "7/a/b#Title", env: "qa", want: "7/a/b#Title"},
+		{raw: "db", env: "dev", want: "1990/db"},
+		{raw: "db#UserName", env: "prod", want: "1988/db#UserName"},
+		{raw: "a%2Fb", env: "dev", want: "1990/a%2Fb"},
 	} {
-		got, err := tt.provider.Qualify(ref(tt.path), "dev")
-		if valid := err == nil; valid != tt.valid || valid && got != ref(tt.path) ||
-			err != nil && !errors.Is(err, external.ErrInvalidReference) {
-			t.Errorf("Qualify(%q) = %v, %v; want valid %t", tt.path, got, err, tt.valid)
+		got, err := p.Qualify(ref(tt.raw), tt.env)
+		if err != nil || got != ref(tt.want) {
+			t.Errorf("Qualify(%q, %q) = %v, %v; want %s", tt.raw, tt.env, got, err, tt.want)
 		}
+	}
+	_, err := p.Qualify(ref("db"), "qa")
+	if !errors.Is(err, external.ErrInvalidReference) || !strings.Contains(
+		err.Error(), `no passwordstate list-id configured for environment "qa"`,
+	) {
+		t.Errorf("Qualify(db, qa) err = %v, want missing list-id", err)
 	}
 }
 
@@ -203,24 +214,31 @@ func TestFetchTitles(t *testing.T) {
 	t.Parallel()
 
 	var seen requests
-	p := newListProvider(newServer(t, &seen), keyHost, 1990, "")
+	p := newProvider(newServer(t, &seen), keyHost)
 
 	for _, tt := range []struct {
 		path string
+		env  string
 		want string
 	}{
-		{path: "db", want: "s3cret"},
-		{path: "db/username", want: "admin"},
-		{path: "db#username", want: "admin"},
-		{path: "a%2Fb", want: "slash"},
-		{path: "42/UserName", want: "admin"},
+		{path: "db", env: "dev", want: "s3cret"},
+		{path: "db#username", env: "dev", want: "admin"},
+		{path: "a%2Fb", env: "dev", want: "slash"},
+		{path: "1990/a/b", env: "prod", want: "slash"},
+		{path: "1990/db", env: "prod", want: "s3cret"},
+		{path: "db", env: "prod", want: "prod"},
+		{path: "42#UserName", env: "dev", want: "admin"},
 	} {
-		got, err := p.Fetch(context.Background(), ref(tt.path))
+		got, err := fetch(p, tt.path, tt.env)
 		if err != nil || got != tt.want {
-			t.Errorf("Fetch(%q) = %q, %v; want %q", tt.path, got, err, tt.want)
+			t.Errorf("fetch(%q, %q) = %q, %v; want %q", tt.path, tt.env, got, err, tt.want)
 		}
 	}
-	want := []string{"/pws/api/passwords/1990?QueryAll", "/pws/api/passwords/42"}
+	want := []string{
+		"/pws/api/passwords/1990?QueryAll",
+		"/pws/api/passwords/1988?QueryAll",
+		"/pws/api/passwords/42",
+	}
 	if paths := seen.all(); !slices.Equal(paths, want) {
 		t.Errorf("requests = %q, want %q", paths, want)
 	}
@@ -230,22 +248,22 @@ func TestFetchTitleErrors(t *testing.T) {
 	t.Parallel()
 
 	var seen requests
-	p := newListProvider(newServer(t, &seen), keyHost, 1990, "")
+	p := newProvider(newServer(t, &seen), keyHost)
 
 	for path, contain := range map[string]string{
 		"missing": `no password titled "missing" in list 1990`,
 		"DB":      `no password titled "DB" in list 1990`,
 		"dup": `2 passwords titled "dup" in list 1990; ` +
 			"reference one by ID, such as passwordstate://44 (IDs: 44, 45)",
-		"db/Missing": `password "db" has no field "Missing"`,
+		"db#Missing": `password "db" has no field "Missing"`,
 	} {
-		_, err := p.Fetch(context.Background(), ref(path))
+		_, err := fetch(p, path, "dev")
 		if !errors.Is(err, external.ErrReferenceUnresolved) ||
 			!strings.Contains(err.Error(), contain) {
-			t.Errorf("Fetch(%q) err = %v, want containing %q", path, err, contain)
+			t.Errorf("fetch(%q) err = %v, want containing %q", path, err, contain)
 		}
 		if strings.Contains(err.Error(), "s3cret") {
-			t.Errorf("Fetch(%q) err = %q, want values hidden", path, err)
+			t.Errorf("fetch(%q) err = %q, want values hidden", path, err)
 		}
 	}
 }
@@ -254,12 +272,16 @@ func TestFetchDefaultField(t *testing.T) {
 	t.Parallel()
 
 	var seen requests
-	p := newListProvider(newServer(t, &seen), keyHost, 1990, "UserName")
+	p := newFieldProvider(newServer(t, &seen), keyHost, "UserName")
 
-	for _, path := range []string{"42", "db"} {
-		got, err := p.Fetch(context.Background(), ref(path))
-		if err != nil || got != "admin" {
-			t.Errorf("Fetch(%q) = %q, %v; want admin", path, got, err)
+	for path, want := range map[string]string{
+		"42":          "admin",
+		"db":          "admin",
+		"42#Password": "s3cret",
+	} {
+		got, err := fetch(p, path, "dev")
+		if err != nil || got != want {
+			t.Errorf("fetch(%q) = %q, %v; want %q", path, got, err, want)
 		}
 	}
 }
@@ -344,12 +366,12 @@ func TestFetchResponseErrors(t *testing.T) {
 		},
 		"missing field": {
 			host:    keyHost,
-			path:    "42/Missing",
+			path:    "42#Missing",
 			contain: `password 42 has no field "Missing"`,
 		},
 		"non-text field": {
 			host:    keyHost,
-			path:    "42/PasswordID",
+			path:    "42#PasswordID",
 			contain: `field "PasswordID" of password 42 is not text`,
 		},
 	}

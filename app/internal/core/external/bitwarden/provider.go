@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net/url"
 	"os/exec"
 	"regexp"
 	"strings"
@@ -39,6 +40,8 @@ type Options struct {
 	Run external.CommandRunner
 	// LookPath locates the CLI offline; nil uses exec.LookPath.
 	LookPath func(file string) (string, error)
+	// Projects maps an environment to the project of its short references.
+	Projects map[string]string
 }
 
 // Provider fetches bws:// references by secret ID or by project and key. It
@@ -48,6 +51,8 @@ type Provider struct {
 	run external.CommandRunner
 	// lookPath locates the CLI offline.
 	lookPath func(file string) (string, error)
+	// envProjects maps an environment to the project of its short references.
+	envProjects map[string]string
 	// env is the minimal child environment.
 	env map[string]string
 	// hasToken reports whether env holds a non-empty access token.
@@ -76,6 +81,16 @@ type secret struct {
 	Value string `json:"value"`
 }
 
+// location is one parsed qualified reference.
+type location struct {
+	// secretID is the secret's ID; empty for a project and key.
+	secretID string
+	// project is the decoded project name or ID; empty for a secret ID.
+	project string
+	// key is the decoded secret key; empty for a secret ID.
+	key string
+}
+
 // New constructs a provider whose CLI runs with the host's base and BWS_*
 // variables only.
 func New(host hostenv.Snapshot, opts Options) *Provider {
@@ -95,11 +110,12 @@ func New(host hostenv.Snapshot, opts Options) *Provider {
 		}
 	}
 	return &Provider{
-		run:      run,
-		lookPath: lookPath,
-		env:      env,
-		hasToken: hasToken,
-		secrets:  make(map[string][]secret),
+		run:         run,
+		lookPath:    lookPath,
+		envProjects: opts.Projects,
+		env:         env,
+		hasToken:    hasToken,
+		secrets:     make(map[string][]secret),
 	}
 }
 
@@ -108,22 +124,24 @@ func (p *Provider) Scheme() string {
 	return external.SchemeBitwarden
 }
 
-// Qualify accepts a secret ID or "<project>/<key>" without a "#field"
-// fragment; references need no qualification.
+// Qualify accepts a secret ID, "<project>/<key>", or a short "<key>" in the
+// environment's configured project, without a "#field" fragment.
 func (p *Provider) Qualify(
-	ref external.Reference, _ string,
+	ref external.Reference, environment string,
 ) (external.Reference, error) {
-	if ref.Field != "" {
-		return external.Reference{}, fmt.Errorf(
-			"%w: bws references do not support #<field>",
-			external.ErrInvalidReference,
-		)
+	short := !strings.Contains(ref.Path, "/") && !uuidPattern.MatchString(ref.Path)
+	if short && ref.Field == "" {
+		project, ok := p.envProjects[environment]
+		if !ok {
+			return external.Reference{}, fmt.Errorf(
+				"%w: no bws project configured for environment %q",
+				external.ErrInvalidReference, environment,
+			)
+		}
+		ref.Path = url.PathEscape(project) + "/" + ref.Path
 	}
-	if !strings.Contains(ref.Path, "/") && !uuidPattern.MatchString(ref.Path) {
-		return external.Reference{}, fmt.Errorf(
-			"%w: want bws://<secret-id> or bws://<project>/<key>",
-			external.ErrInvalidReference,
-		)
+	if _, err := parse(ref); err != nil {
+		return external.Reference{}, err
 	}
 	return ref, nil
 }
@@ -139,24 +157,25 @@ func (p *Provider) CheckAvailable() error {
 	return nil
 }
 
-// Fetch reads one reference: a secret ID, or "<project>/<key>" where the
-// project is a name or ID and the key may contain slashes.
+// Fetch reads one qualified reference: a secret ID, or "<project>/<key>" where
+// the project is a name or ID and the key may contain slashes. Names are
+// percent-decoded once, so "%2F" stands for a slash.
 func (p *Provider) Fetch(ctx context.Context, ref external.Reference) (string, error) {
-	if _, err := p.Qualify(ref, ""); err != nil {
+	target, err := parse(ref)
+	if err != nil {
 		return "", err
 	}
 	if !p.hasToken {
 		return "", tokenError()
 	}
-	projectRef, key, byKey := strings.Cut(ref.Path, "/")
-	if !byKey {
-		return p.secretByID(ctx, ref.Path)
+	if target.secretID != "" {
+		return p.secretByID(ctx, target.secretID)
 	}
-	projectID, err := p.projectID(ctx, projectRef)
+	projectID, err := p.projectID(ctx, target.project)
 	if err != nil {
 		return "", err
 	}
-	return p.secretByKey(ctx, projectID, projectRef, key)
+	return p.secretByKey(ctx, projectID, target.project, target.key)
 }
 
 // secretByID fetches one secret directly.
@@ -241,6 +260,36 @@ func (p *Provider) projectID(ctx context.Context, ref string) (string, error) {
 			external.ErrReferenceUnresolved, len(ids), ref, strings.Join(ids, ", "),
 		)
 	}
+}
+
+// parse splits a qualified reference into a secret ID, or a decoded project
+// and key.
+func parse(ref external.Reference) (location, error) {
+	if ref.Field != "" {
+		return location{}, fmt.Errorf(
+			"%w: bws references do not support #<field>",
+			external.ErrInvalidReference,
+		)
+	}
+	projectRef, keyRef, byKey := strings.Cut(ref.Path, "/")
+	if !byKey {
+		if !uuidPattern.MatchString(ref.Path) {
+			return location{}, fmt.Errorf(
+				"%w: want bws://<secret-id> or bws://<project>/<key>",
+				external.ErrInvalidReference,
+			)
+		}
+		return location{secretID: ref.Path}, nil
+	}
+	project, projectErr := url.PathUnescape(projectRef)
+	key, keyErr := url.PathUnescape(keyRef)
+	if projectErr != nil || keyErr != nil {
+		return location{}, fmt.Errorf(
+			"%w: invalid percent-encoding; write a literal %% as %%25",
+			external.ErrInvalidReference,
+		)
+	}
+	return location{project: project, key: key}, nil
 }
 
 // query runs one bws subcommand with JSON output and decodes stdout into dst.

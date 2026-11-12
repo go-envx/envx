@@ -213,23 +213,85 @@ func TestFetchRejectsInvalidReference(t *testing.T) {
 func TestQualify(t *testing.T) {
 	t.Parallel()
 
-	p := bitwarden.New(hostenv.Snapshot{}, bitwarden.Options{})
+	p := bitwarden.New(hostenv.Snapshot{}, bitwarden.Options{
+		Projects: map[string]string{"dev": "app", "prod": "web app/x"},
+	})
 	field := ref("app/KEY")
 	field.Field = "value"
+	shortField := ref("KEY")
+	shortField.Field = "value"
 	for _, tt := range []struct {
-		ref   external.Reference
-		valid bool
+		ref  external.Reference
+		env  string
+		want string
 	}{
-		{ref(secretID), true},
-		{ref("app/KEY"), true},
-		{ref("DB_PASSWORD"), false},
-		{field, false},
+		{ref: ref(secretID), env: "dev", want: secretID},
+		{ref: ref(secretID), env: "qa", want: secretID},
+		{ref: ref("other/KEY"), env: "qa", want: "other/KEY"},
+		{ref: ref("DB_PASSWORD"), env: "dev", want: "app/DB_PASSWORD"},
+		{ref: ref("a%2Fb"), env: "dev", want: "app/a%2Fb"},
+		{ref: ref("KEY"), env: "prod", want: "web%20app%2Fx/KEY"},
 	} {
-		got, err := p.Qualify(tt.ref, "dev")
-		if valid := err == nil; valid != tt.valid || valid && got != tt.ref ||
-			err != nil && !errors.Is(err, external.ErrInvalidReference) {
-			t.Errorf("Qualify(%s) = %v, %v; want valid %t", tt.ref, got, err, tt.valid)
+		got, err := p.Qualify(tt.ref, tt.env)
+		if err != nil || got != ref(tt.want) {
+			t.Errorf("Qualify(%s, %q) = %v, %v; want %s", tt.ref, tt.env, got, err, tt.want)
 		}
+	}
+	for _, tt := range []struct {
+		ref     external.Reference
+		contain string
+	}{
+		{ref: ref("DB_PASSWORD"), contain: `no bws project configured for environment "qa"`},
+		{ref: field, contain: "do not support #<field>"},
+		{ref: shortField, contain: "do not support #<field>"},
+		{ref: ref("app/bad%zz"), contain: "invalid percent-encoding"},
+	} {
+		_, err := p.Qualify(tt.ref, "qa")
+		if !errors.Is(err, external.ErrInvalidReference) ||
+			!strings.Contains(err.Error(), tt.contain) {
+			t.Errorf("Qualify(%s) err = %v, want containing %q", tt.ref, err, tt.contain)
+		}
+	}
+}
+
+func TestFetchShortReferences(t *testing.T) {
+	t.Parallel()
+
+	runner := &fakeRunner{outputs: map[string]string{
+		"project list": `[{"id":"` + projectID + `","name":"app"}]`,
+		"secret list " + projectID: `[
+			{"id":"s1","key":"a/b","value":"slash"},
+			{"id":"s2","key":"x#y","value":"hash"},
+			{"id":"s3","key":"TWICE","value":"a"},
+			{"id":"s4","key":"TWICE","value":"b"}
+		]`,
+	}}
+	p := bitwarden.New(tokenHost, bitwarden.Options{
+		Run:      runner.run,
+		Projects: map[string]string{"dev": "app"},
+	})
+	fetch := func(path string) (string, error) {
+		qualified, err := p.Qualify(ref(path), "dev")
+		if err != nil {
+			return "", err
+		}
+		return p.Fetch(context.Background(), qualified)
+	}
+
+	for path, want := range map[string]string{
+		"a%2Fb":     "slash",
+		"x%23y":     "hash",
+		"app/a%2Fb": "slash",
+		"app/a/b":   "slash",
+	} {
+		if got, err := fetch(path); err != nil || got != want {
+			t.Errorf("fetch(%q) = %q, %v; want %q", path, got, err, want)
+		}
+	}
+	_, err := fetch("TWICE")
+	if !errors.Is(err, external.ErrReferenceUnresolved) ||
+		!strings.Contains(err.Error(), "such as bws://s3 (IDs: s3, s4)") {
+		t.Errorf("fetch(TWICE) err = %v, want ambiguity", err)
 	}
 }
 
