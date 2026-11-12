@@ -25,6 +25,9 @@ const tokenVar = "BWS_ACCESS_TOKEN"
 // cliEnv selects the CLI's own variables, such as BWS_ACCESS_TOKEN.
 var cliEnv = regexp.MustCompile(`(?i)^BWS_`)
 
+// errorCause matches the first cause line bws prints under its "Error:" line.
+var errorCause = regexp.MustCompile(`(?m)^\s*0:\s*(\S.*)$`)
+
 // uuidPattern matches a canonical UUID, the form of project and secret IDs.
 var uuidPattern = regexp.MustCompile(
 	`^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$`,
@@ -261,10 +264,18 @@ func commandError(command string, err error) error {
 		return fmt.Errorf(
 			"%w: %s: exit status %d: %s",
 			external.ErrReferenceUnresolved, command, exitErr.Code,
-			external.SummarizeStderr(exitErr.Stderr),
+			summarizeStderr(exitErr.Stderr),
 		)
 	}
 	return err
+}
+
+// summarizeStderr prefers the first error cause over the bare "Error:" line.
+func summarizeStderr(stderr string) string {
+	if match := errorCause.FindStringSubmatch(stderr); match != nil {
+		return external.SummarizeStderr(match[1])
+	}
+	return external.SummarizeStderr(stderr)
 }
 
 // notFoundError reports the CLI missing from PATH.

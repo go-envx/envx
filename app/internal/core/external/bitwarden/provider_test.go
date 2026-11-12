@@ -296,6 +296,14 @@ func TestFetchCommandErrors(t *testing.T) {
 			want:    external.ErrReferenceUnresolved,
 			contain: "bws secret get: exit status 1: Error: Resource not found",
 		},
+		"exit with cause": {
+			err: &process.ExitError{
+				Code:   1,
+				Stderr: "Error: \n   0: Resource not found.\n\nsecond line",
+			},
+			want:    external.ErrReferenceUnresolved,
+			contain: "bws secret get: exit status 1: Resource not found.",
+		},
 		"malformed output": {
 			out:     `not json "secret-value"`,
 			want:    external.ErrReferenceUnresolved,
