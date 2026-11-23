@@ -1,0 +1,57 @@
+version: 2
+
+updates:
+  - package-ecosystem: gomod
+    directory: /app
+    schedule: &schedule
+      interval: weekly
+      day: thursday
+      time: "05:00"
+      timezone: America/Chicago
+    cooldown: &cooldown
+      default-days: 3
+    commit-message: &commit-message
+      prefix: chore
+    groups:
+      non-major-dependencies: &non-major
+        update-types: [minor, patch]
+
+  - package-ecosystem: npm
+    directories: [/, /docs]
+    schedule: *schedule
+    cooldown: *cooldown
+    commit-message: *commit-message
+    groups:
+      non-major-dependencies: *non-major
+
+  - package-ecosystem: docker
+    directory: /app
+    schedule: *schedule
+    cooldown: *cooldown
+    commit-message: *commit-message
+    groups:
+      non-major-dependencies: *non-major
+
+  - package-ecosystem: docker-compose
+    directory: /.devcontainer
+    schedule: *schedule
+    cooldown: *cooldown
+    commit-message: *commit-message
+    groups:
+      devcontainer: *non-major
+
+  - package-ecosystem: devcontainers
+    directory: /
+    schedule: *schedule
+    cooldown: *cooldown
+    commit-message: *commit-message
+    groups:
+      devcontainer: *non-major
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule: *schedule
+    cooldown: *cooldown
+    commit-message: *commit-message
+    groups:
+      non-major-dependencies: *non-major
