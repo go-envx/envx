@@ -1,6 +1,6 @@
 // https://aka.ms/devcontainer.json
 {
-  "name": "envx",
+  "name": "${localWorkspaceFolderBasename}",
   "dockerComposeFile": "docker-compose.yaml",
   "service": "devcontainer",
   "workspaceFolder": "/ws",

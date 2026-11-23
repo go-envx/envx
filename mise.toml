@@ -1,29 +1,30 @@
 # Mise https://mise.jdx.dev/
 
-# ---------------------------------------------------------
-# Settings
-# https://mise.jdx.dev/configuration/settings.html
-# ---------------------------------------------------------
-[settings]
+[settings]                  # https://mise.jdx.dev/configuration/settings.html
 lockfile = true
 minimum_release_age = "24h"
 
-# ---------------------------------------------------------
-# Tools
-# https://mise-versions.jdx.dev/
-# ---------------------------------------------------------
-[tools]
+[hooks]                     # https://mise.jdx.dev/hooks.html
+postinstall = "task install"
 
+[tools]                     # https://mise-versions.jdx.dev/
+
+# ---------------------------------------------------------
 # Go
-go = "1.27.4"                     # https://go.dev/ref/spec
-golangci-lint = "2.15.0"          # https://golangci-lint.run/
-goreleaser = "2.20.0"             # https://goreleaser.com/
+# ---------------------------------------------------------
+go = "1.27.4"
+golangci-lint = "2.15.0"
+goreleaser = "2.20.0"
 
+# ---------------------------------------------------------
 # Node
-node = "26.13.0"                  # https://nodejs.org/docs/latest/api/
-pnpm = "12.19.0"                   # https://pnpm.io/motivation
+# ---------------------------------------------------------
+node = "26.13.0"
+pnpm = "12.19.0"
 
+# ---------------------------------------------------------
 # Tools
-gh = "2.103.0"                     # https://cli.github.com/manual/
-svu = "3.4.4"                     # https://github.com/caarlos0/svu
-task = "3.54.0"                   # https://taskfile.dev/docs/guide
+# ---------------------------------------------------------
+gh = "2.103.0"
+svu = "3.4.4"
+task = "3.54.0"
