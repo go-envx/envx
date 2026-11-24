@@ -22,12 +22,6 @@ type NamespaceReader interface {
 	LoadOverlay(includePath, environment string) (NamespaceData, bool, error)
 }
 
-// OverlayWriter persists one key in an environment overlay.
-type OverlayWriter interface {
-	// SetOverlay writes text at the dotted key and returns the overlay path.
-	SetOverlay(includePath, environment, key, text string) (string, error)
-}
-
 // ValueResolver dereferences and diagnoses one winning scalar value, returning
 // unrecognized values unchanged.
 type ValueResolver interface {
@@ -53,8 +47,6 @@ type Executor func(process.Command) error
 type Dependencies struct {
 	// EnvNamespaces loads namespace files.
 	EnvNamespaces NamespaceReader
-	// EnvOverlays writes overlay values; required by Set.
-	EnvOverlays OverlayWriter
 	// HostEnv captures the host environment once per operation; nil is empty.
 	HostEnv func() hostenv.Snapshot
 	// NewValueResolver creates an operation-scoped resolver; nil is identity

@@ -43,8 +43,7 @@ app/
 │   │   ├── diff/       #   compare a project across two environments
 │   │   ├── explain/    #   show each resolved value and where it came from
 │   │   ├── get/        #   print one resolved value
-│   │   ├── run/        #   run a child process with the merged environment
-│   │   └── set/        #   write a key/value into a namespace overlay file
+│   │   └── run/        #   run a child process with the merged environment
 │   ├── config/         # resolution pipeline: meshes input + ENVX_* + manifest into a Result
 │   ├── manifest/       # discover, load, parse, and validate envx.yaml
 │   ├── schema/         # single source of truth: FlagSpec catalog + Manifest/Settings types
@@ -154,7 +153,7 @@ Because a setting is threaded through several packages, adding one is a small bu
    - Execution settings: [internal/runner/params.go](internal/runner/params.go).
 5. **[internal/flags/register.go](internal/flags/register.go)**: add a `WithXxx` option that registers the flag from its `FlagSpec`.
 6. **[internal/flags/input.go](internal/flags/input.go)**: read the flag back into `config.Input` inside `GetInput` (via `optString` / `optBool`).
-7. **[internal/actions/*/command.go](internal/actions)**: add `flags.WithXxx` to each command that should expose the flag. Not every verb registers every flag (for example `set` registers only `--env`).
+7. **[internal/actions/*/command.go](internal/actions)**: add `flags.WithXxx` to each command that should expose the flag. Not every verb registers every flag.
 8. **Tests**: cover the new setting in the affected packages: `schema` (`flagspec_test.go` asserts unique env-var names), `config` (`precedence_test.go`, `config_test.go`), `flags` (`input_test.go`, `register_test.go`), and the consuming engine (`envmerge` or `runner`).
 
 **Changing** a setting: update its `FlagSpec` and `Settings` field, then fix the usage text, defaults, and tests. **Removing** a setting: delete it from every file above, in reverse order (start at the command registrations so nothing still references the removed spec).
@@ -165,16 +164,16 @@ Run `task envx:check` afterward; the linter's type checking catches any referenc
 
 Which flags each verb registers (from each `command.go`):
 
-| Flag | get | run | set | explain | diff |
-| --- | :-: | :-: | :-: | :-: | :-: |
-| `--config` (persistent, all commands) | ✓ | ✓ | ✓ | ✓ | ✓ |
-| `--env` / `-E` | ✓ | ✓ | ✓ | ✓ | |
-| `--require-overlays` | ✓ | ✓ | | ✓ | ✓ |
-| `--prefix` | ✓ | ✓ | | ✓ | ✓ |
-| `--suffix` | ✓ | ✓ | | ✓ | ✓ |
-| `--delimiter` | ✓ | ✓ | | ✓ | ✓ |
-| `--overload` | | ✓ | | | |
-| `--output` / `-o` | | | | ✓ | ✓ |
+| Flag | get | run | explain | diff |
+| --- | :-: | :-: | :-: | :-: |
+| `--config` (persistent, all commands) | ✓ | ✓ | ✓ | ✓ |
+| `--env` / `-E` | ✓ | ✓ | ✓ | |
+| `--require-overlays` | ✓ | ✓ | ✓ | ✓ |
+| `--prefix` | ✓ | ✓ | ✓ | ✓ |
+| `--suffix` | ✓ | ✓ | ✓ | ✓ |
+| `--delimiter` | ✓ | ✓ | ✓ | ✓ |
+| `--overload` | | ✓ | | |
+| `--output` / `-o` | | | ✓ | ✓ |
 
 `diff` takes the two environments as positional arguments, so it does not register `--env`.
 

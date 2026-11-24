@@ -131,7 +131,6 @@ func TestRootRoutesCommands(t *testing.T) {
 
 	tests := [][]string{
 		{"get", "app", "KEY"},
-		{"set", "env/app", "KEY", "value"},
 		{"explain", "app"},
 		{"diff", "app", "development", "production"},
 		{"run", "app", "--", "true"},

@@ -161,24 +161,6 @@ func TestEmitK8sBundleDecrypts(t *testing.T) {
 	}
 }
 
-// TestSetRoundTrip verifies set writes a value that get can read back.
-func TestSetRoundTrip(t *testing.T) {
-	t.Parallel()
-
-	cfg := basicWorkspace(t)
-	mustEnvx(t, nil,
-		"set", "--config", cfg, "--env", "development",
-		"env/postgres", "feature.enabled", "true",
-	)
-	res := mustEnvx(t, nil,
-		"get", "--config", cfg, "--env", "development",
-		"api-core", "FEATURE_ENABLED",
-	)
-	if got := strings.TrimSpace(res.stdout); got != "true" {
-		t.Errorf("FEATURE_ENABLED = %q, want true", got)
-	}
-}
-
 // TestRunExitStatus verifies the child's exit status becomes envx's own, and a
 // command that cannot start reports its cause on stderr with exit 127.
 func TestRunExitStatus(t *testing.T) {

@@ -80,7 +80,6 @@ func envService(
 	}
 	return env.New(*loadedWorkspace, env.Dependencies{
 		EnvNamespaces:    envStore.Repository{},
-		EnvOverlays:      envStore.Repository{},
 		HostEnv:          hostEnv,
 		NewValueResolver: factory.newValueResolver,
 		ProcessRunner:    process.Run,

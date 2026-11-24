@@ -66,7 +66,6 @@ func NewRootCommand(
 		secretscli.NewKeypairCommand(factory),
 		packcli.NewPackCommand(factory),
 		envcli.NewRunCommand(factory),
-		envcli.NewSetCommand(factory),
 		envcli.NewExplainCommand(factory),
 		emitcli.NewEmitCommand(factory),
 		envcli.NewDiffCommand(factory),

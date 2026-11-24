@@ -3,7 +3,6 @@ package atomicfile
 import (
 	"errors"
 	"fmt"
-	"io"
 	"os"
 	"path/filepath"
 	"sync"
@@ -89,47 +88,4 @@ func (fl *FileLock) Unlock() error {
 	mu.Unlock()
 
 	return unlockErr
-}
-
-// ReadModifyWrite executes fn while holding the lock at lockPath.
-// It reads the current contents of path (or an empty byte slice if not found),
-// executes fn with the read data, and if fn returns without error, atomically
-// writes the updated data back to path.
-func ReadModifyWrite(
-	lockPath, path string, fn func(data []byte) ([]byte, error),
-) error {
-	fl, err := Lock(lockPath)
-	if err != nil {
-		return fmt.Errorf("locking for read-modify-write on %s: %w", path, err)
-	}
-	defer func() { _ = fl.Unlock() }()
-
-	var current []byte
-	cleanPath := filepath.Clean(path)
-	//nolint:gosec // G304: callers provide validated config-derived paths
-	f, err := os.Open(cleanPath)
-	if err != nil {
-		if !errors.Is(err, os.ErrNotExist) {
-			return fmt.Errorf("reading current file %s: %w", path, err)
-		}
-		current = nil
-	} else {
-		defer func() { _ = f.Close() }()
-		data, err := io.ReadAll(f)
-		if err != nil {
-			return fmt.Errorf("reading file contents %s: %w", path, err)
-		}
-		current = data
-	}
-
-	updated, err := fn(current)
-	if err != nil {
-		return err
-	}
-
-	if err := Write(path, updated); err != nil {
-		return fmt.Errorf("writing updated contents to %s: %w", path, err)
-	}
-
-	return nil
 }

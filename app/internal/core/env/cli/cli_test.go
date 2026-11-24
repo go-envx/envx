@@ -38,8 +38,6 @@ type fakeFactory struct {
 	host []string
 	// reveals records the reveal policy of every opened resolver.
 	reveals []bool
-	// overlays records every overlay write.
-	overlays []overlayWrite
 	// runs records every child process.
 	runs []process.Command
 	// runErr, when set, is returned by every child process.
@@ -49,18 +47,6 @@ type fakeFactory struct {
 // fakeNamespaces maps an include path, or "<include>.<environment>" for an
 // overlay, to its parsed data.
 type fakeNamespaces map[string]map[string]any
-
-// overlayWrite is one recorded SetOverlay call.
-type overlayWrite struct {
-	// include is the absolute include path.
-	include string
-	// environment is the overlay environment.
-	environment string
-	// key is the dotted key written.
-	key string
-	// text is the value written.
-	text string
-}
 
 // commandCase is one environment command with arguments that succeed against
 // newFakeFactory.
@@ -109,7 +95,6 @@ func (f *fakeFactory) NewEnvService(configPath string) (*env.Service, error) {
 	}
 	return env.New(ws, env.Dependencies{
 		EnvNamespaces: f.namespaces,
-		EnvOverlays:   f,
 		HostEnv: func() hostenv.Snapshot {
 			return hostenv.From(f.host)
 		},
@@ -125,19 +110,6 @@ func (f *fakeFactory) NewEnvService(configPath string) (*env.Service, error) {
 			return f.runErr
 		},
 	})
-}
-
-// SetOverlay implements env.OverlayWriter.
-func (f *fakeFactory) SetOverlay(
-	include, environment, key, text string,
-) (string, error) {
-	f.overlays = append(f.overlays, overlayWrite{
-		include:     include,
-		environment: environment,
-		key:         key,
-		text:        text,
-	})
-	return include + "." + environment + ".yaml", nil
 }
 
 // LoadBase implements env.NamespaceReader.
@@ -199,7 +171,6 @@ func assertGolden(t *testing.T, name, got string) {
 func commandCases() []commandCase {
 	return []commandCase{
 		{name: "get", new: NewGetCommand, args: []string{"app", "host"}},
-		{name: "set", new: NewSetCommand, args: []string{"env/postgres", "host", "x"}},
 		{name: "explain", new: NewExplainCommand, args: []string{"app"}},
 		{
 			name: "diff", new: NewDiffCommand,
@@ -259,7 +230,7 @@ func TestCommandsMapReveal(t *testing.T) {
 	t.Parallel()
 
 	for _, tt := range commandCases() {
-		if tt.name == "set" || tt.name == "run" || tt.name == "diff" {
+		if tt.name == "run" || tt.name == "diff" {
 			continue
 		}
 		t.Run(tt.name, func(t *testing.T) {

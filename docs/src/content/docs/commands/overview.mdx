@@ -12,7 +12,6 @@ The envx CLI is a set of commands for resolving, inspecting, securing, deliverin
 | [`create`](../create/) | Scaffold a ready-to-run example workspace. |
 | [`get`](../get/) | Resolve a project's environment and print one value. |
 | [`run`](../run/) | Run a command with the merged environment injected. |
-| [`set`](../set/) | Write a key/value into a namespace's overlay file. |
 | [`explain`](../explain/) | Show each resolved value and the file it came from. |
 | [`diff`](../diff/) | Compare a project's environment across two environments. |
 | [`emit`](../emit/) | Render a resolved environment to Kubernetes, JSON, or dotenv. |
@@ -35,17 +34,17 @@ These flags are available on every command:
 
 Beyond the global flags, most commands share a common set. The flags in the top group map to [settings](../../configuration/schema/#settings-2) and override the matching value in `envx.yaml`; the bottom group is available only at the command line. A ✓ marks where each flag applies:
 
-| Flag | [`get`](../get/) | [`run`](../run/) | [`set`](../set/) | [`explain`](../explain/) | [`diff`](../diff/) | [`emit`](../emit/) | [`validate`](../validate/) |
-| --- | :-: | :-: | :-: | :-: | :-: | :-: | :-: |
-| **Configurable in `envx.yaml`** | | | | | | | |
-| [`--env`](../../configuration/schema/#env), `-E` | ✓ | ✓ | ✓ | ✓ | | ✓ | |
-| [`--require-overlays`](../../configuration/schema/#requireoverlays) | ✓ | ✓ | | ✓ | ✓ | ✓ | ✓ |
-| [`--prefix`](../../configuration/schema/#prefix) | ✓ | ✓ | | ✓ | ✓ | ✓ | ✓ |
-| [`--suffix`](../../configuration/schema/#suffix) | ✓ | ✓ | | ✓ | ✓ | ✓ | ✓ |
-| [`--delimiter`](../../configuration/schema/#delimiter) | ✓ | ✓ | | ✓ | ✓ | ✓ | ✓ |
-| [`--overload`](../../configuration/schema/#overload) | ✓ | ✓ | | ✓ | ✓ | ✓ | ✓ |
-| [`--reference-pattern`](../../configuration/schema/#referencepattern) | ✓ | ✓ | | ✓ | ✓ | ✓ | ✓ |
-| **Command-line only** | | | | | | | |
-| `--output`, `-o` | | | | ✓ | ✓ | ✓ | ✓ |
+| Flag | [`get`](../get/) | [`run`](../run/) | [`explain`](../explain/) | [`diff`](../diff/) | [`emit`](../emit/) | [`validate`](../validate/) |
+| --- | :-: | :-: | :-: | :-: | :-: | :-: |
+| **Configurable in `envx.yaml`** | | | | | | |
+| [`--env`](../../configuration/schema/#env), `-E` | ✓ | ✓ | ✓ | | ✓ | |
+| [`--require-overlays`](../../configuration/schema/#requireoverlays) | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
+| [`--prefix`](../../configuration/schema/#prefix) | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
+| [`--suffix`](../../configuration/schema/#suffix) | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
+| [`--delimiter`](../../configuration/schema/#delimiter) | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
+| [`--overload`](../../configuration/schema/#overload) | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
+| [`--reference-pattern`](../../configuration/schema/#referencepattern) | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
+| **Command-line only** | | | | | | |
+| `--output`, `-o` | | | ✓ | ✓ | ✓ | ✓ |
 
 `diff` compares two environments given as positional arguments, and `validate` checks every declared environment, so neither accepts `--env`. The `--output` flag selects `table` or `json` on `explain`, `diff`, and `validate`; on `emit` it names a file to write instead. `create`, `pack`, `secrets`, and `keypair` are not shown because they take no settings flags; see their pages for their own flags.

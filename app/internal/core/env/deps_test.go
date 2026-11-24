@@ -29,18 +29,6 @@ type fakeNamespaces struct {
 	baseReads int
 }
 
-// fakeOverlays records SetOverlay calls.
-type fakeOverlays struct {
-	// include is the last include path written.
-	include string
-	// environment is the last environment written.
-	environment string
-	// key is the last key written.
-	key string
-	// text is the last text written.
-	text string
-}
-
 // fakeResolver resolves "secret://" references from a plaintext table.
 type fakeResolver struct {
 	// reveal decrypts references instead of masking them.
@@ -122,14 +110,6 @@ func (f *fakeNamespaces) LoadOverlay(
 		return NamespaceData{SourcePath: path}, false, nil
 	}
 	return NamespaceData{Data: data, SourcePath: path}, true, nil
-}
-
-// SetOverlay implements OverlayWriter.
-func (f *fakeOverlays) SetOverlay(
-	include, environment, key, text string,
-) (string, error) {
-	f.include, f.environment, f.key, f.text = include, environment, key, text
-	return include + "." + environment + ".yaml", nil
 }
 
 // Resolve implements ValueResolver.
