@@ -6,8 +6,6 @@
 package cli
 
 import (
-	"strings"
-
 	"github.com/go-envx/envx/app/internal/core/diagnostic"
 	"github.com/go-envx/envx/app/internal/core/validate"
 	"github.com/go-envx/envx/app/internal/lib/cliflags"
@@ -32,12 +30,11 @@ var (
 
 // selectionFlag describes the flag that selects check. Its name is the check
 // code in kebab case (SECRET_IS_NOT_ENCRYPTED -> "secret-is-not-encrypted"),
-// the twin of its envx.yaml severity key (validate.secret_is_not_encrypted), so
-// the flag and the config property can never drift apart.
+// the twin of its camelCase envx.yaml severity key
+// (validate.secretIsNotEncrypted); both derive from the code so they cannot drift.
 func selectionFlag(check validate.Check) cliflags.Spec[bool] {
-	flagName := strings.ReplaceAll(strings.ToLower(string(check.Code)), "_", "-")
 	return cliflags.Spec[bool]{
-		Name:  flagName,
+		Name:  diagnostic.FlagName(check.Code),
 		Usage: "run only this check: " + check.Summary + " [" + string(check.Group) + "]",
 	}
 }

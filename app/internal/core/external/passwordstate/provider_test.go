@@ -113,10 +113,10 @@ func newFieldProvider(
 	server *httptest.Server, host hostenv.Snapshot, field string,
 ) *passwordstate.Provider {
 	return passwordstate.New(host, passwordstate.Options{
-		URL:       server.URL + "/pws/",
-		ListIDs:   listIDs,
-		Field:     field,
-		Client:    server.Client(),
+		URL:     server.URL + "/pws/",
+		ListIDs: listIDs,
+		Field:   field,
+		Client:  server.Client(),
 	})
 }
 
@@ -176,8 +176,8 @@ func TestQualifyOffline(t *testing.T) {
 	t.Parallel()
 
 	p := passwordstate.New(keyHost, passwordstate.Options{
-		URL:       "https://pw.local",
-		ListIDs:   listIDs,
+		URL:     "https://pw.local",
+		ListIDs: listIDs,
 	})
 	if err := p.CheckAvailable(); err != nil {
 		t.Errorf("CheckAvailable = %v, want nil", err)
@@ -202,9 +202,9 @@ func TestQualifyOffline(t *testing.T) {
 	}
 	_, err := p.Qualify(ref("db"), "qa")
 	if !errors.Is(err, external.ErrInvalidReference) || !strings.Contains(
-		err.Error(), `no passwordstate list-id configured for environment "qa"`,
+		err.Error(), `no passwordstate listId configured for environment "qa"`,
 	) {
-		t.Errorf("Qualify(db, qa) err = %v, want missing list-id", err)
+		t.Errorf("Qualify(db, qa) err = %v, want missing listId", err)
 	}
 }
 
@@ -393,7 +393,7 @@ func TestFetchRequestFailure(t *testing.T) {
 	server := newServer(t, &seen)
 	// The default client rejects the test server's self-signed certificate.
 	p := passwordstate.New(keyHost, passwordstate.Options{
-		URL:       server.URL,
+		URL: server.URL,
 	})
 
 	_, err := p.Fetch(context.Background(), ref("42"))

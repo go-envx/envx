@@ -396,7 +396,7 @@ Examples on this page are collapsed by default to keep it scannable.
   </ExampleBox>
   </ExampleAccordion>
 
-### `reference-pattern`
+### `referencePattern`
 
   <SchemaMeta type="string" />
 
@@ -415,7 +415,7 @@ Examples on this page are collapsed by default to keep it scannable.
         - development
 
       settings:
-        reference-pattern: '\$\{([^}]*)\}'
+        referencePattern: '\$\{([^}]*)\}'
 
       projects:
         web:
@@ -446,7 +446,7 @@ Examples on this page are collapsed by default to keep it scannable.
   </ExampleBox>
   </ExampleAccordion>
 
-### `require-overlays`
+### `requireOverlays`
 
   <SchemaMeta type="bool" />
 
@@ -466,7 +466,7 @@ Examples on this page are collapsed by default to keep it scannable.
         - staging
 
       settings:
-        require-overlays: true
+        requireOverlays: true
 
       projects:
         web:
@@ -551,7 +551,7 @@ Examples on this page are collapsed by default to keep it scannable.
   # envx.yaml
   secrets:
     path: secrets.yaml
-    keys-path: envx.keys
+    keysPath: envx.keys
     cipher: age
     providers:
       op:
@@ -564,7 +564,7 @@ Examples on this page are collapsed by default to keep it scannable.
 
   The secrets store file, relative to the manifest. **Default Value:** `secrets.yaml`
 
-### `keys-path`
+### `keysPath`
 
   <SchemaMeta type="string" />
 
@@ -641,7 +641,7 @@ Examples on this page are collapsed by default to keep it scannable.
   | Key | Type | Default | Description |
   | --- | --- | --- | --- |
   | `url` | string | | The `https` base URL of the Passwordstate site. |
-  | `list-id` | map[string]int | | Maps each environment to the list ID its short references read. May name only declared [`environments`](#environments). |
+  | `listId` | map[string]int | | Maps each environment to the list ID its short references read. May name only declared [`environments`](#environments). |
   | `field` | string | `Password` | The field read when a reference names none. |
   | `timeout` | duration | `30s` | Bounds each HTTP request. A positive duration such as `500ms`, `30s` or `2m`. |
 
@@ -658,7 +658,7 @@ Examples on this page are collapsed by default to keep it scannable.
         providers:
           passwordstate:
             url: https://passwords.example.com
-            list-id:
+            listId:
               development: 1988
               production: 1989
             field: Password
@@ -670,28 +670,28 @@ Examples on this page are collapsed by default to keep it scannable.
 
 ## Validate
 
-  The optional `validate` block sets the severity of each check that [`validate`](../../commands/validate/) runs. Each key is a check code in lowercase `snake_case`, such as `secret_is_not_encrypted`, unlike the kebab-case used elsewhere in the manifest. Each value is `off`, `warn`, or `error`.
+  The optional `validate` block sets the severity of each check that [`validate`](../../commands/validate/) runs. Each key is a check code in camelCase, such as `secretIsNotEncrypted`. Each value is `off`, `warn`, or `error`. A snake_case or SCREAMING_SNAKE_CASE key is rejected.
 
   Severity is set only here, never on the command line. The matching per-check flag on `validate` is the kebab-case twin of the key, for example `--secret-is-not-encrypted`, and selects which checks run.
 
   | Key | Default | Reports |
   | --- | --- | --- |
-  | `secret_is_not_encrypted` | `error` | A stored value left unencrypted. |
-  | `secret_algorithm_mismatch` | `error` | A value stored under a non-configured algorithm. |
-  | `secret_is_not_referenced` | `error` | A stored value no environment references. |
-  | `public_key_is_missing` | `error` | A group with stored secrets but no public key. |
-  | `private_key_is_invalid` | `error` | A group whose private key is malformed or mismatched. |
-  | `private_key_is_unavailable` | `warn` | A group with no private key available in this context. |
-  | `secret_reference_not_found` | `error` | A reference to a value absent from the store. |
-  | `invalid_secret_reference` | `error` | A malformed secret reference. |
-  | `secret_reference_is_unresolved` | `error` | A reference that passed every store check yet failed to decrypt. |
-  | `circular_variable_reference` | `error` | A variable substitution cycle. |
-  | `unresolved_variable_reference` | `error` | A substitution of an undefined variable. |
-  | `property_not_declared_in_base` | `off` | An overlay key its namespace base file never declares. |
-  | `invalid_external_reference` | `error` | A malformed reference for an enabled external provider. |
-  | `external_provider_not_enabled` | `warn` | A value using the scheme of an undeclared external provider. |
-  | `external_provider_unavailable` | `error` | A declared external provider that cannot be used. |
-  | `external_reference_unresolved` | `error` | An external reference the provider could not resolve. |
+  | `secretIsNotEncrypted` | `error` | A stored value left unencrypted. |
+  | `secretAlgorithmMismatch` | `error` | A value stored under a non-configured algorithm. |
+  | `secretIsNotReferenced` | `error` | A stored value no environment references. |
+  | `publicKeyIsMissing` | `error` | A group with stored secrets but no public key. |
+  | `privateKeyIsInvalid` | `error` | A group whose private key is malformed or mismatched. |
+  | `privateKeyIsUnavailable` | `warn` | A group with no private key available in this context. |
+  | `secretReferenceNotFound` | `error` | A reference to a value absent from the store. |
+  | `invalidSecretReference` | `error` | A malformed secret reference. |
+  | `secretReferenceIsUnresolved` | `error` | A reference that passed every store check yet failed to decrypt. |
+  | `circularVariableReference` | `error` | A variable substitution cycle. |
+  | `unresolvedVariableReference` | `error` | A substitution of an undefined variable. |
+  | `propertyNotDeclaredInBase` | `off` | An overlay key its namespace base file never declares. |
+  | `invalidExternalReference` | `error` | A malformed reference for an enabled external provider. |
+  | `externalProviderNotEnabled` | `warn` | A value using the scheme of an undeclared external provider. |
+  | `externalProviderUnavailable` | `error` | A declared external provider that cannot be used. |
+  | `externalReferenceUnresolved` | `error` | An external reference the provider could not resolve. |
 
   <ExampleAccordion>
   <ExampleBox>
@@ -699,9 +699,9 @@ Examples on this page are collapsed by default to keep it scannable.
       ```yaml
       # envx.yaml
       validate:
-        private_key_is_unavailable: error
-        property_not_declared_in_base: warn
-        secret_is_not_referenced: off
+        privateKeyIsUnavailable: error
+        propertyNotDeclaredInBase: warn
+        secretIsNotReferenced: off
       ```
     </Fragment>
   </ExampleBox>

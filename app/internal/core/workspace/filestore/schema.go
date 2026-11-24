@@ -83,8 +83,8 @@ type settingsYAML struct {
 	Env              *string `yaml:"env"`
 	Overload         *bool   `yaml:"overload"`
 	Prefix           *string `yaml:"prefix"`
-	ReferencePattern *string `yaml:"reference-pattern"`
-	RequireOverlays  *bool   `yaml:"require-overlays"`
+	ReferencePattern *string `yaml:"referencePattern"`
+	RequireOverlays  *bool   `yaml:"requireOverlays"`
 	Suffix           *string `yaml:"suffix"`
 }
 
@@ -102,7 +102,7 @@ func (s settingsYAML) toDomain() workspace.Settings {
 
 type secretsConfigYAML struct {
 	SecretsPath string        `yaml:"path"`
-	KeysPath    string        `yaml:"keys-path"`
+	KeysPath    string        `yaml:"keysPath"`
 	Cipher      string        `yaml:"cipher"`
 	Providers   providersYAML `yaml:"providers"`
 }
@@ -209,7 +209,7 @@ type passwordstateYAML struct {
 	// URL is the Passwordstate base URL.
 	URL string `yaml:"url"`
 	// ListIDs maps an environment to the list of its short references.
-	ListIDs listIDsYAML `yaml:"list-id"`
+	ListIDs listIDsYAML `yaml:"listId"`
 	// Field is the field read when a reference names none.
 	Field fieldYAML `yaml:"field"`
 	// Timeout bounds each HTTP request.
@@ -222,7 +222,7 @@ type listIDsYAML map[string]int
 // UnmarshalYAML parses a mapping of positive integers.
 func (l *listIDsYAML) UnmarshalYAML(node *yaml.Node) error {
 	ids, err := decodeByEnvironment(
-		node, "list-id", "development: 1988",
+		node, "listId", "development: 1988",
 		func(value *yaml.Node) (int, bool) {
 			var id int
 			err := value.Decode(&id)

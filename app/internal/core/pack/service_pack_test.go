@@ -316,7 +316,7 @@ func TestPackStandardizesManifest(t *testing.T) {
 	}{
 		{
 			"keeps other settings",
-			"secrets:\n  path: private/vault.yaml\n  keys-path: k\n",
+			"secrets:\n  path: private/vault.yaml\n  keysPath: k\n",
 			true,
 		},
 		{"drops empty block", "secrets:\n  path: private/vault.yaml\n", false},
@@ -345,8 +345,8 @@ func TestPackStandardizesManifest(t *testing.T) {
 			if strings.Contains(manifest, "vault.yaml") {
 				t.Errorf("manifest kept the source secrets path:\n%s", manifest)
 			}
-			if got := strings.Contains(manifest, "keys-path:"); got != tt.keepKeys {
-				t.Errorf("keys-path kept = %t, want %t:\n%s", got, tt.keepKeys, manifest)
+			if got := strings.Contains(manifest, "keysPath:"); got != tt.keepKeys {
+				t.Errorf("keysPath kept = %t, want %t:\n%s", got, tt.keepKeys, manifest)
 			}
 			if got := strings.Contains(manifest, "secrets:"); got != tt.keepKeys {
 				t.Errorf("secrets block kept = %t, want %t:\n%s", got, tt.keepKeys, manifest)

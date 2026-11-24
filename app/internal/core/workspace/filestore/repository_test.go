@@ -94,7 +94,7 @@ func TestLoadValid(t *testing.T) {
 		environments: [development, production]
 		secrets:
 		  path: ./private/secrets.yaml
-		  keys-path: ./private/envx.keys
+		  keysPath: ./private/envx.keys
 		  cipher: age
 		projects:
 		  api:
@@ -149,7 +149,7 @@ func TestLoadProviders(t *testing.T) {
 		        production: 3f2a0c1e-0000-0000-0000-000000000000
 		    passwordstate:
 		      url: https://pw.example.com
-		      list-id:
+		      listId:
 		        development: 1988
 		        production: 1990
 		      field: GenericField1
@@ -201,22 +201,22 @@ func TestLoadProvidersRejectsInvalid(t *testing.T) {
 			body: "secrets:\n  providers:\n    op:\n      timeout: -1s\n",
 			want: "positive duration",
 		},
-		"zero list-id": {
-			body: "secrets:\n  providers:\n    passwordstate:\n      list-id: {dev: 0}\n",
-			want: `list-id for environment "dev" must be a positive integer`,
+		"zero listId": {
+			body: "secrets:\n  providers:\n    passwordstate:\n      listId: {dev: 0}\n",
+			want: `listId for environment "dev" must be a positive integer`,
 		},
-		"non-numeric list-id": {
-			body: "secrets:\n  providers:\n    passwordstate:\n      list-id: {dev: web}\n",
-			want: `list-id for environment "dev" must be a positive integer`,
+		"non-numeric listId": {
+			body: "secrets:\n  providers:\n    passwordstate:\n      listId: {dev: web}\n",
+			want: `listId for environment "dev" must be a positive integer`,
 		},
-		"scalar list-id": {
-			body: "secrets:\n  providers:\n    passwordstate:\n      list-id: 1990\n",
-			want: `list-id must map each environment to a value, ` +
-				`such as "list-id: {development: 1988}"`,
+		"scalar listId": {
+			body: "secrets:\n  providers:\n    passwordstate:\n      listId: 1990\n",
+			want: `listId must map each environment to a value, ` +
+				`such as "listId: {development: 1988}"`,
 		},
-		"undeclared list-id environment": {
-			body: "secrets:\n  providers:\n    passwordstate:\n      list-id: {qa: 1}\n",
-			want: `passwordstate.list-id: environment "qa" is not declared`,
+		"undeclared listId environment": {
+			body: "secrets:\n  providers:\n    passwordstate:\n      listId: {qa: 1}\n",
+			want: `passwordstate.listId: environment "qa" is not declared`,
 		},
 		"scalar project": {
 			body: "secrets:\n  providers:\n    bws:\n      project: web-app\n",

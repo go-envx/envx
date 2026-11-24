@@ -141,7 +141,7 @@ func (p *Provider) Qualify(
 		list, ok := p.listIDs[environment]
 		if !ok {
 			return external.Reference{}, fmt.Errorf(
-				"%w: no passwordstate list-id configured for environment %q",
+				"%w: no passwordstate listId configured for environment %q",
 				external.ErrInvalidReference, environment,
 			)
 		}

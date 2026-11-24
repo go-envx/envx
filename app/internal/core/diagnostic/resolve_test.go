@@ -12,9 +12,9 @@ func TestResolve(t *testing.T) {
 	t.Parallel()
 
 	got, err := diagnostic.Resolve(map[string]string{
-		"secret_is_not_referenced":      "off",
-		"PRIVATE_KEY_IS_UNAVAILABLE":    "error",
-		"property_not_declared_in_base": "warn",
+		"secretIsNotReferenced":     "off",
+		"privateKeyIsUnavailable":   "error",
+		"propertyNotDeclaredInBase": "warn",
 	})
 	if err != nil {
 		t.Fatalf("Resolve() error = %v", err)
@@ -48,10 +48,21 @@ func TestResolve_Empty(t *testing.T) {
 func TestResolve_Errors(t *testing.T) {
 	t.Parallel()
 
-	_, err := diagnostic.Resolve(map[string]string{"not_a_check": "warn"})
+	_, err := diagnostic.Resolve(map[string]string{"notACheck": "warn"})
 	var unknown *diagnostic.UnknownCodeError
-	if !errors.As(err, &unknown) || unknown.Key != "not_a_check" {
+	if !errors.As(err, &unknown) || unknown.Key != "notACheck" {
 		t.Errorf("unknown key error = %v, want UnknownCodeError", err)
+	}
+
+	bad := []string{
+		"secret_is_not_encrypted", "SECRET_IS_NOT_ENCRYPTED", "secret-is-not-encrypted",
+	}
+	for _, key := range bad {
+		_, err = diagnostic.Resolve(map[string]string{key: "warn"})
+		var invalid *diagnostic.InvalidKeyError
+		if !errors.As(err, &invalid) || invalid.Key != key {
+			t.Errorf("Resolve(%q) error = %v, want InvalidKeyError", key, err)
+		}
 	}
 
 	_, err = diagnostic.Resolve(map[string]string{"ok": "warn"})
@@ -60,7 +71,7 @@ func TestResolve_Errors(t *testing.T) {
 	}
 
 	for _, raw := range []string{"warning", "Error", "none", ""} {
-		_, err = diagnostic.Resolve(map[string]string{"secret_is_not_encrypted": raw})
+		_, err = diagnostic.Resolve(map[string]string{"secretIsNotEncrypted": raw})
 		var invalid *diagnostic.InvalidSeverityError
 		if !errors.As(err, &invalid) || invalid.Value != raw {
 			t.Errorf("Resolve(%q) error = %v, want InvalidSeverityError", raw, err)

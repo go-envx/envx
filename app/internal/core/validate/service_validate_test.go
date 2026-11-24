@@ -72,22 +72,22 @@ func TestValidateGradesBySeverity(t *testing.T) {
 		{"defaults", nil, false, 2, 0, true},
 		{
 			"warn passes",
-			map[string]string{"secret_reference_not_found": "warn"},
+			map[string]string{"secretReferenceNotFound": "warn"},
 			false, 0, 2, false,
 		},
 		{
 			"strict warn fails",
-			map[string]string{"secret_reference_not_found": "warn"},
+			map[string]string{"secretReferenceNotFound": "warn"},
 			true, 0, 2, true,
 		},
 		{
 			"off drops",
-			map[string]string{"secret_reference_not_found": "off"},
+			map[string]string{"secretReferenceNotFound": "off"},
 			true, 0, 0, false,
 		},
 		{
 			"opt-in base check",
-			map[string]string{"property_not_declared_in_base": "warn"},
+			map[string]string{"propertyNotDeclaredInBase": "warn"},
 			false, 2, 2, true,
 		},
 	}
@@ -482,7 +482,7 @@ func TestValidateSortsFindings(t *testing.T) {
 			{Group: "shared", PrivateKeyStatus: secrets.PrivateKeyNotAvailable},
 		},
 	}
-	f.ws.ValidateSeverities = map[string]string{"secret_is_not_referenced": "off"}
+	f.ws.ValidateSeverities = map[string]string{"secretIsNotReferenced": "off"}
 
 	report := f.validate(t, ValidateParams{})
 
@@ -609,7 +609,7 @@ func TestNewRejectsInvalidConfiguration(t *testing.T) {
 		{
 			"invalid severity",
 			workspace.Workspace{
-				ValidateSeverities: map[string]string{"secret_is_not_encrypted": "loud"},
+				ValidateSeverities: map[string]string{"secretIsNotEncrypted": "loud"},
 			},
 			Dependencies{
 				OpenEnv: openEnv, OpenSecrets: openSecrets, OpenProviders: openProviders,

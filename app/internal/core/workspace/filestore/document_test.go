@@ -108,7 +108,7 @@ func TestParseDocumentAppliesDefaults(t *testing.T) {
 			body: base + str.Dedent(`
 				secrets:
 				  path: private/secrets.yaml
-				  keys-path: keys/envx.keys
+				  keysPath: keys/envx.keys
 			`),
 			secrets: workspace.SecretsConfig{
 				SecretsPath: filepath.Join(root, "private", "secrets.yaml"),
@@ -117,7 +117,7 @@ func TestParseDocumentAppliesDefaults(t *testing.T) {
 			},
 		},
 		"absolute keys stay rooted": {
-			body: base + "secrets:\n  keys-path: " + absKeys + "\n",
+			body: base + "secrets:\n  keysPath: " + absKeys + "\n",
 			secrets: workspace.SecretsConfig{
 				SecretsPath: filepath.Join(root, "secrets.yaml"),
 				KeysPath:    absKeys,
@@ -265,7 +265,7 @@ func TestParseDocumentSuggestsNearestKey(t *testing.T) {
 	body := str.Dedent(`
 		environments: [development]
 		settings:
-		  require_overlays: false
+		  requireOverlay: false
 		projects:
 		  api:
 		    includes: [env/x]
@@ -273,23 +273,23 @@ func TestParseDocumentSuggestsNearestKey(t *testing.T) {
 
 	_, err := parseDocument([]byte(body), "/path/to/envx.yaml")
 	if err == nil {
-		t.Fatal("expected an error for a renamed settings key")
+		t.Fatal("expected an error for a misspelled settings key")
 	}
-	if !strings.Contains(err.Error(), `Did you mean "require-overlays"?`) {
+	if !strings.Contains(err.Error(), `Did you mean "requireOverlays"?`) {
 		t.Errorf("error %q should suggest the nearest valid key", err)
 	}
 }
 
-// TestParseDocumentKebabSettingsKeys verifies the v2 kebab-case settings keys
-// decode into their fields, guarding the yaml-tag rename from snake_case.
-func TestParseDocumentKebabSettingsKeys(t *testing.T) {
+// TestParseDocumentCamelSettingsKeys verifies the camelCase settings keys
+// decode into their fields.
+func TestParseDocumentCamelSettingsKeys(t *testing.T) {
 	t.Parallel()
 
 	body := str.Dedent(`
 		environments: [development]
 		settings:
-		  reference-pattern: '<<(.+)>>'
-		  require-overlays: true
+		  referencePattern: '<<(.+)>>'
+		  requireOverlays: true
 		projects:
 		  api:
 		    includes: [env/x]

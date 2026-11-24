@@ -23,8 +23,7 @@ const (
 
 	// defaultSuggestionThreshold is the largest edit distance at which a rejected key is
 	// still close enough to a valid one to offer as a "did you mean" correction.
-	// Three keeps the common typo and the snake/kebab rename in range without
-	// suggesting unrelated keys.
+	// Three keeps the common typo in range without suggesting unrelated keys.
 	defaultSuggestionThreshold = 3
 )
 

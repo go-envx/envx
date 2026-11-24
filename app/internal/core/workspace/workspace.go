@@ -174,7 +174,7 @@ func (w *Workspace) Validate() error {
 	}
 	if providers.Passwordstate != nil {
 		err := checkEnvironmentKeys(
-			w, "passwordstate.list-id", providers.Passwordstate.ListIDs,
+			w, "passwordstate.listId", providers.Passwordstate.ListIDs,
 		)
 		if err != nil {
 			return err
