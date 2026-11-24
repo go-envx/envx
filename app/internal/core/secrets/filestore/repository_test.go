@@ -5,7 +5,6 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
-	"strings"
 	"testing"
 
 	"github.com/go-envx/envx/app/internal/core/secrets"
@@ -122,9 +121,9 @@ func TestCommitTightensPermissions(t *testing.T) {
 	testutil.AssertPerm(t, path, 0o600)
 }
 
-// TestCommitUsesIgnoredDirectoryLock verifies commits lock through a
-// Git-ignored .envx.lock rather than a per-file lock.
-func TestCommitUsesIgnoredDirectoryLock(t *testing.T) {
+// TestCommitLeavesOnlySecretsFile verifies commits create no lock, temp, or
+// ignore files beside the document.
+func TestCommitLeavesOnlySecretsFile(t *testing.T) {
 	t.Parallel()
 	repo, path := newRepository(t, "")
 
@@ -132,17 +131,12 @@ func TestCommitUsesIgnoredDirectoryLock(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Commit: %v", err)
 	}
-	dir := filepath.Dir(path)
-	if _, err := os.Stat(filepath.Join(dir, ".envx.lock")); err != nil {
-		t.Errorf("directory lock missing: %v", err)
+	entries, err := os.ReadDir(filepath.Dir(path))
+	if err != nil {
+		t.Fatal(err)
 	}
-	if _, err := os.Stat(path + ".lock"); !errors.Is(err, os.ErrNotExist) {
-		t.Errorf("per-file lock created: %v", err)
-	}
-	if ignore := read(t, filepath.Join(dir, ".gitignore")); !strings.Contains(
-		ignore, ".envx.lock\n",
-	) {
-		t.Errorf(".gitignore = %q, want .envx.lock rule", ignore)
+	if len(entries) != 1 || entries[0].Name() != filepath.Base(path) {
+		t.Errorf("directory holds %v, want only %s", entries, filepath.Base(path))
 	}
 }
 

@@ -1,10 +1,14 @@
 package keyring_test
 
 import (
+	"bytes"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/go-envx/envx/app/internal/core/secrets"
@@ -173,9 +177,9 @@ func TestRetainPreservesExistingKeys(t *testing.T) {
 	}
 }
 
-// TestRetainIgnoresKeysAndLock verifies the key file and directory lock are
-// Git-ignored and no per-file lock is created.
-func TestRetainIgnoresKeysAndLock(t *testing.T) {
+// TestRetainIgnoresKeysFile verifies the directory holds only the key file and
+// a .gitignore naming it.
+func TestRetainIgnoresKeysFile(t *testing.T) {
 	t.Parallel()
 	repo, path := newRepository(t, "", nil)
 
@@ -185,18 +189,119 @@ func TestRetainIgnoresKeysAndLock(t *testing.T) {
 		t.Fatalf("Retain: %v", err)
 	}
 	dir := filepath.Dir(path)
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var names []string
+	for _, e := range entries {
+		names = append(names, e.Name())
+	}
+	if want := []string{".gitignore", filepath.Base(path)}; !slices.Equal(names, want) {
+		t.Errorf("directory holds %v, want %v", names, want)
+	}
 	data, err := filex.Read(filepath.Join(dir, ".gitignore"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, rule := range []string{"envx.keys\n", ".envx.lock\n"} {
-		if !strings.Contains(string(data), rule) {
-			t.Errorf(".gitignore = %q, want %q", data, rule)
+	if rule := filepath.Base(path) + "\n"; !strings.Contains(string(data), rule) {
+		t.Errorf(".gitignore = %q, want %q", data, rule)
+	}
+}
+
+// TestRetainConcurrentKeepsEveryKey verifies parallel Retain calls drop no key.
+func TestRetainConcurrentKeepsEveryKey(t *testing.T) {
+	t.Parallel()
+	repo, _ := newRepository(t, "", nil)
+
+	const workers = 16
+	var wg sync.WaitGroup
+	errs := make(chan error, workers)
+	for i := range workers {
+		wg.Go(func() {
+			errs <- repo.Retain("api", crypt.Keypair{
+				PublicKey:  fmt.Sprintf("pub-%d", i),
+				PrivateKey: fmt.Sprintf("key-%d", i),
+			})
+		})
+	}
+	wg.Wait()
+	close(errs)
+	for err := range errs {
+		if err != nil {
+			t.Fatalf("Retain: %v", err)
 		}
 	}
-	if _, err := os.Stat(path + ".lock"); !errors.Is(err, os.ErrNotExist) {
-		t.Errorf("per-file lock created: %v", err)
+	for i := range workers {
+		key, err := repo.Resolve("api", fmt.Sprintf("pub-%d", i))
+		want := fmt.Sprintf("key-%d", i)
+		if err != nil || key.Value != want {
+			t.Errorf("Resolve(pub-%d) = %q, %v; want %q", i, key.Value, err, want)
+		}
 	}
+}
+
+// TestRetainAppendsAfterMissingNewline verifies an unterminated last line is
+// kept intact.
+func TestRetainAppendsAfterMissingNewline(t *testing.T) {
+	t.Parallel()
+	repo, path := newRepository(t, "API=old", nil)
+
+	if err := repo.Retain("api", crypt.Keypair{
+		PublicKey: "pub", PrivateKey: "key",
+	}); err != nil {
+		t.Fatalf("Retain: %v", err)
+	}
+	data, err := filex.Read(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.HasPrefix(string(data), "API=old\nAPI/") ||
+		!strings.HasSuffix(string(data), "=key\n") {
+		t.Errorf("key file = %q", data)
+	}
+}
+
+// TestRetainExistingEntryIsNotRewritten verifies retaining a held key leaves
+// the file byte-for-byte unchanged.
+func TestRetainExistingEntryIsNotRewritten(t *testing.T) {
+	t.Parallel()
+	repo, path := newRepository(t, "", nil)
+	pair := crypt.Keypair{PublicKey: "pub", PrivateKey: "key"}
+	if err := repo.Retain("api", pair); err != nil {
+		t.Fatal(err)
+	}
+	before, err := filex.Read(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	pair.PrivateKey = "other"
+	if err := repo.Retain("api", pair); err != nil {
+		t.Fatal(err)
+	}
+	after, err := filex.Read(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(before, after) {
+		t.Errorf("key file changed:\n%q\n%q", before, after)
+	}
+}
+
+// TestRetainTightensPermissions verifies an existing wider file ends up 0600.
+func TestRetainTightensPermissions(t *testing.T) {
+	t.Parallel()
+	repo, path := newRepository(t, "API=old\n", nil)
+	//nolint:gosec // G302: deliberately loosened to verify Retain tightens it
+	if err := os.Chmod(path, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := repo.Retain("api", crypt.Keypair{
+		PublicKey: "pub", PrivateKey: "key",
+	}); err != nil {
+		t.Fatalf("Retain: %v", err)
+	}
+	testutil.AssertPerm(t, path, 0o600)
 }
 
 // TestRetainedKeysAreReadableFromBundle verifies a key file's contents work

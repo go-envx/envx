@@ -83,12 +83,12 @@ func write(path string, data []byte, perm os.FileMode) error {
 	if err := os.Rename(tmpName, path); err != nil {
 		return fmt.Errorf("renaming %s to %s: %w", tmpName, path, err)
 	}
-	return syncDir(dir)
+	return SyncDir(dir)
 }
 
-// syncDir flushes a directory entry so a completed rename survives a crash.
-// Windows cannot sync directory handles, and NTFS journals renames.
-func syncDir(dir string) error {
+// SyncDir flushes a directory entry so a completed rename or create survives a
+// crash. Windows cannot sync directory handles, and NTFS journals renames.
+func SyncDir(dir string) error {
 	if runtime.GOOS == "windows" {
 		return nil
 	}

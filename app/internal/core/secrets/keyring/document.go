@@ -20,26 +20,22 @@ type entry struct {
 	version string
 	// value is the private key.
 	value string
-	// line is the entry's index in document.lines.
-	line int
 }
 
-// document is a parsed key file or ENVX_PRIVATE_KEY bundle. It preserves
-// original lines and comments for rewriting.
+// document is a parsed key file or ENVX_PRIVATE_KEY bundle.
 type document struct {
-	// lines holds every original line, including comments and blanks.
-	lines []string
 	// entries holds the parsed key lines in file order.
 	entries []entry
 }
 
-// parseDocument parses NAME=value lines, rejecting malformed, duplicate, and
-// empty entries. Unversioned entries are the legacy format; versioned entries
-// are indexed by the fingerprint of their public key.
+// parseDocument parses NAME=value lines, rejecting malformed, conflicting
+// duplicate, and empty entries. An exact duplicate line, which concurrent
+// Retain calls can append, is accepted. Unversioned entries are the legacy
+// format; versioned entries are indexed by the fingerprint of their public key.
 func parseDocument(content, source string) (document, error) {
-	doc := document{lines: strings.Split(content, "\n")}
-	seen := make(map[string]bool)
-	for index, raw := range doc.lines {
+	var doc document
+	seen := make(map[string]string)
+	for index, raw := range strings.Split(content, "\n") {
 		line := strings.TrimSuffix(raw, "\r")
 		trimmed := strings.TrimSpace(line)
 		if trimmed == "" || strings.HasPrefix(trimmed, "#") {
@@ -53,19 +49,22 @@ func parseDocument(content, source string) (document, error) {
 				"malformed private-key entry in %s at line %d", source, index+1,
 			)
 		}
-		if seen[name] {
-			return document{}, fmt.Errorf(
-				"duplicate private-key entry in %s at line %d", source, index+1,
-			)
-		}
-		seen[name] = true
 		if strings.TrimSpace(value) == "" {
 			return document{}, fmt.Errorf(
 				"empty private-key entry in %s at line %d", source, index+1,
 			)
 		}
+		if previous, dup := seen[name]; dup {
+			if previous != value {
+				return document{}, fmt.Errorf(
+					"duplicate private-key entry in %s at line %d", source, index+1,
+				)
+			}
+			continue
+		}
+		seen[name] = value
 		doc.entries = append(doc.entries, entry{
-			group: group, version: version, value: value, line: index,
+			group: group, version: version, value: value,
 		})
 	}
 	return doc, nil
@@ -112,27 +111,13 @@ func (d document) lookup(group, publicKey string) (key string, found bool, err e
 	return "", false, nil
 }
 
-// retain adds or replaces the versioned entry for publicKey, leaving every
-// other entry untouched, and renders the file with one trailing newline.
-func (d document) retain(group, publicKey, privateKey string) string {
+// has reports whether the document holds a versioned entry for the group and
+// public key.
+func (d document) has(group, publicKey string) bool {
 	id := fingerprint(publicKey)
-	line := group + versionSeparator + id + "=" + privateKey
-	lines := append([]string(nil), d.lines...)
-	for _, e := range d.entries {
-		if e.group == group && e.version == id {
-			lines[e.line] = line
-			return render(lines)
-		}
-	}
-	for len(lines) > 0 && strings.TrimSpace(lines[len(lines)-1]) == "" {
-		lines = lines[:len(lines)-1]
-	}
-	return render(append(lines, line))
-}
-
-// render joins lines with exactly one trailing newline.
-func render(lines []string) string {
-	return strings.TrimRight(strings.Join(lines, "\n"), "\n") + "\n"
+	return slices.ContainsFunc(d.entries, func(e entry) bool {
+		return e.group == group && e.version == id
+	})
 }
 
 // fingerprint is a short, stable public-key identity for entry names.

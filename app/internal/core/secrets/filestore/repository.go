@@ -9,15 +9,12 @@ import (
 	"io"
 	"maps"
 	"os"
-	"path/filepath"
 	"slices"
 	"strings"
 
 	"github.com/go-envx/envx/app/internal/core/secrets"
-	"github.com/go-envx/envx/app/internal/core/workspace"
 	"github.com/go-envx/envx/app/internal/lib/atomicfile"
 	"github.com/go-envx/envx/app/internal/lib/filex"
-	"github.com/go-envx/envx/app/internal/lib/git"
 )
 
 var _ secrets.Store = (*Repository)(nil)
@@ -82,8 +79,8 @@ func (r *Repository) List() ([]secrets.Snapshot, error) {
 	return out, nil
 }
 
-// Commit locks the document, verifies that the group still matches expected,
-// and atomically publishes the replacement's public key and values together.
+// Commit verifies that the group still matches expected and atomically
+// publishes the replacement's public key and values together.
 func (r *Repository) Commit(
 	expected secrets.Snapshot, replacement secrets.Group,
 ) error {
@@ -93,12 +90,6 @@ func (r *Repository) Commit(
 			replacement.Name, expected.Group.Name,
 		)
 	}
-	lock, err := lockDir(r.path)
-	if err != nil {
-		return err
-	}
-	defer func() { _ = lock.Unlock() }()
-
 	doc, err := r.load()
 	if err != nil {
 		return err
@@ -144,15 +135,6 @@ func (r *Repository) Export(out io.Writer, groups []secrets.Group) error {
 	}
 	_, err = out.Write(data)
 	return err
-}
-
-// lockDir takes the Git-ignored directory lock that guards path.
-func lockDir(path string) (*atomicfile.FileLock, error) {
-	lockPath := filepath.Join(filepath.Dir(path), workspace.LockFilename)
-	if err := git.EnsureIgnored(lockPath); err != nil {
-		return nil, err
-	}
-	return atomicfile.Lock(lockPath)
 }
 
 // load reads and parses the document; a missing file is an empty document.

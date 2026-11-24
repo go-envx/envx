@@ -1,8 +1,12 @@
 package keyring
 
 import (
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/go-envx/envx/app/internal/lib/crypt"
 )
 
 // TestParseDocumentErrors verifies malformed entries are rejected without
@@ -64,37 +68,17 @@ func TestLookup(t *testing.T) {
 	}
 }
 
-// TestRetainRendering verifies retaining preserves other lines, replaces only
-// the same public key's entry, and ends with one newline.
-func TestRetainRendering(t *testing.T) {
+// TestParseDuplicates verifies an exact duplicate line parses once while a
+// duplicate name with a different key fails.
+func TestParseDuplicates(t *testing.T) {
 	t.Parallel()
-	entry := "API" + versionSeparator + fingerprint("pub") + "="
 
-	tests := []struct {
-		name    string
-		content string
-		want    string
-	}{
-		{"empty file", "", entry + "key\n"},
-		{
-			"appends after trailing blanks",
-			"# keys\nAPI=old\n\n\n",
-			"# keys\nAPI=old\n" + entry + "key\n",
-		},
-		{
-			"replaces same version in place",
-			entry + "stale\nWEB=web\n",
-			entry + "key\nWEB=web\n",
-		},
+	doc, err := parseDocument("API=a\nAPI=a\n", "envx.local.keys")
+	if err != nil || len(doc.entries) != 1 {
+		t.Errorf("exact duplicate: entries = %d, err = %v", len(doc.entries), err)
 	}
-	for _, tt := range tests {
-		doc, err := parseDocument(tt.content, "envx.keys")
-		if err != nil {
-			t.Fatalf("%s: parseDocument: %v", tt.name, err)
-		}
-		if got := doc.retain("API", "pub", "key"); got != tt.want {
-			t.Errorf("%s: retain =\n%q\nwant\n%q", tt.name, got, tt.want)
-		}
+	if _, err := parseDocument("API=a\napi=b\n", "envx.local.keys"); err == nil {
+		t.Error("conflicting duplicate parsed, want error")
 	}
 }
 
@@ -107,11 +91,27 @@ func FuzzRetainLookup(f *testing.F) {
 			strings.ContainsAny(privateKey, "\r\n") {
 			return
 		}
-		doc, err := parseDocument(content, "envx.keys")
-		if err != nil {
+		path := filepath.Join(t.TempDir(), "envx.local.keys")
+		if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := parseDocument(content, path); err != nil {
 			return
 		}
-		updated, err := parseDocument(doc.retain("API", publicKey, privateKey), "envx.keys")
+		repo, err := New(path, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := repo.Retain("API", crypt.Keypair{
+			PublicKey: publicKey, PrivateKey: privateKey,
+		}); err != nil {
+			t.Fatalf("Retain: %v", err)
+		}
+		data, err := os.ReadFile(path) //nolint:gosec // G304: path is a temp file
+		if err != nil {
+			t.Fatal(err)
+		}
+		updated, err := parseDocument(string(data), path)
 		if err != nil {
 			t.Fatalf("retained document does not parse: %v", err)
 		}

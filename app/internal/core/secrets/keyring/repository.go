@@ -8,7 +8,6 @@ import (
 	"strings"
 
 	"github.com/go-envx/envx/app/internal/core/secrets"
-	"github.com/go-envx/envx/app/internal/core/workspace"
 	"github.com/go-envx/envx/app/internal/lib/atomicfile"
 	"github.com/go-envx/envx/app/internal/lib/crypt"
 	"github.com/go-envx/envx/app/internal/lib/filex"
@@ -106,9 +105,9 @@ func (r *Repository) Resolve(group, publicKey string) (secrets.PrivateKey, error
 }
 
 // Retain durably stores a private key indexed by its public key without
-// replacing any other stored key. The key file and its directory lock are
-// Git-ignored before any key material is written, and the key file is
-// owner-only.
+// replacing any other stored key. It appends one line, so concurrent calls never
+// drop each other's keys. The key file is Git-ignored before any key material
+// is written, and the key file is owner-only.
 func (r *Repository) Retain(group string, pair crypt.Keypair) error {
 	name, err := secrets.NormalizeGroup(group)
 	if err != nil {
@@ -124,27 +123,51 @@ func (r *Repository) Retain(group string, pair crypt.Keypair) error {
 		return err
 	}
 
-	lockPath := filepath.Join(filepath.Dir(r.path), workspace.LockFilename)
-	if err := git.EnsureIgnored(lockPath); err != nil {
-		return err
-	}
-	lock, err := atomicfile.Lock(lockPath)
-	if err != nil {
-		return err
-	}
-	defer func() { _ = lock.Unlock() }()
-
 	data, err := filex.Read(r.path)
-	if err != nil && !errors.Is(err, os.ErrNotExist) {
+	created := errors.Is(err, os.ErrNotExist)
+	if err != nil && !created {
 		return fmt.Errorf("reading private keys %s: %w", r.path, err)
 	}
 	doc, err := parseDocument(string(data), r.path)
 	if err != nil {
 		return fmt.Errorf("%w: %w", secrets.ErrInvalidKey, err)
 	}
-	updated := doc.retain(strings.ToUpper(name), pair.PublicKey, pair.PrivateKey)
-	if err := atomicfile.WritePrivate(r.path, []byte(updated)); err != nil {
+	name = strings.ToUpper(name)
+	if doc.has(name, pair.PublicKey) {
+		return nil
+	}
+
+	line := name + versionSeparator + fingerprint(pair.PublicKey) + "=" +
+		pair.PrivateKey + "\n"
+	if len(data) > 0 && data[len(data)-1] != '\n' {
+		line = "\n" + line
+	}
+	if err := appendPrivate(r.path, line, created); err != nil {
 		return fmt.Errorf("writing private keys %s: %w", r.path, err)
+	}
+	return nil
+}
+
+// appendPrivate appends text to path in a single write, leaving the file
+// owner-only and flushed to disk.
+func appendPrivate(path, text string, created bool) (err error) {
+	//nolint:gosec // G304: path is the configured key file
+	file, err := os.OpenFile(path, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o600)
+	if err != nil {
+		return err
+	}
+	defer func() { err = errors.Join(err, file.Close()) }()
+	if err := file.Chmod(0o600); err != nil {
+		return err
+	}
+	if _, err := file.WriteString(text); err != nil {
+		return err
+	}
+	if err := file.Sync(); err != nil {
+		return err
+	}
+	if created {
+		return atomicfile.SyncDir(filepath.Dir(path))
 	}
 	return nil
 }
