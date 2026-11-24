@@ -102,17 +102,17 @@ func newServer(t *testing.T, seen *requests) *httptest.Server {
 
 // newProvider builds a provider against server with the given host.
 func newProvider(
-	server *httptest.Server, host hostenv.Snapshot,
+	server *httptest.Server, hostEnv *hostenv.Lookup,
 ) *passwordstate.Provider {
-	return newFieldProvider(server, host, "")
+	return newFieldProvider(server, hostEnv, "")
 }
 
 // newFieldProvider builds a provider against server that reads field by
 // default.
 func newFieldProvider(
-	server *httptest.Server, host hostenv.Snapshot, field string,
+	server *httptest.Server, hostEnv *hostenv.Lookup, field string,
 ) *passwordstate.Provider {
-	return passwordstate.New(host, passwordstate.Options{
+	return passwordstate.New(hostEnv, passwordstate.Options{
 		URL:     server.URL + "/pws/",
 		ListIDs: listIDs,
 		Field:   field,
@@ -289,29 +289,29 @@ func TestFetchUnavailable(t *testing.T) {
 
 	tests := map[string]struct {
 		opts    passwordstate.Options
-		host    hostenv.Snapshot
+		hostEnv *hostenv.Lookup
 		contain string
 	}{
 		"missing url": {
 			opts:    passwordstate.Options{},
-			host:    keyHost,
+			hostEnv: keyHost,
 			contain: "url is not configured",
 		},
 		"plain http": {
 			opts:    passwordstate.Options{URL: "http://pw.local"},
-			host:    keyHost,
+			hostEnv: keyHost,
 			contain: "must be an https URL",
 		},
 		"unset key": {
 			opts:    passwordstate.Options{URL: "https://pw.local"},
-			host:    hostenv.From([]string{"PASSWORDSTATE_API_KEY="}),
+			hostEnv: hostenv.From([]string{"PASSWORDSTATE_API_KEY="}),
 			contain: "PASSWORDSTATE_API_KEY is not set",
 		},
 	}
 	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
-			p := passwordstate.New(tt.host, tt.opts)
+			p := passwordstate.New(tt.hostEnv, tt.opts)
 			if err := p.CheckAvailable(); !errors.Is(err, external.ErrProviderUnavailable) {
 				t.Errorf("CheckAvailable = %v, want ErrProviderUnavailable", err)
 			}
@@ -333,37 +333,37 @@ func TestFetchResponseErrors(t *testing.T) {
 	server := newServer(t, &seen)
 	wrongKey := hostenv.From([]string{"PASSWORDSTATE_API_KEY=wrong"})
 	tests := map[string]struct {
-		host    hostenv.Snapshot
+		hostEnv *hostenv.Lookup
 		path    string
 		contain string
 	}{
 		"unauthorized": {
-			host:    wrongKey,
+			hostEnv: wrongKey,
 			path:    "42",
 			contain: "GET password 42: HTTP 401: Invalid API key",
 		},
 		"not found": {
-			host:    keyHost,
+			hostEnv: keyHost,
 			path:    "9",
 			contain: "HTTP 404: Not found",
 		},
 		"no record": {
-			host:    keyHost,
+			hostEnv: keyHost,
 			path:    "7",
 			contain: "want 1 record, got 0",
 		},
 		"malformed": {
-			host:    keyHost,
+			hostEnv: keyHost,
 			path:    "8",
 			contain: "unexpected response format",
 		},
 		"missing field": {
-			host:    keyHost,
+			hostEnv: keyHost,
 			path:    "42#Missing",
 			contain: `password 42 has no field "Missing"`,
 		},
 		"non-text field": {
-			host:    keyHost,
+			hostEnv: keyHost,
 			path:    "42#PasswordID",
 			contain: `field "PasswordID" of password 42 is not text`,
 		},
@@ -371,7 +371,7 @@ func TestFetchResponseErrors(t *testing.T) {
 	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
-			_, err := newProvider(server, tt.host).Fetch(context.Background(), ref(tt.path))
+			_, err := newProvider(server, tt.hostEnv).Fetch(context.Background(), ref(tt.path))
 			if !errors.Is(err, external.ErrReferenceUnresolved) {
 				t.Fatalf("err = %v, want ErrReferenceUnresolved", err)
 			}

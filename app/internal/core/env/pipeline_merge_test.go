@@ -217,7 +217,7 @@ func TestApplyHost(t *testing.T) {
 				t.Fatalf("merge: %v", err)
 			}
 			op := operation{
-				host:     hostOf("HOST=from-host", "HOST_ONLY=x")(),
+				host:     hostVars("HOST=from-host", "HOST_ONLY=x"),
 				settings: resolvedSettings{overload: tt.overload},
 			}
 			merged.applyHost(op, tt.union)

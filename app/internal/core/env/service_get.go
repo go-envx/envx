@@ -52,7 +52,6 @@ func (s *Service) Get(params GetParams) (GetResult, error) {
 
 	resolver, err := s.newValueResolver(ResolverParams{
 		Reveal: params.Reveal,
-		Host:   op.host,
 	})
 	if err != nil {
 		return GetResult{}, err

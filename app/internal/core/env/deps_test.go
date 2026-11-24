@@ -49,8 +49,6 @@ type fakeOpener struct {
 	calls int
 	// reveal records the last reveal policy.
 	reveal bool
-	// host records the last host snapshot.
-	host hostenv.Snapshot
 }
 
 // fakeExecutor records the command it would run.
@@ -153,7 +151,7 @@ func (r fakeResolver) Evaluate(raw, _ string) value.Evaluation {
 // open implements Dependencies.NewValueResolver.
 func (o *fakeOpener) open(params ResolverParams) (ValueResolver, error) {
 	o.calls++
-	o.reveal, o.host = params.Reveal, params.Host
+	o.reveal = params.Reveal
 	return fakeResolver{
 		reveal:    params.Reveal,
 		plaintext: o.plaintext,
@@ -178,7 +176,13 @@ func parseYAML(t *testing.T, text string) map[string]any {
 	return m
 }
 
-// hostOf returns a snapshot source over KEY=value pairs.
-func hostOf(environ ...string) func() hostenv.Snapshot {
-	return func() hostenv.Snapshot { return hostenv.From(environ) }
+// hostOf returns a lookup over KEY=value pairs.
+func hostOf(environ ...string) *hostenv.Lookup {
+	return hostenv.From(environ)
+}
+
+// hostVars returns the variables of KEY=value pairs as an operation's host map.
+func hostVars(environ ...string) map[string]hostenv.Var {
+	vars, _ := hostOf(environ...).All()
+	return vars
 }

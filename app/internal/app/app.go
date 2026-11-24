@@ -16,19 +16,17 @@ import (
 	"github.com/go-envx/envx/app/internal/lib/hostenv"
 )
 
-// Factory assembles feature services on demand. The zero value captures the
+// Factory assembles feature services on demand. The zero value reads the
 // process environment.
 type Factory struct {
-	// Environment captures the host environment; nil uses hostenv.Capture.
-	Environment func() hostenv.Snapshot
+	// Environ returns the host environment as KEY=value entries; nil uses
+	// os.Environ.
+	Environ func() []string
 }
 
-// hostEnvironment returns the host environment source.
-func (f Factory) hostEnvironment() func() hostenv.Snapshot {
-	if f.Environment == nil {
-		return hostenv.Capture
-	}
-	return f.Environment
+// newHostEnv returns the lookup one service shares for its host reads.
+func (f Factory) newHostEnv() *hostenv.Lookup {
+	return hostenv.NewLookup(hostenv.Options{Environ: f.Environ})
 }
 
 // loadWorkspace loads the manifest at configPath, discovering it from the
@@ -61,18 +59,18 @@ func newCipher(algorithm string) (secrets.Cipher, error) {
 
 // newProviders registers an adapter for each declared provider.
 func newProviders(
-	configs workspace.ProvidersConfig, host hostenv.Snapshot,
+	configs workspace.ProvidersConfig, hostEnv *hostenv.Lookup,
 ) []external.Registration {
 	var registrations []external.Registration
 	if config := configs.OnePassword; config != nil {
 		registrations = append(registrations, external.Registration{
-			Provider: onepassword.New(host, onepassword.Options{}),
+			Provider: onepassword.New(hostEnv, onepassword.Options{}),
 			Timeout:  config.Timeout,
 		})
 	}
 	if config := configs.Bitwarden; config != nil {
 		registrations = append(registrations, external.Registration{
-			Provider: bitwarden.New(host, bitwarden.Options{
+			Provider: bitwarden.New(hostEnv, bitwarden.Options{
 				Projects: config.Projects,
 			}),
 			Timeout: config.Timeout,
@@ -80,7 +78,7 @@ func newProviders(
 	}
 	if config := configs.Passwordstate; config != nil {
 		registrations = append(registrations, external.Registration{
-			Provider: passwordstate.New(host, passwordstate.Options{
+			Provider: passwordstate.New(hostEnv, passwordstate.Options{
 				URL:     config.URL,
 				ListIDs: config.ListIDs,
 				Field:   config.Field,

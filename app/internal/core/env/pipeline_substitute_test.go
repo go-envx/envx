@@ -9,7 +9,7 @@ import (
 )
 
 // substituteOp is an operation with the default grammar and the given host.
-func substituteOp(host hostenv.Snapshot, overload bool) operation {
+func substituteOp(host map[string]hostenv.Var, overload bool) operation {
 	return operation{
 		grammar:  &syntax.Grammar{},
 		host:     host,
@@ -19,7 +19,7 @@ func substituteOp(host hostenv.Snapshot, overload bool) operation {
 
 // tableSubstituter builds an engine over a plain table with no opaque values.
 func tableSubstituter(
-	table map[string]string, host hostenv.Snapshot, overload bool,
+	table map[string]string, host map[string]hostenv.Var, overload bool,
 ) *substituter {
 	return newSubstituter(substituteOp(host, overload), symbolTable{
 		declared: func(name string) bool { _, ok := table[name]; return ok },
@@ -53,7 +53,7 @@ func TestSubstituterResolve(t *testing.T) {
 		{"URL", "TOP", "ESCAPED", "HOST"},
 		{"HOST", "ESCAPED", "TOP", "URL"},
 	} {
-		engine := tableSubstituter(table, hostenv.Snapshot{}, false)
+		engine := tableSubstituter(table, nil, false)
 		for _, key := range order {
 			if got, err := engine.resolve(key); err != nil || got != want[key] {
 				t.Errorf("resolve(%s) = %q, %v; want %q", key, got, err, want[key])
@@ -67,7 +67,7 @@ func TestSubstituterResolve(t *testing.T) {
 func TestSubstituterPrecedence(t *testing.T) {
 	t.Parallel()
 
-	host := hostenv.From([]string{"HOST=host", "ONLY_HOST=h"})
+	host := hostVars("HOST=host", "ONLY_HOST=h")
 	table := map[string]string{
 		"HOST": "ns", "ONLY_NS": "n", "URL": "{{HOST}}/{{ONLY_HOST}}/{{ONLY_NS}}",
 	}
@@ -85,7 +85,7 @@ func TestSubstituterPrecedence(t *testing.T) {
 func TestSubstituterSupersededFailure(t *testing.T) {
 	t.Parallel()
 
-	op := substituteOp(hostenv.From([]string{"BROKEN=ok"}), false)
+	op := substituteOp(hostVars("BROKEN=ok"), false)
 	engine := newSubstituter(op, symbolTable{
 		declared: func(string) bool { return true },
 		opaque:   func(string) bool { return false },
@@ -107,7 +107,7 @@ func TestSubstituterErrors(t *testing.T) {
 	t.Parallel()
 
 	_, err := tableSubstituter(
-		map[string]string{"URL": "{{HOST}}"}, hostenv.Snapshot{}, false,
+		map[string]string{"URL": "{{HOST}}"}, nil, false,
 	).resolve("URL")
 	var missing *MissingReferenceError
 	if !errors.As(err, &missing) || missing.Key != "URL" || missing.Reference != "HOST" {
@@ -119,7 +119,7 @@ func TestSubstituterErrors(t *testing.T) {
 		"circular reference: A -> B -> C -> A": {"A": "{{B}}", "B": "{{C}}", "C": "{{A}}"},
 	}
 	for want, table := range tests {
-		_, err := tableSubstituter(table, hostenv.Snapshot{}, false).resolve("A")
+		_, err := tableSubstituter(table, nil, false).resolve("A")
 		if !errors.Is(err, ErrCircularReference) || err.Error() != want {
 			t.Errorf("cycle error = %v, want %q", err, want)
 		}
@@ -130,7 +130,7 @@ func TestSubstituterErrors(t *testing.T) {
 func TestSubstituterOpaque(t *testing.T) {
 	t.Parallel()
 
-	engine := newSubstituter(substituteOp(hostenv.Snapshot{}, false), symbolTable{
+	engine := newSubstituter(substituteOp(nil, false), symbolTable{
 		declared: func(string) bool { return true },
 		opaque:   func(string) bool { return true },
 		value:    func(string) (string, error) { return "{{MISSING}}", nil },
@@ -146,7 +146,7 @@ func TestSubstituterMemoizes(t *testing.T) {
 
 	reads := map[string]int{}
 	table := map[string]string{"A": "{{C}}{{C}}", "B": "{{C}}", "C": "x"}
-	engine := newSubstituter(substituteOp(hostenv.Snapshot{}, false), symbolTable{
+	engine := newSubstituter(substituteOp(nil, false), symbolTable{
 		declared: func(name string) bool { _, ok := table[name]; return ok },
 		opaque:   func(string) bool { return false },
 		value: func(name string) (string, error) {

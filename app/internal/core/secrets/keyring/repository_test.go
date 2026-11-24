@@ -15,15 +15,17 @@ import (
 	"github.com/go-envx/envx/app/internal/core/secrets/keyring"
 	"github.com/go-envx/envx/app/internal/lib/crypt"
 	"github.com/go-envx/envx/app/internal/lib/filex"
+	"github.com/go-envx/envx/app/internal/lib/hostenv"
 	"github.com/go-envx/envx/app/internal/testutil"
 )
 
-// env returns a lookup function over vars.
-func env(vars map[string]string) func(string) (string, bool) {
-	return func(name string) (string, bool) {
-		value, ok := vars[name]
-		return value, ok
+// hostEnv returns a host lookup over vars.
+func hostEnv(vars map[string]string) *hostenv.Lookup {
+	environ := make([]string, 0, len(vars))
+	for name, value := range vars {
+		environ = append(environ, name+"="+value)
 	}
+	return hostenv.From(environ)
 }
 
 // newRepository returns a keyring repository over a temp key file seeded with
@@ -38,7 +40,7 @@ func newRepository(
 			t.Fatal(err)
 		}
 	}
-	repo, err := keyring.New(path, env(vars))
+	repo, err := keyring.New(path, hostEnv(vars))
 	if err != nil {
 		t.Fatalf("New: %v", err)
 	}

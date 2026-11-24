@@ -13,7 +13,7 @@ func (f Factory) NewValidateService(configPath string) (*validate.Service, error
 	if err != nil {
 		return nil, err
 	}
-	hostEnv := f.hostEnvironment()
+	hostEnv := f.newHostEnv()
 	return validate.New(ws, validate.Dependencies{
 		OpenEnv: func() (validate.Explainer, error) {
 			service, err := envService(&ws, hostEnv)
@@ -30,7 +30,7 @@ func (f Factory) NewValidateService(configPath string) (*validate.Service, error
 			return service, nil
 		},
 		OpenProviders: func() (validate.ProviderInspector, error) {
-			providers := newProviders(ws.Secrets.Providers, hostEnv())
+			providers := newProviders(ws.Secrets.Providers, hostEnv)
 			return external.NewInspector(providers), nil
 		},
 	})

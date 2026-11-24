@@ -95,9 +95,7 @@ func (f *fakeFactory) NewEnvService(configPath string) (*env.Service, error) {
 	}
 	return env.New(ws, env.Dependencies{
 		EnvNamespaces: f.namespaces,
-		HostEnv: func() hostenv.Snapshot {
-			return hostenv.From(f.host)
-		},
+		HostEnvLookup: hostenv.From(f.host),
 		NewValueResolver: func(
 			params env.ResolverParams,
 		) (env.ValueResolver, error) {

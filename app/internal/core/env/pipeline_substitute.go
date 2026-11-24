@@ -27,7 +27,7 @@ type substituter struct {
 	// symbols is the namespace view.
 	symbols symbolTable
 	// host supplies host variables for references.
-	host hostenv.Snapshot
+	host map[string]hostenv.Var
 	// overload prefers namespace variables over host variables.
 	overload bool
 	// composed memoizes composed values.
@@ -100,12 +100,12 @@ func (s *substituter) resolve(key string) (string, error) {
 // under overload. A namespace value is resolved only when chosen.
 func (s *substituter) reference(name, key string) (string, error) {
 	declared := s.symbols.declared(name)
-	hostValue, inHost := s.host.Get(name)
+	hostVar, inHost := s.host[name]
 	switch {
 	case s.overload && declared:
 		return s.resolve(name)
 	case inHost:
-		return hostValue, nil
+		return hostVar.Value, nil
 	case declared:
 		return s.resolve(name)
 	default:

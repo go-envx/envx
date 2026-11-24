@@ -29,7 +29,7 @@ func explainFixture(t *testing.T, host ...string) *Service {
 	opener := &fakeOpener{plaintext: map[string]string{"secret://db/password": "s3cr3t"}}
 	return newService(t, testWorkspace(), Dependencies{
 		EnvNamespaces:    namespaces,
-		HostEnv:          hostOf(host...),
+		HostEnvLookup:    hostOf(host...),
 		NewValueResolver: opener.open,
 	})
 }
@@ -216,7 +216,7 @@ func TestExplainSecretThroughCycle(t *testing.T) {
 			b: "{{A}}"
 			c: secret://db/password
 		`),
-		HostEnv:          hostOf("A=from-host"),
+		HostEnvLookup:    hostOf("A=from-host"),
 		NewValueResolver: opener.open,
 	})
 	for key, entry := range explainEntries(t, s, ExplainParams{Reveal: true}) {

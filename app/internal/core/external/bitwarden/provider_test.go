@@ -74,13 +74,13 @@ func TestFetchBySecretID(t *testing.T) {
 	runner := &fakeRunner{outputs: map[string]string{
 		"secret get " + secretID: `{"id":"` + secretID + `","key":"K","value":"pw"}`,
 	}}
-	host := hostenv.From([]string{
+	hostEnv := hostenv.From([]string{
 		"PATH=/bin",
 		"BWS_ACCESS_TOKEN=0.token",
 		"bws_server_url=https://vault.bitwarden.eu",
 		"OP_SERVICE_ACCOUNT_TOKEN=leak",
 	})
-	p := bitwarden.New(host, bitwarden.Options{Run: runner.run})
+	p := bitwarden.New(hostEnv, bitwarden.Options{Run: runner.run})
 
 	got, err := p.Fetch(context.Background(), ref(secretID))
 	if err != nil || got != "pw" {
@@ -213,7 +213,7 @@ func TestFetchRejectsInvalidReference(t *testing.T) {
 func TestQualify(t *testing.T) {
 	t.Parallel()
 
-	p := bitwarden.New(hostenv.Snapshot{}, bitwarden.Options{
+	p := bitwarden.New(nil, bitwarden.Options{
 		Projects: map[string]string{"dev": "app", "prod": "web app/x"},
 	})
 	field := ref("app/KEY")
@@ -301,18 +301,18 @@ func TestCheckAvailable(t *testing.T) {
 	found := func(string) (string, error) { return "/bin/bws", nil }
 	missing := func(string) (string, error) { return "", exec.ErrNotFound }
 	tests := map[string]struct {
-		host     hostenv.Snapshot
+		hostEnv  *hostenv.Lookup
 		lookPath func(string) (string, error)
 		contain  string
 	}{
-		"available": {host: tokenHost, lookPath: found},
+		"available": {hostEnv: tokenHost, lookPath: found},
 		"no token": {
-			host:     hostenv.From([]string{"BWS_ACCESS_TOKEN="}),
+			hostEnv:  hostenv.From([]string{"BWS_ACCESS_TOKEN="}),
 			lookPath: found,
 			contain:  "BWS_ACCESS_TOKEN is not set",
 		},
 		"no cli": {
-			host:     tokenHost,
+			hostEnv:  tokenHost,
 			lookPath: missing,
 			contain:  "install Bitwarden Secrets Manager CLI",
 		},
@@ -320,7 +320,7 @@ func TestCheckAvailable(t *testing.T) {
 	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
-			p := bitwarden.New(tt.host, bitwarden.Options{LookPath: tt.lookPath})
+			p := bitwarden.New(tt.hostEnv, bitwarden.Options{LookPath: tt.lookPath})
 			err := p.CheckAvailable()
 			if tt.contain == "" {
 				if err != nil {

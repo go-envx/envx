@@ -53,10 +53,8 @@ type Provider struct {
 	lookPath func(file string) (string, error)
 	// envProjects maps an environment to the project of its short references.
 	envProjects map[string]string
-	// env is the minimal child environment.
-	env map[string]string
-	// hasToken reports whether env holds a non-empty access token.
-	hasToken bool
+	// hostEnv serves the CLI's BWS_* variables.
+	hostEnv *hostenv.Lookup
 	// projects caches the accessible projects once listed.
 	projects []project
 	// secrets caches each listed project's secrets by project ID.
@@ -92,8 +90,8 @@ type location struct {
 }
 
 // New constructs a provider whose CLI runs with the host's base and BWS_*
-// variables only.
-func New(host hostenv.Snapshot, opts Options) *Provider {
+// variables only, read on first use.
+func New(hostEnv *hostenv.Lookup, opts Options) *Provider {
 	run := opts.Run
 	if run == nil {
 		run = process.Output
@@ -102,21 +100,29 @@ func New(host hostenv.Snapshot, opts Options) *Provider {
 	if lookPath == nil {
 		lookPath = exec.LookPath
 	}
-	env := process.MinimalEnv(host.All(), cliEnv)
-	hasToken := false
-	for name, val := range env {
-		if strings.EqualFold(name, tokenVar) && val != "" {
-			hasToken = true
-		}
-	}
 	return &Provider{
 		run:         run,
 		lookPath:    lookPath,
 		envProjects: opts.Projects,
-		env:         env,
-		hasToken:    hasToken,
+		hostEnv:     hostEnv,
 		secrets:     make(map[string][]secret),
 	}
+}
+
+// childEnv returns the minimal CLI environment and whether it holds a
+// non-empty access token.
+func (p *Provider) childEnv() (env map[string]string, hasToken bool, err error) {
+	vars, err := external.HostValues(p.hostEnv)
+	if err != nil {
+		return nil, false, err
+	}
+	env = process.MinimalEnv(vars, cliEnv)
+	for name, val := range env {
+		if strings.EqualFold(name, tokenVar) && val != "" {
+			return env, true, nil
+		}
+	}
+	return env, false, nil
 }
 
 // Scheme returns "bws".
@@ -148,7 +154,11 @@ func (p *Provider) Qualify(
 
 // CheckAvailable reports a missing access token or CLI.
 func (p *Provider) CheckAvailable() error {
-	if !p.hasToken {
+	_, hasToken, err := p.childEnv()
+	if err != nil {
+		return err
+	}
+	if !hasToken {
 		return tokenError()
 	}
 	if _, err := p.lookPath(program); err != nil {
@@ -165,7 +175,11 @@ func (p *Provider) Fetch(ctx context.Context, ref external.Reference) (string, e
 	if err != nil {
 		return "", err
 	}
-	if !p.hasToken {
+	_, hasToken, err := p.childEnv()
+	if err != nil {
+		return "", err
+	}
+	if !hasToken {
 		return "", tokenError()
 	}
 	if target.secretID != "" {
@@ -296,11 +310,15 @@ func parse(ref external.Reference) (location, error) {
 // Errors never quote stdout, which may hold secret values.
 func (p *Provider) query(ctx context.Context, dst any, args ...string) error {
 	command := program + " " + strings.Join(args[:2], " ")
+	env, _, err := p.childEnv()
+	if err != nil {
+		return err
+	}
 	out, err := p.run(ctx, process.OutputCommand{
 		Args: append(
 			append([]string{program}, args...), "--output", "json", "--color", "no",
 		),
-		Env: p.env,
+		Env: env,
 	})
 	if err != nil {
 		return commandError(command, err)

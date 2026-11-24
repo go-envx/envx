@@ -83,7 +83,7 @@ func (s Service) Create(params CreateParams) (CreateResult, error) {
 	}
 
 	// A representative local file name lets git decide whether the rule is needed.
-	local := filepath.Join(params.TargetDir, "envx.local.env")
+	local := filepath.Join(params.TargetDir, "envx.local.yaml")
 	if err := git.EnsureIgnoredRule(local, workspace.LocalFilePattern); err != nil {
 		return CreateResult{}, err
 	}

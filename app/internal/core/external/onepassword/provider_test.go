@@ -45,7 +45,7 @@ func TestFetchReadsReference(t *testing.T) {
 	t.Parallel()
 
 	runner := &fakeRunner{out: "pw"}
-	host := hostenv.From([]string{
+	hostEnv := hostenv.From([]string{
 		"Path=/bin",
 		"HOME=/home/u",
 		"https_proxy=http://proxy:3128",
@@ -54,7 +54,7 @@ func TestFetchReadsReference(t *testing.T) {
 		"AWS_SECRET_ACCESS_KEY=leak",
 		"BWS_ACCESS_TOKEN=other",
 	})
-	p := onepassword.New(host, onepassword.Options{Run: runner.run})
+	p := onepassword.New(hostEnv, onepassword.Options{Run: runner.run})
 
 	got, err := p.Fetch(context.Background(), ref("vault/item name/field"))
 	if err != nil || got != "pw" {
@@ -79,7 +79,7 @@ func TestFetchReadsReference(t *testing.T) {
 func TestQualify(t *testing.T) {
 	t.Parallel()
 
-	p := onepassword.New(hostenv.Snapshot{}, onepassword.Options{})
+	p := onepassword.New(nil, onepassword.Options{})
 	field := ref("vault/item/field")
 	field.Field = "x"
 	for _, tt := range []struct {
@@ -104,7 +104,7 @@ func TestFetchRejectsField(t *testing.T) {
 	t.Parallel()
 
 	runner := &fakeRunner{out: "pw"}
-	p := onepassword.New(hostenv.Snapshot{}, onepassword.Options{Run: runner.run})
+	p := onepassword.New(nil, onepassword.Options{Run: runner.run})
 	field := ref("vault/item/field")
 	field.Field = "x"
 
@@ -124,11 +124,11 @@ func TestCheckAvailable(t *testing.T) {
 	found := func(string) (string, error) { return "/bin/op", nil }
 	missing := func(string) (string, error) { return "", exec.ErrNotFound }
 
-	p := onepassword.New(hostenv.Snapshot{}, onepassword.Options{LookPath: found})
+	p := onepassword.New(nil, onepassword.Options{LookPath: found})
 	if err := p.CheckAvailable(); err != nil {
 		t.Errorf("found: err = %v, want nil", err)
 	}
-	p = onepassword.New(hostenv.Snapshot{}, onepassword.Options{LookPath: missing})
+	p = onepassword.New(nil, onepassword.Options{LookPath: missing})
 	if err := p.CheckAvailable(); !errors.Is(err, external.ErrProviderUnavailable) ||
 		!strings.Contains(err.Error(), "install 1Password CLI") {
 		t.Errorf("missing: err = %v, want install hint", err)
@@ -170,7 +170,7 @@ func TestFetchErrors(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 			runner := &fakeRunner{err: tt.err}
-			p := onepassword.New(hostenv.Snapshot{}, onepassword.Options{Run: runner.run})
+			p := onepassword.New(nil, onepassword.Options{Run: runner.run})
 			_, err := p.Fetch(context.Background(), ref("v/i/f"))
 			if !errors.Is(err, tt.want) {
 				t.Fatalf("err = %v, want %v", err, tt.want)

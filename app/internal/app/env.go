@@ -13,6 +13,8 @@ import (
 
 // valueResolverFactory builds operation-scoped value resolvers.
 type valueResolverFactory struct {
+	// hostEnv serves private-key overrides and provider credentials.
+	hostEnv *hostenv.Lookup
 	// secretsReader reads the workspace secrets store.
 	secretsReader secrets.Reader
 	// keysPath locates the private keyring file.
@@ -24,11 +26,11 @@ type valueResolverFactory struct {
 }
 
 // newValueResolver builds a resolver whose keyring and external providers read
-// overrides and credentials from the operation's host snapshot.
+// overrides and credentials from the shared host lookup.
 func (f valueResolverFactory) newValueResolver(
 	params env.ResolverParams,
 ) (env.ValueResolver, error) {
-	keys, err := keyring.New(f.keysPath, params.Host.Get)
+	keys, err := keyring.New(f.keysPath, f.hostEnv)
 	if err != nil {
 		return nil, err
 	}
@@ -41,7 +43,7 @@ func (f valueResolverFactory) newValueResolver(
 	resolver, err := external.NewResolver(external.ResolverParams{
 		Next:      storeResolver,
 		Reveal:    params.Reveal,
-		Providers: newProviders(f.providers, params.Host),
+		Providers: newProviders(f.providers, f.hostEnv),
 	})
 	if err != nil {
 		return nil, err
@@ -55,14 +57,13 @@ func (f Factory) NewEnvService(configPath string) (*env.Service, error) {
 	if err != nil {
 		return nil, err
 	}
-	return envService(&loadedWorkspace, f.hostEnvironment())
+	return envService(&loadedWorkspace, f.newHostEnv())
 }
 
-// envService wires the environment service; each operation's resolver reads
-// private-key overrides from that operation's host snapshot.
+// envService wires the environment service over a shared host lookup.
 func envService(
 	loadedWorkspace *workspace.Workspace,
-	hostEnv func() hostenv.Snapshot,
+	hostEnv *hostenv.Lookup,
 ) (*env.Service, error) {
 	cipher, err := newCipher(loadedWorkspace.Secrets.Cipher)
 	if err != nil {
@@ -73,6 +74,7 @@ func envService(
 		return nil, err
 	}
 	factory := valueResolverFactory{
+		hostEnv:       hostEnv,
 		secretsReader: store,
 		keysPath:      loadedWorkspace.Secrets.KeysPath,
 		cipher:        cipher,
@@ -80,7 +82,7 @@ func envService(
 	}
 	return env.New(*loadedWorkspace, env.Dependencies{
 		EnvNamespaces:    envStore.Repository{},
-		HostEnv:          hostEnv,
+		HostEnvLookup:    hostEnv,
 		NewValueResolver: factory.newValueResolver,
 		ProcessRunner:    process.Run,
 	})

@@ -55,7 +55,6 @@ func (s *Service) Materialize(params MaterializeParams) (MaterializeResult, erro
 	}
 	resolver, err := s.newValueResolver(ResolverParams{
 		Reveal: true,
-		Host:   op.host,
 	})
 	if err != nil {
 		return MaterializeResult{}, err
@@ -128,8 +127,8 @@ func (s *Service) materializeTolerant(
 			Key:         key,
 			Message:     fmt.Sprintf("omitting %s: %v", key, f.err),
 		}
-		if hostValue, ok := op.host.Get(key); ok {
-			out[key] = hostValue
+		if hostVar, ok := op.host[key]; ok {
+			out[key] = hostVar.Value
 			origins[key] = s.hostFallback(merged.origins[key], key)
 			warning.Message = fmt.Sprintf(
 				"%s: %v; keeping the value set in the environment", key, f.err,

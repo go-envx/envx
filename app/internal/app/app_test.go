@@ -16,20 +16,19 @@ import (
 	"github.com/go-envx/envx/app/internal/core/validate"
 	"github.com/go-envx/envx/app/internal/core/value"
 	"github.com/go-envx/envx/app/internal/core/workspace"
-	"github.com/go-envx/envx/app/internal/lib/hostenv"
 	"github.com/go-envx/envx/app/internal/testutil"
 )
 
 // minimalWorkspace is the read-only composition fixture.
 const minimalWorkspace = "testdata/minimal-workspace"
 
-// countingFactory returns a factory whose snapshot source serves environment
-// and counts captures.
+// countingFactory returns a factory whose environment serves environment and
+// counts reads.
 func countingFactory(environment ...string) (Factory, *atomic.Int32) {
 	captures := &atomic.Int32{}
-	return Factory{Environment: func() hostenv.Snapshot {
+	return Factory{Environ: func() []string {
 		captures.Add(1)
-		return hostenv.From(environment)
+		return environment
 	}}, captures
 }
 
@@ -64,7 +63,7 @@ func TestConstructorsAreLazy(t *testing.T) {
 		t.Fatalf("NewEmitService: %v", err)
 	}
 	if got := captures.Load(); got != 0 {
-		t.Errorf("environment captured %d times, want 0", got)
+		t.Errorf("environment read %d times, want 0", got)
 	}
 	entries, err := os.ReadDir(workspaceDir)
 	if err != nil {
@@ -75,10 +74,10 @@ func TestConstructorsAreLazy(t *testing.T) {
 	}
 }
 
-// TestNewEnvServiceBindsOperationSnapshot verifies a revealed read decrypts through
-// the store and keyring, and that the resolver reads private-key overrides from
-// the snapshot the operation captured.
-func TestNewEnvServiceBindsOperationSnapshot(t *testing.T) {
+// TestNewEnvServiceReadsHostOnce verifies a revealed read decrypts through
+// the store and keyring, that the resolver reads private-key overrides from the
+// service's host lookup, and that the host is read once per service.
+func TestNewEnvServiceReadsHostOnce(t *testing.T) {
 	t.Parallel()
 
 	workspaceDir := testutil.CopyDir(t, minimalWorkspace)
@@ -109,8 +108,11 @@ func TestNewEnvServiceBindsOperationSnapshot(t *testing.T) {
 	if err != nil || got.Value != "s3cr3t" {
 		t.Errorf("Get = %q, %v; want s3cr3t", got.Value, err)
 	}
+	if _, err := service.Get(getParams); err != nil {
+		t.Errorf("second Get: %v", err)
+	}
 	if count := captures.Load(); count != 1 {
-		t.Errorf("environment captured %d times, want 1", count)
+		t.Errorf("environment read %d times, want 1", count)
 	}
 
 	f, _ = countingFactory("ENVX_PRIVATE_KEY_APP=")

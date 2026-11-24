@@ -35,8 +35,6 @@ type ValueResolver interface {
 type ResolverParams struct {
 	// Reveal decrypts or fetches values instead of masking them.
 	Reveal bool
-	// Host is the operation's captured host snapshot.
-	Host hostenv.Snapshot
 }
 
 // Executor runs a child process.
@@ -47,8 +45,8 @@ type Executor func(process.Command) error
 type Dependencies struct {
 	// EnvNamespaces loads namespace files.
 	EnvNamespaces NamespaceReader
-	// HostEnv captures the host environment once per operation; nil is empty.
-	HostEnv func() hostenv.Snapshot
+	// HostEnvLookup serves host variables; nil is empty.
+	HostEnvLookup *hostenv.Lookup
 	// NewValueResolver creates an operation-scoped resolver; nil is identity
 	// resolution.
 	NewValueResolver func(params ResolverParams) (ValueResolver, error)

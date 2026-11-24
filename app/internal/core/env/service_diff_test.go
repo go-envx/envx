@@ -29,7 +29,7 @@ func diffFixture(t *testing.T, host ...string) (*Service, *fakeOpener) {
 	}}
 	return newService(t, testWorkspace(), Dependencies{
 		EnvNamespaces:    namespaces,
-		HostEnv:          hostOf(host...),
+		HostEnvLookup:    hostOf(host...),
 		NewValueResolver: opener.open,
 	}), opener
 }

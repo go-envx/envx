@@ -17,7 +17,7 @@ func materializeFixture(t *testing.T, yaml string, host ...string) *Service {
 	opener := &fakeOpener{plaintext: map[string]string{"secret://db/password": "s3cr3t"}}
 	return newService(t, testWorkspace(), Dependencies{
 		EnvNamespaces:    newFakeNamespaces().base(t, appInclude, yaml),
-		HostEnv:          hostOf(host...),
+		HostEnvLookup:    hostOf(host...),
 		NewValueResolver: opener.open,
 	})
 }
@@ -141,31 +141,30 @@ func TestMaterializeTolerant(t *testing.T) {
 	}
 }
 
-// TestMaterializeCapturesHostOnce verifies one snapshot serves merging and the
-// resolver within an operation.
-func TestMaterializeCapturesHostOnce(t *testing.T) {
+// TestMaterializeReadsHostOnce verifies one host read serves merging within
+// an operation and across operations.
+func TestMaterializeReadsHostOnce(t *testing.T) {
 	t.Parallel()
 
-	captures := 0
+	reads := 0
 	opener := &fakeOpener{}
 	s := newService(t, testWorkspace(), Dependencies{
 		EnvNamespaces: newFakeNamespaces().base(t, appInclude, "a: b"),
-		HostEnv: func() hostenv.Snapshot {
-			captures++
-			return hostenv.From([]string{"X=1"})
-		},
+		HostEnvLookup: hostenv.NewLookup(hostenv.Options{Environ: func() []string {
+			reads++
+			return []string{"X=1"}
+		}}),
 		NewValueResolver: opener.open,
 	})
-	if _, err := s.Materialize(MaterializeParams{}); err != nil {
-		t.Fatalf("Materialize: %v", err)
+	for range 2 {
+		if _, err := s.Materialize(MaterializeParams{}); err != nil {
+			t.Fatalf("Materialize: %v", err)
+		}
 	}
-	if captures != 1 || opener.calls != 1 || !opener.reveal {
+	if reads != 1 || opener.calls != 2 || !opener.reveal {
 		t.Errorf(
-			"captures = %d opens = %d reveal = %v",
-			captures, opener.calls, opener.reveal,
+			"reads = %d opens = %d reveal = %v",
+			reads, opener.calls, opener.reveal,
 		)
-	}
-	if v, _ := opener.host.Get("X"); v != "1" {
-		t.Errorf("resolver host X = %q, want 1", v)
 	}
 }

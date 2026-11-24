@@ -178,20 +178,20 @@ func (m *mergedEnv) applyAffixes(prefix, suffix string) {
 // a materialized child sees the complete environment.
 func (m *mergedEnv) applyHost(op operation, union bool) {
 	overload := op.settings.overload
-	for key, text := range op.host.All() {
+	for key, v := range op.host {
 		hostSource := Source{Key: key, Host: true}
 		prev, inNamespace := m.origins[key]
 		switch {
 		case inNamespace && !overload:
 			shadowed := append(append([]Source{}, prev.Shadowed...), prev.Winner)
 			m.overridden[key] = m.values[key]
-			m.values[key] = m.hostLeaf(text)
+			m.values[key] = m.hostLeaf(v.Value)
 			m.origins[key] = Origin{Winner: hostSource, Shadowed: shadowed}
 		case inNamespace:
 			shadowed := append(append([]Source{}, prev.Shadowed...), hostSource)
 			m.origins[key] = Origin{Winner: prev.Winner, Shadowed: shadowed}
 		case union:
-			m.values[key] = m.hostLeaf(text)
+			m.values[key] = m.hostLeaf(v.Value)
 			m.origins[key] = Origin{Winner: hostSource}
 		}
 	}

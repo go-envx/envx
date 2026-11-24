@@ -34,13 +34,13 @@ type Provider struct {
 	run external.CommandRunner
 	// lookPath locates the CLI offline.
 	lookPath func(file string) (string, error)
-	// env is the minimal child environment.
-	env map[string]string
+	// hostEnv serves the CLI's OP_* variables.
+	hostEnv *hostenv.Lookup
 }
 
 // New constructs a provider whose CLI runs with the host's base and OP_*
-// variables only.
-func New(host hostenv.Snapshot, opts Options) *Provider {
+// variables only, read on first use.
+func New(hostEnv *hostenv.Lookup, opts Options) *Provider {
 	run := opts.Run
 	if run == nil {
 		run = process.Output
@@ -52,7 +52,7 @@ func New(host hostenv.Snapshot, opts Options) *Provider {
 	return &Provider{
 		run:      run,
 		lookPath: lookPath,
-		env:      process.MinimalEnv(host.All(), cliEnv),
+		hostEnv:  hostEnv,
 	}
 }
 
@@ -97,9 +97,13 @@ func (p *Provider) Fetch(ctx context.Context, ref external.Reference) (string, e
 		return "", err
 	}
 	read := external.Reference{Scheme: external.SchemeOnePassword, Path: ref.Path}
+	vars, err := external.HostValues(p.hostEnv)
+	if err != nil {
+		return "", err
+	}
 	out, err := p.run(ctx, process.OutputCommand{
 		Args: []string{program, "read", "--no-newline", read.String()},
-		Env:  p.env,
+		Env:  process.MinimalEnv(vars, cliEnv),
 	})
 	if err == nil {
 		return string(out), nil

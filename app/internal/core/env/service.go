@@ -16,8 +16,8 @@ import (
 const defaultDelimiter = ","
 
 // Service runs environment workflows over a privately copied workspace
-// configuration. Each operation reads fresh namespace data, captures the host
-// environment once, and opens its own resolver.
+// configuration. Each operation reads fresh namespace data, reads the host
+// variables, and opens its own resolver.
 type Service struct {
 	// root is the workspace root directory.
 	root string
@@ -45,8 +45,8 @@ type operation struct {
 	settings resolvedSettings
 	// grammar is the reference syntax for the resolved pattern.
 	grammar *syntax.Grammar
-	// host is the host environment captured for this operation.
-	host hostenv.Snapshot
+	// host holds the host variables read for this operation.
+	host map[string]hostenv.Var
 }
 
 // resolvedSettings are the effective settings after precedence.
@@ -97,7 +97,7 @@ func New(ws workspace.Workspace, deps Dependencies) (*Service, error) {
 }
 
 // begin resolves the project, environment, settings, and grammar for a query
-// and captures the host environment.
+// and reads the host variables.
 // begin opens an operation on project with the given setting overrides; an
 // empty project selects the only declared project.
 func (s *Service) begin(
@@ -118,13 +118,17 @@ func (s *Service) begin(
 			return operation{}, err
 		}
 	}
+	host, err := s.deps.HostEnvLookup.All()
+	if err != nil {
+		return operation{}, err
+	}
 	return operation{
 		project:     name,
 		environment: environment,
 		includes:    project.IncludePaths,
 		settings:    settings,
 		grammar:     grammar,
-		host:        s.host(),
+		host:        host,
 	}, nil
 }
 
@@ -179,14 +183,6 @@ func (s *Service) environment(candidates ...*string) (string, error) {
 		)
 	}
 	return selected, nil
-}
-
-// host captures the host environment; a nil source is empty.
-func (s *Service) host() hostenv.Snapshot {
-	if s.deps.HostEnv == nil {
-		return hostenv.Snapshot{}
-	}
-	return s.deps.HostEnv()
 }
 
 // newValueResolver creates an operation-scoped resolver. A nil factory yields

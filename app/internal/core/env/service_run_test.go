@@ -18,7 +18,7 @@ func runFixture(t *testing.T, yaml string) (*Service, *fakeExecutor) {
 	opener := &fakeOpener{plaintext: map[string]string{"secret://db/password": "s3cr3t"}}
 	return newService(t, testWorkspace(), Dependencies{
 		EnvNamespaces:    newFakeNamespaces().base(t, appInclude, yaml),
-		HostEnv:          hostOf("HOST_ONLY=x"),
+		HostEnvLookup:    hostOf("HOST_ONLY=x"),
 		NewValueResolver: opener.open,
 		ProcessRunner:    executor.run,
 	}), executor

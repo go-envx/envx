@@ -50,15 +50,15 @@ type Provider struct {
 	client external.HTTPClient
 	// baseURL is the validated site URL.
 	baseURL string
-	// apiKey authenticates requests.
-	apiKey string
+	// hostEnv serves the API key.
+	hostEnv *hostenv.Lookup
 	// listIDs maps an environment to the list of its short references.
 	listIDs map[string]int
 	// field is read when a reference names none.
 	field string
 	// listings caches each listed list's records by list ID.
 	listings map[string][]record
-	// configErr reports invalid configuration or missing credentials on fetch.
+	// configErr reports invalid configuration on fetch.
 	configErr error
 }
 
@@ -86,9 +86,9 @@ type apiError struct {
 	} `json:"errors"`
 }
 
-// New constructs a provider that reads its API key from host. Configuration
-// problems surface on Fetch, so construction never fails.
-func New(host hostenv.Snapshot, opts Options) *Provider {
+// New constructs a provider that reads its API key from host on first use.
+// Configuration problems surface on Fetch, so construction never fails.
+func New(hostEnv *hostenv.Lookup, opts Options) *Provider {
 	client := opts.Client
 	if client == nil {
 		// Refusing redirects keeps the APIKey header from following one.
@@ -100,6 +100,7 @@ func New(host hostenv.Snapshot, opts Options) *Provider {
 	}
 	p := &Provider{
 		client:   client,
+		hostEnv:  hostEnv,
 		baseURL:  opts.URL,
 		listIDs:  opts.ListIDs,
 		field:    opts.Field,
@@ -114,17 +115,28 @@ func New(host hostenv.Snapshot, opts Options) *Provider {
 		p.configErr = errors.New("passwordstate url is not configured")
 	case err != nil || parsed.Scheme != "https" || parsed.Host == "":
 		p.configErr = fmt.Errorf("passwordstate url %q must be an https URL", opts.URL)
-	default:
-		key, _ := host.Get(apiKeyVar)
-		if key == "" {
-			p.configErr = fmt.Errorf("%s is not set", apiKeyVar)
-		}
-		p.apiKey = key
 	}
 	if p.configErr != nil {
 		p.configErr = fmt.Errorf("%w: %w", external.ErrProviderUnavailable, p.configErr)
 	}
 	return p
+}
+
+// auth returns the API key, or the configuration or credential problem.
+func (p *Provider) auth() (string, error) {
+	if p.configErr != nil {
+		return "", p.configErr
+	}
+	key, _, err := p.hostEnv.Get(apiKeyVar)
+	if err != nil {
+		return "", fmt.Errorf("%w: %w", external.ErrProviderUnavailable, err)
+	}
+	if key.Value == "" {
+		return "", fmt.Errorf(
+			"%w: %s is not set", external.ErrProviderUnavailable, apiKeyVar,
+		)
+	}
+	return key.Value, nil
 }
 
 // Scheme returns "passwordstate".
@@ -155,7 +167,8 @@ func (p *Provider) Qualify(
 
 // CheckAvailable reports invalid configuration or a missing API key.
 func (p *Provider) CheckAvailable() error {
-	return p.configErr
+	_, err := p.auth()
+	return err
 }
 
 // Fetch reads one qualified reference: a password ID or a title within a list.
@@ -165,8 +178,8 @@ func (p *Provider) Fetch(ctx context.Context, ref external.Reference) (string, e
 	if err != nil {
 		return "", err
 	}
-	if p.configErr != nil {
-		return "", p.configErr
+	if _, err := p.auth(); err != nil {
+		return "", err
 	}
 	if target.id != "" {
 		found, err := p.password(ctx, target.id)
@@ -278,11 +291,15 @@ func (p *Provider) passwordByTitle(
 // get requests endpoint and decodes its record array; what names the target in
 // errors. Errors never quote the body, which holds secret values.
 func (p *Provider) get(ctx context.Context, endpoint, what string) ([]record, error) {
+	key, err := p.auth()
+	if err != nil {
+		return nil, err
+	}
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, http.NoBody)
 	if err != nil {
 		return nil, fmt.Errorf("%w: %w", external.ErrProviderUnavailable, err)
 	}
-	req.Header.Set("APIKey", p.apiKey)
+	req.Header.Set("APIKey", key)
 	req.Header.Set("Accept", "application/json")
 	resp, err := p.client.Do(req)
 	if err != nil {

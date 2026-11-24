@@ -21,7 +21,7 @@ func getFixture(t *testing.T, host ...string) (*Service, *fakeOpener) {
 	opener := &fakeOpener{plaintext: map[string]string{"secret://db/password": "s3cr3t"}}
 	s := newService(t, testWorkspace(), Dependencies{
 		EnvNamespaces:    namespaces,
-		HostEnv:          hostOf(host...),
+		HostEnvLookup:    hostOf(host...),
 		NewValueResolver: opener.open,
 	})
 	return s, opener
@@ -100,13 +100,10 @@ func TestGetFailures(t *testing.T) {
 func TestGetHostSelection(t *testing.T) {
 	t.Parallel()
 
-	s, opener := getFixture(t, "HOST=from-host", "HOST_ONLY=x")
+	s, _ := getFixture(t, "HOST=from-host", "HOST_ONLY=x")
 	got, err := s.Get(GetParams{Key: "host"})
 	if err != nil || got.Value != "from-host" || !got.Origin.Winner.Host {
 		t.Errorf("Get(host) = %+v, %v; want host winner", got, err)
-	}
-	if v, _ := opener.host.Get("HOST"); v != "from-host" {
-		t.Errorf("resolver host snapshot HOST = %q, want from-host", v)
 	}
 	if _, err := s.Get(GetParams{Key: "host_only"}); err == nil {
 		t.Error("Get(host-only key) succeeded")

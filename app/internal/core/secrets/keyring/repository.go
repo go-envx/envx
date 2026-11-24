@@ -13,6 +13,7 @@ import (
 	"github.com/go-envx/envx/app/internal/lib/crypt"
 	"github.com/go-envx/envx/app/internal/lib/filex"
 	"github.com/go-envx/envx/app/internal/lib/git"
+	"github.com/go-envx/envx/app/internal/lib/hostenv"
 )
 
 var _ secrets.Keys = (*Repository)(nil)
@@ -29,21 +30,18 @@ const (
 type Repository struct {
 	// path is the key file path.
 	path string
-	// lookupEnv reads environment overrides from the operation's snapshot.
-	lookupEnv func(string) (string, bool)
+	// hostEnv serves environment overrides.
+	hostEnv *hostenv.Lookup
 }
 
 // New constructs a keyring repository. An empty path uses "envx.local.keys"; a nil
-// lookupEnv means no environment overrides.
-func New(path string, lookupEnv func(string) (string, bool)) (*Repository, error) {
+// host means no environment overrides.
+func New(path string, hostEnv *hostenv.Lookup) (*Repository, error) {
 	path = strings.TrimSpace(path)
 	if path == "" {
 		path = defaultFilename
 	}
-	if lookupEnv == nil {
-		lookupEnv = func(string) (string, bool) { return "", false }
-	}
-	return &Repository{path: path, lookupEnv: lookupEnv}, nil
+	return &Repository{path: path, hostEnv: hostEnv}, nil
 }
 
 // Location returns the key file path.
@@ -62,22 +60,30 @@ func (r *Repository) Resolve(group, publicKey string) (secrets.PrivateKey, error
 	name = strings.ToUpper(name)
 
 	specific := EnvPrefix + "_" + name
-	if value, ok := r.lookupEnv(specific); ok {
-		if value == "" {
+	override, ok, err := r.hostEnv.Get(specific)
+	if err != nil {
+		return secrets.PrivateKey{}, err
+	}
+	if ok {
+		if override.Value == "" {
 			return secrets.PrivateKey{}, fmt.Errorf(
 				"%w: environment variable %s is empty", secrets.ErrInvalidKey, specific,
 			)
 		}
-		return secrets.PrivateKey{Value: value, Origin: specific}, nil
+		return secrets.PrivateKey{Value: override.Value, Origin: specific}, nil
 	}
 
-	if bundle, ok := r.lookupEnv(EnvPrefix); ok {
-		if bundle == "" {
+	bundle, ok, err := r.hostEnv.Get(EnvPrefix)
+	if err != nil {
+		return secrets.PrivateKey{}, err
+	}
+	if ok {
+		if bundle.Value == "" {
 			return secrets.PrivateKey{}, fmt.Errorf(
 				"%w: environment variable %s is empty", secrets.ErrInvalidKey, EnvPrefix,
 			)
 		}
-		key, found, err := selectKey(bundle, EnvPrefix, name, publicKey)
+		key, found, err := selectKey(bundle.Value, EnvPrefix, name, publicKey)
 		if err != nil {
 			return secrets.PrivateKey{}, err
 		}
