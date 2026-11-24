@@ -1,0 +1,6 @@
+envx does not show plaintext unless you ask:
+
+- [`get`](../../commands/get/) prints a secret as its reference, such as `secret://group/key`, unless you pass `--reveal`.
+- [`explain`](../../commands/explain/) classifies each value without resolving it. `--reveal` adds the plaintext.
+- [`diff`](../../commands/diff/) and [`validate`](../../commands/validate/) never decrypt or fetch secrets. They compare or diagnose references as written. `validate` checks that declared secret references are usable and well-formed.
+- [`run`](../../commands/run/) and [`emit`](../../commands/emit/) must hand real values to their consumer, so they resolve them. Both abort on a value that cannot be resolved, unless `run` is given `--ignore-errors`.

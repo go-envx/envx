@@ -18,6 +18,9 @@ import (
 	"github.com/go-envx/envx/app/internal/lib/hostenv"
 )
 
+// apiKeyVar is the host variable holding the API key.
+const apiKeyVar = "PASSWORDSTATE_API_KEY"
+
 // defaultField is the password record field read when a reference names none.
 const defaultField = "Password"
 
@@ -27,12 +30,10 @@ const maxResponseBytes = 1 << 20
 // numeric matches a password or list ID.
 var numeric = regexp.MustCompile(`^\d+$`)
 
-// Options locates the Passwordstate API and its credentials.
+// Options locates the Passwordstate API.
 type Options struct {
 	// URL is the HTTPS base URL of the Passwordstate site.
 	URL string
-	// APIKeyEnv names the host variable holding the API key.
-	APIKeyEnv string
 	// ListIDs maps an environment to the list of its short references.
 	ListIDs map[string]int
 	// Field is read when a reference names none; empty means "Password".
@@ -113,12 +114,10 @@ func New(host hostenv.Snapshot, opts Options) *Provider {
 		p.configErr = errors.New("passwordstate url is not configured")
 	case err != nil || parsed.Scheme != "https" || parsed.Host == "":
 		p.configErr = fmt.Errorf("passwordstate url %q must be an https URL", opts.URL)
-	case opts.APIKeyEnv == "":
-		p.configErr = errors.New("passwordstate api-key-env is not configured")
 	default:
-		key, _ := host.Get(opts.APIKeyEnv)
+		key, _ := host.Get(apiKeyVar)
 		if key == "" {
-			p.configErr = fmt.Errorf("%s is not set", opts.APIKeyEnv)
+			p.configErr = fmt.Errorf("%s is not set", apiKeyVar)
 		}
 		p.apiKey = key
 	}

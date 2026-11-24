@@ -1,0 +1,54 @@
+---
+title: pack
+description: Copy an environment-scoped slice of the workspace into a deployable bundle.
+sidebar:
+  order: 9
+---
+
+```sh
+envx pack --out <dir>
+```
+
+`pack` copies an environment-scoped subset of the workspace into an output directory that runs through the ordinary `envx run --config` pipeline. The bundle holds a manifest, each project's include files (the base namespace file plus only the selected environments' overlays), and a filtered secrets store containing only the values those environments reference.
+
+Nothing is decrypted: secrets stay encrypted and decrypt at runtime exactly as they do for a normal run. The bundle excludes:
+
+- The private-key file. Supply the key at runtime through `ENVX_PRIVATE_KEY`; see [Secrets store](../../concepts/secrets-store/#private-key-lookup).
+- Every unselected environment's overlays.
+- Every public key, since the bundle is run-only.
+
+## Bundle layout
+
+Each project gets its own `<project>/` directory holding every namespace file it includes, and the manifest's `includes` are rewritten to `<project>/<name>` to match. A file that two projects both include is copied into each directory. The secrets store stays a single `secrets.yaml` at the bundle root, filtered to the union of the selected projects' references.
+
+Because the store lives at the root, a project directory is not runnable on its own. For per-project secret isolation, run `pack` once per project into a separate output.
+
+An existing, non-empty `--out` directory is refused so a bundle never merges into stale files. Pass `--force` to clear it and pack fresh.
+
+## Examples
+
+```sh
+# Every project, production only.
+envx pack --env production --out ./dist
+
+# One bundle that serves several environments.
+envx pack -e staging -e production --out ./dist
+
+# Only one project's includes.
+envx pack -e production -p api-core --out ./dist
+
+# Run a packed project; the container picks the environment at start.
+ENVX_PRIVATE_KEY="$KEY" envx run api-core --env production \
+  --config ./dist/envx.yaml -- node server.js
+```
+
+## Flags
+
+| Flag | Description |
+| --- | --- |
+| `--out` | Required. Destination directory for the packed workspace. |
+| `--env`, `-e` | Environment to include. Repeatable. Default: all declared environments. |
+| `--project`, `-p` | Limit the bundle to this project's includes. Repeatable. Default: all projects. |
+| `--force` | Replace the output directory if it already exists and is not empty. |
+
+Plus the [global flags](../overview/#global-flags). Unlike most commands, `--env` here is repeatable and uses the short form `-e`.

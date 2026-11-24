@@ -17,6 +17,8 @@ envx diff <project> <env-a> <env-b>
 
 Use `--output json` for machine-readable output.
 
+The table prefixes each row with a sign: `+` for a key only in `env-b`, `-` for a key only in `env-a`, and `~` for a key whose value differs. The JSON object has matching `added`, `removed`, and `changed` arrays; an empty one is omitted.
+
 ## Arguments
 
 | Argument | Description |
@@ -100,5 +102,7 @@ The examples below use the same `api` workspace, comparing its two environments.
 | `--prefix` | `ENVX_PREFIX` | Prefix prepended to every key. |
 | `--suffix` | `ENVX_SUFFIX` | Suffix appended to every key. |
 | `--delimiter` | `ENVX_DELIMITER` | String used to join list values. |
+| `--overload` | `ENVX_OVERLOAD` | Prefer file values over host variables in `{{VAR}}` substitution. |
+| `--reference-pattern` | `ENVX_REFERENCE_PATTERN` | Regex overriding the `{{VAR}}` reference syntax. |
 
-Plus the [global flags](../overview/#global-flags). The `--require-overlays`, `--prefix`, `--suffix`, and `--delimiter` flags map to [settings](../../configuration/schema/#settings-2) and override the values in `envx.yaml`.
+Plus the [global flags](../overview/#global-flags). The setting flags map to [settings](../../configuration/schema/#settings-2) and override the values in `envx.yaml`.

@@ -11,7 +11,9 @@ import ExampleBox from '#components/ExampleBox.astro';
 envx explain <project> [key]
 ```
 
-`explain` resolves a project's environment and reports, for each key, the value and the file it was resolved from. With no key it explains every key; with a key it explains just that one.
+`explain` resolves a project's environment and reports, for each key, its type, its literal value, the file it was resolved from, and a resolution status. With no key it explains every key; with a key it explains just that one.
+
+Secret references are classified without decrypting them; pass `--reveal` to add a `RESOLVED` column with their plaintext. Source paths are relative to `envx.yaml` unless you pass `--absolute`.
 
 Use `--output json` for machine-readable output.
 
@@ -66,30 +68,42 @@ The examples below use the same `api` workspace:
       ```sh
       # Explain every key.
       envx explain api
-      # KEY           VALUE      SOURCE
-      # DB_HOST       localhost  db.development.yaml
-      # DB_POOL_SIZE  10         db.yaml
-      # DB_PORT       5432       db.yaml
+      # KEY           TYPE    VALUE      SOURCE               STATUS
+      # DB_HOST       config   localhost  db.development.yaml  OK
+      # DB_POOL_SIZE  config   10         db.yaml              OK
+      # DB_PORT       config   5432       db.yaml              OK
 
       # Explain one key.
       envx explain api DB_HOST
-      # KEY      VALUE      SOURCE
-      # DB_HOST  localhost  db.development.yaml
+      # KEY      TYPE    VALUE      SOURCE               STATUS
+      # DB_HOST  config   localhost  db.development.yaml  OK
 
       # Machine-readable output.
       envx explain api --output json
-      # [
-      #   {
-      #     "key": "DB_HOST",
-      #     "value": "localhost",
-      #     "source": "db.development.yaml",
-      #     "sourceKey": "db.host",
-      #     "shadowed": [
-      #       "db.yaml"
-      #     ]
+      # {
+      #   "summary": {
+      #     "severity": "ok",
+      #     "errors": 0,
+      #     "warnings": 0
       #   },
-      #   ...
-      # ]
+      #   "entries": [
+      #     {
+      #       "key": "DB_HOST",
+      #       "type": "config",
+      #       "value": "localhost",
+      #       "source": "db.development.yaml",
+      #       "sourceKey": "db.host",
+      #       "shadowed": [
+      #         "db.yaml"
+      #       ],
+      #       "status": {
+      #         "severity": "ok",
+      #         "code": "OK"
+      #       }
+      #     },
+      #     ...
+      #   ]
+      # }
       ```
     </Fragment>
   </ExampleBox>
@@ -99,10 +113,14 @@ The examples below use the same `api` workspace:
 | Flag | Environment variable | Description |
 | --- | --- | --- |
 | `--output`, `-o` | | Output format: `table` (default) or `json`. |
+| `--reveal` | | Decrypt secret references and show them in a `RESOLVED` column (and a `resolved` JSON field). |
+| `--absolute` | | Show absolute source paths instead of paths relative to `envx.yaml`. |
 | `--env`, `-E` | `ENVX_ENV` | Target environment to resolve. |
 | `--require-overlays` | `ENVX_REQUIRE_OVERLAYS` | Require every overlay file to exist. |
 | `--prefix` | `ENVX_PREFIX` | Prefix prepended to every key. |
 | `--suffix` | `ENVX_SUFFIX` | Suffix appended to every key. |
 | `--delimiter` | `ENVX_DELIMITER` | String used to join list values. |
+| `--overload` | `ENVX_OVERLOAD` | Prefer file values over host variables in `{{VAR}}` substitution. |
+| `--reference-pattern` | `ENVX_REFERENCE_PATTERN` | Regex overriding the `{{VAR}}` reference syntax. |
 
-Plus the [global flags](../overview/#global-flags). The `--env`, `--require-overlays`, `--prefix`, `--suffix`, and `--delimiter` flags map to [settings](../../configuration/schema/#settings-2) and override the values in `envx.yaml`.
+Plus the [global flags](../overview/#global-flags). The setting flags map to [settings](../../configuration/schema/#settings-2) and override the values in `envx.yaml`.

@@ -5,7 +5,7 @@
 # can copy the binary out of it in a build stage, instead of downloading and
 # verifying a release archive themselves:
 #
-#   COPY --from=ghcr.io/go-envx/envx:1.0.1 /envx /usr/local/bin/envx
+#   COPY --from=ghcr.io/go-envx/envx:2.0.0 /envx /usr/local/bin/envx
 #
 # GoReleaser builds the binaries for every target platform (see the `dockers_v2`
 # block in .goreleaser.yaml); this Dockerfile only copies the one matching the

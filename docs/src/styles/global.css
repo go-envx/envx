@@ -22,3 +22,10 @@
   --sl-sidebar-width: 15.5rem;
   --sl-sidebar-pad-x: 0.5rem;
 }
+
+/* Demote h4 so provider subsections read as children of the h3 key headings. */
+.sl-markdown-content h4 {
+  font-size: var(--sl-text-base);
+  font-weight: 600;
+  color: var(--sl-color-gray-2);
+}

@@ -149,7 +149,6 @@ func TestLoadProviders(t *testing.T) {
 		        production: 3f2a0c1e-0000-0000-0000-000000000000
 		    passwordstate:
 		      url: https://pw.example.com
-		      api-key-env: PW_KEY
 		      list-id:
 		        development: 1988
 		        production: 1990
@@ -170,11 +169,10 @@ func TestLoadProviders(t *testing.T) {
 			},
 		},
 		Passwordstate: &workspace.PasswordstateConfig{
-			Timeout:   5 * time.Second,
-			URL:       "https://pw.example.com",
-			APIKeyEnv: "PW_KEY",
-			ListIDs:   map[string]int{"development": 1988, "production": 1990},
-			Field:     "GenericField1",
+			Timeout: 5 * time.Second,
+			URL:     "https://pw.example.com",
+			ListIDs: map[string]int{"development": 1988, "production": 1990},
+			Field:   "GenericField1",
 		},
 	}
 	if !reflect.DeepEqual(ws.Secrets.Providers, want) {

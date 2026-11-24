@@ -81,10 +81,9 @@ func newProviders(
 	if config := configs.Passwordstate; config != nil {
 		registrations = append(registrations, external.Registration{
 			Provider: passwordstate.New(host, passwordstate.Options{
-				URL:       config.URL,
-				APIKeyEnv: config.APIKeyEnv,
-				ListIDs:   config.ListIDs,
-				Field:     config.Field,
+				URL:     config.URL,
+				ListIDs: config.ListIDs,
+				Field:   config.Field,
 			}),
 			Timeout: config.Timeout,
 		})

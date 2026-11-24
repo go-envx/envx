@@ -1,0 +1,68 @@
+---
+title: Variable substitution
+description: Compose values from other variables with {{VAR}} substitution and escape literal text.
+sidebar:
+  order: 1
+---
+
+import ExampleBox from '#components/ExampleBox.astro';
+
+A value in a namespace file can refer to another variable with `{{NAME}}`. envx replaces each reference with that variable's value when it resolves the environment, so one value can be built from others.
+
+## Substitution
+
+`NAME` is the flattened, uppercase key of another variable, such as `DB_HOST`. Whitespace inside the braces is trimmed.
+
+  <ExampleBox>
+    <Fragment slot="manifest">
+      ```yaml
+      # envx.yaml
+      environments:
+        - development
+
+      projects:
+        api:
+          includes:
+            - db
+      ```
+    </Fragment>
+    <Fragment slot="files">
+      ```yaml
+      # db.yaml
+      db:
+        host: localhost
+        port: 5432
+        url: postgres://{{DB_HOST}}:{{DB_PORT}}
+      ```
+    </Fragment>
+    <Fragment slot="commands">
+      ```sh
+      envx get api DB_URL
+      # postgres://localhost:5432
+      ```
+    </Fragment>
+  </ExampleBox>
+
+A reference can name a variable from the project's namespaces or a variable from the host environment. By default a host variable wins over a namespace variable of the same name. With [`overload`](../../configuration/schema/#overload) enabled, the namespace variable wins instead. A reference that matches neither is an error.
+
+## Errors
+
+Substitution fails rather than producing a partial value:
+
+- **Cycle.** Variables that refer to each other, directly or through a chain, such as `A` to `B` to `A`, are reported as a circular reference with the path that formed the loop.
+- **Undefined variable.** A reference to a name that is neither a namespace variable nor a host variable is reported with the key that used it.
+
+[`validate`](../../commands/validate/) reports both for every project and environment, and [`explain`](../../commands/explain/) shows them as a key's status without aborting.
+
+## Escaping
+
+Put a backslash before a reference to keep it as literal text. The backslash is dropped and the rest is kept as written:
+
+```yaml
+# Resolves to the literal text {{HOST}}.
+template: \{{HOST}}
+```
+
+## Custom syntax
+
+Set [`reference-pattern`](../../configuration/schema/#reference-pattern) to replace `{{VAR}}` with your own regular expression. Capture group 1 is the variable name, and the pattern must contain that group.

@@ -13,11 +13,14 @@ By default, envx walks up from the current working directory, stopping at the gi
 
 ## Explicit path
 
-To use a file in another location, or one that is not named `envx.yaml`, point at it directly with the `--config` flag or the `ENVX_CONFIG` environment variable:
+To use a file in another location, or one that is not named `envx.yaml`, point at it directly with the `--config` flag or the `ENVX_CONFIG` environment variable. Either can also name a directory, in which case envx uses the `envx.yaml` inside it:
 
 ```sh
 envx get api-service DATABASE_HOST --config ./path/to/my-config.yaml
 ENVX_CONFIG=./path/to/my-config.yaml envx get api-service DATABASE_HOST
+
+# A directory containing envx.yaml
+envx get api-service DATABASE_HOST --config ./path/to/dir
 ```
 
 The `--config` flag takes precedence over `ENVX_CONFIG`, which in turn takes precedence over automatic discovery.

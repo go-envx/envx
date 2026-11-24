@@ -1,0 +1,83 @@
+---
+title: emit
+description: Render a resolved environment to Kubernetes, JSON, or dotenv.
+sidebar:
+  order: 8
+---
+
+```sh
+envx emit <project> --target <format>
+```
+
+`emit` fully resolves and decrypts one project's environment and renders it to a delivery target. It reveals every value through the ordinary resolution path, so a value that cannot be resolved or decrypted aborts the command before any output is written. `emit` fails closed and never produces a partial result.
+
+The target environment is chosen like any other setting: the `--env` flag, `ENVX_ENV`, an `env` setting in `envx.yaml`, or the first declared environment.
+
+## Arguments
+
+| Argument | Description |
+| --- | --- |
+| `<project>` | The project to resolve and render. |
+
+## Targets
+
+`--target` is required and selects the output shape:
+
+| Target | Output |
+| --- | --- |
+| `k8s` | Canonical Kubernetes resources: a `ConfigMap` and/or `Secret`, with each value as its own data key. Consume them with `envFrom`. |
+| `k8s-bundle` | The same slice packed into a single data key holding one JSON blob, so the resource can be volume-mounted as one file. |
+| `json` | A flat JSON object. |
+| `dotenv` | `KEY=value` lines. |
+
+`--only` restricts the output to one slice: `secrets` for secret-derived values or `config` for the plain ones. Without it, everything is emitted, and `k8s` produces both a `Secret` and a `ConfigMap`.
+
+By default the Kubernetes targets name their resources `<project>-config` and `<project>-secrets`, and a merged bundle is `<project>-config-secrets`. An explicit `--name` is used verbatim instead. A `k8s-bundle` data key, which is also the mounted filename, defaults to `config.json` (`secrets.json` for a secrets-only bundle). `--key` overrides it, and its extension (`.json` or `.env`) picks the body format.
+
+## Output
+
+Output goes to stdout unless `--output` names a file. A file written with `--output` has private permissions because it may carry plaintext secrets, and the directory must already exist. When the file carries secret values, envx prints a warning on stderr: the output is unencrypted and must not be committed.
+
+:::danger[Never commit emitted files]
+A file written with `--output` holds unencrypted values. Do not commit it, and keep it out of version control with `.gitignore`.
+:::
+
+## Examples
+
+```sh
+# KEY=value lines on stdout.
+envx emit api-service --target dotenv
+
+# Only the secret-derived values, as JSON, for production.
+envx emit api-service --target json --only secrets --env production
+
+# A ConfigMap and a Secret for production.
+envx emit api-service --target k8s --env production
+
+# A single mountable config file, named explicitly.
+envx emit api-service --target k8s-bundle --only config --name web
+
+# Write to a file with private permissions.
+envx emit api-service --target k8s --env production --output ./secret.yaml
+```
+
+## Flags
+
+| Flag | Environment variable | Description |
+| --- | --- | --- |
+| `--target`, `-t` | | Required. Output shape: `k8s`, `k8s-bundle`, `json`, or `dotenv`. |
+| `--only` | | Restrict output to one slice: `secrets` or `config`. Default: all values. |
+| `--name`, `-n` | | Base for Kubernetes resource names. Default: the project name. Kubernetes targets only. |
+| `--key` | | `k8s-bundle` data key and filename. Default: `config.json` or `secrets.json`. |
+| `--output`, `-o` | | Write output to this file instead of stdout. |
+| `--env`, `-E` | `ENVX_ENV` | Target environment to resolve. |
+| `--require-overlays` | `ENVX_REQUIRE_OVERLAYS` | Require every overlay file to exist. |
+| `--prefix` | `ENVX_PREFIX` | Prefix prepended to every key. |
+| `--suffix` | `ENVX_SUFFIX` | Suffix appended to every key. |
+| `--delimiter` | `ENVX_DELIMITER` | String used to join list values. |
+| `--overload` | `ENVX_OVERLOAD` | Prefer file values over host variables in `{{VAR}}` substitution. |
+| `--reference-pattern` | `ENVX_REFERENCE_PATTERN` | Regex overriding the `{{VAR}}` reference syntax. |
+
+Plus the [global flags](../overview/#global-flags). The setting flags map to [settings](../../configuration/schema/#settings-2) and override the values in `envx.yaml`.
+
+Failures exit non-zero; see [Exit codes](../../concepts/exit-codes/).

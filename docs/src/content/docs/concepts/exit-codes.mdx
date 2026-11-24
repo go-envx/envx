@@ -1,0 +1,29 @@
+---
+title: Exit codes
+description: The process exit codes envx returns, so scripts and CI can branch on them.
+sidebar:
+  order: 4
+---
+
+envx maps outcomes to conventional exit codes. The values are stable, so scripts and CI pipelines can branch on them.
+
+| Code | Meaning |
+| --- | --- |
+| `0` | Success. |
+| `1` | Runtime error, such as a configuration, I/O, or resolution failure. |
+| `2` | Usage or validation error: invalid flags or arguments, rejected before the command ran. |
+| `126` | Command found but not executable. |
+| `127` | Command not found. |
+| `128+N` | Child terminated by signal `N`, such as `130` for `SIGINT`. |
+
+## Commands that spawn a child
+
+[`run`](../../commands/run/) propagates the child process's own exit code verbatim, so a command that exits `7` makes envx exit `7`. The `126`, `127`, and `128+N` codes only arise from a child.
+
+## Gates
+
+Commands used as a gate exit `1` on failure:
+
+- [`validate`](../../commands/validate/) exits `1` when the report fails: any error finding, or any warning with `--strict`. The findings are printed first, followed by a terse `validation failed` on stderr.
+- [`emit`](../../commands/emit/) exits `1` when a value cannot be resolved or decrypted, and writes no output.
+- [`explain`](../../commands/explain/) exits `0` even when a value is unresolved, because it reports status rather than failing.

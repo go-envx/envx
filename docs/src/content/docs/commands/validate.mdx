@@ -1,0 +1,68 @@
+---
+title: validate
+description: Check every project and environment for resolution and secrets problems.
+sidebar:
+  order: 10
+---
+
+```sh
+envx validate
+```
+
+`validate` resolves every project against every declared environment and reports the problems a workspace-wide gate should catch before deploy. It never materializes plaintext, because every reference is diagnosed through the masked dry-run path, and it never aborts on a single failure: every problem is collected and reported together.
+
+Errors always fail the command. `--strict` also fails it on warnings, chiefly a private key that is absent in this context. That is normal on a developer laptop but a failure for a full-CI gate. A failed report exits `1`; see [Exit codes](../../concepts/exit-codes/).
+
+## Checks
+
+Checks fall into three groups by what they read, which is also their cost:
+
+| Group | Reads | Checks |
+| --- | --- | --- |
+| `store` | Offline and instant. Only `secrets.yaml` and the keys file. | Unencrypted value, algorithm mismatch, unused value, missing public key, invalid private key, unavailable private key. |
+| `provider` | Offline. The external providers the merge references. | A declared provider that cannot be used. |
+| `resolution` | Merges each project and environment. | Dangling or undecryptable reference, invalid reference, substitution cycle, undefined variable, malformed or unresolved external reference, and an overlay key its base file never declares. |
+
+Every check has a code, a default severity, and a matching per-check flag. The codes and defaults are listed under the [`validate` block](../../configuration/schema/#validate) of the schema.
+
+By default every check runs. Passing any per-check flag runs only the named checks and skips the cost of the rest. A pre-commit hook can select just the offline store checks and pay for no environment merge. Each flag is the kebab-case twin of its `snake_case` severity key, so `--secret-is-not-encrypted` selects the check configured by `validate.secret_is_not_encrypted`.
+
+Severity itself is set only in `envx.yaml`, never on the command line.
+
+## Output
+
+The table has `SCOPE`, `KEY`, `STATUS`, and `MESSAGE` columns. `SCOPE` is `<project>/<environment>` for a reference finding, or `secrets` for a store-level finding. Error and warning counts print on stderr, and a clean report prints `no validation problems found`.
+
+`--output json` prints a `summary` with `failed`, `errors`, and `warnings`, and a `findings` array whose entries have `severity`, `project`, `environment`, `key`, `code`, and `message`.
+
+## Examples
+
+```sh
+# Run every check.
+envx validate
+
+# Fail on warnings too, for CI.
+envx validate --strict
+
+# Machine-readable output.
+envx validate --output json
+
+# A pre-commit hook: only offline store checks, no environment merge.
+envx validate --secret-is-not-encrypted --public-key-is-missing
+```
+
+## Flags
+
+| Flag | Environment variable | Description |
+| --- | --- | --- |
+| `--strict` | | Fail on warnings as well as errors. |
+| `--output`, `-o` | | Output format: `table` (default) or `json`. |
+| `--require-overlays` | `ENVX_REQUIRE_OVERLAYS` | Require every overlay file to exist. |
+| `--prefix` | `ENVX_PREFIX` | Prefix prepended to every key. |
+| `--suffix` | `ENVX_SUFFIX` | Suffix appended to every key. |
+| `--delimiter` | `ENVX_DELIMITER` | String used to join list values. |
+| `--overload` | `ENVX_OVERLOAD` | Prefer file values over host variables in `{{VAR}}` substitution. |
+| `--reference-pattern` | `ENVX_REFERENCE_PATTERN` | Regex overriding the `{{VAR}}` reference syntax. |
+| `--<check-code>` | | One flag per check, such as `--secret-is-not-encrypted`. Run only the named checks. |
+
+Plus the [global flags](../overview/#global-flags). `validate` has no `--env` flag because it checks every declared environment.

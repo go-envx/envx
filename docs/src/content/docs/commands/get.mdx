@@ -13,6 +13,8 @@ envx get <project> <key>
 
 `get` resolves the merged environment for a project and prints the value of a single key. The key is matched case-insensitively, so `HOST` and `host` resolve to the same value.
 
+Secret references print masked as `secret://group/key` unless you pass `--reveal`, which decrypts and prints the plaintext.
+
 ## Arguments
 
 | Argument | Description |
@@ -82,10 +84,13 @@ The examples below resolve a small workspace — an `api` project with one neste
 
 | Flag | Environment variable | Description |
 | --- | --- | --- |
+| `--reveal` | | Decrypt secret references instead of masking them. |
 | `--env`, `-E` | `ENVX_ENV` | Target environment to resolve. |
 | `--require-overlays` | `ENVX_REQUIRE_OVERLAYS` | Require every overlay file to exist. |
 | `--prefix` | `ENVX_PREFIX` | Prefix prepended to every key. |
 | `--suffix` | `ENVX_SUFFIX` | Suffix appended to every key. |
 | `--delimiter` | `ENVX_DELIMITER` | String used to join list values. |
+| `--overload` | `ENVX_OVERLOAD` | Prefer file values over host variables in `{{VAR}}` substitution. |
+| `--reference-pattern` | `ENVX_REFERENCE_PATTERN` | Regex overriding the `{{VAR}}` reference syntax. |
 
-Plus the [global flags](../overview/#global-flags). These flags map to [settings](../../configuration/schema/#settings-2) and override the values in `envx.yaml`.
+Plus the [global flags](../overview/#global-flags). The setting flags map to [settings](../../configuration/schema/#settings-2) and override the values in `envx.yaml`.

@@ -60,6 +60,10 @@ export default defineConfig({
           items: [{ autogenerate: { directory: 'configuration' } }],
         },
         {
+          label: 'Concepts',
+          items: [{ autogenerate: { directory: 'concepts' } }],
+        },
+        {
           label: 'Commands',
           items: [{ autogenerate: { directory: 'commands' } }],
         },

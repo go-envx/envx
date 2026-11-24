@@ -36,7 +36,7 @@ const prodListing = `[{"PasswordID":50,"Title":"db","Password":"prod"}]`
 var listIDs = map[string]int{"dev": 1990, "prod": 1988}
 
 // keyHost carries the API key.
-var keyHost = hostenv.From([]string{"PW_KEY=" + apiKey})
+var keyHost = hostenv.From([]string{"PASSWORDSTATE_API_KEY=" + apiKey})
 
 // requests records the paths a fake API served, safely across goroutines.
 type requests struct {
@@ -114,7 +114,6 @@ func newFieldProvider(
 ) *passwordstate.Provider {
 	return passwordstate.New(host, passwordstate.Options{
 		URL:       server.URL + "/pws/",
-		APIKeyEnv: "PW_KEY",
 		ListIDs:   listIDs,
 		Field:     field,
 		Client:    server.Client(),
@@ -178,7 +177,6 @@ func TestQualifyOffline(t *testing.T) {
 
 	p := passwordstate.New(keyHost, passwordstate.Options{
 		URL:       "https://pw.local",
-		APIKeyEnv: "PW_KEY",
 		ListIDs:   listIDs,
 	})
 	if err := p.CheckAvailable(); err != nil {
@@ -295,24 +293,19 @@ func TestFetchUnavailable(t *testing.T) {
 		contain string
 	}{
 		"missing url": {
-			opts:    passwordstate.Options{APIKeyEnv: "PW_KEY"},
+			opts:    passwordstate.Options{},
 			host:    keyHost,
 			contain: "url is not configured",
 		},
 		"plain http": {
-			opts:    passwordstate.Options{URL: "http://pw.local", APIKeyEnv: "PW_KEY"},
+			opts:    passwordstate.Options{URL: "http://pw.local"},
 			host:    keyHost,
 			contain: "must be an https URL",
 		},
-		"missing api-key-env": {
-			opts:    passwordstate.Options{URL: "https://pw.local"},
-			host:    keyHost,
-			contain: "api-key-env is not configured",
-		},
 		"unset key": {
-			opts:    passwordstate.Options{URL: "https://pw.local", APIKeyEnv: "PW_KEY"},
-			host:    hostenv.From([]string{"PW_KEY="}),
-			contain: "PW_KEY is not set",
+			opts:    passwordstate.Options{URL: "https://pw.local"},
+			host:    hostenv.From([]string{"PASSWORDSTATE_API_KEY="}),
+			contain: "PASSWORDSTATE_API_KEY is not set",
 		},
 	}
 	for name, tt := range tests {
@@ -338,7 +331,7 @@ func TestFetchResponseErrors(t *testing.T) {
 
 	var seen requests
 	server := newServer(t, &seen)
-	wrongKey := hostenv.From([]string{"PW_KEY=wrong"})
+	wrongKey := hostenv.From([]string{"PASSWORDSTATE_API_KEY=wrong"})
 	tests := map[string]struct {
 		host    hostenv.Snapshot
 		path    string
@@ -401,7 +394,6 @@ func TestFetchRequestFailure(t *testing.T) {
 	// The default client rejects the test server's self-signed certificate.
 	p := passwordstate.New(keyHost, passwordstate.Options{
 		URL:       server.URL,
-		APIKeyEnv: "PW_KEY",
 	})
 
 	_, err := p.Fetch(context.Background(), ref("42"))

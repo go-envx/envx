@@ -11,7 +11,9 @@ import ExampleControls from '#components/ExampleControls.astro';
 import KeyboardShortcut from '#components/KeyboardShortcut.astro';
 import SchemaMeta from '#components/SchemaMeta.astro';
 
-`envx.yaml` is the workspace manifest: it declares your environments, your projects, and the settings that shape how envx resolves them. This page is the structural reference for every key. To see a manifest built from scratch, follow [Getting Started](../../guide/getting-started/). To learn how envx locates the manifest, see [Discovery](../discovery/).
+`envx.yaml` is the workspace manifest: it declares your environments, your projects, the settings that shape how envx resolves them, and optionally your [secrets](#secrets) store and [validation](#validate) severities. This page is the structural reference for every key. To see a manifest built from scratch, follow [Getting Started](../../guide/getting-started/). To learn how envx locates the manifest, see [Discovery](../discovery/).
+
+The manifest is decoded strictly: an unknown key is rejected with a "Did you mean" suggestion for the closest valid key and a link back to this page.
 
 :::note
 Examples on this page are collapsed by default to keep it scannable.
@@ -301,7 +303,7 @@ Examples on this page are collapsed by default to keep it scannable.
 
   <SchemaMeta type="bool" />
 
-  Let values from your files override existing OS environment variables. Applies to [`run`](../../commands/run/); by default an existing OS variable wins.
+  Let values from your files override existing OS environment variables. Applies to [`run`](../../commands/run/), where by default an existing OS variable wins. It also decides whether file values or host variables win in [`{{VAR}}` substitution](../../concepts/variable-substitution/) for every command that resolves values.
 
   - **CLI Flag:** `--overload`
   - **Environment Variable:** `ENVX_OVERLOAD`
@@ -394,6 +396,56 @@ Examples on this page are collapsed by default to keep it scannable.
   </ExampleBox>
   </ExampleAccordion>
 
+### `reference-pattern`
+
+  <SchemaMeta type="string" />
+
+  A regular expression that replaces the built-in `{{VAR}}` reference syntax. Capture group 1 is the variable name. The pattern must contain that group. See [Variable substitution](../../concepts/variable-substitution/).
+
+  - **CLI Flag:** `--reference-pattern`
+  - **Environment Variable:** `ENVX_REFERENCE_PATTERN`
+  - **Default Value:** `\{\{([^}]*)\}\}`
+
+  <ExampleAccordion>
+  <ExampleBox>
+    <Fragment slot="manifest">
+      ```yaml
+      # envx.yaml
+      environments:
+        - development
+
+      settings:
+        reference-pattern: '\$\{([^}]*)\}'
+
+      projects:
+        web:
+          includes:
+            - values
+      ```
+    </Fragment>
+    <Fragment slot="files">
+      ```yaml
+      # values.yaml
+      host: localhost
+      url: http://${HOST}:8080
+      literal: http://{{HOST}}:8080
+      ```
+    </Fragment>
+    <Fragment slot="commands">
+      ```sh
+      envx get web URL
+      # http://localhost:8080
+
+      envx get web LITERAL
+      # http://{{HOST}}:8080
+
+      ENVX_REFERENCE_PATTERN='\{\{([^}]*)\}\}' envx get web LITERAL
+      # http://localhost:8080
+      ```
+    </Fragment>
+  </ExampleBox>
+  </ExampleAccordion>
+
 ### `require-overlays`
 
   <SchemaMeta type="bool" />
@@ -431,7 +483,7 @@ Examples on this page are collapsed by default to keep it scannable.
     <Fragment slot="commands">
       ```sh
       envx get web HOST --env staging
-      # Error: loading environment file values.staging.yaml: open values.staging.yaml: no such file or directory
+      # ERROR: loading environment file <path>: required overlay file not found
 
       ENVX_REQUIRE_OVERLAYS=false envx get web HOST --env staging
       # localhost
@@ -486,6 +538,170 @@ Examples on this page are collapsed by default to keep it scannable.
 
       envx get web HOST_BETA --suffix beta
       # localhost
+      ```
+    </Fragment>
+  </ExampleBox>
+  </ExampleAccordion>
+
+## Secrets
+
+  The optional `secrets` block locates the encrypted secrets store and its keys, and declares the [external providers](../../concepts/secrets-providers/) a workspace may reference. Every key is optional. For how references, groups, and keypairs work, see [Secrets store](../../concepts/secrets-store/).
+
+  ```yaml
+  # envx.yaml
+  secrets:
+    path: secrets.yaml
+    keys-path: envx.keys
+    cipher: age
+    providers:
+      op:
+        timeout: 30s
+  ```
+
+### `path`
+
+  <SchemaMeta type="string" />
+
+  The secrets store file, relative to the manifest. **Default Value:** `secrets.yaml`
+
+### `keys-path`
+
+  <SchemaMeta type="string" />
+
+  The private-key file, relative to the manifest. Keep it out of version control. **Default Value:** `envx.keys`, beside the store
+
+### `cipher`
+
+  <SchemaMeta type={'"age" | "nacl-box"'} />
+
+  The encryption algorithm for the store: `age` or `nacl-box` (NaCl sealed box over Curve25519). It applies to key generation and to every value in the store. A stored value sealed under a different algorithm is not decrypted; [`validate`](../../commands/validate/) reports it as `secret_algorithm_mismatch`. **Default Value:** `age`
+
+### `providers`
+
+  <SchemaMeta type="Providers" />
+
+  Declares which external providers are enabled. A provider that is not declared is disabled, and a value using its scheme passes through unchanged. Each provider takes the keys documented below.
+
+#### `op`
+
+  The 1Password CLI provider.
+
+  | Key | Type | Default | Description |
+  | --- | --- | --- | --- |
+  | `timeout` | duration | `30s` | Bounds each 1Password CLI call. A positive duration such as `500ms`, `30s` or `2m`. |
+
+  <ExampleAccordion>
+  <ExampleBox>
+    <Fragment slot="manifest">
+      ```yaml
+      # envx.yaml
+      secrets:
+        providers:
+          op:
+            timeout: 20s
+      ```
+    </Fragment>
+  </ExampleBox>
+  </ExampleAccordion>
+
+#### `bws`
+
+  The Bitwarden Secrets Manager CLI provider.
+
+  | Key | Type | Default | Description |
+  | --- | --- | --- | --- |
+  | `timeout` | duration | `30s` | Bounds each Bitwarden Secrets Manager CLI call. A positive duration such as `500ms`, `30s` or `2m`. |
+  | `project` | map[string]string | | Maps each environment to the project (name or ID) its short references read. May name only declared [`environments`](#environments). |
+
+  <ExampleAccordion>
+  <ExampleBox>
+    <Fragment slot="manifest">
+      ```yaml
+      # envx.yaml
+      environments:
+        - development
+        - production
+
+      secrets:
+        providers:
+          bws:
+            timeout: 20s
+            project:
+              development: web-app-dev
+              production: web-app-prod
+      ```
+    </Fragment>
+  </ExampleBox>
+  </ExampleAccordion>
+
+#### `passwordstate`
+
+  The Passwordstate provider.
+
+  | Key | Type | Default | Description |
+  | --- | --- | --- | --- |
+  | `url` | string | | The `https` base URL of the Passwordstate site. |
+  | `list-id` | map[string]int | | Maps each environment to the list ID its short references read. May name only declared [`environments`](#environments). |
+  | `field` | string | `Password` | The field read when a reference names none. |
+  | `timeout` | duration | `30s` | Bounds each HTTP request. A positive duration such as `500ms`, `30s` or `2m`. |
+
+  <ExampleAccordion>
+  <ExampleBox>
+    <Fragment slot="manifest">
+      ```yaml
+      # envx.yaml
+      environments:
+        - development
+        - production
+
+      secrets:
+        providers:
+          passwordstate:
+            url: https://passwords.example.com
+            list-id:
+              development: 1988
+              production: 1989
+            field: Password
+            timeout: 20s
+      ```
+    </Fragment>
+  </ExampleBox>
+  </ExampleAccordion>
+
+## Validate
+
+  The optional `validate` block sets the severity of each check that [`validate`](../../commands/validate/) runs. Each key is a check code in lowercase `snake_case`, such as `secret_is_not_encrypted`, unlike the kebab-case used elsewhere in the manifest. Each value is `off`, `warn`, or `error`.
+
+  Severity is set only here, never on the command line. The matching per-check flag on `validate` is the kebab-case twin of the key, for example `--secret-is-not-encrypted`, and selects which checks run.
+
+  | Key | Default | Reports |
+  | --- | --- | --- |
+  | `secret_is_not_encrypted` | `error` | A stored value left unencrypted. |
+  | `secret_algorithm_mismatch` | `error` | A value stored under a non-configured algorithm. |
+  | `secret_is_not_referenced` | `error` | A stored value no environment references. |
+  | `public_key_is_missing` | `error` | A group with stored secrets but no public key. |
+  | `private_key_is_invalid` | `error` | A group whose private key is malformed or mismatched. |
+  | `private_key_is_unavailable` | `warn` | A group with no private key available in this context. |
+  | `secret_reference_not_found` | `error` | A reference to a value absent from the store. |
+  | `invalid_secret_reference` | `error` | A malformed secret reference. |
+  | `secret_reference_is_unresolved` | `error` | A reference that passed every store check yet failed to decrypt. |
+  | `circular_variable_reference` | `error` | A variable substitution cycle. |
+  | `unresolved_variable_reference` | `error` | A substitution of an undefined variable. |
+  | `property_not_declared_in_base` | `off` | An overlay key its namespace base file never declares. |
+  | `invalid_external_reference` | `error` | A malformed reference for an enabled external provider. |
+  | `external_provider_not_enabled` | `warn` | A value using the scheme of an undeclared external provider. |
+  | `external_provider_unavailable` | `error` | A declared external provider that cannot be used. |
+  | `external_reference_unresolved` | `error` | An external reference the provider could not resolve. |
+
+  <ExampleAccordion>
+  <ExampleBox>
+    <Fragment slot="manifest">
+      ```yaml
+      # envx.yaml
+      validate:
+        private_key_is_unavailable: error
+        property_not_declared_in_base: warn
+        secret_is_not_referenced: off
       ```
     </Fragment>
   </ExampleBox>

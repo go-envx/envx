@@ -9,6 +9,8 @@ import ExampleBox from '#components/ExampleBox.astro';
 
 The same setting can be declared in several places — a global default in `envx.yaml`, a per-project override, a CLI flag, or an environment variable. This page explains how envx decides which one wins. For what each setting does, see [Schema](../schema/#settings-2).
 
+The settings that follow this precedence are [`delimiter`](../schema/#delimiter), [`env`](../schema/#env), [`overload`](../schema/#overload), [`prefix`](../schema/#prefix), [`reference-pattern`](../schema/#reference-pattern), [`require-overlays`](../schema/#require-overlays), and [`suffix`](../schema/#suffix). Each has a matching flag and `ENVX_*` variable.
+
 ## Per-project overrides
 
 Settings can be declared globally and overridden for a single project. A project setting always wins over the matching global setting. For example, a project that sets `prefix: web` overrides a global `prefix: app`. The example below shows this.

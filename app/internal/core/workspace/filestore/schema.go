@@ -158,11 +158,10 @@ func (p providersYAML) toDomain() workspace.ProvidersConfig {
 	}
 	if p.Passwordstate != nil {
 		providers.Passwordstate = &workspace.PasswordstateConfig{
-			Timeout:   p.Passwordstate.Timeout.orDefault(),
-			URL:       p.Passwordstate.URL,
-			APIKeyEnv: p.Passwordstate.APIKeyEnv,
-			ListIDs:   p.Passwordstate.ListIDs,
-			Field:     string(p.Passwordstate.Field),
+			Timeout: p.Passwordstate.Timeout.orDefault(),
+			URL:     p.Passwordstate.URL,
+			ListIDs: p.Passwordstate.ListIDs,
+			Field:   string(p.Passwordstate.Field),
 		}
 	}
 	return providers
@@ -209,8 +208,6 @@ func (p *projectsYAML) UnmarshalYAML(node *yaml.Node) error {
 type passwordstateYAML struct {
 	// URL is the Passwordstate base URL.
 	URL string `yaml:"url"`
-	// APIKeyEnv names the host variable holding the API key.
-	APIKeyEnv string `yaml:"api-key-env"`
 	// ListIDs maps an environment to the list of its short references.
 	ListIDs listIDsYAML `yaml:"list-id"`
 	// Field is the field read when a reference names none.

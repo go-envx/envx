@@ -1,0 +1,70 @@
+---
+title: keypair
+description: Generate, inspect, and rotate a secret group's keypair.
+sidebar:
+  order: 12
+---
+
+```sh
+envx keypair <command> <group>
+```
+
+`keypair` manages the asymmetric keypair of one secret group. Public keys are stored in `secrets.yaml`, and private keys in the git-ignored `envx.keys` file. Private-key material is never printed. See [Secrets store](../../concepts/secrets-store/) for how groups and keys are used.
+
+| Command | Purpose |
+| --- | --- |
+| [`generate`](#generate) | Generate a keypair for a new group. |
+| [`inspect`](#inspect) | Report a group's public key and private-key status. |
+| [`rotate`](#rotate) | Replace a group's keypair and re-encrypt its values. |
+
+## `generate`
+
+```sh
+envx keypair generate <group>
+```
+
+Generates a keypair for the group, writes its public key to `secrets.yaml`, and writes its private key to the configured private-key file. An existing group is rejected; use `rotate` to replace its keypair.
+
+```sh
+envx keypair generate production
+envx keypair generate shared
+```
+
+## `inspect`
+
+```sh
+envx keypair inspect <group>
+```
+
+Inspects the group without writing files or prompting. The private-key status is `not_available`, `valid`, or `invalid`.
+
+```sh
+envx keypair inspect production
+# Keypair for group "production":
+#   public key: age1...
+#   private key: valid
+```
+
+## `rotate`
+
+```sh
+envx keypair rotate <group>
+```
+
+Replaces the group's keypair and re-encrypts every value in the group under the new public key. The current private key must be available so existing values can be decrypted and re-encrypted. The new public key is written to `secrets.yaml` and the new private key to the private-key file.
+
+When the current key comes from a higher-priority environment source, rotating into the local key file is refused.
+
+```sh
+envx keypair rotate production
+```
+
+## Private-key lookup
+
+Commands that decrypt look for a group's private key in this order, using the first one found:
+
+1. The `ENVX_PRIVATE_KEY_<GROUP>` environment variable, with the group name in uppercase.
+2. The `ENVX_PRIVATE_KEY` environment variable, a bundle of keys.
+3. The `envx.keys` file, or the path set by [`secrets.keys-path`](../../configuration/schema/#keys-path).
+
+Plus the [global flags](../overview/#global-flags).

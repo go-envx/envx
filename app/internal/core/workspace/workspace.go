@@ -93,8 +93,6 @@ type PasswordstateConfig struct {
 	Timeout time.Duration
 	// URL is the Passwordstate base URL.
 	URL string
-	// APIKeyEnv names the host variable holding the API key.
-	APIKeyEnv string
 	// ListIDs maps an environment to the list of its short references.
 	ListIDs map[string]int
 	// Field is the field read when a reference names none; empty when unset.

@@ -16,7 +16,15 @@ import { Icon } from 'astro-icon/components'
 // The eyebrow labels ("Workspace" / "Commands") are inlined here rather than
 // factored into a component: they're two trivial call sites, so a shared
 // component earned its keep less than the indirection cost.
+//
+// Optional `columns` prop (a CSS grid-template-columns value such as "1fr 3fr")
+// overrides the default even two-column split for a single box.
 
+interface Props {
+  columns?: string
+}
+
+const { columns } = Astro.props
 const hasFiles = Astro.slots.has('files')
 const hasWorkspace = Astro.slots.has('manifest') || hasFiles
 const hasCommands = Astro.slots.has('commands')
@@ -46,10 +54,15 @@ const hasCommands = Astro.slots.has('commands')
         <div
           class:list={[
             'example-files mb-2 grid items-start gap-4',
-            hasFiles ? 'grid-cols-1 @min-[28rem]:grid-cols-2' : 'grid-cols-1',
+            hasFiles
+              ? columns
+                ? 'grid-cols-1 @min-[28rem]:grid-cols-[var(--example-columns)]'
+                : 'grid-cols-1 @min-[28rem]:grid-cols-2'
+              : 'grid-cols-1',
           ]}
+          style={columns ? `--example-columns: ${columns}` : undefined}
         >
-          <div class="example-files__manifest">
+          <div class="example-files__manifest flex flex-col gap-4">
             <slot name="manifest" />
           </div>
           {hasFiles && (

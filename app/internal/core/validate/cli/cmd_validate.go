@@ -22,15 +22,18 @@ const (
 	validateLong  = `
 		Validate resolves every project against every declared environment and
 		reports the problems a workspace-wide gate should catch before deploy. Its
-		checks fall into two groups by the files they read, which is also their cost:
+		checks fall into three groups by what they read, which is also their cost:
 
 		  store      offline, instant; reads only secrets.yaml and the keys file
 		             (unencrypted value, algorithm mismatch, unused value, missing
 		             public key, invalid private key, unavailable private key)
+		  provider   offline; checks that each external provider the merge
+		             references is declared and usable (CLI or credentials present)
 		  resolution merges each project and environment (dangling or undecryptable
 		             reference, invalid reference, variable-substitution cycle,
-		             undefined variable, and a key an environment overlay declares
-		             but its namespace base file does not)
+		             undefined variable, malformed or unresolved external reference,
+		             and a key an environment overlay declares but its namespace
+		             base file does not)
 
 		By default every check runs. Passing any per-check flag runs only the named
 		checks and skips the cost of the rest, so a pre-commit hook can select just

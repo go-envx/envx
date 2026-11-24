@@ -43,4 +43,16 @@ Real projects rarely have one `.env` file. They have shared configs, per-app set
   <Card title="Run anything" icon="rocket">
     Launch any command with the fully merged environment injected, with transparent signal forwarding and exit-code propagation.
   </Card>
+  <Card title="Encrypted secrets" icon="approve-check">
+    Keep secrets in an encrypted store, reference them as `secret://group/key`, and manage their keypairs with `secrets` and `keypair`.
+  </Card>
+  <Card title="Secrets providers" icon="external">
+    Pull values from 1Password, Bitwarden Secrets Manager, or Passwordstate with `op://`, `bws://`, and `passwordstate://` references.
+  </Card>
+  <Card title="Emit & pack" icon="seti:docker">
+    Render a resolved environment to Kubernetes, JSON, or dotenv with `emit`, or bundle an environment-scoped workspace for deployment with `pack`.
+  </Card>
+  <Card title="Validate" icon="approve-check-circle">
+    Gate CI on a workspace-wide check of resolution and secrets problems with `validate`.
+  </Card>
 </CardGrid>

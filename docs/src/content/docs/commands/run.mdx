@@ -15,6 +15,8 @@ envx run <project> -- <command> [args...]
 
 By default, existing OS environment variables take precedence over values from your files. Pass `--overload` to let file values win instead. Signals are forwarded transparently to the child process, and its exit code is propagated verbatim.
 
+By default an unresolved value aborts the run before the child starts, so the child never receives an unresolved reference as plaintext. Pass `--ignore-errors` to warn on each unresolved value, omit its key from the child environment, and start the child anyway.
+
 ## Arguments
 
 | Argument | Description |
@@ -92,24 +94,15 @@ The examples below use the same `api` workspace, running `printenv` so you can s
 | --- | --- | --- |
 | `--env`, `-E` | `ENVX_ENV` | Target environment to resolve. |
 | `--overload` | `ENVX_OVERLOAD` | File values override existing OS env vars. |
+| `--ignore-errors` | | Warn on unresolved values and omit them instead of aborting. |
 | `--require-overlays` | `ENVX_REQUIRE_OVERLAYS` | Require every overlay file to exist. |
 | `--prefix` | `ENVX_PREFIX` | Prefix prepended to every key. |
 | `--suffix` | `ENVX_SUFFIX` | Suffix appended to every key. |
 | `--delimiter` | `ENVX_DELIMITER` | String used to join list values. |
+| `--reference-pattern` | `ENVX_REFERENCE_PATTERN` | Regex overriding the `{{VAR}}` reference syntax. |
 
-Plus the [global flags](../overview/#global-flags). These flags map to [settings](../../configuration/schema/#settings-2) and override the values in `envx.yaml`.
+Plus the [global flags](../overview/#global-flags). The setting flags map to [settings](../../configuration/schema/#settings-2) and override the values in `envx.yaml`.
 
 ## Exit codes
 
-envx maps outcomes to conventional exit codes so `run` composes cleanly in scripts:
-
-| Code | Meaning |
-| --- | --- |
-| `0` | Success |
-| `1` | Runtime error |
-| `2` | Usage or validation error (invalid flags or arguments) |
-| `126` | Command found but not executable |
-| `127` | Command not found |
-| `128+N` | Child terminated by signal `N` (e.g. `130` for SIGINT) |
-
-The child process's own exit code is propagated verbatim, so a command that exits `7` makes envx exit `7`.
+envx maps outcomes to conventional exit codes so `run` composes cleanly in scripts. See [Exit codes](../../concepts/exit-codes/) for the full table; a child that exits `7` makes envx exit `7`.
