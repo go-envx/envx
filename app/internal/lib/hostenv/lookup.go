@@ -73,6 +73,19 @@ func (l *Lookup) All() (map[string]Var, error) {
 	return maps.Clone(vars), nil
 }
 
+// Values returns every variable's value by name.
+func (l *Lookup) Values() (map[string]string, error) {
+	vars, err := l.All()
+	if err != nil {
+		return nil, err
+	}
+	values := make(map[string]string, len(vars))
+	for name, v := range vars {
+		values[name] = v.Value
+	}
+	return values, nil
+}
+
 // read merges the file under the process environment.
 func read(opts Options) (map[string]Var, error) {
 	environ := os.Environ

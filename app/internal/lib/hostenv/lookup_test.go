@@ -70,6 +70,19 @@ func TestAllReturnsCopy(t *testing.T) {
 	}
 }
 
+func TestValuesReturnsValuesByName(t *testing.T) {
+	t.Parallel()
+
+	got, err := hostenv.From([]string{"A=1", "EMPTY="}).Values()
+	if err != nil || len(got) != 2 || got["A"] != "1" || got["EMPTY"] != "" {
+		t.Errorf("Values() = %v, %v", got, err)
+	}
+	var nilLookup *hostenv.Lookup
+	if got, err := nilLookup.Values(); err != nil || len(got) != 0 {
+		t.Errorf("nil Values() = %v, %v", got, err)
+	}
+}
+
 func TestPrecedence(t *testing.T) {
 	t.Parallel()
 

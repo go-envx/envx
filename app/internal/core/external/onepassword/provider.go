@@ -97,9 +97,9 @@ func (p *Provider) Fetch(ctx context.Context, ref external.Reference) (string, e
 		return "", err
 	}
 	read := external.Reference{Scheme: external.SchemeOnePassword, Path: ref.Path}
-	vars, err := external.HostValues(p.hostEnv)
+	vars, err := p.hostEnv.Values()
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("%w: %w", external.ErrProviderUnavailable, err)
 	}
 	out, err := p.run(ctx, process.OutputCommand{
 		Args: []string{program, "read", "--no-newline", read.String()},

@@ -112,9 +112,9 @@ func New(hostEnv *hostenv.Lookup, opts Options) *Provider {
 // childEnv returns the minimal CLI environment and whether it holds a
 // non-empty access token.
 func (p *Provider) childEnv() (env map[string]string, hasToken bool, err error) {
-	vars, err := external.HostValues(p.hostEnv)
+	vars, err := p.hostEnv.Values()
 	if err != nil {
-		return nil, false, err
+		return nil, false, fmt.Errorf("%w: %w", external.ErrProviderUnavailable, err)
 	}
 	env = process.MinimalEnv(vars, cliEnv)
 	for name, val := range env {
