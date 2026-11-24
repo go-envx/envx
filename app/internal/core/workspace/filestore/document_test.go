@@ -72,7 +72,7 @@ func TestParseDocumentAppliesDefaults(t *testing.T) {
 
 	const manifestPath = "/work/envx.yaml"
 	root := filepath.Dir(manifestPath)
-	absKeys := filepath.Join(string(filepath.Separator), "etc", "envx.keys")
+	absKeys := filepath.Join(string(filepath.Separator), "etc", "envx.local.keys")
 	base := str.Dedent(`
 		environments: [dev]
 		projects:
@@ -88,7 +88,7 @@ func TestParseDocumentAppliesDefaults(t *testing.T) {
 			body: base,
 			secrets: workspace.SecretsConfig{
 				SecretsPath: filepath.Join(root, "secrets.yaml"),
-				KeysPath:    filepath.Join(root, "envx.keys"),
+				KeysPath:    filepath.Join(root, "envx.local.keys"),
 				Cipher:      "age",
 			},
 		},
@@ -100,7 +100,7 @@ func TestParseDocumentAppliesDefaults(t *testing.T) {
 			`),
 			secrets: workspace.SecretsConfig{
 				SecretsPath: filepath.Join(root, "private", "secrets.yaml"),
-				KeysPath:    filepath.Join(root, "private", "envx.keys"),
+				KeysPath:    filepath.Join(root, "private", "envx.local.keys"),
 				Cipher:      "nacl-box",
 			},
 		},
@@ -108,11 +108,11 @@ func TestParseDocumentAppliesDefaults(t *testing.T) {
 			body: base + str.Dedent(`
 				secrets:
 				  path: private/secrets.yaml
-				  keysPath: keys/envx.keys
+				  keysPath: keys/envx.local.keys
 			`),
 			secrets: workspace.SecretsConfig{
 				SecretsPath: filepath.Join(root, "private", "secrets.yaml"),
-				KeysPath:    filepath.Join(root, "keys", "envx.keys"),
+				KeysPath:    filepath.Join(root, "keys", "envx.local.keys"),
 				Cipher:      "age",
 			},
 		},

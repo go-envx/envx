@@ -9,7 +9,7 @@ sidebar:
 envx keypair <command> <group>
 ```
 
-`keypair` manages the asymmetric keypair of one secret group. Public keys are stored in `secrets.yaml`, and private keys in the git-ignored `envx.keys` file. Private-key material is never printed. See [Secrets store](../../concepts/secrets-store/) for how groups and keys are used.
+`keypair` manages the asymmetric keypair of one secret group. Public keys are stored in `secrets.yaml`, and private keys in the git-ignored `envx.local.keys` file. Private-key material is never printed. See [Secrets store](../../concepts/secrets-store/) for how groups and keys are used.
 
 | Command | Purpose |
 | --- | --- |
@@ -65,6 +65,6 @@ Commands that decrypt look for a group's private key in this order, using the fi
 
 1. The `ENVX_PRIVATE_KEY_<GROUP>` environment variable, with the group name in uppercase.
 2. The `ENVX_PRIVATE_KEY` environment variable, a bundle of keys.
-3. The `envx.keys` file, or the path set by [`secrets.keysPath`](../../configuration/schema/#keyspath).
+3. The `envx.local.keys` file, or the path set by [`secrets.keysPath`](../../configuration/schema/#keyspath).
 
 Plus the [global flags](../overview/#global-flags).

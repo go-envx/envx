@@ -16,6 +16,13 @@ import (
 // and leaves ignore files untouched when Git is unavailable or targetPath is already
 // ignored by an ancestor ignore rule.
 func EnsureIgnored(targetPath string) error {
+	return EnsureIgnoredRule(targetPath, filepath.Base(targetPath))
+}
+
+// EnsureIgnoredRule is EnsureIgnored with an explicit rule, such as a glob
+// covering targetPath, appended to the sibling .gitignore when targetPath is
+// not already ignored.
+func EnsureIgnoredRule(targetPath, rule string) error {
 	if strings.TrimSpace(targetPath) == "" {
 		return errors.New("file path is empty")
 	}
@@ -42,7 +49,7 @@ func EnsureIgnored(targetPath string) error {
 	if err != nil && !errors.Is(err, os.ErrNotExist) {
 		return fmt.Errorf("reading %s: %w", ignorePath, err)
 	}
-	if hasIgnoreRule(string(data), name) {
+	if hasIgnoreRule(string(data), rule) {
 		return nil
 	}
 
@@ -50,7 +57,7 @@ func EnsureIgnored(targetPath string) error {
 	if content != "" && !strings.HasSuffix(content, "\n") {
 		content += "\n"
 	}
-	content += name + "\n"
+	content += rule + "\n"
 	if err := writeDurable(ignorePath, []byte(content)); err != nil {
 		return fmt.Errorf("protecting file with %s: %w", ignorePath, err)
 	}

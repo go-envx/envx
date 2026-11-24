@@ -37,6 +37,8 @@ envx create quick-start --force
 
 Plus the [global flags](../overview/#global-flags).
 
+After writing the files, `create` makes sure the target directory's `.gitignore` contains `envx.local.*`, so machine-local files such as `envx.local.keys` are never committed. The rule is skipped when Git already ignores such files or is not installed, and an existing `.gitignore` is appended to, never overwritten.
+
 After scaffolding, `cd` into the directory and try a command:
 
 ```sh

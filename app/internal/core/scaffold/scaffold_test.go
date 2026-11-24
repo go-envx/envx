@@ -137,3 +137,30 @@ func TestQuickStartLoads(t *testing.T) {
 		}
 	}
 }
+
+func TestCreateIgnoresLocalFiles(t *testing.T) {
+	t.Parallel()
+
+	service := scaffold.Service{Templates: fstest.MapFS{
+		"demo/envx.yaml": {Data: []byte("root")},
+	}}
+	dir := t.TempDir()
+	ignore := filepath.Join(dir, ".gitignore")
+	if err := os.WriteFile(ignore, []byte("dist/"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := service.Create(scaffold.CreateParams{
+		Template: "demo", TargetDir: dir, Force: true,
+	}); err != nil {
+		t.Fatalf("Create: %v", err)
+	}
+
+	data, err := filex.Read(filepath.Join(dir, ".gitignore"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := "dist/\nenvx.local.*\n"; string(data) != want {
+		t.Errorf(".gitignore = %q, want %q", data, want)
+	}
+}

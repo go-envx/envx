@@ -94,7 +94,7 @@ func TestLoadValid(t *testing.T) {
 		environments: [development, production]
 		secrets:
 		  path: ./private/secrets.yaml
-		  keysPath: ./private/envx.keys
+		  keysPath: ./private/envx.local.keys
 		  cipher: age
 		projects:
 		  api:
@@ -118,7 +118,7 @@ func TestLoadValid(t *testing.T) {
 	if ws.Secrets.SecretsPath != wantSecrets {
 		t.Errorf("SecretsPath = %q, want %q", ws.Secrets.SecretsPath, wantSecrets)
 	}
-	wantKeys := filepath.Join(ws.Root, "private", "envx.keys")
+	wantKeys := filepath.Join(ws.Root, "private", "envx.local.keys")
 	if ws.Secrets.KeysPath != wantKeys {
 		t.Errorf("KeysPath = %q, want %q", ws.Secrets.KeysPath, wantKeys)
 	}

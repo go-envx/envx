@@ -16,7 +16,7 @@ const (
 	// defaultSecretsFilename is the store filename used when the manifest names none.
 	defaultSecretsFilename = "secrets.yaml"
 	// defaultKeysFilename is the private-key filename placed beside the store by default.
-	defaultKeysFilename = "envx.keys"
+	defaultKeysFilename = "envx.local.keys"
 	// defaultCipher is the algorithm used when the manifest names none.
 	defaultCipher = "age"
 	// defaultProviderTimeout bounds each external provider call when unset.

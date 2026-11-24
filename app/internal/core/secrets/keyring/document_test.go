@@ -23,7 +23,7 @@ func TestParseDocumentErrors(t *testing.T) {
 		"duplicate entry": material + "=a\n" + strings.ToLower(material) + "=b\n",
 	}
 	for name, content := range tests {
-		_, err := parseDocument(content, "envx.keys")
+		_, err := parseDocument(content, "envx.local.keys")
 		if err == nil {
 			t.Errorf("%s: parseDocument succeeded, want error", name)
 			continue
@@ -57,7 +57,7 @@ func TestLookup(t *testing.T) {
 		{"ambiguous without identity", "API=old\n" + versioned, "", "", false, true},
 	}
 	for _, tt := range tests {
-		doc, err := parseDocument(tt.content, "envx.keys")
+		doc, err := parseDocument(tt.content, "envx.local.keys")
 		if err != nil {
 			t.Fatalf("%s: parseDocument: %v", tt.name, err)
 		}

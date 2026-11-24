@@ -15,6 +15,9 @@ import (
 // internal Go types.
 const SchemaDocsURL = "https://go-envx.github.io/envx/configuration/schema/"
 
+// LocalFilePattern matches every machine-local envx file that must never be committed.
+const LocalFilePattern = "envx.local.*"
+
 // Workspace represents the validated workspace domain entity.
 type Workspace struct {
 	Path string

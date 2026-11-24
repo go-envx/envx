@@ -11,7 +11,7 @@ const (
 	keypairLong  = `
 		Generate, inspect, or rotate the asymmetric keypair for one secret group.
 		Managed public keys are stored in secrets.yaml; private keys are stored in the
-		configured git-ignored envx.keys file.
+		configured git-ignored envx.local.keys file.
 	`
 )
 

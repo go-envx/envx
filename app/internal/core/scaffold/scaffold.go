@@ -8,8 +8,10 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/go-envx/envx/app/internal/core/workspace"
 	"github.com/go-envx/envx/app/internal/lib/atomicfile"
 	"github.com/go-envx/envx/app/internal/lib/filex"
+	"github.com/go-envx/envx/app/internal/lib/git"
 )
 
 // QuickStartTemplate is the template name matching the quick-start subdirectory.
@@ -78,6 +80,12 @@ func (s Service) Create(params CreateParams) (CreateResult, error) {
 		if err := atomicfile.Write(dests[i], data); err != nil {
 			return CreateResult{}, err
 		}
+	}
+
+	// A representative local file name lets git decide whether the rule is needed.
+	local := filepath.Join(params.TargetDir, "envx.local.env")
+	if err := git.EnsureIgnoredRule(local, workspace.LocalFilePattern); err != nil {
+		return CreateResult{}, err
 	}
 
 	return CreateResult{Written: dests}, nil

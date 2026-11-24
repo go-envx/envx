@@ -551,7 +551,7 @@ Examples on this page are collapsed by default to keep it scannable.
   # envx.yaml
   secrets:
     path: secrets.yaml
-    keysPath: envx.keys
+    keysPath: envx.local.keys
     cipher: age
     providers:
       op:
@@ -568,7 +568,7 @@ Examples on this page are collapsed by default to keep it scannable.
 
   <SchemaMeta type="string" />
 
-  The private-key file, relative to the manifest. Keep it out of version control. **Default Value:** `envx.keys`, beside the store
+  The private-key file, relative to the manifest. Keep it out of version control. **Default Value:** `envx.local.keys`, beside the store
 
 ### `cipher`
 

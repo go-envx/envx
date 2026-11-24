@@ -200,7 +200,7 @@ func secretWorkspace(t *testing.T) (cfg, privateKeyEnv string) {
 
 	mustEnvx(t, nil, "keypair", "generate", "app", "--config", cfg)
 	mustEnvx(t, nil, "secrets", "set", "app", "api_key", "s3cr3t", "--config", cfg)
-	privateKey, err := filex.Read(filepath.Join(work, "envx.keys"))
+	privateKey, err := filex.Read(filepath.Join(work, "envx.local.keys"))
 	if err != nil {
 		t.Fatal(err)
 	}

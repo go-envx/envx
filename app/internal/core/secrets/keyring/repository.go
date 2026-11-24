@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/go-envx/envx/app/internal/core/secrets"
+	"github.com/go-envx/envx/app/internal/core/workspace"
 	"github.com/go-envx/envx/app/internal/lib/atomicfile"
 	"github.com/go-envx/envx/app/internal/lib/crypt"
 	"github.com/go-envx/envx/app/internal/lib/filex"
@@ -20,7 +21,7 @@ const (
 	// EnvPrefix names the shared key bundle and prefixes group-specific keys.
 	EnvPrefix = "ENVX_PRIVATE_KEY"
 
-	defaultFilename = "envx.keys"
+	defaultFilename = "envx.local.keys"
 )
 
 // Repository resolves private keys from the environment and a local key file,
@@ -32,7 +33,7 @@ type Repository struct {
 	lookupEnv func(string) (string, bool)
 }
 
-// New constructs a keyring repository. An empty path uses "envx.keys"; a nil
+// New constructs a keyring repository. An empty path uses "envx.local.keys"; a nil
 // lookupEnv means no environment overrides.
 func New(path string, lookupEnv func(string) (string, bool)) (*Repository, error) {
 	path = strings.TrimSpace(path)
@@ -119,7 +120,7 @@ func (r *Repository) Retain(group string, pair crypt.Keypair) error {
 	if strings.ContainsAny(pair.PrivateKey, "\r\n") {
 		return errors.New("private key contains a line break")
 	}
-	if err := git.EnsureIgnored(r.path); err != nil {
+	if err := git.EnsureIgnoredRule(r.path, r.ignoreRule()); err != nil {
 		return err
 	}
 
@@ -146,6 +147,16 @@ func (r *Repository) Retain(group string, pair crypt.Keypair) error {
 		return fmt.Errorf("writing private keys %s: %w", r.path, err)
 	}
 	return nil
+}
+
+// ignoreRule returns the pattern covering all local files when the key file
+// matches it, and the exact file name otherwise.
+func (r *Repository) ignoreRule() string {
+	name := filepath.Base(r.path)
+	if ok, _ := filepath.Match(workspace.LocalFilePattern, name); ok {
+		return workspace.LocalFilePattern
+	}
+	return name
 }
 
 // appendPrivate appends text to path in a single write, leaving the file

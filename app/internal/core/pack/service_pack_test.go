@@ -21,7 +21,7 @@ import (
 func TestPackWritesPerProjectDirectories(t *testing.T) {
 	t.Parallel()
 	f := newSampleFixture(t)
-	f.write(t, "envx.keys", "shared: PRIVATE\n")
+	f.write(t, "envx.local.keys", "shared: PRIVATE\n")
 	out := filepath.Join(t.TempDir(), "dist")
 
 	result := f.pack(t, PackParams{Environments: []string{"production"}, OutDir: out})
@@ -468,7 +468,7 @@ func TestPackRejectsOutputContainingSources(t *testing.T) {
 			return filepath.Join(f.root, "vault")
 		}},
 		{"key directory", func(t *testing.T, f *fixture) string {
-			f.ws.Secrets.KeysPath = f.write(t, "keys/envx.keys", "shared: PRIVATE\n")
+			f.ws.Secrets.KeysPath = f.write(t, "keys/envx.local.keys", "shared: PRIVATE\n")
 			return filepath.Join(f.root, "keys")
 		}},
 		{"unselected project directory", func(t *testing.T, f *fixture) string {

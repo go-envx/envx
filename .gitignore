@@ -1,14 +1,9 @@
-# Environment
-*.env
-*.env.*
-!.env.example
-
 # Logs
 *.log
 *.log.*
 
 # Local
-**.local.json
+**.local.*
 **/.temp/
 **/temp/
 
@@ -19,22 +14,16 @@
 **/dist/
 **/obj/
 
-# Cache
-.astro/
-.task/
-
 # macOS system files
 _MACOSX/
 .DS_Store
 .DS_Store?
+.Spotlight-V100
+.Trashes
 
 # Windows system files
 ehthumbs.db
 Thumbs.db
-
-# macOS indexing & trash files
-.Spotlight-V100
-.Trashes
 
 # Go
 coverage.out
@@ -42,10 +31,14 @@ coverage.out
 # Node
 node_modules/
 .pnpm-store/
+.tsbuildinfo
 
 # Python
 __pycache__/
 .venv/
 
-# TypeScript
-.tsbuildinfo
+# Astro
+.astro/
+
+# Taskfile
+.task/

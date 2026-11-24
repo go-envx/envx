@@ -32,7 +32,7 @@ func newRepository(
 	t *testing.T, content string, vars map[string]string,
 ) (repo *keyring.Repository, path string) {
 	t.Helper()
-	path = filepath.Join(t.TempDir(), "envx.keys")
+	path = filepath.Join(t.TempDir(), "envx.local.keys")
 	if content != "" {
 		if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
 			t.Fatal(err)
@@ -204,8 +204,32 @@ func TestRetainIgnoresKeysFile(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if rule := filepath.Base(path) + "\n"; !strings.Contains(string(data), rule) {
-		t.Errorf(".gitignore = %q, want %q", data, rule)
+	if want := "envx.local.*\n"; string(data) != want {
+		t.Errorf(".gitignore = %q, want %q", data, want)
+	}
+}
+
+// TestRetainIgnoresCustomKeysFileByName verifies a key file outside the
+// envx.local.* pattern is ignored by its exact name.
+func TestRetainIgnoresCustomKeysFileByName(t *testing.T) {
+	t.Parallel()
+	path := filepath.Join(t.TempDir(), "custom.keys")
+	repo, err := keyring.New(path, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err := repo.Retain("api", crypt.Keypair{
+		PublicKey: "pub", PrivateKey: "key",
+	}); err != nil {
+		t.Fatalf("Retain: %v", err)
+	}
+	data, err := filex.Read(filepath.Join(filepath.Dir(path), ".gitignore"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := "custom.keys\n"; string(data) != want {
+		t.Errorf(".gitignore = %q, want %q", data, want)
 	}
 }
 
