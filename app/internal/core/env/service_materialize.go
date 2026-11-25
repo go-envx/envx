@@ -129,7 +129,7 @@ func (s *Service) materializeTolerant(
 		}
 		if hostVar, ok := op.host[key]; ok {
 			out[key] = hostVar.Value
-			origins[key] = s.hostFallback(merged.origins[key], key)
+			origins[key] = s.hostFallback(merged.origins[key], key, hostVar.File)
 			warning.Message = fmt.Sprintf(
 				"%s: %v; keeping the value set in the environment", key, f.err,
 			)
@@ -140,19 +140,20 @@ func (s *Service) materializeTolerant(
 }
 
 // hostFallback promotes the shadowed host source of key to winner, shadowing
-// the namespace winner in its place.
-func (s *Service) hostFallback(prev Origin, key string) Origin {
-	if prev.Winner.Host {
+// the namespace winner in its place. file is the local env file that supplied
+// the host value, or empty for a process variable.
+func (s *Service) hostFallback(prev Origin, key, file string) Origin {
+	if prev.Winner.IsHost() {
 		return prev
 	}
 	shadowed := make([]Source, 0, len(prev.Shadowed)+1)
 	for _, source := range prev.Shadowed {
-		if !source.Host {
+		if !source.IsHost() {
 			shadowed = append(shadowed, source)
 		}
 	}
 	shadowed = append(shadowed, prev.Winner)
-	return Origin{Winner: Source{Key: key, Host: true}, Shadowed: shadowed}
+	return Origin{Winner: newHostSource(key, file), Shadowed: shadowed}
 }
 
 // materializeLeaves resolves and renders every winner, recording per-key

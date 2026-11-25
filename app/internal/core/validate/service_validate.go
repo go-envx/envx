@@ -142,7 +142,7 @@ func (s *Service) diagnose(r *run) error {
 					}
 					// A host winner's items were replaced, so it calls no provider.
 					scheme, ok := external.SchemeOf(item)
-					if ok && !entry.Origin.Winner.Host {
+					if ok && !entry.Origin.Winner.IsHost() {
 						r.schemes[scheme] = true
 					}
 				}

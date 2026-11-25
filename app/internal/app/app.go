@@ -24,9 +24,28 @@ type Factory struct {
 	Environ func() []string
 }
 
-// newHostEnv returns the lookup one service shares for its host reads.
-func (f Factory) newHostEnv() *hostenv.Lookup {
-	return hostenv.NewLookup(hostenv.Options{Environ: f.Environ})
+// workspaceOptions is a loaded workspace with the host lookup its services
+// share.
+type workspaceOptions struct {
+	workspace workspace.Workspace
+	hostEnv   *hostenv.Lookup
+}
+
+// loadWorkspaceOptions loads the workspace at configPath and pairs it with the
+// process environment layered over its local env file.
+func (f Factory) loadWorkspaceOptions(configPath string) (workspaceOptions, error) {
+	ws, err := loadWorkspace(configPath)
+	if err != nil {
+		return workspaceOptions{}, err
+	}
+	he := hostenv.NewLookup(hostenv.Options{
+		File:    ws.LocalEnvPath,
+		Environ: f.Environ,
+	})
+	return workspaceOptions{
+		workspace: ws,
+		hostEnv:   he,
+	}, nil
 }
 
 // loadWorkspace loads the manifest at configPath, discovering it from the

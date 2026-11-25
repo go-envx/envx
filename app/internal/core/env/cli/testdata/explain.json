@@ -10,6 +10,7 @@
       "type": "config",
       "value": "true",
       "source": "env/postgres.development.yaml",
+      "sourceKind": "namespace",
       "sourceKey": "debug",
       "status": {
         "severity": "ok",
@@ -21,6 +22,7 @@
       "type": "config",
       "value": "dev-db.local",
       "source": "env/postgres.development.yaml",
+      "sourceKind": "namespace",
       "sourceKey": "host",
       "shadowed": [
         "env/postgres.yaml"
@@ -35,6 +37,7 @@
       "type": "config",
       "value": "5432",
       "source": "env/postgres.yaml",
+      "sourceKind": "namespace",
       "sourceKey": "port",
       "status": {
         "severity": "ok",

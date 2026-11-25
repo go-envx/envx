@@ -86,6 +86,63 @@ Examples on this page are collapsed by default to keep it scannable.
   </ExampleBox>
   </ExampleAccordion>
 
+### `localEnvPath`
+
+  <SchemaMeta type="string" />
+
+  The path to the [local env file](../../concepts/local-env/), a dotenv file of machine-local variables that envx reads alongside the process environment. A relative path resolves against the manifest. Keep the file out of version control.
+
+  - **Environment Variable:** `ENVX_LOCAL_ENV`
+  - **Default Value:** `envx.local.env`, beside the manifest
+
+  <ExampleAccordion>
+  <ExampleBox>
+    <Fragment slot="manifest">
+      ```yaml
+      # envx.yaml
+      environments:
+        - development
+        - production
+
+      localEnvPath: envx.local.env
+
+      projects:
+        web:
+          includes:
+            - values
+      ```
+    </Fragment>
+    <Fragment slot="files">
+      ```dotenv
+      # envx.local.env
+      LOCAL_DEV_EMAIL=dev@example.com
+      ```
+
+      ```yaml
+      # values.yaml
+      dev_email: # set per environment
+      ```
+
+      ```yaml
+      # values.development.yaml
+      dev_email: "{{LOCAL_DEV_EMAIL}}"
+      ```
+    </Fragment>
+    <Fragment slot="commands">
+      ```sh
+      # development is the default env.
+      envx run web -- printenv DEV_EMAIL
+      # dev@example.com
+
+      # The other environment never reads it.
+      envx run web --env production \
+        -- printenv DEV_EMAIL
+      # (empty)
+      ```
+    </Fragment>
+  </ExampleBox>
+  </ExampleAccordion>
+
 ## Project
 
   One entry under [`projects`](#projects).

@@ -1,5 +1,6 @@
-// Package env owns environment workflows: get, set, explain, diff,
-// materialization, and run. Namespace files, value resolution, and process
+// Package env owns environment workflows: get, explain, diff,
+// materialization, and run. Host values come from the process environment and
+// the machine-local env file. Namespace files, value resolution, and process
 // execution are supplied by adapters.
 //
 // # Value pipeline

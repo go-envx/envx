@@ -86,11 +86,8 @@ func TestValuesReturnsValuesByName(t *testing.T) {
 func TestPrecedence(t *testing.T) {
 	t.Parallel()
 
-	for _, name := range []string{"envx.local.yaml", ".env"} {
-		content := "BOTH: file\nONLY_FILE: f\nEMPTY_WINS: file\n"
-		if name == ".env" {
-			content = "BOTH=file\nONLY_FILE=f\nEMPTY_WINS=file\n"
-		}
+	for _, name := range []string{"envx.local.env", ".env"} {
+		content := "BOTH=file\nONLY_FILE=f\nEMPTY_WINS=file\n"
 		file := writeNamed(t, name, content)
 		l := hostenv.NewLookup(hostenv.Options{
 			File:    file,
@@ -120,7 +117,7 @@ func TestMissingFileIsEmpty(t *testing.T) {
 	t.Parallel()
 
 	l := hostenv.NewLookup(hostenv.Options{
-		File:    filepath.Join(t.TempDir(), "absent.yaml"),
+		File:    filepath.Join(t.TempDir(), "absent.env"),
 		Environ: func() []string { return []string{"A=1"} },
 	})
 	all, err := l.All()
@@ -185,88 +182,52 @@ func TestParseDotenv(t *testing.T) {
 	}
 }
 
-func TestParseYAML(t *testing.T) {
+func TestMalformedFileNamesFile(t *testing.T) {
 	t.Parallel()
 
-	content := "# comment\nPLAIN: value\nDOLLAR: pa$$word\n" +
-		"QUOTED: \"1234\"\nEMPTY: \"\"\n"
-	want := map[string]string{
-		"PLAIN": "value", "DOLLAR": "pa$$word", "QUOTED": "1234", "EMPTY": "",
-	}
-	for _, name := range []string{"envx.local.yaml", "envx.local.yml", "A.YAML"} {
-		l := hostenv.NewLookup(hostenv.Options{
-			File:    writeNamed(t, name, content),
-			Environ: func() []string { return nil },
-		})
-		all, err := l.All()
-		if err != nil {
-			t.Fatalf("%s: %v", name, err)
-		}
-		if len(all) != len(want) {
-			t.Errorf("%s: got %v, want %v", name, all, want)
-		}
-		for key, value := range want {
-			if got := all[key].Value; got != value {
-				t.Errorf("%s: %s = %q, want %q", name, key, got, value)
-			}
-		}
+	file := writeNamed(t, ".env", "A=\"unterminated\n")
+	_, err := hostenv.NewLookup(hostenv.Options{File: file}).All()
+	if err == nil || !strings.Contains(err.Error(), file) {
+		t.Errorf("err = %v, want one naming the file", err)
 	}
 }
 
-func TestEmptyYAMLFile(t *testing.T) {
+func TestFileVarOverridesFile(t *testing.T) {
 	t.Parallel()
 
-	for _, content := range []string{"", "# only a comment\n", "---\n", "null\n"} {
-		l := hostenv.NewLookup(hostenv.Options{
-			File:    writeNamed(t, "envx.local.yaml", content),
-			Environ: func() []string { return nil },
-		})
-		if all, err := l.All(); err != nil || len(all) != 0 {
-			t.Errorf("%q: All = (%v, %v), want empty", content, all, err)
-		}
-	}
-}
-
-func TestYAMLErrorsNameFileAndLine(t *testing.T) {
-	t.Parallel()
+	defaultFile := writeNamed(t, "envx.local.env", "FROM=default\n")
+	override := writeNamed(t, "machine.env", "FROM=override\nONLY=o\n")
 
 	tests := []struct {
-		name, content, want string
+		name    string
+		environ []string
+		want    string
+		wantSrc string
 	}{
-		{"not a mapping", "- a\n- b\n", ":1:"},
-		{"nested value", "A: 1\nB:\n  C: x\n", ":1:"},
-		{"number", "PORT: 5432\n", ":1:"},
-		{"bool", "A: x\nFLAG: true\n", ":2:"},
-		{"null value", "A:\n", ":1:"},
-		{"alias", "A: &a x\nB: *a\n", ":2:"},
-		{"duplicate", "A: x\nB: y\nA: z\n", ":3:"},
-		{"bad name", "\n\"1BAD\": x\n", ":2:"},
+		{"no override", nil, "default", defaultFile},
+		{"empty is unset", []string{"ENVX_LOCAL_ENV="}, "default", defaultFile},
+		{"override", []string{"ENVX_LOCAL_ENV=" + override}, "override", override},
+		{
+			"missing override is empty",
+			[]string{"ENVX_LOCAL_ENV=" + filepath.Join(t.TempDir(), "none.env")},
+			"", "",
+		},
 	}
-	for _, tc := range tests {
-		t.Run(tc.name, func(t *testing.T) {
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			file := writeNamed(t, "envx.local.yaml", tc.content)
-			_, err := hostenv.NewLookup(hostenv.Options{File: file}).All()
-			if err == nil || !strings.Contains(err.Error(), file+tc.want) {
-				t.Errorf("err = %v, want it to contain %q", err, file+tc.want)
+			l := hostenv.NewLookup(hostenv.Options{
+				File:    defaultFile,
+				Environ: func() []string { return tt.environ },
+			})
+			v, ok, err := l.Get("FROM")
+			if err != nil || ok != (tt.want != "") || v.Value != tt.want ||
+				v.File != tt.wantSrc {
+				t.Errorf("Get(FROM) = (%+v, %v, %v), want %q from %q",
+					v, ok, err, tt.want, tt.wantSrc)
 			}
 		})
-	}
-}
-
-func TestMalformedFilesNameFile(t *testing.T) {
-	t.Parallel()
-
-	for name, content := range map[string]string{
-		".env":            "A=\"unterminated\n",
-		"envx.local.yaml": "A: [unclosed\n",
-	} {
-		file := writeNamed(t, name, content)
-		_, err := hostenv.NewLookup(hostenv.Options{File: file}).All()
-		if err == nil || !strings.Contains(err.Error(), file) {
-			t.Errorf("%s: err = %v, want one naming the file", name, err)
-		}
 	}
 }
 
@@ -291,7 +252,7 @@ func TestReadsOnceAndMemoizesErrors(t *testing.T) {
 	}
 
 	bad := hostenv.NewLookup(hostenv.Options{
-		File: writeNamed(t, "envx.local.yaml", "BROKEN\n"),
+		File: writeNamed(t, "envx.local.env", "BROKEN=\"x\n"),
 	})
 	_, _, first := bad.Get("A")
 	_, second := bad.All()

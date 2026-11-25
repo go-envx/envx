@@ -1,0 +1,2 @@
+Review docs for emit, keypair, pack, secrets, validate, and local-env
+keypair: have Retain write a "# <GROUP> public key: <key>" comment above each entry in envx.local.keys (the parser already skips # lines), optionally with a creation timestamp, so a human can match a private key to its public key. Alternative: show the fingerprint in `keypair inspect`.

@@ -53,36 +53,33 @@ func (f valueResolverFactory) newValueResolver(
 
 // NewEnvService assembles the environment service for the workspace at configPath.
 func (f Factory) NewEnvService(configPath string) (*env.Service, error) {
-	loadedWorkspace, err := loadWorkspace(configPath)
+	o, err := f.loadWorkspaceOptions(configPath)
 	if err != nil {
 		return nil, err
 	}
-	return envService(&loadedWorkspace, f.newHostEnv())
+	return envService(o)
 }
 
-// envService wires the environment service over a shared host lookup.
-func envService(
-	loadedWorkspace *workspace.Workspace,
-	hostEnv *hostenv.Lookup,
-) (*env.Service, error) {
-	cipher, err := newCipher(loadedWorkspace.Secrets.Cipher)
+// envService wires the environment service over the shared host lookup.
+func envService(o workspaceOptions) (*env.Service, error) {
+	cipher, err := newCipher(o.workspace.Secrets.Cipher)
 	if err != nil {
 		return nil, err
 	}
-	store, err := newSecretsStore(loadedWorkspace)
+	store, err := newSecretsStore(&o.workspace)
 	if err != nil {
 		return nil, err
 	}
 	factory := valueResolverFactory{
-		hostEnv:       hostEnv,
+		hostEnv:       o.hostEnv,
 		secretsReader: store,
-		keysPath:      loadedWorkspace.Secrets.KeysPath,
+		keysPath:      o.workspace.Secrets.KeysPath,
 		cipher:        cipher,
-		providers:     loadedWorkspace.Secrets.Providers,
+		providers:     o.workspace.Secrets.Providers,
 	}
-	return env.New(*loadedWorkspace, env.Dependencies{
+	return env.New(o.workspace, env.Dependencies{
 		EnvNamespaces:    envStore.Repository{},
-		HostEnvLookup:    hostEnv,
+		HostEnvLookup:    o.hostEnv,
 		NewValueResolver: factory.newValueResolver,
 		ProcessRunner:    process.Run,
 	})

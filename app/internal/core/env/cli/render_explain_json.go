@@ -20,14 +20,15 @@ type explainSummaryJSON struct {
 
 // explainEntryJSON is the exported, tagged view of an entry used for JSON output.
 type explainEntryJSON struct {
-	Key       string            `json:"key"`
-	Type      string            `json:"type"`
-	Value     string            `json:"value"`
-	Source    string            `json:"source"`
-	SourceKey string            `json:"sourceKey"`
-	Shadowed  []string          `json:"shadowed,omitempty"`
-	Status    explainStatusJSON `json:"status"`
-	Resolved  *string           `json:"resolved,omitempty"`
+	Key        string            `json:"key"`
+	Type       string            `json:"type"`
+	Value      string            `json:"value"`
+	Source     string            `json:"source"`
+	SourceKind string            `json:"sourceKind"`
+	SourceKey  string            `json:"sourceKey"`
+	Shadowed   []string          `json:"shadowed,omitempty"`
+	Status     explainStatusJSON `json:"status"`
+	Resolved   *string           `json:"resolved,omitempty"`
 }
 
 // explainStatusJSON is the tagged view of a resolution outcome for JSON output.
@@ -79,12 +80,13 @@ func (r explainRenderer) toEntryJSON(
 
 	status := r.status(e)
 	return explainEntryJSON{
-		Key:       e.Key,
-		Type:      e.Evaluation.Kind.String(),
-		Value:     e.Raw,
-		Source:    source,
-		SourceKey: e.Origin.Winner.Key,
-		Shadowed:  shadowed,
+		Key:        e.Key,
+		Type:       e.Evaluation.Kind.String(),
+		Value:      e.Raw,
+		Source:     source,
+		SourceKind: e.Origin.Winner.Kind.String(),
+		SourceKey:  e.Origin.Winner.Key,
+		Shadowed:   shadowed,
 		Status: explainStatusJSON{
 			Severity: status.Level.DisplayString(),
 			Code:     string(status.Code),

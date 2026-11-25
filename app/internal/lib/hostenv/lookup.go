@@ -6,14 +6,22 @@ import (
 	"io/fs"
 	"maps"
 	"os"
+	"path/filepath"
 	"strings"
 	"sync"
+
+	"github.com/joho/godotenv"
 )
+
+// FileVar names the process variable that overrides Options.File. Only the
+// process environment is consulted, since the variable locates the file.
+const FileVar = "ENVX_LOCAL_ENV"
 
 // Options configures a Lookup.
 type Options struct {
-	// File is an optional variables file; .yaml and .yml are read as a flat
-	// YAML mapping and anything else as dotenv. Empty reads none.
+	// File is an optional dotenv file; empty reads none. A non-empty FileVar in
+	// the process environment replaces it, resolved against the working
+	// directory.
 	File string
 	// Environ returns the process environment as KEY=value entries; nil uses
 	// os.Environ.
@@ -93,24 +101,36 @@ func read(opts Options) (map[string]Var, error) {
 		environ = opts.Environ
 	}
 	vars := make(map[string]Var)
-	if opts.File != "" {
-		fileVars, err := readFile(opts.File)
+	process := make(map[string]string)
+	for _, entry := range environ() {
+		if name, value, found := strings.Cut(entry, "="); found {
+			process[name] = value
+		}
+	}
+	file := opts.File
+	if override := process[FileVar]; override != "" {
+		abs, err := filepath.Abs(override)
+		if err != nil {
+			return nil, fmt.Errorf("resolving %s: %w", FileVar, err)
+		}
+		file = abs
+	}
+	if file != "" {
+		fileVars, err := readFile(file)
 		if err != nil {
 			return nil, err
 		}
 		for name, value := range fileVars {
-			vars[name] = Var{Value: value, File: opts.File}
+			vars[name] = Var{Value: value, File: file}
 		}
 	}
-	for _, entry := range environ() {
-		if name, value, found := strings.Cut(entry, "="); found {
-			vars[name] = Var{Value: value}
-		}
+	for name, value := range process {
+		vars[name] = Var{Value: value}
 	}
 	return vars, nil
 }
 
-// readFile parses a variables file; a missing file is empty.
+// readFile parses a dotenv file; a missing file is empty.
 func readFile(path string) (map[string]string, error) {
 	//nolint:gosec // the path is the configured local env file
 	data, err := os.ReadFile(path)
@@ -120,9 +140,9 @@ func readFile(path string) (map[string]string, error) {
 	if err != nil {
 		return nil, fmt.Errorf("reading %s: %w", path, err)
 	}
-	values, err := parseFile(path, data)
+	values, err := godotenv.Unmarshal(string(data))
 	if err != nil {
-		return nil, fileError(path, err)
+		return nil, fmt.Errorf("%s: %w", path, err)
 	}
 	return values, nil
 }

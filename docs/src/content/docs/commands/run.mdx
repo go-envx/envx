@@ -15,6 +15,8 @@ envx run <project> -- <command> [args...]
 
 By default, existing OS environment variables take precedence over values from your files. Pass `--overload` to let file values win instead. Signals are forwarded transparently to the child process, and its exit code is propagated verbatim.
 
+The [local env file](../../concepts/local-env/) is read by envx but is not inherited by the child. A value in it overrides a key a namespace declares, but a variable that only the file defines, such as `BWS_ACCESS_TOKEN` or `ENVX_PRIVATE_KEY_DEVELOPMENT`, is not passed to the command. To pass one on, declare the key in a namespace or export it in your shell.
+
 By default an unresolved value aborts the run before the child starts, so the child never receives an unresolved reference as plaintext. Pass `--ignore-errors` to warn on each unresolved value, omit its key from the child environment, and start the child anyway.
 
 ## Arguments

@@ -161,6 +161,74 @@ func TestEmitK8sBundleDecrypts(t *testing.T) {
 	}
 }
 
+// TestLocalEnvFile verifies the machine-local file is the only key source,
+// feeds substitution and decryption, overrides declared keys for the child, and
+// never reaches the child as a file-only variable. It runs with the file at the
+// default path and with a dotenv file selected by ENVX_LOCAL_ENV.
+func TestLocalEnvFile(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name string
+		// place writes the file for the given private key and returns the
+		// extra process environment.
+		place func(t *testing.T, work, key string) []string
+	}{
+		{"default path", func(t *testing.T, work, key string) []string {
+			writeFile(t, filepath.Join(work, "envx.local.env"),
+				"REGION=eu\nDECLARED=from-file\nFILE_ONLY=f\n"+
+					"ENVX_PRIVATE_KEY_APP='"+key+"'\n")
+			return nil
+		}},
+		{"ENVX_LOCAL_ENV", func(t *testing.T, _, key string) []string {
+			path := filepath.Join(t.TempDir(), "machine.env")
+			writeFile(t, path, "REGION=eu\nDECLARED=from-file\nFILE_ONLY=f\n"+
+				"ENVX_PRIVATE_KEY_APP='"+key+"'\n")
+			return []string{"ENVX_LOCAL_ENV=" + path}
+		}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			cfg, privateKey := secretWorkspace(t)
+			work := filepath.Dir(cfg)
+			writeFile(t, filepath.Join(work, "env", "app.yaml"),
+				"API_KEY: secret://app/api_key\nURL: \"api.{{REGION}}\"\nDECLARED: ns\n")
+
+			keysPath := filepath.Join(work, "envx.local.keys")
+			_, key, _ := strings.Cut(strings.TrimSpace(
+				strings.TrimPrefix(privateKey, "ENVX_PRIVATE_KEY="),
+			), "=")
+			if err := os.Remove(keysPath); err != nil {
+				t.Fatal(err)
+			}
+			env := tt.place(t, work, key)
+
+			for name, want := range map[string]string{"URL": "api.eu", "API_KEY": "s3cr3t"} {
+				res := mustEnvx(t, env,
+					"get", "--config", cfg, "--env", "production", "app", name, "--reveal")
+				if !strings.Contains(res.stdout, want) {
+					t.Errorf("get %s = %q, want it to contain %q", name, res.stdout, want)
+				}
+			}
+
+			runArgs := func(name string) []string {
+				return append([]string{
+					"run", "--config", cfg, "--env", "production", "app", "--",
+				}, helper(t, "printenv", name)...)
+			}
+			res := mustEnvx(t, env, runArgs("DECLARED")...)
+			if got := strings.TrimSpace(res.stdout); got != "from-file" {
+				t.Errorf("child DECLARED = %q, want from-file", got)
+			}
+			if res := envx(t, env, runArgs("FILE_ONLY")...); res.code != 1 {
+				t.Errorf("printenv FILE_ONLY exit %d, want 1", res.code)
+			}
+		})
+	}
+}
+
 // TestRunExitStatus verifies the child's exit status becomes envx's own, and a
 // command that cannot start reports its cause on stderr with exit 127.
 func TestRunExitStatus(t *testing.T) {

@@ -94,6 +94,43 @@ func TestResolvePrecedence(t *testing.T) {
 	}
 }
 
+// TestResolveOriginNamesLocalEnvFile verifies a file override names the file
+// and a process override stays the bare variable name.
+func TestResolveOriginNamesLocalEnvFile(t *testing.T) {
+	t.Parallel()
+
+	file := filepath.Join(t.TempDir(), "envx.local.env")
+	content := []byte("ENVX_PRIVATE_KEY_API=file-key\n")
+	if err := os.WriteFile(file, content, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	tests := []struct {
+		name    string
+		environ []string
+		want    string
+	}{
+		{"file", nil, "ENVX_PRIVATE_KEY_API in " + file},
+		{"process", []string{"ENVX_PRIVATE_KEY_API=proc-key"}, "ENVX_PRIVATE_KEY_API"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			lookup := hostenv.NewLookup(hostenv.Options{
+				File:    file,
+				Environ: func() []string { return tt.environ },
+			})
+			repo, err := keyring.New(filepath.Join(t.TempDir(), "envx.local.keys"), lookup)
+			if err != nil {
+				t.Fatal(err)
+			}
+			key, err := repo.Resolve("api", "")
+			if err != nil || key.Origin != tt.want {
+				t.Errorf("Resolve = %+v, %v; want origin %q", key, err, tt.want)
+			}
+		})
+	}
+}
+
 // TestResolveFailures verifies missing keys are unavailable and malformed
 // sources are invalid.
 func TestResolveFailures(t *testing.T) {

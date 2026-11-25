@@ -8,14 +8,52 @@ import (
 	"github.com/go-envx/envx/app/internal/core/value"
 )
 
+// SourceKind classifies where a value came from.
+type SourceKind int
+
+// Source kinds. The zero value is a namespace file.
+const (
+	SourceNamespace SourceKind = iota
+	SourceLocalEnv
+	SourceProcess
+)
+
+// String returns the kind's stable machine-readable name.
+func (k SourceKind) String() string {
+	switch k {
+	case SourceLocalEnv:
+		return "localEnv"
+	case SourceProcess:
+		return "process"
+	default:
+		return "namespace"
+	}
+}
+
 // Source identifies one contribution to a value.
 type Source struct {
-	// Path is the namespace file; empty for a host value.
+	// Path is the namespace file or the local env file; empty for a process
+	// variable.
 	Path string
 	// Key is the dotted file key, or the variable name for a host value.
 	Key string
-	// Host marks a value taken from the host environment.
-	Host bool
+	// Kind is where the value came from.
+	Kind SourceKind
+}
+
+// IsHost reports whether the value came from the host environment, whether the
+// process or the local env file.
+func (s Source) IsHost() bool {
+	return s.Kind != SourceNamespace
+}
+
+// newHostSource returns the source of a host value read from file, which is
+// empty for a process variable.
+func newHostSource(key, file string) Source {
+	if file == "" {
+		return Source{Key: key, Kind: SourceProcess}
+	}
+	return Source{Path: file, Key: key, Kind: SourceLocalEnv}
 }
 
 // Origin records the winning source and every source it shadowed.

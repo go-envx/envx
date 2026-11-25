@@ -175,11 +175,12 @@ func (m *mergedEnv) applyAffixes(prefix, suffix string) {
 // applyHost selects between namespace and op's host values. Without overload a
 // host value wins and the namespace source is shadowed; with overload the
 // namespace wins and the host source is shadowed. union adds host-only keys so
-// a materialized child sees the complete environment.
+// a materialized child sees the complete environment, except values read from
+// the local env file, which never reach the child as host-only keys.
 func (m *mergedEnv) applyHost(op operation, union bool) {
 	overload := op.settings.overload
 	for key, v := range op.host {
-		hostSource := Source{Key: key, Host: true}
+		hostSource := newHostSource(key, v.File)
 		prev, inNamespace := m.origins[key]
 		switch {
 		case inNamespace && !overload:
@@ -190,7 +191,7 @@ func (m *mergedEnv) applyHost(op operation, union bool) {
 		case inNamespace:
 			shadowed := append(append([]Source{}, prev.Shadowed...), hostSource)
 			m.origins[key] = Origin{Winner: prev.Winner, Shadowed: shadowed}
-		case union:
+		case union && v.File == "":
 			m.values[key] = m.hostLeaf(v.Value)
 			m.origins[key] = Origin{Winner: hostSource}
 		}

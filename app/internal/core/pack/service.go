@@ -58,7 +58,8 @@ func New(ws workspace.Workspace, deps Dependencies) (*Service, error) {
 		return nil, errors.New("secrets store is required")
 	}
 	protected := []string{ws.Path}
-	for _, path := range []string{ws.Secrets.SecretsPath, ws.Secrets.KeysPath} {
+	localPaths := []string{ws.Secrets.SecretsPath, ws.Secrets.KeysPath, ws.LocalEnvPath}
+	for _, path := range localPaths {
 		if path != "" {
 			protected = append(protected, path)
 		}

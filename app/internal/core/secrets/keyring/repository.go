@@ -70,7 +70,8 @@ func (r *Repository) Resolve(group, publicKey string) (secrets.PrivateKey, error
 				"%w: environment variable %s is empty", secrets.ErrInvalidKey, specific,
 			)
 		}
-		return secrets.PrivateKey{Value: override.Value, Origin: specific}, nil
+		origin := originOf(specific, override)
+		return secrets.PrivateKey{Value: override.Value, Origin: origin}, nil
 	}
 
 	bundle, ok, err := r.hostEnv.Get(EnvPrefix)
@@ -88,7 +89,7 @@ func (r *Repository) Resolve(group, publicKey string) (secrets.PrivateKey, error
 			return secrets.PrivateKey{}, err
 		}
 		if found {
-			return secrets.PrivateKey{Value: key, Origin: EnvPrefix}, nil
+			return secrets.PrivateKey{Value: key, Origin: originOf(EnvPrefix, bundle)}, nil
 		}
 	}
 
@@ -109,6 +110,14 @@ func (r *Repository) Resolve(group, publicKey string) (secrets.PrivateKey, error
 		return secrets.PrivateKey{}, unavailable(group)
 	}
 	return secrets.PrivateKey{Value: key, Origin: secrets.OriginStore}, nil
+}
+
+// originOf names the variable, and the local env file when it supplied it.
+func originOf(name string, v hostenv.Var) string {
+	if v.File == "" {
+		return name
+	}
+	return name + " in " + v.File
 }
 
 // Retain durably stores a private key indexed by its public key without

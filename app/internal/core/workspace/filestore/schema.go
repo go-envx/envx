@@ -17,6 +17,8 @@ const (
 	defaultSecretsFilename = "secrets.yaml"
 	// defaultKeysFilename is the private-key filename placed beside the store by default.
 	defaultKeysFilename = "envx.local.keys"
+	// defaultLocalEnvFilename is the machine-local variables file beside the manifest.
+	defaultLocalEnvFilename = "envx.local.env"
 	// defaultCipher is the algorithm used when the manifest names none.
 	defaultCipher = "age"
 	// defaultProviderTimeout bounds each external provider call when unset.
@@ -32,6 +34,7 @@ type manifestYAML struct {
 	Projects           map[string]projectYAML `yaml:"projects"`
 	Secrets            secretsConfigYAML      `yaml:"secrets"`
 	ValidateSeverities map[string]string      `yaml:"validate"`
+	LocalEnvPath       string                 `yaml:"localEnvPath"`
 }
 
 func (m manifestYAML) toWorkspace(path string, indent int) *workspace.Workspace {
@@ -49,6 +52,11 @@ func (m manifestYAML) toWorkspace(path string, indent int) *workspace.Workspace 
 	severities := make(map[string]string, len(m.ValidateSeverities))
 	maps.Copy(severities, m.ValidateSeverities)
 
+	localEnvPath := m.LocalEnvPath
+	if localEnvPath == "" {
+		localEnvPath = defaultLocalEnvFilename
+	}
+
 	return &workspace.Workspace{
 		Path:               path,
 		Root:               root,
@@ -58,6 +66,7 @@ func (m manifestYAML) toWorkspace(path string, indent int) *workspace.Workspace 
 		Settings:           m.Settings.toDomain(),
 		Secrets:            m.Secrets.toDomain(root),
 		ValidateSeverities: severities,
+		LocalEnvPath:       filex.ResolvePath(root, localEnvPath),
 	}
 }
 

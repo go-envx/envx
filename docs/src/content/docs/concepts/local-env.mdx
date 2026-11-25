@@ -1,0 +1,66 @@
+---
+title: Local env file
+description: Keep machine-local variables, such as private keys and provider tokens, in a file envx reads next to the process environment.
+sidebar:
+  order: 4
+---
+
+The local env file holds variables that describe one machine rather than a deployment target: a private key, a provider token, or a developer's override of a declared key. envx reads it wherever it reads host variables, so a value in the file behaves like an exported variable you do not have to export.
+
+## Format
+
+The file is a dotenv file, whatever its name. `$VAR` expands, so use single quotes for a literal `$`.
+
+```sh
+# envx.local.env
+ENVX_PRIVATE_KEY_PROD='AGE-SECRET-KEY-1...'
+BWS_ACCESS_TOKEN=0.abc...
+DEV_EMAIL=dev@example.com
+```
+
+Values are literal. A `{{VAR}}` reference or a `secret://` reference in the file is not substituted or resolved.
+
+## Location
+
+envx looks for the file in this order:
+
+1. The `ENVX_LOCAL_ENV` environment variable. A relative path resolves against the working directory, and an empty value counts as unset. The variable is read from the process environment only and has no flag.
+2. The [`localEnvPath`](../../configuration/schema/#localenvpath) key in `envx.yaml`.
+3. `envx.local.env` beside `envx.yaml`.
+
+The file is not per environment. A missing file is empty, even when `ENVX_LOCAL_ENV` names it, because a teammate or a CI job may have no file.
+
+## Precedence
+
+For each variable, the first source that defines it wins:
+
+1. The process environment.
+2. The local env file.
+3. The namespace files.
+
+With [`overload`](../../configuration/schema/#overload) enabled, the namespace files win over the local env file, and the process environment still wins over both.
+
+## What the file feeds
+
+Every command that reads host variables reads the file: `get`, `explain`, `diff`, `run`, `emit`, `validate`, `secrets`, and `keypair`. The file supplies:
+
+- Provider credentials, such as `BWS_ACCESS_TOKEN`, `PASSWORDSTATE_API_KEY`, `OP_SERVICE_ACCOUNT_TOKEN`, and the other `OP_*` and `BWS_*` variables.
+- The private keys `ENVX_PRIVATE_KEY_<GROUP>` and `ENVX_PRIVATE_KEY`.
+- Values for [`{{VAR}}` substitution](../variable-substitution/).
+- Overrides of declared keys, such as `DEV_EMAIL`.
+
+The `ENVX_*` settings, `ENVX_CONFIG`, and `ENVX_LOCAL_ENV` are read from the process environment only. The file may contain them, but nothing reads them from there.
+
+## Behaviour in `run` and `explain`
+
+[`run`](../../commands/run/) passes a file value to the child only when a namespace declares the key, for example `debug: ""` in a base file, or when you export the variable. A variable that only the file defines, such as a provider token or a private key, never reaches the child.
+
+[`explain`](../../commands/explain/) shows the file as the source of a value it supplied: `envx.local.env` relative to the workspace, or an absolute path with `--absolute` or when the file lies outside the workspace. A process variable shows `(process)`.
+
+## Errors
+
+A malformed file fails every command that reads host variables, and the error names the file.
+
+## Git ignore
+
+The `envx.local.*` rule that [`create`](../../commands/create/) and the key file add to `.gitignore` covers the default file. Name a custom file `envx.local.<ext>` so the same rule covers it, or ignore it yourself. envx never writes the local env file and never bundles it with [`pack`](../../commands/pack/).

@@ -176,7 +176,7 @@ func TestApplyHost(t *testing.T) {
 	t.Parallel()
 
 	baseSource := Source{Path: appInclude + ".yaml", Key: "host"}
-	hostSource := Source{Key: "HOST", Host: true}
+	hostSource := Source{Key: "HOST", Kind: SourceProcess}
 	tests := []struct {
 		// name labels the case.
 		name string

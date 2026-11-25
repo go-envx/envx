@@ -43,7 +43,7 @@ A value in a namespace file can refer to another variable with `{{NAME}}`. envx 
     </Fragment>
   </ExampleBox>
 
-A reference can name a variable from the project's namespaces or a variable from the host environment. By default a host variable wins over a namespace variable of the same name. With [`overload`](../../configuration/schema/#overload) enabled, the namespace variable wins instead. A reference that matches neither is an error.
+A reference can name a variable from the project's namespaces or a host variable, which is a process environment variable or a value in the [local env file](../local-env/). By default a host variable wins over a namespace variable of the same name. With [`overload`](../../configuration/schema/#overload) enabled, the namespace variable wins instead. A reference that matches neither is an error.
 
 ## Errors
 

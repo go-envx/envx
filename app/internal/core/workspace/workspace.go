@@ -29,6 +29,8 @@ type Workspace struct {
 	Settings           Settings
 	Secrets            SecretsConfig
 	ValidateSeverities map[string]string
+	// LocalEnvPath is the absolute machine-local variables file; it may not exist.
+	LocalEnvPath string
 }
 
 // Project defines one project's environment configuration within a workspace.

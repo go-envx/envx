@@ -53,7 +53,8 @@ func TestMaterialize(t *testing.T) {
 	if result.Warnings != nil {
 		t.Errorf("Warnings = %v, want nil", result.Warnings)
 	}
-	if origin, ok := result.Environment.Origin("HOST_ONLY"); !ok || !origin.Winner.Host {
+	origin, ok := result.Environment.Origin("HOST_ONLY")
+	if !ok || !origin.Winner.IsHost() {
 		t.Errorf("HOST_ONLY origin = %+v", origin)
 	}
 }
@@ -109,8 +110,8 @@ func TestMaterializeTolerant(t *testing.T) {
 	}
 	for _, key := range []string{"DANGLING", "LOOP"} {
 		origin, ok := result.Environment.Origin(key)
-		if !ok || !origin.Winner.Host || len(origin.Shadowed) != 1 ||
-			origin.Shadowed[0].Host {
+		if !ok || !origin.Winner.IsHost() || len(origin.Shadowed) != 1 ||
+			origin.Shadowed[0].IsHost() {
 			t.Errorf("%s origin = %+v, want host winner over namespace", key, origin)
 		}
 	}

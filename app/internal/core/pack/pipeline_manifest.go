@@ -12,8 +12,8 @@ import (
 const defaultIndent = 2
 
 // rewriteManifest points each selected project's includes at its bundle
-// directory, removes unselected projects, and drops an explicit secrets path,
-// preserving comments, key order, and formatting.
+// directory, removes unselected projects, and drops an explicit secrets path and
+// localEnvPath, preserving comments, key order, and formatting.
 func rewriteManifest(source []byte, bundles []projectBundle) ([]byte, error) {
 	var doc yaml.Node
 	if err := yaml.Unmarshal(source, &doc); err != nil {
@@ -31,6 +31,7 @@ func rewriteManifest(source []byte, bundles []projectBundle) ([]byte, error) {
 		return nil, err
 	}
 	// The bundled store sits beside the manifest at the default path.
+	yamlx.DeleteMappingEntry(root, "localEnvPath")
 	if entry, found := yamlx.FindMappingEntry(root, "secrets"); found &&
 		entry.ValueNode != nil && entry.ValueNode.Kind == yaml.MappingNode {
 		block := entry.ValueNode

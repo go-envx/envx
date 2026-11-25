@@ -53,7 +53,7 @@ envx keypair rotate <group>
 
 Replaces the group's keypair and re-encrypts every value in the group under the new public key. The current private key must be available so existing values can be decrypted and re-encrypted. The new public key is written to `secrets.yaml` and the new private key to the private-key file.
 
-When the current key comes from a higher-priority environment source, rotating into the local key file is refused.
+When the current key comes from a higher-priority environment source, rotating into the local key file is refused. The error names the variable and, when the key sits in the [local env file](../../concepts/local-env/), that file.
 
 ```sh
 envx keypair rotate production
@@ -63,8 +63,10 @@ envx keypair rotate production
 
 Commands that decrypt look for a group's private key in this order, using the first one found:
 
-1. The `ENVX_PRIVATE_KEY_<GROUP>` environment variable, with the group name in uppercase.
-2. The `ENVX_PRIVATE_KEY` environment variable, a bundle of keys.
+1. The `ENVX_PRIVATE_KEY_<GROUP>` variable, with the group name in uppercase.
+2. The `ENVX_PRIVATE_KEY` variable, a bundle of keys.
+
+Both variables are read from the process environment and from the [local env file](../../concepts/local-env/), and the process environment wins.
 3. The `envx.local.keys` file, or the path set by [`secrets.keysPath`](../../configuration/schema/#keyspath).
 
 Plus the [global flags](../overview/#global-flags).

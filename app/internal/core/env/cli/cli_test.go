@@ -2,6 +2,7 @@ package cli
 
 import (
 	"bytes"
+	"cmp"
 	"errors"
 	"fmt"
 	"os"
@@ -36,6 +37,10 @@ type fakeFactory struct {
 	namespaces fakeNamespaces
 	// host is the host environment as KEY=value entries.
 	host []string
+	// root overrides the workspace root; empty uses /ws.
+	root string
+	// hostFile is an optional local env file read beside the process host.
+	hostFile string
 	// reveals records the reveal policy of every opened resolver.
 	reveals []bool
 	// runs records every child process.
@@ -84,7 +89,7 @@ func (f *fakeFactory) NewEnvService(configPath string) (*env.Service, error) {
 		return nil, f.err
 	}
 	ws := workspace.Workspace{
-		Root:         "/ws",
+		Root:         cmp.Or(f.root, "/ws"),
 		Environments: []string{"development", "production"},
 		Projects: map[string]workspace.Project{
 			"app": {
@@ -95,7 +100,10 @@ func (f *fakeFactory) NewEnvService(configPath string) (*env.Service, error) {
 	}
 	return env.New(ws, env.Dependencies{
 		EnvNamespaces: f.namespaces,
-		HostEnvLookup: hostenv.From(f.host),
+		HostEnvLookup: hostenv.NewLookup(hostenv.Options{
+			File:    f.hostFile,
+			Environ: func() []string { return f.host },
+		}),
 		NewValueResolver: func(
 			params env.ResolverParams,
 		) (env.ValueResolver, error) {

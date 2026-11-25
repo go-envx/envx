@@ -13,9 +13,9 @@ envx explain <project> [key]
 
 `explain` resolves a project's environment and reports, for each key, its type, its literal value, the file it was resolved from, and a resolution status. With no key it explains every key; with a key it explains just that one.
 
-Secret references are classified without decrypting them; pass `--reveal` to add a `RESOLVED` column with their plaintext. Source paths are relative to `envx.yaml` unless you pass `--absolute`.
+Secret references are classified without decrypting them; pass `--reveal` to add a `RESOLVED` column with their plaintext. Source paths are relative to `envx.yaml` unless you pass `--absolute`. A value read from the [local env file](../../concepts/local-env/) shows that file as its source, and a process variable shows `(process)`.
 
-Use `--output json` for machine-readable output.
+Use `--output json` for machine-readable output. Each entry's `sourceKind` is `namespace`, `localEnv` or `process`, and `source` is empty for a process variable.
 
 ## Arguments
 
@@ -92,6 +92,7 @@ The examples below use the same `api` workspace:
       #       "type": "config",
       #       "value": "localhost",
       #       "source": "db.development.yaml",
+      #       "sourceKind": "namespace",
       #       "sourceKey": "db.host",
       #       "shadowed": [
       #         "db.yaml"

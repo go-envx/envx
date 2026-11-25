@@ -355,6 +355,74 @@ func TestPackStandardizesManifest(t *testing.T) {
 	}
 }
 
+// TestPackProtectsLocalEnvFile verifies a forced destination that is or
+// contains the local env file is refused, wherever the file lives.
+func TestPackProtectsLocalEnvFile(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name string
+		out  func(t *testing.T, f *fixture) string
+	}{
+		{"default file itself", func(t *testing.T, f *fixture) string {
+			f.ws.LocalEnvPath = f.write(t, "envx.local.yaml", "A: b\n")
+			return f.ws.LocalEnvPath
+		}},
+		{"outside the root", func(t *testing.T, f *fixture) string {
+			f.ws.LocalEnvPath = writeFile(t, t.TempDir(), "machine.env", "A=b\n")
+			return filepath.Dir(f.ws.LocalEnvPath)
+		}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			f := newSampleFixture(t)
+			out := tt.out(t, f)
+
+			_, err := f.service(t).Pack(PackParams{OutDir: out, Force: true})
+			if !errors.Is(err, ErrOutputContainsSource) {
+				t.Fatalf("err = %v, want ErrOutputContainsSource", err)
+			}
+			if _, statErr := os.Stat(f.ws.LocalEnvPath); statErr != nil {
+				t.Errorf("local env file lost: %v", statErr)
+			}
+		})
+	}
+}
+
+// TestPackNeverBundlesLocalEnvFile verifies a file at the default path stays
+// out of the bundle.
+func TestPackNeverBundlesLocalEnvFile(t *testing.T) {
+	t.Parallel()
+	f := newSampleFixture(t)
+	f.ws.LocalEnvPath = f.write(t, "envx.local.env", "A=b\n")
+	out := filepath.Join(t.TempDir(), "dist")
+	f.pack(t, PackParams{OutDir: out})
+	for _, file := range listFiles(t, out) {
+		if strings.Contains(file, "local") {
+			t.Errorf("bundle holds %s", file)
+		}
+	}
+}
+
+// TestPackDropsLocalEnvPath verifies the bundle manifest drops localEnvPath.
+func TestPackDropsLocalEnvPath(t *testing.T) {
+	t.Parallel()
+	f := newFixture(t, "production")
+	f.ws.Path = f.write(t, "envx.yaml", "environments: [production]\n"+
+		"localEnvPath: ../machine.env\n"+
+		"projects:\n  app:\n    includes: [env/app]\n")
+	f.project("app", "env/app")
+	f.write(t, "env/app.yaml", "A: b\n")
+	out := filepath.Join(t.TempDir(), "dist")
+
+	f.pack(t, PackParams{OutDir: out})
+
+	manifest := readFile(t, out, "envx.yaml")
+	if strings.Contains(manifest, "localEnvPath") {
+		t.Errorf("manifest kept localEnvPath:\n%s", manifest)
+	}
+}
+
 // TestPackOutputDirectoryPolicy verifies non-empty and non-directory
 // destinations are refused without force and replaced with it.
 func TestPackOutputDirectoryPolicy(t *testing.T) {

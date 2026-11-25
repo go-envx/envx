@@ -9,28 +9,27 @@ import (
 // configPath. The environment, secrets, and provider adapters are assembled
 // only when a selected check needs them.
 func (f Factory) NewValidateService(configPath string) (*validate.Service, error) {
-	ws, err := loadWorkspace(configPath)
+	o, err := f.loadWorkspaceOptions(configPath)
 	if err != nil {
 		return nil, err
 	}
-	hostEnv := f.newHostEnv()
-	return validate.New(ws, validate.Dependencies{
+	return validate.New(o.workspace, validate.Dependencies{
 		OpenEnv: func() (validate.Explainer, error) {
-			service, err := envService(&ws, hostEnv)
+			service, err := envService(o)
 			if err != nil {
 				return nil, err
 			}
 			return service, nil
 		},
 		OpenSecrets: func() (validate.Inspector, error) {
-			service, err := secretsService(&ws, hostEnv)
+			service, err := secretsService(o)
 			if err != nil {
 				return nil, err
 			}
 			return service, nil
 		},
 		OpenProviders: func() (validate.ProviderInspector, error) {
-			providers := newProviders(ws.Secrets.Providers, hostEnv)
+			providers := newProviders(o.workspace.Secrets.Providers, o.hostEnv)
 			return external.NewInspector(providers), nil
 		},
 	})

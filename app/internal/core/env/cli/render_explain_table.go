@@ -31,10 +31,7 @@ func (r explainRenderer) toTableRow(
 	e *env.ExplainEntry,
 	workspaceDir string,
 ) []printer.Cell {
-	source := e.Origin.Winner.Path
-	if !r.absolute {
-		source = filex.RelativeTo(workspaceDir, source)
-	}
+	source := r.sourceLabel(e.Origin.Winner, workspaceDir)
 	status := r.status(e)
 	row := []printer.Cell{
 		{Text: e.Key},
@@ -51,6 +48,18 @@ func (r explainRenderer) toTableRow(
 		row = append(row, printer.Cell{Text: resolved})
 	}
 	return row
+}
+
+// sourceLabel names where a value came from: its file, or "(process)" for a
+// process variable.
+func (r explainRenderer) sourceLabel(s env.Source, workspaceDir string) string {
+	if s.Kind == env.SourceProcess {
+		return "(process)"
+	}
+	if r.absolute {
+		return s.Path
+	}
+	return filex.RelativeTo(workspaceDir, s.Path)
 }
 
 // toTableBanner writes leading severity lines to standard error when resolution is

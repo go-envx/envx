@@ -46,6 +46,7 @@ func TestConstructorsAreLazy(t *testing.T) {
 	t.Parallel()
 
 	workspaceDir := testutil.CopyDir(t, minimalWorkspace)
+	writeFile(t, filepath.Join(workspaceDir, "envx.local.env"), "A=\"unterminated\n")
 	f, captures := countingFactory()
 	if _, err := f.NewEnvService(workspaceDir); err != nil {
 		t.Fatalf("NewEnvService: %v", err)
@@ -69,8 +70,8 @@ func TestConstructorsAreLazy(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(entries) != 2 {
-		t.Errorf("workspace has %d entries after construction, want 2", len(entries))
+	if len(entries) != 3 {
+		t.Errorf("workspace has %d entries after construction, want 3", len(entries))
 	}
 }
 
@@ -127,6 +128,92 @@ func TestNewEnvServiceReadsHostOnce(t *testing.T) {
 	got, err = service.Get(getParams)
 	if err != nil || got.Value != "secret://app/token" {
 		t.Errorf("masked Get = %q, %v; want secret://app/token", got.Value, err)
+	}
+}
+
+// localEnvWorkspace returns a workspace whose only private key lives in a local
+// env file next to it, with a secret and a {{REGION}} reference to resolve.
+func localEnvWorkspace(t *testing.T) (dir, key string) {
+	t.Helper()
+	dir = testutil.CopyDir(t, minimalWorkspace)
+	f, _ := countingFactory()
+	manager, err := f.NewSecretsService(dir)
+	if err != nil {
+		t.Fatalf("NewSecretsService: %v", err)
+	}
+	if _, err := manager.GenerateKeypair("app"); err != nil {
+		t.Fatalf("GenerateKeypair: %v", err)
+	}
+	plaintext := func() (string, error) { return "s3cr3t", nil }
+	if _, err := manager.SetSecret("app", "token", plaintext); err != nil {
+		t.Fatalf("SetSecret: %v", err)
+	}
+	keysPath := filepath.Join(dir, "envx.local.keys")
+	//nolint:gosec // test-local path
+	data, err := os.ReadFile(keysPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, key, _ = strings.Cut(strings.TrimSpace(string(data)), "=")
+	if err := os.Remove(keysPath); err != nil {
+		t.Fatal(err)
+	}
+	writeFile(t, filepath.Join(dir, "env", "app.yaml"),
+		"greeting: hello\ntoken: secret://app/token\nurl: \"api.{{REGION}}\"\n")
+	return dir, key
+}
+
+// TestLocalEnvFileFeedsGet verifies the local env file supplies {{VAR}}
+// values and the private key, and the process environment wins over it.
+func TestLocalEnvFileFeedsGet(t *testing.T) {
+	t.Parallel()
+
+	dir, key := localEnvWorkspace(t)
+	writeFile(t, filepath.Join(dir, "envx.local.env"),
+		"REGION=eu\nENVX_PRIVATE_KEY_APP='"+key+"'\n")
+
+	f, _ := countingFactory()
+	service, err := f.NewEnvService(dir)
+	if err != nil {
+		t.Fatalf("NewEnvService: %v", err)
+	}
+	for param, want := range map[string]string{"url": "api.eu", "token": "s3cr3t"} {
+		got, err := service.Get(env.GetParams{Project: "app", Key: param, Reveal: true})
+		if err != nil || got.Value != want {
+			t.Errorf("Get %s = %q, %v; want %q", param, got.Value, err, want)
+		}
+	}
+
+	f, _ = countingFactory("REGION=us")
+	service, err = f.NewEnvService(dir)
+	if err != nil {
+		t.Fatalf("NewEnvService: %v", err)
+	}
+	got, err := service.Get(env.GetParams{Project: "app", Key: "url", Reveal: true})
+	if err != nil || got.Value != "api.us" {
+		t.Errorf("Get url = %q, %v; want api.us", got.Value, err)
+	}
+}
+
+// TestLocalEnvVarSelectsFile verifies ENVX_LOCAL_ENV selects a file outside the
+// workspace.
+func TestLocalEnvVarSelectsFile(t *testing.T) {
+	t.Parallel()
+
+	dir, key := localEnvWorkspace(t)
+	outside := filepath.Join(t.TempDir(), "machine.env")
+	writeFile(t, outside, "REGION=ap\nENVX_PRIVATE_KEY_APP='"+key+"'\n")
+
+	f, _ := countingFactory("ENVX_LOCAL_ENV=" + outside)
+	service, err := f.NewEnvService(dir)
+	if err != nil {
+		t.Fatalf("NewEnvService: %v", err)
+	}
+	for param, want := range map[string]string{"url": "api.ap", "token": "s3cr3t"} {
+		got, err := service.Get(env.GetParams{Project: "app", Key: param, Reveal: true})
+		if err != nil || got.Value != want {
+			t.Errorf("Get %s = %q, %v; want %q", param, got.Value, err, want)
+		}
 	}
 }
 

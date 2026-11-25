@@ -102,7 +102,7 @@ func TestGetHostSelection(t *testing.T) {
 
 	s, _ := getFixture(t, "HOST=from-host", "HOST_ONLY=x")
 	got, err := s.Get(GetParams{Key: "host"})
-	if err != nil || got.Value != "from-host" || !got.Origin.Winner.Host {
+	if err != nil || got.Value != "from-host" || !got.Origin.Winner.IsHost() {
 		t.Errorf("Get(host) = %+v, %v; want host winner", got, err)
 	}
 	if _, err := s.Get(GetParams{Key: "host_only"}); err == nil {
@@ -113,7 +113,7 @@ func TestGetHostSelection(t *testing.T) {
 		Options: workspace.Settings{Overload: ptr(true)},
 		Key:     "host",
 	})
-	if err != nil || got.Value != "db.local" || got.Origin.Winner.Host {
+	if err != nil || got.Value != "db.local" || got.Origin.Winner.IsHost() {
 		t.Errorf("Get(host, overload) = %+v, %v; want file winner", got, err)
 	}
 }

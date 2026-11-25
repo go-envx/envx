@@ -313,7 +313,7 @@ func TestValidateReportsUnavailableProvidersOnce(t *testing.T) {
 	t.Parallel()
 	f := newFixture("api", "web")
 	hostWinner := entry("PS", "passwordstate://13138")
-	hostWinner.Origin.Winner.Host = true
+	hostWinner.Origin.Winner.Kind = env.SourceProcess
 	for _, project := range []string{"api", "web"} {
 		f.explainer.entries[project] = []env.ExplainEntry{
 			entry("A", "op://vault/item/a"),
