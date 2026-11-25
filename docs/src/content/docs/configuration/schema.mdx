@@ -731,24 +731,7 @@ Examples on this page are collapsed by default to keep it scannable.
 
   Severity is set only here, never on the command line. The matching per-check flag on `validate` is the kebab-case twin of the key, for example `--secret-is-not-encrypted`, and selects which checks run.
 
-  | Key | Default | Reports |
-  | --- | --- | --- |
-  | `secretIsNotEncrypted` | `error` | A stored value left unencrypted. |
-  | `secretAlgorithmMismatch` | `error` | A value stored under a non-configured algorithm. |
-  | `secretIsNotReferenced` | `error` | A stored value no environment references. |
-  | `publicKeyIsMissing` | `error` | A group with stored secrets but no public key. |
-  | `privateKeyIsInvalid` | `error` | A group whose private key is malformed or mismatched. |
-  | `privateKeyIsUnavailable` | `warn` | A group with no private key available in this context. |
-  | `secretReferenceNotFound` | `error` | A reference to a value absent from the store. |
-  | `invalidSecretReference` | `error` | A malformed secret reference. |
-  | `secretReferenceIsUnresolved` | `error` | A reference that passed every store check yet failed to decrypt. |
-  | `circularVariableReference` | `error` | A variable substitution cycle. |
-  | `unresolvedVariableReference` | `error` | A substitution of an undefined variable. |
-  | `propertyNotDeclaredInBase` | `off` | An overlay key its namespace base file never declares. |
-  | `invalidExternalReference` | `error` | A malformed reference for an enabled external provider. |
-  | `externalProviderNotEnabled` | `warn` | A value using the scheme of an undeclared external provider. |
-  | `externalProviderUnavailable` | `error` | A declared external provider that cannot be used. |
-  | `externalReferenceUnresolved` | `error` | An external reference the provider could not resolve. |
+  For the full list of check codes, their default severities, and what each one reports, see [Checks](../../commands/validate/#checks) on the `validate` page.
 
   <ExampleAccordion>
   <ExampleBox>

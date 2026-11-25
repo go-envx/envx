@@ -15,19 +15,42 @@ Errors always fail the command. `--strict` also fails it on warnings, chiefly a 
 
 ## Checks
 
-Checks fall into three groups by what they read, which is also their cost:
+Every check has a code, a default severity, and a matching per-check flag. Each entry below lists the code as it appears in the [`validate` block](../../configuration/schema/#validate) of `envx.yaml` and its default severity. Checks fall into three groups by what they read, which is also their cost.
 
-| Group | Reads | Checks |
-| --- | --- | --- |
-| `store` | Offline and instant. Only `secrets.yaml` and the keys file. | Unencrypted value, algorithm mismatch, unused value, missing public key, invalid private key, unavailable private key. |
-| `provider` | Offline. The external providers the merge references. | A declared provider that cannot be used. |
-| `resolution` | Merges each project and environment. | Dangling or undecryptable reference, invalid reference, substitution cycle, undefined variable, malformed or unresolved external reference, and an overlay key its base file never declares. |
-
-Every check has a code, a default severity, and a matching per-check flag. The codes and defaults are listed under the [`validate` block](../../configuration/schema/#validate) of the schema.
-
-By default every check runs. Passing any per-check flag runs only the named checks and skips the cost of the rest. A pre-commit hook can select just the offline store checks and pay for no environment merge. Each flag is the kebab-case twin of its camelCase severity key, so `--secret-is-not-encrypted` selects the check configured by `validate.secretIsNotEncrypted`.
+By default every check runs. Passing any per-check flag runs only the named checks and skips the cost of the rest. A pre-commit hook can select just the offline store checks and pay for no environment merge. Each flag is the kebab-case twin of its camelCase code, so `--secret-is-not-encrypted` selects the check configured by `validate.secretIsNotEncrypted`.
 
 Severity itself is set only in `envx.yaml`, never on the command line.
+
+### Store checks
+
+Offline and instant. These read only `secrets.yaml` and the keys file.
+
+- `secretIsNotEncrypted` (`error`): a stored value is left unencrypted.
+- `secretAlgorithmMismatch` (`error`): a value is stored under an algorithm other than the configured one.
+- `secretIsNotReferenced` (`error`): a stored value is not referenced by any environment.
+- `publicKeyIsMissing` (`error`): a group has stored secrets but no public key.
+- `privateKeyIsInvalid` (`error`): a group's private key is malformed or does not match its public key.
+- `privateKeyIsUnavailable` (`warn`): a group has no private key available in this context.
+
+### Provider checks
+
+Offline. These read the external providers the merge references.
+
+- `externalProviderUnavailable` (`error`): a declared external provider cannot be used.
+
+### Resolution checks
+
+These merge each project and environment, then diagnose every reference through the masked dry-run path.
+
+- `secretReferenceNotFound` (`error`): a reference points to a value absent from the store.
+- `invalidSecretReference` (`error`): a secret reference is malformed.
+- `secretReferenceIsUnresolved` (`error`): a reference passed every store check yet failed to decrypt.
+- `circularVariableReference` (`error`): variable substitution forms a cycle.
+- `unresolvedVariableReference` (`error`): a substitution names an undefined variable.
+- `propertyNotDeclaredInBase` (`off`): an overlay key is never declared in its namespace base file.
+- `invalidExternalReference` (`error`): a reference for an enabled external provider is malformed.
+- `externalProviderNotEnabled` (`warn`): a value uses the scheme of an undeclared external provider.
+- `externalReferenceUnresolved` (`error`): the provider could not resolve an external reference.
 
 ## Output
 
